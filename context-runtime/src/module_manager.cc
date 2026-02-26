@@ -212,8 +212,8 @@ std::vector<std::string> ModuleManager::GetScanDirectories() const {
   }
 
   // Get CHI_REPO_PATH
-  const char *chi_repo_path = std::getenv("CHI_REPO_PATH");
-  if (chi_repo_path) {
+  std::string chi_repo_path = hshm::SystemInfo::Getenv("CHI_REPO_PATH");
+  if (!chi_repo_path.empty()) {
     std::string path_str(chi_repo_path);
     // Split by platform path separator
     char delimiter = hshm::SystemInfo::GetPathListSeparator();
@@ -231,8 +231,8 @@ std::vector<std::string> ModuleManager::GetScanDirectories() const {
   // Get library search path (LD_LIBRARY_PATH on Linux, PATH on Windows)
   std::string lib_path_var = hshm::SystemInfo::GetLibrarySearchPathVar();
   char path_sep = hshm::SystemInfo::GetPathListSeparator();
-  const char *ld_path = std::getenv(lib_path_var.c_str());
-  if (ld_path) {
+  std::string ld_path = hshm::SystemInfo::Getenv(lib_path_var.c_str());
+  if (!ld_path.empty()) {
     std::string path_str(ld_path);
     size_t start = 0;
     size_t end = path_str.find(path_sep);

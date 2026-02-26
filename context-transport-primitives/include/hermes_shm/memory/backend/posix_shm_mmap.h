@@ -99,7 +99,7 @@ class PosixShmMmap : public MemoryBackend, public UrlMemoryBackend {
     SystemInfo::DestroySharedMemory(url);
     if (!SystemInfo::CreateNewSharedMemory(fd_, url, total_file_size)) {
       char *err_buf = strerror(errno);
-      HLOG(kError, "shm_open failed: {}", err_buf);
+      HLOG(kError, "shm_open (create) failed for '{}': {}", url, err_buf);
       return false;
     }
     url_ = url;
@@ -175,7 +175,7 @@ class PosixShmMmap : public MemoryBackend, public UrlMemoryBackend {
   bool shm_attach(const std::string &url) {
     if (!SystemInfo::OpenSharedMemory(fd_, url)) {
       const char *err_buf = strerror(errno);
-      HLOG(kError, "shm_open failed: {}", err_buf);
+      HLOG(kError, "shm_open failed for '{}': {}", url, err_buf);
       return false;
     }
     url_ = url;

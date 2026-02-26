@@ -42,6 +42,8 @@
 #ifndef _WIN32
 #include <sys/types.h>
 #include <unistd.h>
+#else
+#include <unordered_map>
 #endif
 
 namespace hshm::ipc {
@@ -236,32 +238,59 @@ class _MultiProcessAllocator : public Allocator {
   /**
    * Set the process block for this process
    *
-   * Stores the ProcessBlock pointer in the private header region
-   * allocated by GetPrivateHeader().
+   * On Linux: stores in the private header region (MAP_PRIVATE, per-process).
+   * On Windows: stores in a process-local static map since the private header
+   * is file-backed shared memory and would be corrupted by other processes.
    *
    * @param pblock Pointer to ProcessBlock for current process
    */
   void SetProcessBlock(ProcessBlock *pblock) {
+#ifdef _WIN32
+    GetProcessBlockMap()[reinterpret_cast<uintptr_t>(this)] = pblock;
+#else
     auto *header = GetPrivateHeader<MultiProcessAllocatorPrivateHeader>();
     if (header != nullptr) {
       header->process_block_ = pblock;
     }
+#endif
   }
 
   /**
    * Get the process block for this process
    *
-   * Retrieves the ProcessBlock pointer from the private header region.
+   * On Linux: retrieves from the private header region (MAP_PRIVATE, per-process).
+   * On Windows: retrieves from a process-local static map.
    *
    * @return Pointer to ProcessBlock for current process, or nullptr if not set
    */
   ProcessBlock* GetProcessBlock() const {
+#ifdef _WIN32
+    auto &map = GetProcessBlockMap();
+    auto it = map.find(reinterpret_cast<uintptr_t>(this));
+    if (it != map.end()) {
+      return it->second;
+    }
+    return nullptr;
+#else
     auto *header = GetPrivateHeader<MultiProcessAllocatorPrivateHeader>();
     if (header != nullptr) {
       return header->process_block_;
     }
     return nullptr;
+#endif
   }
+
+#ifdef _WIN32
+  /**
+   * Process-local storage for ProcessBlock pointers on Windows.
+   * Keyed by allocator address (which is stable within a process's SHM mapping).
+   * This replaces the MAP_PRIVATE-based private header that Linux uses.
+   */
+  static std::unordered_map<uintptr_t, ProcessBlock*>& GetProcessBlockMap() {
+    static std::unordered_map<uintptr_t, ProcessBlock*> map;
+    return map;
+  }
+#endif
 
   /**
    * Validate that a pointer is not within an allocated region

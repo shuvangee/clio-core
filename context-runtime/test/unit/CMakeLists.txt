@@ -598,89 +598,18 @@ if(WRP_CORE_ENABLE_TESTS)
   )
 
   # Per-Process Shared Memory Tests
+  # Consolidated into a single ctest entry: all test cases share one runtime
+  # process, avoiding TCP TIME_WAIT port conflicts on Windows where ZMQ uses
+  # SO_EXCLUSIVEADDRUSE and prevents rebinding to ports in TIME_WAIT state.
   add_test(
-    NAME cr_per_process_shm_increase_memory_tests
+    NAME cr_per_process_shm_tests
     COMMAND ${PER_PROCESS_SHM_TEST_TARGET}
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
   )
-  set_tests_properties(cr_per_process_shm_increase_memory_tests PROPERTIES
+  set_tests_properties(cr_per_process_shm_tests PROPERTIES
     ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV}"
-  )
-
-  add_test(
-    NAME cr_per_process_shm_medium_alloc_tests
-    COMMAND ${PER_PROCESS_SHM_TEST_TARGET}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_tests_properties(cr_per_process_shm_medium_alloc_tests PROPERTIES
-    ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV}"
-  )
-
-  add_test(
-    NAME cr_per_process_shm_large_alloc_tests
-    COMMAND ${PER_PROCESS_SHM_TEST_TARGET}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_tests_properties(cr_per_process_shm_large_alloc_tests PROPERTIES
-    ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV}"
-    TIMEOUT 300  # 5 minute timeout for large allocation test
-  )
-
-  add_test(
-    NAME cr_per_process_shm_multiple_large_tests
-    COMMAND ${PER_PROCESS_SHM_TEST_TARGET}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_tests_properties(cr_per_process_shm_multiple_large_tests PROPERTIES
-    ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV}"
-    TIMEOUT 300
-  )
-
-  add_test(
-    NAME cr_per_process_shm_patterns_tests
-    COMMAND ${PER_PROCESS_SHM_TEST_TARGET}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_tests_properties(cr_per_process_shm_patterns_tests PROPERTIES
-    ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV}"
-    TIMEOUT 300
-  )
-
-  add_test(
-    NAME cr_per_process_shm_free_tests
-    COMMAND ${PER_PROCESS_SHM_TEST_TARGET}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_tests_properties(cr_per_process_shm_free_tests PROPERTIES
-    ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV}"
-  )
-
-  add_test(
-    NAME cr_per_process_shm_tofullptr_tests
-    COMMAND ${PER_PROCESS_SHM_TEST_TARGET}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_tests_properties(cr_per_process_shm_tofullptr_tests PROPERTIES
-    ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV}"
-  )
-
-  add_test(
-    NAME cr_per_process_shm_stress_tests
-    COMMAND ${PER_PROCESS_SHM_TEST_TARGET}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_tests_properties(cr_per_process_shm_stress_tests PROPERTIES
-    ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV}"
-    TIMEOUT 600  # 10 minute timeout for stress test
-  )
-
-  add_test(
-    NAME cr_per_process_shm_info_tests
-    COMMAND ${PER_PROCESS_SHM_TEST_TARGET}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_tests_properties(cr_per_process_shm_info_tests PROPERTIES
-    ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV}"
+    TIMEOUT 600  # 10 minute timeout for full suite including stress tests
+    LABELS "core;unit;runtime"
   )
 
   # Autogen Coverage Tests (requires wrp_cte/wrp_cae, Linux-only)

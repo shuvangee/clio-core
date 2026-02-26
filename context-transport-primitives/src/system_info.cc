@@ -390,13 +390,15 @@ bool SystemInfo::CreateNewSharedMemory(File &fd, const std::string &name,
   return true;
 #endif
 #elif HSHM_ENABLE_WINDOWS_SYSINFO
+  DWORD size_hi = static_cast<DWORD>(size >> 32);
+  DWORD size_lo = static_cast<DWORD>(size & 0xFFFFFFFF);
   fd.windows_fd_ =
       CreateFileMapping(INVALID_HANDLE_VALUE,  // use paging file
                         nullptr,               // default security
                         PAGE_READWRITE,        // read/write access
-                        0,         // maximum object size (high-order DWORD)
-                        size,      // maximum object size (low-order DWORD)
-                        nullptr);  // name of mapping object
+                        size_hi,               // maximum object size (high-order DWORD)
+                        size_lo,               // maximum object size (low-order DWORD)
+                        name.c_str());         // name of mapping object
   return fd.windows_fd_ != nullptr;
 #endif
 }
@@ -534,11 +536,13 @@ void *SystemInfo::MapMixedMemory(const File &fd, size_t private_size,
   return ptr;
 
 #elif HSHM_ENABLE_WINDOWS_SYSINFO
-  // Windows doesn't easily support MAP_FIXED-like behavior for mixed mappings
-  // Fall back to just returning the shared mapping
-  // The private region won't work as expected on Windows
-  (void)private_size;  // Unused on Windows
-  return MapSharedMemory(fd, shared_size, shared_offset);
+  // Windows doesn't support MAP_FIXED-style mixed private/shared mappings.
+  // Map the full region (private_size + shared_size) as file-backed shared
+  // memory so that all offsets and sizes match the Linux layout exactly.
+  // The "private header" portion will be file-backed (shared between processes)
+  // rather than truly per-process private. The MultiProcessAllocator handles
+  // this by using process-local storage for its private header data on Windows.
+  return MapSharedMemory(fd, private_size + shared_size, shared_offset);
 #endif
 }
 
@@ -656,7 +660,12 @@ void SystemInfo::Setenv(const char *name, const std::string &value,
 #if HSHM_ENABLE_PROCFS_SYSINFO
   setenv(name, value.c_str(), overwrite);
 #elif HSHM_ENABLE_WINDOWS_SYSINFO
-  SetEnvironmentVariable(name, value.c_str());
+  // Use _putenv_s to update BOTH the C runtime env (read by std::getenv)
+  // and the Win32 env block (read by GetEnvironmentVariable).
+  // SetEnvironmentVariable alone only updates the Win32 block.
+  if (overwrite || GetEnvironmentVariable(name, nullptr, 0) == 0) {
+    _putenv_s(name, value.c_str());
+  }
 #endif
 }
 
@@ -664,7 +673,9 @@ void SystemInfo::Unsetenv(const char *name) {
 #if HSHM_ENABLE_PROCFS_SYSINFO
   unsetenv(name);
 #elif HSHM_ENABLE_WINDOWS_SYSINFO
-  SetEnvironmentVariable(name, nullptr);
+  // _putenv_s with empty string removes the variable from both
+  // the C runtime env and Win32 env blocks.
+  _putenv_s(name, "");
 #endif
 }
 
@@ -726,8 +737,12 @@ ProcessHandle SystemInfo::SpawnProcess(
     const std::vector<std::pair<std::string, std::string>> &env) {
   ProcessHandle handle{};
 
-  // Set environment variables before spawning
+  // Save original env values so we can restore after spawn.
+  // SpawnProcess must not permanently modify the parent's environment.
+  std::vector<std::pair<std::string, std::string>> saved_env;
+  saved_env.reserve(env.size());
   for (const auto &kv : env) {
+    saved_env.emplace_back(kv.first, Getenv(kv.first.c_str()));
     Setenv(kv.first.c_str(), kv.second, 1);
   }
 
@@ -751,6 +766,15 @@ ProcessHandle SystemInfo::SpawnProcess(
     _exit(127);
   }
   handle.pid = pid;
+
+  // Restore parent's original environment
+  for (const auto &kv : saved_env) {
+    if (kv.second.empty()) {
+      Unsetenv(kv.first.c_str());
+    } else {
+      Setenv(kv.first.c_str(), kv.second, 1);
+    }
+  }
 
 #elif HSHM_ENABLE_WINDOWS_SYSINFO
   // Build command line: "exe_path" arg1 arg2 ...
@@ -811,6 +835,15 @@ ProcessHandle SystemInfo::SpawnProcess(
     handle.hJob = nullptr;
     handle.pid = 0;
     if (hJob) CloseHandle(hJob);
+  }
+
+  // Restore parent's original environment
+  for (const auto &kv : saved_env) {
+    if (kv.second.empty()) {
+      Unsetenv(kv.first.c_str());
+    } else {
+      Setenv(kv.first.c_str(), kv.second, 1);
+    }
   }
 #endif
 

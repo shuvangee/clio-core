@@ -87,9 +87,10 @@ bool IpcManager::ClientInit() {
   }
 
   // Parse CHI_IPC_MODE environment variable (default: TCP)
-  const char *ipc_mode_env = std::getenv("CHI_IPC_MODE");
-  if (ipc_mode_env != nullptr) {
-    std::string mode_str(ipc_mode_env);
+  // Use SystemInfo::Getenv for Windows compatibility (std::getenv
+  // doesn't reflect changes made via SetEnvironmentVariable/Setenv)
+  std::string mode_str = hshm::SystemInfo::Getenv("CHI_IPC_MODE");
+  if (!mode_str.empty()) {
     if (mode_str == "SHM" || mode_str == "shm") {
       ipc_mode_ = IpcMode::kShm;
     } else if (mode_str == "IPC" || mode_str == "ipc") {
@@ -104,9 +105,9 @@ bool IpcManager::ClientInit() {
                                     : "TCP");
 
   // Parse retry timeout environment variable
-  const char *retry_env = std::getenv("CHI_CLIENT_RETRY_TIMEOUT");
-  if (retry_env) {
-    client_retry_timeout_ = static_cast<float>(std::atof(retry_env));
+  std::string retry_str = hshm::SystemInfo::Getenv("CHI_CLIENT_RETRY_TIMEOUT");
+  if (!retry_str.empty()) {
+    client_retry_timeout_ = static_cast<float>(std::atof(retry_str.c_str()));
   }
   HLOG(kInfo, "IpcManager::ClientInit: retry_timeout = {}s",
        client_retry_timeout_);
@@ -685,9 +686,9 @@ bool IpcManager::StartLocalServer() {
 
 bool IpcManager::WaitForLocalServer() {
   // Read environment variables for wait configuration
-  const char *wait_env = std::getenv("CHI_WAIT_SERVER");
-  if (wait_env != nullptr) {
-    wait_server_timeout_ = static_cast<u32>(std::atoi(wait_env));
+  std::string wait_str = hshm::SystemInfo::Getenv("CHI_WAIT_SERVER");
+  if (!wait_str.empty()) {
+    wait_server_timeout_ = static_cast<u32>(std::atoi(wait_str.c_str()));
   }
 
   HLOG(kInfo, "Waiting for runtime via lightbeam (timeout={}s)",
