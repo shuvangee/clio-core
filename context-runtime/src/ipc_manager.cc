@@ -1646,10 +1646,15 @@ bool IpcManager::IdentifyThisHost() {
     std::string entry_short =
         host.ip_address.substr(0, host.ip_address.find('.'));
 
-    // "0.0.0.0" is the synthetic wildcard pushed by LoadHostfile() when
-    // no hostfile is configured — treat it as "always me" so the runtime
-    // binds without needing the user to predeclare the local hostname.
+    // Treat the synthetic "0.0.0.0" wildcard (pushed by LoadHostfile()
+    // when no hostfile is configured) and loopback addresses as "always
+    // me" so the runtime binds without needing the user to predeclare
+    // the local hostname.
+    bool is_loopback = (host.ip_address == "127.0.0.1") ||
+                       (host.ip_address == "localhost") ||
+                       (host.ip_address == "::1");
     bool is_me = (host.ip_address == "0.0.0.0") ||
+                 is_loopback ||
                  (host.ip_address == local_host) ||
                  (entry_short == local_short);
     if (!is_me) continue;
