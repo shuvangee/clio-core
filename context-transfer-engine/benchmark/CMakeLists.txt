@@ -235,6 +235,16 @@ if(WRP_CORE_ENABLE_CUDA)
     PROPERTIES
       ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
   )
+  # Tests that start the Chimaera server must serialize with other server tests
+  set_tests_properties(
+    cte_gpu_bench_client_overhead
+    cte_gpu_bench_client_overhead_multiblock
+    cte_gpu_bench_client_overhead_cpu
+    cte_gpu_bench_stress
+    cte_gpu_synthetic_cte
+    cte_gpu_synthetic_cte_validate
+    PROPERTIES RESOURCE_LOCK "chimaera_runtime"
+  )
 else()
   message(STATUS "Skipping wrp_cte_gpu_bench - CUDA not enabled")
 endif()

@@ -860,6 +860,9 @@ if(WRP_CORE_ENABLE_TESTS)
              rm -rf /tmp/chimaera_memfd 2>/dev/null; \
              rm -rf /tmp/chimaera_${USER} 2>/dev/null; \
              rm -f /dev/shm/sm_segment.* 2>/dev/null; \
+             rm -f /dev/shm/test_buddy_bench_* 2>/dev/null; \
+             rm -f \"${CMAKE_BINARY_DIR}\"/cte_*.dat \"${CMAKE_BINARY_DIR}\"/cte_*.yaml \"${CMAKE_BINARY_DIR}\"/*stress*.bin* \"${CMAKE_BINARY_DIR}\"/*reorganize*.bin* \"${CMAKE_BINARY_DIR}\"/*reorganize*.yaml \"${CMAKE_BINARY_DIR}\"/temp_unregister_test.dat 2>/dev/null; \
+             rm -rf \"${CMAKE_BINARY_DIR}\"/cee_test_data 2>/dev/null; \
              exit 0"
     )
     set_tests_properties(chimaera_pre_test_cleanup PROPERTIES

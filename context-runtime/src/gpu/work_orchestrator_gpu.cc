@@ -49,6 +49,9 @@
 
 #if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
 
+#include <time.h>
+#include <unistd.h>
+
 #include "chimaera/ipc_manager.h"
 #include "chimaera/gpu/work_orchestrator.h"
 #include "chimaera/gpu/container.h"
@@ -74,11 +77,6 @@ __global__ void chimaera_gpu_orchestrator(gpu::PoolManager *pool_mgr,
   // num_blocks is used to partition the backend memory among blocks.
   CHIMAERA_GPU_ORCHESTRATOR_INIT(gpu_info, num_blocks);
 
-  // Thread 0 signals that the orchestrator is running
-  if (threadIdx.x == 0) {
-    control->running_flag = 1;
-    __threadfence_system();  // Flush to CPU-visible memory
-  }
   __syncthreads();
 
   // Only thread 0 polls
@@ -100,6 +98,11 @@ __global__ void chimaera_gpu_orchestrator(gpu::PoolManager *pool_mgr,
                 control->cpu2gpu_queue_base,
                 control);
     worker.gpu_info_ptr_ = d_gpu_info;
+
+    // Signal readiness after worker is fully initialized so the CPU
+    // spin-wait in Launch()/Resume() only unblocks when polling is imminent.
+    control->running_flag = 1;
+    __threadfence_system();
 
     // Poll until exit signal — both GPU→GPU and CPU→GPU from same thread
     int loop_count = 0;
@@ -194,7 +197,28 @@ bool gpu::WorkOrchestrator::Launch(const IpcManagerGpuInfo &gpu_info, u32 blocks
 
   launched_num_warps_ = 1;
   is_launched_ = true;
-  HLOG(kInfo, "GPU work orchestrator launched successfully");
+
+  // Wait for the GPU kernel to signal it is actually running.
+  // The first launch can take tens of seconds (CUDA context init, JIT warm-up).
+  // Without this barrier, tasks submitted before running_flag==1 are queued
+  // but never drained because the kernel has not started polling yet.
+  HLOG(kInfo, "Waiting for GPU orchestrator kernel to start...");
+  struct timespec t_start, t_now;
+  clock_gettime(CLOCK_MONOTONIC, &t_start);
+  while (!control_->running_flag) {
+    usleep(50000);
+    clock_gettime(CLOCK_MONOTONIC, &t_now);
+    double elapsed = (t_now.tv_sec - t_start.tv_sec) +
+                     (t_now.tv_nsec - t_start.tv_nsec) * 1e-9;
+    if (elapsed > 60.0) {
+      HLOG(kError, "GPU orchestrator failed to start within 60s");
+      return false;
+    }
+  }
+  clock_gettime(CLOCK_MONOTONIC, &t_now);
+  HLOG(kInfo, "GPU orchestrator is running (started in %.1fs)",
+       (float)((t_now.tv_sec - t_start.tv_sec) +
+               (t_now.tv_nsec - t_start.tv_nsec) * 1e-9));
   return true;
 }
 

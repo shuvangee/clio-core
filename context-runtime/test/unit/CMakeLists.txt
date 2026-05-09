@@ -469,6 +469,11 @@ if(WRP_CORE_ENABLE_CUDA OR WRP_CORE_ENABLE_ROCM)
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
   )
   add_test(NAME test_buddy_benchmark_gpu COMMAND test_buddy_benchmark_gpu)
+  set_tests_properties(test_buddy_benchmark_gpu PROPERTIES
+    TIMEOUT 120
+    LABELS "gpu;msan_skip"
+    RESOURCE_LOCK "chimaera_runtime"
+  )
 
   # GPU Runtime test executable (pure host code, compiled by g++)
   set(GPU_RUNTIME_TEST_TARGET test_chimaera_gpu_runtime)

@@ -128,6 +128,15 @@ class IpcManager {
     u32 num_warps = num_threads / 32;
     if (num_warps < 1) num_warps = 1;
     if (gpu_info_.backend.data_ != nullptr) {
+      // Partition the backend so each block initializes its own sub-region.
+      // Without this, all blocks race to placement-new the same allocator.
+#if HSHM_IS_GPU
+      if (num_blocks > 1 && gpu_info_.backend.data_capacity_ > 0) {
+        size_t per_block = gpu_info_.backend.data_capacity_ / num_blocks;
+        gpu_info_.backend.data_ += blockIdx.x * per_block;
+        gpu_info_.backend.data_capacity_ = per_block;
+      }
+#endif
       auto *alloc = reinterpret_cast<hipc::RoundRobinAllocator *>(
           gpu_info_.backend.data_);
       if (alloc->heap_ready_.load() == 1) {
