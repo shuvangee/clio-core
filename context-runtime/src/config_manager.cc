@@ -195,7 +195,7 @@ void ConfigManager::LoadDefault() {
   wait_for_restart_poll_period_ = 1;   // 1 second
 
   // Set default worker sleep configuration (in microseconds)
-  first_busy_wait_ = 50;               // 50us busy wait
+  first_busy_wait_ = 1000;             // 1000us busy wait
   max_sleep_ = 50000;                  // 50000us (50ms) maximum sleep
 
   // Set default task load prediction model learning rate
