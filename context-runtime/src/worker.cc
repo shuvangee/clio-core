@@ -330,42 +330,16 @@ bool Worker::ProcessNewTaskGpu(GpuTaskLane *gpu_lane) {
     return true;
   }
 
-  // For kPinnedHost / kManagedUvm backends, IpcGpu2Cpu::ClientSend stores
-  // the raw device-accessible address in `off_` directly — both kernel
-  // and CPU worker can dereference it without any base+offset math. We
-  // do still consult the registered backend map to validate that the
-  // alloc_id belongs to a known kind (kDeviceMem will need a cudaMemcpy
-  // path; that's the obvious follow-up).
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
-  auto *gpu_ipc = CHI_IPC->GetGpuIpcManager();
-  if (gpu_ipc) {
-    bool found = false;
-    for (u32 g = 0; g < gpu_ipc->GetGpuQueueCount(); ++g) {
-      auto *b = gpu_ipc->FindClientBackend(g, gpu_fshm_shmptr.alloc_id_);
-      if (!b) continue;
-      if (b->kind == gpu::IpcManager::MemKind::kDeviceMem) {
-        HLOG(kWarning, "Worker {}: ProcessNewTaskGpu: kDeviceMem backend "
-             "resolution not yet implemented", worker_id_);
-        return true;
-      }
-      found = true;
-      break;
-    }
-    if (!found) {
-      HLOG(kWarning, "Worker {}: ProcessNewTaskGpu: alloc_id ({}.{}) is not "
-           "a registered GPU client backend — proceeding with raw deref",
-           worker_id_, gpu_fshm_shmptr.alloc_id_.major_,
-           gpu_fshm_shmptr.alloc_id_.minor_);
-    }
-  }
+  // IpcGpu2Cpu::ClientSend stashes the raw device-or-host-accessible
+  // address in `off_` for all three GPU backend kinds (kPinnedHost,
+  // kManagedUvm, kDeviceMem). The Future/Task shmptrs themselves must
+  // be CPU-dereferenceable here (the worker reads the structs directly),
+  // so they are always allocated in kPinnedHost or kManagedUvm — never
+  // kDeviceMem. The runtime ToFullPtr on payload data handles the
+  // kDeviceMem case for us via the new GPU-backend lookup.
   auto *gpu_fshm = reinterpret_cast<gpu::FutureShm *>(
       gpu_fshm_shmptr.off_.load());
   Task *task_raw = reinterpret_cast<Task *>(task_shmptr.off_.load());
-#else
-  auto *gpu_fshm = reinterpret_cast<gpu::FutureShm *>(
-      gpu_fshm_shmptr.off_.load());
-  Task *task_raw = reinterpret_cast<Task *>(task_shmptr.off_.load());
-#endif
   if (!gpu_fshm || !task_raw) {
     HLOG(kError, "Worker {}: ProcessNewTaskGpu: failed to resolve "
          "task/FutureShm pointers", worker_id_);

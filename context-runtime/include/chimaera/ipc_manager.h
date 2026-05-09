@@ -909,12 +909,32 @@ class IpcManager {
     if (it != alloc_map_.end()) {
       result = hipc::FullPtr<T>(it->second, shm_ptr);
     }
-    // Note: GPU client backends are resolved in Worker::ProcessNewTaskGpu
-    // via gpu::IpcManager::FindClientBackend, not here. CPU-side ToFullPtr
-    // only sees CPU SHM allocators.
 
-    // Release the lock before returning
+    // Release the lock before continuing
     allocator_map_lock_.ReadUnlock();
+    if (result.ptr_ != nullptr) return result;
+
+    // Case 4: Check GPU client backends (kPinnedHost / kManagedUvm /
+    // kDeviceMem). The IpcGpu2Cpu producer convention stashes the raw
+    // device-or-host-accessible address in `off_` directly, so resolution
+    // is the same as the null-alloc_id case once we've confirmed the
+    // alloc_id refers to a registered GPU backend. Callers that operate
+    // on the resolved ptr_ via DeviceAwareMemcpy (which dispatches
+    // through cudaMemcpyDefault / hipMemcpyDefault / sycl::queue::memcpy)
+    // can copy from kDeviceMem pointers without first staging through
+    // the host.
+#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL) && HSHM_IS_HOST
+    if (gpu_ipc_) {
+      size_t ngpu = gpu_ipc_->GetGpuQueueCount();
+      for (size_t g = 0; g < ngpu; ++g) {
+        if (gpu_ipc_->FindClientBackend(static_cast<u32>(g),
+                                         shm_ptr.alloc_id_)) {
+          T *raw_ptr = reinterpret_cast<T *>(shm_ptr.off_.load());
+          return hipc::FullPtr<T>(raw_ptr);
+        }
+      }
+    }
+#endif
 
     return result;
   }

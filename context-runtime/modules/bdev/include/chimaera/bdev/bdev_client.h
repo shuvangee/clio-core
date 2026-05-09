@@ -65,7 +65,7 @@ class Client : public chi::ContainerClient {
       BdevType bdev_type, chi::u64 total_size = 0,
       chi::u32 io_depth = 32, chi::u32 alignment = 4096,
       const PerfMetrics* perf_metrics = nullptr) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CHI_CPU_IPC;
 
     // CreateTask should always use admin pool, never the client's pool_id_
     // Pass all arguments directly to NewTask constructor including CreateParams
@@ -99,7 +99,7 @@ class Client : public chi::ContainerClient {
   chi::Future<AllocateBlocksTask> AsyncAllocateBlocks(
       const chi::PoolQuery& pool_query,
       chi::u64 size) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CHI_CPU_IPC;
 
     auto task = ipc_manager->NewTask<AllocateBlocksTask>(
         chi::CreateTaskId(), pool_id_, pool_query, size);
@@ -113,7 +113,7 @@ class Client : public chi::ContainerClient {
   chi::Future<chimaera::bdev::FreeBlocksTask> AsyncFreeBlocks(
       const chi::PoolQuery& pool_query,
       const std::vector<Block>& blocks) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CHI_CPU_IPC;
 
     auto task = ipc_manager->NewTask<chimaera::bdev::FreeBlocksTask>(
         chi::CreateTaskId(), pool_id_, pool_query, blocks);
@@ -127,7 +127,7 @@ class Client : public chi::ContainerClient {
   chi::Future<chimaera::bdev::FreeBlocksTask> AsyncFreeBlocks(
       const chi::PoolQuery& pool_query,
       const chi::priv::vector<Block>& blocks) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CHI_CPU_IPC;
 
     auto task = ipc_manager->NewTask<chimaera::bdev::FreeBlocksTask>(
         chi::CreateTaskId(), pool_id_, pool_query, blocks);
@@ -146,7 +146,7 @@ class Client : public chi::ContainerClient {
   chi::Future<chimaera::bdev::WriteTask> AsyncWrite(
       const chi::PoolQuery& pool_query,
       const chi::priv::vector<Block>& blocks, hipc::ShmPtr<> data, size_t length) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CHI_CPU_IPC;
 
     auto task = ipc_manager->NewTask<chimaera::bdev::WriteTask>(
         chi::CreateTaskId(), pool_id_, pool_query, blocks, data, length);
@@ -166,7 +166,7 @@ class Client : public chi::ContainerClient {
       const chi::PoolQuery& pool_query,
       const chi::priv::vector<Block>& blocks, hipc::ShmPtr<> data,
       size_t buffer_size) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CHI_CPU_IPC;
 
     auto task = ipc_manager->NewTask<chimaera::bdev::ReadTask>(
         chi::CreateTaskId(), pool_id_, pool_query, blocks, data, buffer_size);
@@ -181,7 +181,7 @@ class Client : public chi::ContainerClient {
    * creating a kHbm or kPinned bdev pool.
    */
   chi::Future<UpdateTask> AsyncUpdate(const chi::PoolQuery &pool_query) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CHI_CPU_IPC;
     auto task = ipc_manager->NewTask<UpdateTask>(
         chi::CreateTaskId(), pool_id_, pool_query,
         /*hbm_ptr=*/0, /*pinned_ptr=*/0,
@@ -195,7 +195,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<MonitorTask> AsyncMonitor(const chi::PoolQuery &pool_query,
                                         const std::string &query) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CHI_CPU_IPC;
     auto task = ipc_manager->NewTask<MonitorTask>(
         chi::CreateTaskId(), pool_id_, pool_query, query);
     return ipc_manager->Send(task);
@@ -205,7 +205,7 @@ class Client : public chi::ContainerClient {
    * Get performance statistics - asynchronous
    */
   chi::Future<chimaera::bdev::GetStatsTask> AsyncGetStats() {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CHI_CPU_IPC;
 
     auto task = ipc_manager->NewTask<chimaera::bdev::GetStatsTask>(
         chi::CreateTaskId(), pool_id_, chi::PoolQuery());
