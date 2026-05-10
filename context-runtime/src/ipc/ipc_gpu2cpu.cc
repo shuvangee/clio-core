@@ -47,7 +47,7 @@ void IpcGpu2Cpu::RuntimeSend(
     RunContext *run_ctx, Container *container) {
   (void)container;
   auto future_shm = run_ctx->future_.GetFutureShm();
-  HLOG(kInfo, "IpcGpu2Cpu::RuntimeSend: pool={} method={}",
+  HLOG(kDebug, "IpcGpu2Cpu::RuntimeSend: pool={} method={}",
        task_ptr->pool_id_, task_ptr->method_);
 
   // 1) Writeback the POD task bytes to device memory if the kernel

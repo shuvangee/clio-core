@@ -320,7 +320,7 @@ bool Worker::ProcessNewTaskGpu(GpuTaskLane *gpu_lane) {
   if (!gpu_lane->Pop(gpu_future)) {
     return false;
   }
-  HLOG(kInfo, "Worker {}: ProcessNewTaskGpu: popped task from gpu2cpu queue",
+  HLOG(kDebug, "Worker {}: ProcessNewTaskGpu: popped task from gpu2cpu queue",
        worker_id_);
 
   SetCurrentRunContext(nullptr);
@@ -462,7 +462,7 @@ bool Worker::ProcessNewTaskGpu(GpuTaskLane *gpu_lane) {
   }
 
   RouteResult route_result = CHI_IPC->RouteTask(future, /*force_enqueue=*/true);
-  HLOG(kInfo, "Worker {}: ProcessNewTaskGpu: RouteTask returned {} "
+  HLOG(kDebug, "Worker {}: ProcessNewTaskGpu: RouteTask returned {} "
        "pool={} method={}",
        worker_id_, (int)route_result, pool_id, method_id);
   return true;
@@ -515,7 +515,7 @@ bool Worker::ProcessNewTask(TaskLane *lane) {
   // Get pool_id and method_id from FutureShm
   PoolId pool_id = future_shm->pool_id_;
   u32 method_id = future_shm->method_id_;
-  HLOG(kInfo, "Worker {}: ProcessNewTask popped pool={} method={}",
+  HLOG(kDebug, "Worker {}: ProcessNewTask popped pool={} method={}",
        worker_id_, pool_id, method_id);
 
   // Get static container for task deserialization (stateless operation)
@@ -1132,7 +1132,7 @@ void Worker::ProcessEventQueue() {
   // FUTURE_COMPLETE is never set before the event is consumed.
   Future<Task, CHI_QUEUE_ALLOC_T> future;
   while (event_queue_->Pop(future)) {
-    HLOG(kInfo, "Worker {}: ProcessEventQueue popped subtask future",
+    HLOG(kDebug, "Worker {}: ProcessEventQueue popped subtask future",
          worker_id_);
     // Mark the subtask's future as complete
     future.Complete();
