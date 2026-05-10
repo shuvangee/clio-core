@@ -456,6 +456,84 @@ class vector {
         last_page_array_, i, /*is_write=*/false);
   }
 
+  /**
+   * Stride-1 write fast path. Equivalent to:
+   *   for (i = lo; i < hi; ++i) (*this)[i] = value_at(i);
+   * but resolves the page once per page-spanning sub-range and runs a
+   * tight inner loop with no per-element Resolve / atomic / dirty-range
+   * overhead. value_at must be callable as `T value_at(chi::u64 i)`.
+   *
+   * Single-thread for now (only threadIdx.x == 0 mutates); multi-thread
+   * cooperative version is a follow-up.
+   */
+  template <typename F>
+  HSHM_GPU_FUN void write_range(chi::u64 lo, chi::u64 hi, F &&value_at) {
+    if (threadIdx.x != 0) return;
+    if (lo >= hi) return;
+    ::wrp_cte::gpu_vector::Block *b =
+        ::wrp_cte::gpu_vector::GetBlock(view_.base, blockIdx.x);
+    chi::u64 cap = view_.page_capacity_t;
+    while (lo < hi) {
+      // Page that contains `lo`. Compute via Resolve (cheap on hit) so
+      // the cache + faulting + eviction logic still applies; then peel
+      // the inner loop off.
+      T *first = ::wrp_cte::gpu_vector::Resolve(
+          ipc_, view_, last_page_array_, lo, /*is_write=*/true);
+      ::wrp_cte::gpu_vector::Page *p =
+          last_page_array_[threadIdx.x & 31];
+      // page_base = the address of the element at offset 0 of this page.
+      chi::u64 page_off = lo - static_cast<chi::u64>(p->page_idx) * cap;
+      T *page_base = first - page_off;
+      chi::u64 page_end_i =
+          static_cast<chi::u64>(p->page_idx + 1) * cap;
+      chi::u64 stop = (hi < page_end_i) ? hi : page_end_i;
+      // Resolve already seeded the dirty range to [page_off, page_off].
+      // Extend the right edge to cover the whole stripe-on-page in one
+      // shot. (modify_min stays correct because we're only growing right.)
+      int32_t hi_off = static_cast<int32_t>(stop - 1) -
+                       p->page_idx * static_cast<int32_t>(cap);
+      if (hi_off > p->modify_max) p->modify_max = hi_off;
+      // Tight inner loop: pure stride-1 store.
+      chi::u64 nelem = stop - lo;
+      chi::u64 i = lo;
+      for (chi::u64 j = 0; j < nelem; ++j) {
+        page_base[page_off + j] = value_at(i++);
+      }
+      lo = stop;
+    }
+    (void)b;
+  }
+
+  /**
+   * Stride-1 read fast path. Equivalent to:
+   *   for (i = lo; i < hi; ++i) consume(i, (*this)[i]);
+   * with the same page-once-per-page amortization. consume must be
+   * callable as `void consume(chi::u64 i, T value)`.
+   */
+  template <typename F>
+  HSHM_GPU_FUN void read_range(chi::u64 lo, chi::u64 hi, F &&consume) {
+    if (threadIdx.x != 0) return;
+    if (lo >= hi) return;
+    chi::u64 cap = view_.page_capacity_t;
+    while (lo < hi) {
+      T *first = ::wrp_cte::gpu_vector::Resolve(
+          ipc_, view_, last_page_array_, lo, /*is_write=*/false);
+      ::wrp_cte::gpu_vector::Page *p =
+          last_page_array_[threadIdx.x & 31];
+      chi::u64 page_off = lo - static_cast<chi::u64>(p->page_idx) * cap;
+      T *page_base = first - page_off;
+      chi::u64 page_end_i =
+          static_cast<chi::u64>(p->page_idx + 1) * cap;
+      chi::u64 stop = (hi < page_end_i) ? hi : page_end_i;
+      chi::u64 i = lo;
+      for (chi::u64 j = 0, n = stop - lo; j < n; ++j) {
+        consume(i, page_base[page_off + j]);
+        ++i;
+      }
+      lo = stop;
+    }
+  }
+
   /** Flush every dirty page in the calling block. */
   HSHM_GPU_FUN void FlushAll() {
     ::wrp_cte::gpu_vector::FlushAllInBlock(ipc_, view_, blockIdx.x);

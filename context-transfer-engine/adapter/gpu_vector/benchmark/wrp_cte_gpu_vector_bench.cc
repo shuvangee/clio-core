@@ -223,33 +223,35 @@ chi::u64 ExpectedGets(chi::u32 nblocks, chi::u32 pages_per_block,
 
 }  // namespace
 
-/** Sequential write of v[i] = i across each block's stripe. */
+/** Sequential write of v[i] = i across each block's stripe.
+ *  Uses dev::vector::write_range so the page lookup + dirty-range
+ *  bookkeeping happens once per page; the inner loop is a tight
+ *  stride-1 store. */
 __global__ void BenchWriteKernel(chi::IpcManagerGpuInfo info,
                                   gv::DeviceView<chi::u32> view,
                                   chi::u64 per_block) {
   CHIMAERA_GPU_INIT(info, /*ipc_ptr=*/nullptr);
   dev::vector<chi::u32> v(view, g_ipc_manager_ptr);
-  if (threadIdx.x != 0) return;
   chi::u64 lo = static_cast<chi::u64>(blockIdx.x) * per_block;
   chi::u64 hi = lo + per_block;
-  for (chi::u64 i = lo; i < hi; ++i) {
-    v[i] = static_cast<chi::u32>(i);
-  }
+  v.write_range(lo, hi, [] (chi::u64 i) {
+    return static_cast<chi::u32>(i);
+  });
   (void)g_ipc_manager;
 }
 
-/** Sequential read into a result buffer (host-pinned). */
+/** Sequential read into a result buffer (host-pinned).
+ *  Uses dev::vector::read_range so we resolve the page once per page. */
 __global__ void BenchReadKernel(chi::IpcManagerGpuInfo info,
                                  gv::DeviceView<chi::u32> view,
                                  chi::u32 *result, chi::u64 per_block) {
   CHIMAERA_GPU_INIT(info, /*ipc_ptr=*/nullptr);
   dev::vector<chi::u32> v(view, g_ipc_manager_ptr);
-  if (threadIdx.x != 0) return;
   chi::u64 lo = static_cast<chi::u64>(blockIdx.x) * per_block;
   chi::u64 hi = lo + per_block;
-  for (chi::u64 i = lo; i < hi; ++i) {
-    result[i] = v[i];
-  }
+  v.read_range(lo, hi, [result] (chi::u64 i, chi::u32 val) {
+    result[i] = val;
+  });
   (void)g_ipc_manager;
 }
 
