@@ -287,9 +287,14 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
       chi::u64 slot_idx = static_cast<chi::u64>(b) * pages_per_block + p;
       char *put_addr = impl_->put_base + slot_idx * put_stride;
       char *get_addr = impl_->get_base + slot_idx * get_stride;
-      // Blob name format: "<tag>_b<block>_p<slot>"
-      std::string blob_name = tag_name + "_b" + std::to_string(b) +
-                              "_p" + std::to_string(p);
+      // Blob name format: "<tag>_b<block>". The per-page suffix
+      // ("_pi<page_idx>") is appended runtime-side via the task's
+      // gpu_page_idx_ field, set by FlushPage / FaultPage. We can't
+      // include the page index here because cache slots are reused
+      // for different pages over the lifetime of the Vector — we'd
+      // collide unique data into a shared blob name.
+      std::string blob_name = tag_name + "_b" + std::to_string(b);
+      (void)p;
       auto put_task = new (put_addr) wrp_cte::core::PutBlobTask(
           chi::CreateTaskId(), impl_->cte_pool_id,
           chi::PoolQuery::ToLocalCpu(), view_.base.tag_id,

@@ -1048,6 +1048,16 @@ struct PutBlobTask : public chi::Task {
                            // 0.0-1.0=explicit
   INOUT Context context_;  // Context for compression control and statistics
   IN chi::u32 flags_;      // Operation flags
+  /**
+   * Optional page index appended to blob_name_ at handler time as
+   * "_pi<gpu_page_idx_>" so each cache page in a gpu_vector::Vector
+   * resolves to its own blob. Sentinel kNoPageIdx (~0u) disables the
+   * suffix (default for non-GPU clients). Mutated from device kernels
+   * (FlushPage / FaultPage) which can't safely rebuild a chi::priv::
+   * string at flush time, so the suffix is composed runtime-side.
+   */
+  static constexpr chi::u32 kNoPageIdx = ~static_cast<chi::u32>(0);
+  IN chi::u32 gpu_page_idx_;
 
   // SHM constructor
   // Default score -1.0f means "unknown" - runtime will use 1.0 for new blobs
@@ -1061,7 +1071,8 @@ struct PutBlobTask : public chi::Task {
         blob_data_(hipc::ShmPtr<>::GetNull()),
         score_(-1.0f),
         context_(),
-        flags_(0) {}
+        flags_(0),
+        gpu_page_idx_(kNoPageIdx) {}
 
   // Emplace constructor
   HSHM_CROSS_FUN explicit PutBlobTask(const chi::TaskId &task_id,
@@ -1080,7 +1091,8 @@ struct PutBlobTask : public chi::Task {
         blob_data_(blob_data),
         score_(score),
         context_(context),
-        flags_(flags) {
+        flags_(flags),
+        gpu_page_idx_(kNoPageIdx) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kPutBlob;
@@ -1105,7 +1117,8 @@ struct PutBlobTask : public chi::Task {
         blob_data_(blob_data),
         score_(score),
         context_(context),
-        flags_(flags) {
+        flags_(flags),
+        gpu_page_idx_(kNoPageIdx) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kPutBlob;
@@ -1121,7 +1134,7 @@ struct PutBlobTask : public chi::Task {
     ar.PushPod(blob_name_.UsingSso());
     Task::SerializeIn(ar);
     ar(tag_id_, blob_name_, offset_, size_, blob_data_,
-       score_, context_, flags_);
+       score_, context_, flags_, gpu_page_idx_);
     ar.PopPod();
     ar.bulk(blob_data_, size_, BULK_XFER);
   }
@@ -1134,7 +1147,7 @@ struct PutBlobTask : public chi::Task {
     ar.PushPod(blob_name_.UsingSso());
     Task::SerializeOut(ar);
     ar(tag_id_, blob_name_, offset_, size_, blob_data_,
-       score_, context_, flags_);
+       score_, context_, flags_, gpu_page_idx_);
     ar.PopPod();
   }
 
@@ -1157,6 +1170,7 @@ struct PutBlobTask : public chi::Task {
     score_ = other->score_;
     context_ = other->context_;
     flags_ = other->flags_;
+    gpu_page_idx_ = other->gpu_page_idx_;
   }
 
   /**
@@ -1180,6 +1194,12 @@ struct GetBlobTask : public chi::Task {
   IN chi::u32 flags_;               // Operation flags
   IN hipc::ShmPtr<>
       blob_data_;  // Input buffer for blob data (shared memory pointer)
+  /**
+   * Optional page index appended to blob_name_ at handler time as
+   * "_pi<gpu_page_idx_>". See PutBlobTask::gpu_page_idx_ for rationale.
+   */
+  static constexpr chi::u32 kNoPageIdx = ~static_cast<chi::u32>(0);
+  IN chi::u32 gpu_page_idx_;
 
   // SHM constructor
   HSHM_CROSS_FUN GetBlobTask()
@@ -1189,7 +1209,8 @@ struct GetBlobTask : public chi::Task {
         offset_(0),
         size_(0),
         flags_(0),
-        blob_data_(hipc::ShmPtr<>::GetNull()) {}
+        blob_data_(hipc::ShmPtr<>::GetNull()),
+        gpu_page_idx_(kNoPageIdx) {}
 
   // Emplace constructor
   HSHM_CROSS_FUN explicit GetBlobTask(const chi::TaskId &task_id,
@@ -1205,7 +1226,8 @@ struct GetBlobTask : public chi::Task {
         offset_(offset),
         size_(size),
         flags_(flags),
-        blob_data_(blob_data) {
+        blob_data_(blob_data),
+        gpu_page_idx_(kNoPageIdx) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kGetBlob;
@@ -1227,7 +1249,8 @@ struct GetBlobTask : public chi::Task {
         offset_(offset),
         size_(size),
         flags_(flags),
-        blob_data_(blob_data) {
+        blob_data_(blob_data),
+        gpu_page_idx_(kNoPageIdx) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kGetBlob;
@@ -1242,7 +1265,8 @@ struct GetBlobTask : public chi::Task {
   HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
     ar.PushPod(blob_name_.UsingSso());
     Task::SerializeIn(ar);
-    ar(tag_id_, blob_name_, offset_, size_, flags_, blob_data_);
+    ar(tag_id_, blob_name_, offset_, size_, flags_, blob_data_,
+       gpu_page_idx_);
     ar.PopPod();
     ar.bulk(blob_data_, size_, BULK_EXPOSE);
   }
@@ -1273,6 +1297,7 @@ struct GetBlobTask : public chi::Task {
     size_ = other->size_;
     flags_ = other->flags_;
     blob_data_ = other->blob_data_;
+    gpu_page_idx_ = other->gpu_page_idx_;
   }
 
   /**

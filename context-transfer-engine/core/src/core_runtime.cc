@@ -922,6 +922,13 @@ chi::TaskResume Runtime::PutBlob(hipc::FullPtr<PutBlobTask> task,
   try {
     TagId tag_id = task->tag_id_;
     std::string blob_name = task->blob_name_.str();
+    // Append the per-page suffix when a GPU client (gpu_vector::Vector)
+    // routed this put through a per-(block, page) sub-blob — keeps cache
+    // pages from colliding on a shared blob name. Sentinel kNoPageIdx
+    // means "no suffix", which is the path non-GPU clients take.
+    if (task->gpu_page_idx_ != PutBlobTask::kNoPageIdx) {
+      blob_name += "_pi" + std::to_string(task->gpu_page_idx_);
+    }
     chi::u64 offset = task->offset_;
     chi::u64 size = task->size_;
     hipc::ShmPtr<> blob_data = task->blob_data_;
@@ -1076,6 +1083,9 @@ chi::TaskResume Runtime::GetBlob(hipc::FullPtr<GetBlobTask> task,
     // Extract input parameters
     TagId tag_id = task->tag_id_;
     std::string blob_name = task->blob_name_.str();
+    if (task->gpu_page_idx_ != GetBlobTask::kNoPageIdx) {
+      blob_name += "_pi" + std::to_string(task->gpu_page_idx_);
+    }
     chi::u64 offset = task->offset_;
     chi::u64 size = task->size_;
     chi::u32 flags = task->flags_;

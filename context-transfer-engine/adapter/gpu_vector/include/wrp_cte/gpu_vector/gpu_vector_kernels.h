@@ -126,14 +126,15 @@ HSHM_GPU_FUN void FlushPageBase(::chi::gpu::IpcManager *ipc,
   detail::AtomicDecU32(&GetBlock(v, block_idx)->num_modified);
 
   auto *task = GetPutTask(v, block_idx, slot);
-  // For the T-agnostic path the management kernel doesn't know T, so it
-  // flushes the entire page (page_size_bytes from page_byte_off). The
-  // T-aware FlushPage<T>() in the eviction path uses tighter
-  // [modify_min, modify_max] ranges.
-  chi::u64 page_byte_off =
-      static_cast<chi::u64>(page->page_idx) * v.page_size_bytes;
-  task->offset_ = page_byte_off;
+  // Reset lifecycle flags + fresh task_id for slot reuse.
+  task->task_flags_.Clear();
+  task->return_code_.store(0);
+  task->task_id_ = chi::CreateTaskId();
+  // T-agnostic path: flush the whole page. The page-keyed blob name is
+  // composed runtime-side from blob_name_ + "_pi" + gpu_page_idx_.
+  task->offset_ = 0;
   task->size_ = v.page_size_bytes;
+  task->gpu_page_idx_ = static_cast<chi::u32>(page->page_idx);
   task->blob_data_ = detail::MakeBlobShmPtr(page->device_ptr,
                                              v.pages_alloc_id);
 
@@ -171,16 +172,26 @@ HSHM_GPU_FUN void FlushPage(::chi::gpu::IpcManager *ipc,
   detail::AtomicDecU32(&GetBlock(v.base, block_idx)->num_modified);
 
   auto *task = GetPutTask(v.base, block_idx, slot);
-  // The host already populated tag_id_, blob_name_, score_, context_,
-  // pool_query_, pool_id_, method_ at construction time. We only stamp
-  // the per-flush mutable fields.
+  // The host already populated tag_id_, blob_name_ ("<tag>_b<block>"),
+  // score_, context_, pool_query_, pool_id_, method_ at construction.
+  // We stamp the per-flush mutable fields plus gpu_page_idx_, which the
+  // CTE runtime appends to blob_name_ as "_pi<page_idx>" so each cache
+  // page resolves to its own blob (slots are reused across pages, so a
+  // slot-keyed blob name would collide writes from different pages).
+  //
+  // Clear lifecycle flags carried over from the previous put through
+  // this slot (TASK_ROUTED in particular — RouteTask short-circuits to
+  // ExecHere on a re-routed task and the put never reaches the CTE
+  // handler). Mint a fresh task_id_ for the same reason.
+  task->task_flags_.Clear();
+  task->return_code_.store(0);
+  task->task_id_ = chi::CreateTaskId();
   chi::u64 t_size = sizeof(T);
-  chi::u64 page_byte_off = static_cast<chi::u64>(page->page_idx) *
-                            v.base.page_size_bytes;
   chi::u64 mn_b = static_cast<chi::u64>(mn) * t_size;
   chi::u64 mx_b = (static_cast<chi::u64>(mx) + 1) * t_size;
-  task->offset_ = page_byte_off + mn_b;
+  task->offset_ = mn_b;            // offset within the per-page blob
   task->size_ = mx_b - mn_b;
+  task->gpu_page_idx_ = static_cast<chi::u32>(page->page_idx);
   task->blob_data_ = detail::MakeBlobShmPtr(
       reinterpret_cast<char *>(page->device_ptr) + mn_b,
       v.base.pages_alloc_id);
@@ -203,10 +214,15 @@ HSHM_GPU_FUN void FaultPage(::chi::gpu::IpcManager *ipc,
                             Page *page, chi::u32 slot,
                             int32_t target_page_idx) {
   auto *task = GetGetTask(v.base, block_idx, slot);
-  chi::u64 page_byte_off = static_cast<chi::u64>(target_page_idx) *
-                            v.base.page_size_bytes;
-  task->offset_ = page_byte_off;
+  // Reset lifecycle flags + mint a fresh task_id for slot reuse.
+  task->task_flags_.Clear();
+  task->return_code_.store(0);
+  task->task_id_ = chi::CreateTaskId();
+  // Per-page blob: offset 0, full page size; the runtime appends
+  // "_pi<target_page_idx>" to the host-pre-built blob_name_.
+  task->offset_ = 0;
   task->size_ = v.base.page_size_bytes;
+  task->gpu_page_idx_ = static_cast<chi::u32>(target_page_idx);
   task->blob_data_ = detail::MakeBlobShmPtr(page->device_ptr,
                                              v.base.pages_alloc_id);
   hipc::FullPtr<wrp_cte::core::GetBlobTask> fp;
