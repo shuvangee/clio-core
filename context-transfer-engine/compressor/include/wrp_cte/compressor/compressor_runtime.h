@@ -37,8 +37,11 @@
 
 #include <atomic>
 #include <chimaera/chimaera.h>
+#include <chimaera/corwlock.h>
 #include <hermes_shm/data_structures/ipc/ring_buffer.h>
+#include <hermes_shm/introspect/system_info.h>
 #include <memory>
+#include <vector>
 #include <wrp_cte/compressor/compressor_tasks.h>
 #include <wrp_cte/compressor/compressor_client.h>
 #include <wrp_cte/compressor/models/compression_features.h>
@@ -131,6 +134,20 @@ private:
                               chi::RunContext &ctx);
 
   /**
+   * Sample this node's CPU utilization and aggregated worker load
+   * (Method::kPollNodeLoad). Writes results into task->sample_.
+   */
+  chi::TaskResume PollNodeLoad(hipc::FullPtr<PollNodeLoadTask> task,
+                                chi::RunContext &ctx);
+
+  /**
+   * Periodic task that iterates the tracked consumer list and dispatches
+   * PollNodeLoad to each consumer node (Method::kPollConsumers).
+   */
+  chi::TaskResume PollConsumers(hipc::FullPtr<PollConsumersTask> task,
+                                 chi::RunContext &ctx);
+
+  /**
    * Schedule a task by resolving Dynamic pool queries.
    */
   chi::PoolQuery ScheduleTask(const hipc::FullPtr<chi::Task> &task) override;
@@ -182,6 +199,26 @@ private:
   // Target state cache for compression/tiering decisions
   std::unordered_map<std::string, TargetState> target_states_;
   std::mutex target_states_mutex_;
+
+  // Maximum number of distinct consumer nodes tracked by this container.
+  static constexpr std::size_t kMaxConsumers = 32;
+
+  // Preallocated consumer node-id slots (size is fixed at kMaxConsumers).
+  // Only slots [0, consumer_count_) are valid. Guarded by consumers_lock_.
+  std::vector<chi::u32> consumers_;
+  std::atomic<chi::u32> consumer_count_{0};
+  chi::CoRwLock consumers_lock_;
+
+  // Previous CPU times sample, used by PollNodeLoad to compute CPU%.
+  hshm::CpuTimes prev_cpu_times_;
+  std::mutex cpu_times_mutex_;
+
+  /**
+   * Append node_id to consumers_ if not already present and under the
+   * kMaxConsumers cap. Acquires consumers_lock_ as a writer.
+   * @param node_id Originating node ID of an inbound Decompress request.
+   */
+  void RegisterConsumer(chi::u32 node_id);
 
   /**
    * Estimate compression statistics using AI models

@@ -21,8 +21,10 @@ GLOBAL_CROSS_CONST chi::u32 kMonitor = 9;
 GLOBAL_CROSS_CONST chi::u32 kDynamicSchedule = 10;
 GLOBAL_CROSS_CONST chi::u32 kCompress = 11;
 GLOBAL_CROSS_CONST chi::u32 kDecompress = 12;
+GLOBAL_CROSS_CONST chi::u32 kPollNodeLoad = 13;
+GLOBAL_CROSS_CONST chi::u32 kPollConsumers = 14;
 
-GLOBAL_CROSS_CONST chi::u32 kMaxMethodId = 13;
+GLOBAL_CROSS_CONST chi::u32 kMaxMethodId = 15;
 
 inline const std::vector<std::string>& GetMethodNames() {
   static const std::vector<std::string> names = [] {
@@ -33,6 +35,8 @@ inline const std::vector<std::string>& GetMethodNames() {
     v[10] = "DynamicSchedule";
     v[11] = "Compress";
     v[12] = "Decompress";
+    v[13] = "PollNodeLoad";
+    v[14] = "PollConsumers";
     return v;
   }();
   return names;

@@ -204,6 +204,41 @@ class Client : public wrp_cte::core::Client {
     return ipc_manager->Send(task);
   }
 
+  /**
+   * Poll a node's CPU utilization and worker load.
+   * Use PoolQuery::Physical(node_id) to target a specific consumer node.
+   * @param pool_query Pool routing — use Physical(node_id) for a remote node
+   *                   or Local() for the current node.
+   * @return Future for the PollNodeLoadTask whose OUT sample_ field carries
+   *         the node's CPU% and aggregated worker load.
+   */
+  chi::Future<PollNodeLoadTask> AsyncPollNodeLoad(
+      const chi::PoolQuery &pool_query) {
+    auto *ipc_manager = CHI_IPC;
+    auto task = ipc_manager->NewTask<PollNodeLoadTask>(
+        chi::CreateTaskId(), compressor_pool_id_, pool_query);
+    return ipc_manager->Send(task);
+  }
+
+  /**
+   * Spawn the periodic PollConsumers task that iterates this container's
+   * tracked consumer list and calls PollNodeLoad on each consumer node.
+   * @param pool_query Pool routing — typically Local().
+   * @param period_us Period in microseconds (default 5s).
+   * @return Future for the PollConsumersTask.
+   */
+  chi::Future<PollConsumersTask> AsyncPollConsumers(
+      const chi::PoolQuery &pool_query, double period_us = 5000000) {
+    auto *ipc_manager = CHI_IPC;
+    auto task = ipc_manager->NewTask<PollConsumersTask>(
+        chi::CreateTaskId(), compressor_pool_id_, pool_query);
+    if (period_us > 0) {
+      task->SetPeriod(period_us, chi::kMicro);
+      task->SetFlags(TASK_PERIODIC);
+    }
+    return ipc_manager->Send(task);
+  }
+
  private:
   chi::PoolId compressor_pool_id_;
 };

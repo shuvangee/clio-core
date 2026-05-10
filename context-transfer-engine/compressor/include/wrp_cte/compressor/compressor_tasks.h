@@ -418,6 +418,89 @@ struct DecompressTask : public chi::Task {
   }
 };
 
+/**
+ * NodeLoadSample - Snapshot of a node's CPU utilization and worker load.
+ * Returned as the OUT payload of a PollNodeLoadTask.
+ */
+struct NodeLoadSample {
+  chi::u32 node_id_;          ///< Node ID being sampled
+  float cpu_usage_pct_;       ///< Aggregate CPU utilization (0-100)
+  float worker_load_us_;      ///< Sum of WorkerStats::load_ across all workers (us)
+  chi::u32 num_queued_tasks_; ///< Sum of queued tasks across all workers
+  chi::u32 num_blocked_tasks_;///< Sum of blocked tasks across all workers
+  chi::u32 num_workers_;      ///< Total worker count on this node
+
+  NodeLoadSample()
+      : node_id_(0), cpu_usage_pct_(0.0f), worker_load_us_(0.0f),
+        num_queued_tasks_(0), num_blocked_tasks_(0), num_workers_(0) {}
+
+  template <class Archive>
+  void serialize(Archive &ar) {
+    ar(node_id_, cpu_usage_pct_, worker_load_us_, num_queued_tasks_,
+       num_blocked_tasks_, num_workers_);
+  }
+};
+
+/**
+ * PollNodeLoadTask - Query a node's CPU% and worker load.
+ *
+ * No inputs. The task is routed to a target node via PoolQuery::Physical(node_id)
+ * and the runtime samples the local node's stats and writes them into the OUT
+ * NodeLoadSample.
+ */
+struct PollNodeLoadTask : public chi::Task {
+  OUT NodeLoadSample sample_;  ///< Sampled node load (filled by runtime)
+
+  PollNodeLoadTask() : chi::Task(), sample_() {}
+
+  explicit PollNodeLoadTask(const chi::TaskId &task_id,
+                            const chi::PoolId &pool_id,
+                            const chi::PoolQuery &pool_query)
+      : chi::Task(task_id, pool_id, pool_query, Method::kPollNodeLoad),
+        sample_() {}
+
+  void Copy(const hipc::FullPtr<PollNodeLoadTask> &other) {
+    sample_ = other->sample_;
+  }
+
+  template <typename Ar>
+  void SerializeStart(Ar &ar) {
+    task_serialize<Ar>(ar);
+    ar(sample_);
+  }
+
+  template <typename Ar>
+  void SerializeEnd(Ar &ar) {
+    ar(sample_);
+  }
+};
+
+/**
+ * PollConsumersTask - Periodic task that, when fired, iterates the
+ * compressor's tracked consumer list and dispatches PollNodeLoad to each
+ * consumer node. Has no IN/OUT fields — it is a trigger.
+ */
+struct PollConsumersTask : public chi::Task {
+  PollConsumersTask() : chi::Task() {}
+
+  explicit PollConsumersTask(const chi::TaskId &task_id,
+                             const chi::PoolId &pool_id,
+                             const chi::PoolQuery &pool_query)
+      : chi::Task(task_id, pool_id, pool_query, Method::kPollConsumers) {}
+
+  void Copy(const hipc::FullPtr<PollConsumersTask> &other) {
+    (void)other;
+  }
+
+  template <typename Ar>
+  void SerializeStart(Ar &ar) {
+    task_serialize<Ar>(ar);
+  }
+
+  template <typename Ar>
+  void SerializeEnd(Ar &ar) {}
+};
+
 }  // namespace wrp_cte::compressor
 
 #endif  // WRP_CTE_COMPRESSOR_COMPRESSOR_TASKS_H_
