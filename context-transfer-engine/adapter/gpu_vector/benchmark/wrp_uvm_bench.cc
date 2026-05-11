@@ -313,6 +313,11 @@ int main(int argc, char *argv[]) {
                  FmtBytes(workspace_bytes).c_str());
     return 2;
   }
+  // Pre-fault managed_buf on the host so OS page faults land here, not
+  // in the timed write loop. The fill kernel will then migrate pages
+  // host->device on first GPU access — that migration is what we're
+  // measuring; the underlying OS page allocation isn't.
+  std::memset(managed_buf, 0, workspace_bytes);
   chi::u32 *xor_out = hshm::GpuApi::Malloc<chi::u32>(
       static_cast<chi::u64>(opts.nblocks) * sizeof(chi::u32));
 

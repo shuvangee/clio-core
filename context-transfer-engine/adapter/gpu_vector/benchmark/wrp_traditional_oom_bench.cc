@@ -315,6 +315,11 @@ int main(int argc, char *argv[]) {
                  (void *)dev_buf, (void *)host_buf);
     return 2;
   }
+  // Pre-fault host_buf so the first cudaMemcpy D2H + PutBlob memcpy in the
+  // timed loop don't pay ~3-5 us/page first-touch faults. cudaMallocHost
+  // reserves pinnable virtual address space; the kernel only commits
+  // physical pages on first write.
+  std::memset(host_buf, 0, workspace_bytes);
   // Tiny xor-out buffer so the read kernel has somewhere to land its result.
   chi::u32 *xor_out = hshm::GpuApi::Malloc<chi::u32>(
       static_cast<chi::u64>(opts.nblocks) * sizeof(chi::u32));

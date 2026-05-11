@@ -389,7 +389,11 @@ class CTEBenchmark {
     // Allocate shared memory buffers
     auto put_shm = CHI_IPC->AllocateBuffer(io_size_);
     auto get_shm = CHI_IPC->AllocateBuffer(io_size_);
+    // Pre-fault both buffers (see GetWorkerThread for rationale). put_shm
+    // gets a real fill below; get_shm is a GetBlob destination, so zero-
+    // fill is purely to land the page faults before the timed loop.
     std::memset(put_shm.ptr_, thread_id & 0xFF, io_size_);
+    std::memset(get_shm.ptr_, 0, io_size_);
     hipc::ShmPtr<> put_ptr = put_shm.shm_.template Cast<void>();
     hipc::ShmPtr<> get_ptr = get_shm.shm_.template Cast<void>();
 
