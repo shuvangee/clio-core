@@ -207,7 +207,7 @@ class WrpCte(Service):
         Exec(cmd, PsshExecInfo(
             env=self.mod_env,
             hostfile=self.jarvis.hostfile,
-            container=self._container_engine,
+            container=getattr(self, '_container_engine', 'none'),
             container_image=self.deploy_image_name(),
             private_dir=self.private_dir,
             bind_mounts=self.container_mounts,

@@ -43,8 +43,9 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
 
   auto sycl_devices = sycl::device::get_devices(sycl::info::device_type::gpu);
   if (sycl_devices.empty()) {
-    HLOG(kWarning, "ServerInitGpuQueues (SYCL): no GPU devices detected");
-    return false;
+    HLOG(kInfo, "ServerInitGpuQueues (SYCL): no GPU devices detected — "
+         "GPU queues will not be initialized (CPU-only mode)");
+    return true;
   }
   per_gpu_devices_.resize(sycl_devices.size());
 

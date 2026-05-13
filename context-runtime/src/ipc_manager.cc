@@ -41,6 +41,8 @@
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <endian.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <netdb.h>
 #include <signal.h>
 #include <sys/epoll.h>
@@ -1131,7 +1133,31 @@ bool IpcManager::IdentifyThisHost() {
   std::string local_short =
       local_host.substr(0, local_host.find('.'));
 
-  // Try to identify (by hostname match) and start the server.
+  // Also collect local IPv4 addresses on every UP non-loopback interface
+  // so containerized deployments (Docker networks) can be identified by
+  // their bridge-assigned IP when the hostfile lists IPs but
+  // gethostname() returns the compose service name (e.g. iowarp-node1).
+  std::vector<std::string> local_ips;
+  {
+    struct ifaddrs *ifa_head = nullptr;
+    if (getifaddrs(&ifa_head) == 0 && ifa_head) {
+      for (struct ifaddrs *ifa = ifa_head; ifa; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr) continue;
+        if (ifa->ifa_addr->sa_family != AF_INET) continue;
+        if (!(ifa->ifa_flags & IFF_UP)) continue;
+        if (ifa->ifa_flags & IFF_LOOPBACK) continue;
+        char buf[INET_ADDRSTRLEN] = {0};
+        const sockaddr_in *sin =
+            reinterpret_cast<const sockaddr_in *>(ifa->ifa_addr);
+        if (inet_ntop(AF_INET, &sin->sin_addr, buf, sizeof(buf))) {
+          local_ips.emplace_back(buf);
+        }
+      }
+      freeifaddrs(ifa_head);
+    }
+  }
+
+  // Try to identify (by hostname or local-IP match) and start the server.
   for (const auto &pair : hostfile_map_) {
     const Host &host = pair.second;
     attempted_hosts.push_back(host.ip_address);
@@ -1145,10 +1171,18 @@ bool IpcManager::IdentifyThisHost() {
     bool is_loopback = (host.ip_address == "127.0.0.1") ||
                        (host.ip_address == "localhost") ||
                        (host.ip_address == "::1");
+    bool ip_matches_local = false;
+    for (const auto &ip : local_ips) {
+      if (host.ip_address == ip) {
+        ip_matches_local = true;
+        break;
+      }
+    }
     bool is_me = (host.ip_address == "0.0.0.0") ||
                  is_loopback ||
                  (host.ip_address == local_host) ||
-                 (entry_short == local_short);
+                 (entry_short == local_short) ||
+                 ip_matches_local;
     if (!is_me) continue;
 
     HLOG(kDebug, "Hostfile entry {} matches local host {}; binding 0.0.0.0",
