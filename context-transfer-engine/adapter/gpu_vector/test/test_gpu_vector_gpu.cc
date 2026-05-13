@@ -96,78 +96,29 @@ __global__ void GpuVectorWriteKernel(chi::IpcManagerGpuInfo info,
                                       gv::DeviceView<chi::u32> view,
                                       chi::u64 total) {
   CHIMAERA_GPU_INIT(info, /*ipc_ptr=*/nullptr);
-  // dev::vector ctor sets up the per-warp last-page __shared__ cache.
   dev::vector<chi::u32> v(view, g_ipc_manager_ptr);
-  if (threadIdx.x != 0) return;
-  chi::u64 stripe = view.page_capacity_t * view.base.pages_per_block;
-  chi::u64 lo = blockIdx.x * stripe;
+  chi::u64 stripe = (total + gridDim.x - 1) / gridDim.x;
+  chi::u64 lo = static_cast<chi::u64>(blockIdx.x) * stripe;
   chi::u64 hi = lo + stripe;
   if (hi > total) hi = total;
-  for (chi::u64 i = lo; i < hi; ++i) {
-    v[i] = static_cast<chi::u32>(i * 2u);
-  }
+  v.write_range(lo, hi, [] (chi::u64 i) {
+    return static_cast<chi::u32>(i * 2u);
+  });
   (void)g_ipc_manager;
 }
 
-/** Read v[i] back into result[i]. */
 __global__ void GpuVectorReadKernel(chi::IpcManagerGpuInfo info,
                                      gv::DeviceView<chi::u32> view,
                                      chi::u32 *result, chi::u64 total) {
   CHIMAERA_GPU_INIT(info, /*ipc_ptr=*/nullptr);
   dev::vector<chi::u32> v(view, g_ipc_manager_ptr);
-  if (threadIdx.x != 0) return;
-  chi::u64 stripe = view.page_capacity_t * view.base.pages_per_block;
-  chi::u64 lo = blockIdx.x * stripe;
+  chi::u64 stripe = (total + gridDim.x - 1) / gridDim.x;
+  chi::u64 lo = static_cast<chi::u64>(blockIdx.x) * stripe;
   chi::u64 hi = lo + stripe;
   if (hi > total) hi = total;
-  for (chi::u64 i = lo; i < hi; ++i) {
-    // Implicit ElementRef -> chi::u32 conversion triggers a read.
-    result[i] = v[i];
-  }
-  (void)g_ipc_manager;
-}
-
-/** Stress write: each block writes a contiguous stripe of `per_block`
- *  elements that spans many more pages than the cache holds, forcing
- *  per-page eviction + flush on every page miss. */
-__global__ void GpuVectorWriteStressKernel(chi::IpcManagerGpuInfo info,
-                                            gv::DeviceView<chi::u32> view,
-                                            chi::u64 per_block) {
-  CHIMAERA_GPU_INIT(info, /*ipc_ptr=*/nullptr);
-  dev::vector<chi::u32> v(view, g_ipc_manager_ptr);
-  if (threadIdx.x != 0) return;
-  chi::u64 lo = static_cast<chi::u64>(blockIdx.x) * per_block;
-  chi::u64 hi = lo + per_block;
-  for (chi::u64 i = lo; i < hi; ++i) {
-    v[i] = static_cast<chi::u32>(i ^ 0xC0FFEEUL);
-  }
-  (void)g_ipc_manager;
-}
-
-/** Stress verify: each block reads its stripe back and atomic-adds a
- *  counter for every mismatch. Sequential reads across pages much
- *  larger than the cache force a fresh fault per page. */
-__global__ void GpuVectorVerifyStressKernel(chi::IpcManagerGpuInfo info,
-                                             gv::DeviceView<chi::u32> view,
-                                             chi::u64 per_block,
-                                             chi::u32 *mismatch,
-                                             chi::u64 *first_bad_idx) {
-  CHIMAERA_GPU_INIT(info, /*ipc_ptr=*/nullptr);
-  dev::vector<chi::u32> v(view, g_ipc_manager_ptr);
-  if (threadIdx.x != 0) return;
-  chi::u64 lo = static_cast<chi::u64>(blockIdx.x) * per_block;
-  chi::u64 hi = lo + per_block;
-  chi::u32 local_bad = 0;
-  for (chi::u64 i = lo; i < hi; ++i) {
-    chi::u32 expected = static_cast<chi::u32>(i ^ 0xC0FFEEUL);
-    chi::u32 actual = v[i];
-    if (actual != expected) {
-      ++local_bad;
-      atomicMin(reinterpret_cast<unsigned long long *>(first_bad_idx),
-                static_cast<unsigned long long>(i));
-    }
-  }
-  if (local_bad) atomicAdd(mismatch, local_bad);
+  v.read_range(lo, hi, [result] (chi::u64 i, chi::u32 val) {
+    result[i] = val;
+  });
   (void)g_ipc_manager;
 }
 
@@ -181,10 +132,16 @@ TEST_CASE("gpu_vector: write then read round-trip",
   const chi::u32 pages_per_block = 4;
   const chi::u64 page_size_bytes = 4096;
 
-  // cache_period_ms=20 exercises the periodic CacheMgmtKernel.
+  // Legacy mode (host_pages_per_block=0); enable cold-miss fault since
+  // the test kernel doesn't push lookahead hints ahead of access.
   gv::Vector<chi::u32> vec("gpu_vector_smoke", nblocks, /*gpu_id=*/0,
-                            pages_per_block, page_size_bytes,
-                            /*cache_period_ms=*/20);
+                            pages_per_block,
+                            /*host_pages_per_block=*/0,
+                            page_size_bytes,
+                            /*cache_period_us=*/20000,
+                            gv::CacheMode::kLegacy,
+                            /*manager_threads_per_block=*/32,
+                            /*allow_cold_miss_fault=*/true);
 
   chi::u64 elements_per_page = page_size_bytes / sizeof(chi::u32);
   chi::u64 total = static_cast<chi::u64>(nblocks) * pages_per_block *

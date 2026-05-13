@@ -20,6 +20,19 @@ if(WRP_CORE_ENABLE_CUDA)
     )
     install(TARGETS wrp_memcpy_d2h_bench RUNTIME DESTINATION bin)
 
+    # Raw GPU-kernel write/read bandwidth to pinned host / HBM. No runtime,
+    # no IPC — answers "what's the upper bound for kernel writes to DRAM?"
+    add_cuda_executable(wrp_kernel_pinned_bench FALSE
+        wrp_kernel_pinned_bench.cc
+    )
+    set_target_properties(wrp_kernel_pinned_bench PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    target_link_libraries(wrp_kernel_pinned_bench PUBLIC
+        hshm::cuda_cxx
+    )
+    install(TARGETS wrp_kernel_pinned_bench RUNTIME DESTINATION bin)
+
     add_cuda_executable(wrp_cte_gpu_vector_bench FALSE
         wrp_cte_gpu_vector_bench.cc
         INCLUDE_DIRS

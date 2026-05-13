@@ -21,7 +21,7 @@
  *                          eviction; defaults to 1.0).
  *   --total-bytes B        Override total data size in bytes; if set
  *                          this takes precedence over --ratio.
- *   --cache-period-ms N    Period of the periodic CacheMgmtKernel
+ *   --cache-period-us N    Period of the periodic CacheMgmtKernel
  *                          (0 = disabled; default 0).
  *   --iters N              Repeat the write/flush/read cycle N times
  *                          (default 1).
@@ -70,16 +70,19 @@ namespace {
 
 struct BenchOpts {
   chi::u32 nblocks = 32;
-  chi::u32 pages_per_block = 2;
+  chi::u32 pages_per_block = 2;       // HBM tier slots per block
+  chi::u32 host_pages_per_block = 0;  // DRAM tier slots; 0 = legacy mode
+  chi::u32 manager_threads_per_block = 32;
   chi::u64 page_size = 1ULL << 20;  // 1 MiB
   double ratio = 1.0;
   chi::u64 total_bytes = 0;          // 0 = derive from ratio
   chi::u64 per_block_bytes = 0;      // 0 = derive from ratio / total_bytes
-  chi::u32 cache_period_ms = 0;
+  chi::u32 cache_period_us = 0;
   chi::u32 iters = 1;
   bool do_read = true;
   chi::u32 gpu_id = 0;
   chi::u64 bdev_capacity_mib = 0;    // 0 = auto
+  bool allow_cold_miss_fault = false;  // default: async-only
 };
 
 void PrintUsage(const char *prog) {
@@ -87,7 +90,11 @@ void PrintUsage(const char *prog) {
                "Usage: %s [options]\n"
                "\n"
                "  --blocks N             Cache blocks (default 32)\n"
-               "  --pages-per-block P    Pages per cache block (default 2)\n"
+               "  --pages-per-block P    HBM cache slots per block (default 2)\n"
+               "  --host-pages-per-block P  DRAM cache slots per block.\n"
+               "                            0 = legacy single-tier mode (default).\n"
+               "                            >0 promotes to kAsync mode (CacheManagerKernel).\n"
+               "  --manager-threads N    Threads/block for CacheManagerKernel (default 32, multiple of 32)\n"
                "  --page-size BYTES      Page size in bytes (default 1048576)\n"
                "  --per-block-bytes B    Bytes each block writes/reads (overrides --ratio\n"
                "                         and --total-bytes; total_bytes = blocks * B).\n"
@@ -95,7 +102,12 @@ void PrintUsage(const char *prog) {
                "                         (e.g. --per-block-bytes 16777216 = 16 MiB/block).\n"
                "  --ratio R              total_bytes = R * cache_bytes (default 1.0)\n"
                "  --total-bytes BYTES    Override total bytes (takes precedence over --ratio)\n"
-               "  --cache-period-ms N    Periodic CacheMgmtKernel period (0=off, default 0)\n"
+               "  --cache-period-us N    Cache-thread tick period in microseconds.\n"
+               "                            0=off (default). Doubles as the initial\n"
+               "                            __nanosleep duration for the persistent\n"
+               "                            CacheManagerKernel; blocks back off\n"
+               "                            exponentially up to 16x when idle, and\n"
+               "                            self-terminate after 500ms idle.\n"
                "  --iters N              Repeat write/flush/read cycle N times (default 1)\n"
                "  --no-read              Skip read+verify phase\n"
                "  --bdev-capacity-mib N  kRam bdev capacity (default = 4x total_bytes, min 64)\n"
@@ -118,6 +130,12 @@ bool ParseOpts(int argc, char *argv[], BenchOpts &opts) {
     else if (a == "--blocks") opts.nblocks = std::atoi(next("--blocks"));
     else if (a == "--pages-per-block")
       opts.pages_per_block = std::atoi(next("--pages-per-block"));
+    else if (a == "--host-pages-per-block")
+      opts.host_pages_per_block =
+          std::atoi(next("--host-pages-per-block"));
+    else if (a == "--manager-threads")
+      opts.manager_threads_per_block =
+          std::atoi(next("--manager-threads"));
     else if (a == "--page-size")
       opts.page_size = std::strtoull(next("--page-size"), nullptr, 10);
     else if (a == "--ratio")
@@ -127,8 +145,8 @@ bool ParseOpts(int argc, char *argv[], BenchOpts &opts) {
     else if (a == "--per-block-bytes")
       opts.per_block_bytes =
           std::strtoull(next("--per-block-bytes"), nullptr, 10);
-    else if (a == "--cache-period-ms")
-      opts.cache_period_ms = std::atoi(next("--cache-period-ms"));
+    else if (a == "--cache-period-us")
+      opts.cache_period_us = std::atoi(next("--cache-period-us"));
     else if (a == "--iters")
       opts.iters = std::atoi(next("--iters"));
     else if (a == "--no-read") opts.do_read = false;
@@ -136,6 +154,7 @@ bool ParseOpts(int argc, char *argv[], BenchOpts &opts) {
       opts.bdev_capacity_mib =
           std::strtoull(next("--bdev-capacity-mib"), nullptr, 10);
     else if (a == "--gpu-id") opts.gpu_id = std::atoi(next("--gpu-id"));
+    else if (a == "--allow-cold-miss-fault") opts.allow_cold_miss_fault = true;
     else {
       std::fprintf(stderr, "Unknown arg: %s\n", a.c_str());
       PrintUsage(argv[0]);
@@ -241,7 +260,12 @@ __global__ void BenchWriteKernel(chi::IpcManagerGpuInfo info,
 }
 
 /** Sequential read into a result buffer (host-pinned).
- *  Uses dev::vector::read_range so we resolve the page once per page. */
+ *  Uses dev::vector::read_range so we resolve the page once per page.
+ *  Accumulates into a per-thread register and atomicAdd_system's a single
+ *  reduction per block back to result[0]. This matches the "read-and-
+ *  consume" usage pattern far more honestly than writing every element
+ *  back to host — that pattern is bottlenecked by PCIe transaction
+ *  count (32-lane × 4B coalesced = 128B per burst), not bandwidth. */
 __global__ void BenchReadKernel(chi::IpcManagerGpuInfo info,
                                  gv::DeviceView<chi::u32> view,
                                  chi::u32 *result, chi::u64 per_block) {
@@ -249,9 +273,17 @@ __global__ void BenchReadKernel(chi::IpcManagerGpuInfo info,
   dev::vector<chi::u32> v(view, g_ipc_manager_ptr);
   chi::u64 lo = static_cast<chi::u64>(blockIdx.x) * per_block;
   chi::u64 hi = lo + per_block;
-  v.read_range(lo, hi, [result] (chi::u64 i, chi::u32 val) {
-    result[i] = val;
+  chi::u32 lane_sum = 0;
+  v.read_range(lo, hi, [&lane_sum] (chi::u64 /*i*/, chi::u32 val) {
+    lane_sum ^= val;
   });
+  // Warp-reduce + one atomicAdd_system per block.
+  for (int o = 16; o > 0; o >>= 1) {
+    lane_sum ^= __shfl_xor_sync(0xffffffff, lane_sum, o);
+  }
+  if ((threadIdx.x & 31) == 0) {
+    atomicAdd_system(reinterpret_cast<unsigned int *>(result), lane_sum);
+  }
   (void)g_ipc_manager;
 }
 
@@ -324,12 +356,16 @@ int main(int argc, char *argv[]) {
       ExpectedGets(opts.nblocks, opts.pages_per_block, per_block_pages);
 
   std::fprintf(stderr,
-               "[BENCH] blocks=%u pages_per_block=%u page_size=%s\n"
+               "[BENCH] blocks=%u pages_per_block=%u host_pages=%u "
+               "mode=%s page_size=%s\n"
                "[BENCH] cache=%s total=%s ratio=%.2fx\n"
                "[BENCH] per_block=%llu pages (%s)\n"
                "[BENCH] expected_puts=%llu expected_gets=%llu\n"
-               "[BENCH] cache_period_ms=%u iters=%u read=%s\n",
+               "[BENCH] cache_period_us=%u manager_threads=%u iters=%u "
+               "read=%s\n",
                opts.nblocks, opts.pages_per_block,
+               opts.host_pages_per_block,
+               opts.host_pages_per_block > 0 ? "kAsync" : "kLegacy",
                FmtBytes(opts.page_size).c_str(),
                FmtBytes(cache_bytes).c_str(),
                FmtBytes(opts.total_bytes).c_str(),
@@ -338,7 +374,8 @@ int main(int argc, char *argv[]) {
                FmtBytes(per_block_bytes).c_str(),
                (unsigned long long)expected_puts,
                (unsigned long long)expected_gets,
-               opts.cache_period_ms, opts.iters,
+               opts.cache_period_us, opts.manager_threads_per_block,
+               opts.iters,
                opts.do_read ? "yes" : "no");
 
   EnsureInit(opts, bdev_capacity_bytes);
@@ -362,28 +399,48 @@ int main(int argc, char *argv[]) {
     // Fresh Vector per iteration to avoid cumulative cache state.
     std::string tag_name = "bench_iter_" + std::to_string(it);
     gv::Vector<chi::u32> vec(tag_name, opts.nblocks, opts.gpu_id,
-                              opts.pages_per_block, opts.page_size,
-                              opts.cache_period_ms);
+                              opts.pages_per_block,
+                              opts.host_pages_per_block,
+                              opts.page_size,
+                              opts.cache_period_us,
+                              opts.host_pages_per_block > 0
+                                  ? gv::CacheMode::kAsync
+                                  : gv::CacheMode::kLegacy,
+                              opts.manager_threads_per_block,
+                              opts.allow_cold_miss_fault);
     auto view = vec.Device();
     chi::IpcManagerGpuInfo gpu_info =
         ipc->GetGpuIpcManager()->GetGpuInfo(opts.gpu_id);
 
-    // ----- Write (kernel launch + entire kernel duration + cudaSync) -----
-    auto t0 = clock::now();
-    BenchWriteKernel<<<opts.nblocks, 32>>>(gpu_info, view, per_block_elems);
-    hshm::GpuApi::Synchronize();
-    long long w = us_since(t0);
+    // Dedicated non-blocking stream for the user kernels. We
+    // cudaStreamSynchronize on THIS stream only — never
+    // cudaDeviceSynchronize. The persistent manager runs on its own
+    // non-blocking stream inside Vector and is never waited on by the
+    // bench. Cache management is fully automatic.
+    cudaStream_t user_stream = nullptr;
+    cudaStreamCreateWithFlags(&user_stream, cudaStreamNonBlocking);
 
-    // ----- Flush (CacheMgmtKernel + DrainKernel; this is where the real
-    //              PutBlob round-trips happen at ratio=1.0) -----
-    auto t1 = clock::now();
-    vec.FlushAllSync();
-    long long f = us_since(t1);
+    // ----- Write -----
+    vec.StatsReset();
+    std::fprintf(stderr, "[BENCH-DBG] iter %u: launching write kernel\n", it);
+    auto t0 = clock::now();
+    BenchWriteKernel<<<opts.nblocks, 32, 0, user_stream>>>(
+        gpu_info, view, per_block_elems);
+    cudaStreamSynchronize(user_stream);
+    long long w = us_since(t0);
+    auto stats_w = vec.StatsSnapshot();
+    std::fprintf(stderr, "[BENCH-DBG] iter %u: write done in %lld us\n",
+                 it, w);
+
+    // No flush step — the persistent manager kernel flushes dirty
+    // pages continuously in the background. The Vector is
+    // automatically coherent.
+    long long f = 0;
+    gv::VectorStats stats_f{};
 
     long long r = 0;
+    gv::VectorStats stats_r{};
     if (opts.do_read) {
-      // hshm::GpuApi::MallocHost takes BYTES (not elements) — the
-      // template parameter is just the cast type for the returned ptr.
       auto *result = hshm::GpuApi::MallocHost<chi::u32>(
           total_elems * sizeof(chi::u32));
       if (!result) {
@@ -392,13 +449,68 @@ int main(int argc, char *argv[]) {
         std::exit(2);
       }
       std::memset(result, 0, total_elems * sizeof(chi::u32));
+      vec.StatsReset();
+      std::fprintf(stderr, "[BENCH-DBG] iter %u: launching read kernel\n", it);
       auto t2 = clock::now();
-      BenchReadKernel<<<opts.nblocks, 32>>>(gpu_info, view, result,
-                                              per_block_elems);
-      hshm::GpuApi::Synchronize();
+      BenchReadKernel<<<opts.nblocks, 32, 0, user_stream>>>(
+          gpu_info, view, result, per_block_elems);
+      cudaStreamSynchronize(user_stream);
       r = us_since(t2);
+      stats_r = vec.StatsSnapshot();
+      std::fprintf(stderr, "[BENCH-DBG] iter %u: read done in %lld us\n",
+                   it, r);
       hshm::GpuApi::FreeHost(result);
     }
+    cudaStreamDestroy(user_stream);
+
+    auto pct = [](unsigned long long num, unsigned long long denom) {
+      if (denom == 0) return 0.0;
+      return 100.0 * static_cast<double>(num) /
+             static_cast<double>(denom);
+    };
+    auto dump_stats = [&](const char *phase, const gv::VectorStats &s,
+                          long long elapsed_us) {
+      double sec = elapsed_us / 1e6;
+      auto rate = [&](unsigned long long n) {
+        return (sec > 0.0) ? n / sec : 0.0;
+      };
+      std::fprintf(stderr,
+          "[STATS %s %.2fms] resolve total=%llu hits=%llu(%.1f%%) "
+          "cold_miss=%llu(%.1f%%) fault_get=%llu spin_iters=%llu\n",
+          phase, elapsed_us / 1e3,
+          (unsigned long long)s.resolve_total,
+          (unsigned long long)s.resolve_hits, pct(s.resolve_hits, s.resolve_total),
+          (unsigned long long)s.resolve_cold_miss, pct(s.resolve_cold_miss, s.resolve_total),
+          (unsigned long long)s.resolve_fault_get,
+          (unsigned long long)s.resolve_spin_iters);
+      std::fprintf(stderr,
+          "[STATS %s rate/s] manager=%.0f/s prefetch=%.0f/s "
+          "swap=%.0f/s flush=%.0f/s rescore=%.0f/s\n",
+          phase,
+          rate(s.manager_iters),
+          rate(s.phase4_prefetches),
+          rate(s.phase2_swaps),
+          rate(s.phase3_flushes),
+          rate(s.phase1c_drained));
+      std::fprintf(stderr,
+          "[STATS %s] manager iters=%llu work=%llu(%.1f%%) "
+          "p1c_drained=%llu p2_swaps=%llu p3_flushes=%llu "
+          "p4_pops=%llu p4_prefetch=%llu p4_skip_cached=%llu p4_skip_nofree=%llu\n",
+          phase,
+          (unsigned long long)s.manager_iters,
+          (unsigned long long)s.manager_work_iters,
+          pct(s.manager_work_iters, s.manager_iters),
+          (unsigned long long)s.phase1c_drained,
+          (unsigned long long)s.phase2_swaps,
+          (unsigned long long)s.phase3_flushes,
+          (unsigned long long)s.phase4_pops,
+          (unsigned long long)s.phase4_prefetches,
+          (unsigned long long)s.phase4_skip_cached,
+          (unsigned long long)s.phase4_skip_nofree);
+    };
+    dump_stats("write", stats_w, w);
+    dump_stats("flush", stats_f, f);
+    if (opts.do_read) dump_stats("read ", stats_r, r);
 
     write_us.push_back(w);
     flush_us.push_back(f);

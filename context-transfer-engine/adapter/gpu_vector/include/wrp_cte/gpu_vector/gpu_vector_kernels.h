@@ -52,8 +52,7 @@ HSHM_GPU_FUN chi::u32 AtomicClearBitsU32(chi::u32 *p, chi::u32 mask) {
                    static_cast<unsigned int>(~mask));
 }
 
-/** Atomic min for i32 (CAS loop — atomicMin's i32 overload exists but
- *  using a CAS keeps the path uniform with the max variant below). */
+/** Atomic min for i32. */
 HSHM_GPU_FUN void AtomicMinI32(int32_t *p, int32_t v) {
   atomicMin(reinterpret_cast<int *>(p), static_cast<int>(v));
 }
@@ -73,19 +72,28 @@ HSHM_GPU_FUN chi::u32 AtomicDecU32(chi::u32 *p) {
   return atomicSub(reinterpret_cast<unsigned int *>(p), 1u);
 }
 
+/** Attempt to acquire kPageBusy. Returns true on success. */
+HSHM_GPU_FUN bool TryAcquireBusy(Page *p) {
+  chi::u32 prev = AtomicOrU32(&p->flags, kPageBusy);
+  return (prev & kPageBusy) == 0;
+}
+
+/** Release kPageBusy. */
+HSHM_GPU_FUN void ReleaseBusy(Page *p) {
+  AtomicClearBitsU32(&p->flags, kPageBusy);
+}
+
 /**
  * Build a blob_data_ ShmPtr that ToFullPtr resolves directly to a raw
  * pointer via its null-alloc_id branch (the canonical pattern used by
  * the kernel-side CTE benchmarks: see workload_cte_client_overhead.cc).
  *
  * For kDeviceMem-backed pages, off_ holds a CUDA/HIP device address.
- * The bdev runtime calls DeviceAwareMemcpy with that address;
- * DeviceAwareMemcpy's registered hook (cudaMemcpyDefault /
- * hipMemcpyDefault) auto-detects the memory kind via pointer attributes
- * and copies device→host without staging.
- *
- * `alloc_id` is unused but kept in the signature so callers can pass
- * the page backend's id without special-casing.
+ * For kPinnedHost-backed pages, off_ holds the mapped host address (it
+ * is GPU-addressable via the pinned mapping). DeviceAwareMemcpy's
+ * registered hook (cudaMemcpyDefault / hipMemcpyDefault) auto-detects
+ * the memory kind via pointer attributes and copies in the right
+ * direction without staging.
  */
 HSHM_GPU_FUN hipc::ShmPtr<> MakeBlobShmPtr(void *device_addr,
                                                   hipc::AllocatorId alloc_id) {
@@ -97,11 +105,30 @@ HSHM_GPU_FUN hipc::ShmPtr<> MakeBlobShmPtr(void *device_addr,
 }
 
 /**
- * Construct the blob name into a heap-free char buffer. Names are stable
- * for the lifetime of the Vector and only depend on (block, slot) so we
- * cache them in the Pool by writing the name into the pre-allocated task
- * once (host side, at ctor). The kernel just leaves blob_name_ alone.
+ * Push a hint into a block's per-block rescore queue. Producer-side
+ * MPSC: bump tail atomically; drop if full. Returns true if the entry
+ * was enqueued.
  */
+HSHM_GPU_FUN bool RescorePush(RescoreQueue *q, chi::u32 page_idx,
+                              float score) {
+  chi::u32 cur_tail = AtomicIncU32(&q->tail);
+  chi::u32 head = q->head;
+  if (cur_tail - head >= kRescoreQueueCap) {
+    // Roll back. Not perfectly atomic, but a dropped hint is benign.
+    AtomicDecU32(&q->tail);
+    return false;
+  }
+  q->slots[cur_tail & (kRescoreQueueCap - 1)] =
+      RescoreEntry{page_idx, score};
+  return true;
+}
+
+/** Remaining capacity in the rescore queue (lower bound — may be stale). */
+HSHM_GPU_FUN chi::u32 RescoreRemaining(const RescoreQueue *q) {
+  chi::u32 used = q->tail - q->head;
+  if (used > kRescoreQueueCap) used = kRescoreQueueCap;
+  return kRescoreQueueCap - used;
+}
 
 }  // namespace detail
 
@@ -135,8 +162,9 @@ HSHM_GPU_FUN void FlushPageBase(::chi::gpu::IpcManager *ipc,
   task->offset_ = 0;
   task->size_ = v.page_size_bytes;
   task->gpu_page_idx_ = static_cast<chi::u32>(page->page_idx);
-  task->blob_data_ = detail::MakeBlobShmPtr(page->device_ptr,
-                                             v.pages_alloc_id);
+  hipc::AllocatorId alloc =
+      (page->tier == 0) ? v.pages_alloc_id : v.host_pages_alloc_id;
+  task->blob_data_ = detail::MakeBlobShmPtr(page->device_ptr, alloc);
 
   hipc::FullPtr<wrp_cte::core::PutBlobTask> fp;
   fp.shm_.alloc_id_ = v.put_pool_alloc_id;
@@ -151,8 +179,8 @@ HSHM_GPU_FUN void FlushPageBase(::chi::gpu::IpcManager *ipc,
  * push completes; does not wait for the runtime to ack. `ipc` is the
  * kernel-scope `g_ipc_manager_ptr` from CHIMAERA_GPU_INIT.
  *
- * `slot` is the index in `Block::pages[]`, used to pick which task slot
- * in the put pool we use (one slot per page, so no cross-page aliasing).
+ * `slot` is the index in `Block::pages[]` (covering BOTH tiers), used
+ * to pick which task slot in the put pool we use.
  */
 template <typename T>
 HSHM_GPU_FUN void FlushPage(::chi::gpu::IpcManager *ipc,
@@ -172,17 +200,8 @@ HSHM_GPU_FUN void FlushPage(::chi::gpu::IpcManager *ipc,
   detail::AtomicDecU32(&GetBlock(v.base, block_idx)->num_modified);
 
   auto *task = GetPutTask(v.base, block_idx, slot);
-  // The host already populated tag_id_, blob_name_ ("<tag>_b<block>"),
-  // score_, context_, pool_query_, pool_id_, method_ at construction.
-  // We stamp the per-flush mutable fields plus gpu_page_idx_, which the
-  // CTE runtime appends to blob_name_ as "_pi<page_idx>" so each cache
-  // page resolves to its own blob (slots are reused across pages, so a
-  // slot-keyed blob name would collide writes from different pages).
-  //
   // Clear lifecycle flags carried over from the previous put through
-  // this slot (TASK_ROUTED in particular — RouteTask short-circuits to
-  // ExecHere on a re-routed task and the put never reaches the CTE
-  // handler). Mint a fresh task_id_ for the same reason.
+  // this slot (TASK_ROUTED in particular). Mint a fresh task_id_.
   task->task_flags_.Clear();
   task->return_code_.store(0);
   task->task_id_ = chi::CreateTaskId();
@@ -192,13 +211,11 @@ HSHM_GPU_FUN void FlushPage(::chi::gpu::IpcManager *ipc,
   task->offset_ = mn_b;            // offset within the per-page blob
   task->size_ = mx_b - mn_b;
   task->gpu_page_idx_ = static_cast<chi::u32>(page->page_idx);
+  hipc::AllocatorId alloc =
+      (page->tier == 0) ? v.base.pages_alloc_id : v.base.host_pages_alloc_id;
   task->blob_data_ = detail::MakeBlobShmPtr(
-      reinterpret_cast<char *>(page->device_ptr) + mn_b,
-      v.base.pages_alloc_id);
+      reinterpret_cast<char *>(page->device_ptr) + mn_b, alloc);
 
-  // Wrap into a FullPtr the producer-only Send understands: alloc_id is
-  // the put-pool backend; off_ is the raw pinned-host address (worker
-  // dereferences directly).
   hipc::FullPtr<wrp_cte::core::PutBlobTask> fp;
   fp.shm_.alloc_id_ = v.base.put_pool_alloc_id;
   fp.shm_.off_ = reinterpret_cast<chi::u64>(task);
@@ -218,13 +235,12 @@ HSHM_GPU_FUN void FaultPage(::chi::gpu::IpcManager *ipc,
   task->task_flags_.Clear();
   task->return_code_.store(0);
   task->task_id_ = chi::CreateTaskId();
-  // Per-page blob: offset 0, full page size; the runtime appends
-  // "_pi<target_page_idx>" to the host-pre-built blob_name_.
   task->offset_ = 0;
   task->size_ = v.base.page_size_bytes;
   task->gpu_page_idx_ = static_cast<chi::u32>(target_page_idx);
-  task->blob_data_ = detail::MakeBlobShmPtr(page->device_ptr,
-                                             v.base.pages_alloc_id);
+  hipc::AllocatorId alloc =
+      (page->tier == 0) ? v.base.pages_alloc_id : v.base.host_pages_alloc_id;
+  task->blob_data_ = detail::MakeBlobShmPtr(page->device_ptr, alloc);
   hipc::FullPtr<wrp_cte::core::GetBlobTask> fp;
   fp.shm_.alloc_id_ = v.base.get_pool_alloc_id;
   fp.shm_.off_ = reinterpret_cast<chi::u64>(task);
@@ -246,16 +262,18 @@ HSHM_GPU_FUN void DrainGet(Page *page) {
   if (!page->active_get.IsNull()) {
     page->active_get.Wait();
     page->active_get = chi::gpu::Future<wrp_cte::core::GetBlobTask>();
+    detail::AtomicClearBitsU32(&page->flags, kPageGetInFlight);
   }
 }
 
-/** Flush every dirty page in the calling block. */
+/** Flush every dirty page in the calling block across BOTH tiers. */
 template <typename T>
 HSHM_GPU_FUN void FlushAllInBlock(::chi::gpu::IpcManager *ipc,
                                   const DeviceView<T> &v,
                                   chi::u32 block_idx) {
   Block *b = GetBlock(v.base, block_idx);
-  for (chi::u32 s = 0; s < v.base.pages_per_block; ++s) {
+  chi::u32 total = TotalPagesPerBlock(v.base);
+  for (chi::u32 s = 0; s < total; ++s) {
     Page *p = &b->pages[s];
     if (p->modify_min < 0) continue;
     if (detail::AtomicOrU32(&p->flags, kPagePutInFlight) & kPagePutInFlight) {
@@ -266,29 +284,38 @@ HSHM_GPU_FUN void FlushAllInBlock(::chi::gpu::IpcManager *ipc,
 }
 
 /**
- * Pick a victim slot (free first, else LRU). Drains any in-flight ops
- * on it before returning so the caller can reuse the slot freely.
+ * Pick a victim slot (free first, else LRU) within a single tier.
+ * Drains any in-flight ops on it before returning so the caller can
+ * reuse the slot freely. `tier_lo`/`tier_hi` bound the search range.
  */
 template <typename T>
-HSHM_GPU_FUN chi::u32 EvictSlot(::chi::gpu::IpcManager *ipc,
-                                const DeviceView<T> &v,
-                                chi::u32 block_idx) {
+HSHM_GPU_FUN chi::u32 EvictSlotInRange(::chi::gpu::IpcManager *ipc,
+                                       const DeviceView<T> &v,
+                                       chi::u32 block_idx,
+                                       chi::u32 tier_lo, chi::u32 tier_hi) {
   Block *b = GetBlock(v.base, block_idx);
-  // Flush every dirty page first (kicks Sends in flight; we will Wait
-  // on the chosen victim's active_put below if needed).
-  FlushAllInBlock(ipc, v, block_idx);
+  // Flush every dirty page first (kicks Sends in flight; we'll Wait on
+  // the chosen victim's active_put below).
+  for (chi::u32 s = tier_lo; s < tier_hi; ++s) {
+    Page *p = &b->pages[s];
+    if (p->modify_min < 0) continue;
+    if (detail::AtomicOrU32(&p->flags, kPagePutInFlight) & kPagePutInFlight) {
+      continue;
+    }
+    FlushPage(ipc, v, block_idx, p, s);
+  }
   // Free slot?
-  for (chi::u32 s = 0; s < v.base.pages_per_block; ++s) {
+  for (chi::u32 s = tier_lo; s < tier_hi; ++s) {
     if (b->pages[s].page_idx < 0) {
       DrainPut(&b->pages[s]);
       DrainGet(&b->pages[s]);
       return s;
     }
   }
-  // LRU.
-  chi::u32 lru = 0;
-  chi::u64 lru_clock = b->pages[0].lru_clock;
-  for (chi::u32 s = 1; s < v.base.pages_per_block; ++s) {
+  // LRU within range.
+  chi::u32 lru = tier_lo;
+  chi::u64 lru_clock = b->pages[tier_lo].lru_clock;
+  for (chi::u32 s = tier_lo + 1; s < tier_hi; ++s) {
     if (b->pages[s].lru_clock < lru_clock) {
       lru_clock = b->pages[s].lru_clock;
       lru = s;
@@ -299,9 +326,166 @@ HSHM_GPU_FUN chi::u32 EvictSlot(::chi::gpu::IpcManager *ipc,
   return lru;
 }
 
+/** Pick a victim slot anywhere in the block, preferring HBM (tier 0). */
+template <typename T>
+HSHM_GPU_FUN chi::u32 EvictSlot(::chi::gpu::IpcManager *ipc,
+                                const DeviceView<T> &v,
+                                chi::u32 block_idx) {
+  return EvictSlotInRange(ipc, v, block_idx, 0, v.base.gpu_pages_per_block);
+}
+
+/**
+ * Warp-cooperative copy of a 4-byte-aligned region between two page
+ * pointers. All 32 lanes participate. The page-size bytes are split
+ * across lanes as uint4 stores (16 bytes per thread per step). This is
+ * the same pattern as Phase 2 swap but exposed as a building block for
+ * eviction.
+ */
+HSHM_GPU_FUN void WarpCopyUint4(void *dst, const void *src,
+                                 chi::u64 bytes, chi::u32 lane) {
+  chi::u64 n = bytes / sizeof(uint4);
+  uint4 *d = static_cast<uint4 *>(dst);
+  const uint4 *s = static_cast<const uint4 *>(src);
+  for (chi::u64 i = lane; i < n; i += 32) d[i] = s[i];
+}
+
+/**
+ * WARP-COOPERATIVE allocate-slot-for-write. All 32 lanes must call.
+ * Strategy, in order of preference:
+ *   1. Any FREE slot (HBM-first, then DRAM) — no copy required.
+ *   2. Else: pick LRU HBM victim. If DRAM has any free slot, copy
+ *      HBM-victim → free-DRAM-slot warp-coop (1 step, ~80 µs at PCIe).
+ *      Then return the freed HBM slot.
+ *   3. Else (DRAM also full): pick LRU HBM victim AND LRU DRAM victim.
+ *      If DRAM victim is dirty, kick a Send. Copy HBM-victim → DRAM-
+ *      victim. Return HBM slot.
+ *
+ * In all cases the returned slot has page_idx == target_page, kPageBusy
+ * held by the caller, ready for the warp-coop write that follows.
+ */
+template <typename T>
+HSHM_GPU_FUN Page *WarpCoopAllocSlotForWrite(
+    ::chi::gpu::IpcManager *ipc, const DeviceView<T> &v,
+    chi::u32 block_idx, int32_t target_page, chi::u32 lane) {
+  __shared__ Page *s_dst;
+  __shared__ Page *s_evict_src;   // populated only if we need to copy
+  __shared__ Page *s_evict_dst;
+  Block *b = GetBlock(v.base, block_idx);
+  if (lane == 0) {
+    s_dst = nullptr;
+    s_evict_src = nullptr;
+    s_evict_dst = nullptr;
+    chi::u32 total = TotalPagesPerBlock(v.base);
+    // Path 1: free HBM?
+    for (chi::u32 s = 0; s < v.base.gpu_pages_per_block; ++s) {
+      Page *p = &b->pages[s];
+      if (p->flags & (kPageBusy | kPageGetInFlight)) continue;
+      if (p->page_idx < 0) {
+        if (detail::TryAcquireBusy(p)) {
+          if (p->page_idx < 0) { s_dst = p; break; }
+          detail::ReleaseBusy(p);
+        }
+      }
+    }
+    // Path 1b: free DRAM?
+    if (s_dst == nullptr && v.base.host_pages_per_block > 0) {
+      for (chi::u32 s = v.base.gpu_pages_per_block; s < total; ++s) {
+        Page *p = &b->pages[s];
+        if (p->flags & (kPageBusy | kPageGetInFlight)) continue;
+        if (p->page_idx < 0) {
+          if (detail::TryAcquireBusy(p)) {
+            if (p->page_idx < 0) { s_dst = p; break; }
+            detail::ReleaseBusy(p);
+          }
+        }
+      }
+    }
+    // Path 2/3: need eviction. Pick LRU HBM victim.
+    if (s_dst == nullptr) {
+      chi::u32 hv = ~0u; chi::u64 hclk = ~0ULL;
+      for (chi::u32 s = 0; s < v.base.gpu_pages_per_block; ++s) {
+        Page *p = &b->pages[s];
+        if (p->flags & (kPageBusy | kPageGetInFlight)) continue;
+        if (p->lru_clock < hclk) { hclk = p->lru_clock; hv = s; }
+      }
+      if (hv != ~0u) {
+        Page *vp = &b->pages[hv];
+        while (!detail::TryAcquireBusy(vp)) {}
+        DrainPut(vp); DrainGet(vp);
+        s_evict_src = vp;
+        // Find a DRAM slot — free first, else LRU.
+        if (v.base.host_pages_per_block > 0 && vp->page_idx >= 0) {
+          chi::u32 dv = ~0u; chi::u64 dclk = ~0ULL;
+          for (chi::u32 s = v.base.gpu_pages_per_block; s < total; ++s) {
+            Page *p = &b->pages[s];
+            if (p->flags & (kPageBusy | kPageGetInFlight)) continue;
+            if (p->page_idx < 0) { dv = s; break; }
+            if (p->lru_clock < dclk) { dclk = p->lru_clock; dv = s; }
+          }
+          if (dv != ~0u) {
+            Page *dp = &b->pages[dv];
+            while (!detail::TryAcquireBusy(dp)) {}
+            DrainPut(dp); DrainGet(dp);
+            if (dp->page_idx >= 0 && dp->modify_min >= 0) {
+              if (!(detail::AtomicOrU32(&dp->flags, kPagePutInFlight) &
+                    kPagePutInFlight)) {
+                FlushPage(ipc, v, block_idx, dp, dv);
+              }
+            }
+            s_evict_dst = dp;
+          }
+        }
+        s_dst = vp;  // HBM victim becomes the destination after eviction
+      }
+    }
+  }
+  __syncwarp();
+  Page *dst = s_dst;
+  Page *evict_src = s_evict_src;
+  Page *evict_dst = s_evict_dst;
+  // Warp-coop copy of HBM victim → DRAM (1 step, ~80 µs at PCIe).
+  if (evict_src != nullptr && evict_dst != nullptr) {
+    WarpCopyUint4(evict_dst->device_ptr, evict_src->device_ptr,
+                  v.base.page_size_bytes, lane);
+    __syncwarp();
+    if (lane == 0) {
+      evict_dst->page_idx = evict_src->page_idx;
+      evict_dst->modify_min = evict_src->modify_min;
+      evict_dst->modify_max = evict_src->modify_max;
+      evict_dst->lru_clock = evict_src->lru_clock;
+      evict_dst->score = evict_src->score;
+      __threadfence();
+      detail::ReleaseBusy(evict_dst);
+    }
+  }
+  __syncwarp();
+  if (lane == 0 && dst != nullptr) {
+    dst->page_idx = target_page;
+    dst->modify_min = -1;
+    dst->modify_max = -1;
+    dst->lru_clock = clock64();
+    dst->score = 1.0f;
+  }
+  __syncwarp();
+  return dst;
+}
+
+// Back-compat alias for the previous name.
+template <typename T>
+HSHM_GPU_FUN Page *WarpCoopEvictHbmToDram(
+    ::chi::gpu::IpcManager *ipc, const DeviceView<T> &v,
+    chi::u32 block_idx, int32_t target_page, chi::u32 lane) {
+  return WarpCoopAllocSlotForWrite(ipc, v, block_idx, target_page, lane);
+}
+
 /** Resolve `i` to (page,offset) and return a pointer to the byte slot.
  *  Used by both read and write paths. `is_write` controls FaultPage vs
- *  not — writes don't bother faulting because they overwrite. */
+ *  not — writes don't bother faulting because they overwrite.
+ *
+ *  Two-tier lookup: scan HBM first, then DRAM. On a cold miss the
+ *  fallback evicts in the HBM tier (the hottest target) and faults
+ *  from CTE. In kAsync mode the caller also pushes a high-score hint
+ *  into the rescore queue so neighboring pages get pulled in next tick. */
 template <typename T>
 HSHM_GPU_FUN T *Resolve(::chi::gpu::IpcManager *ipc, DeviceView<T> v,
                         Page **last_page_array, chi::u64 i, bool is_write) {
@@ -309,57 +493,109 @@ HSHM_GPU_FUN T *Resolve(::chi::gpu::IpcManager *ipc, DeviceView<T> v,
   Block *b = GetBlock(v.base, block_idx);
   int32_t target_page = static_cast<int32_t>(i / v.page_capacity_t);
   chi::u64 off_t = i - static_cast<chi::u64>(target_page) * v.page_capacity_t;
+  // Instrument: bump resolve_total. Cheap relative to the IPC work below.
+  if (v.base.stats) {
+    atomicAdd_system(&v.base.stats->resolve_total, 1ULL);
+  }
 
   // (1) Per-lane fast path.
   Page *&last = detail::LaneLastPage(last_page_array);
   Page *hit = nullptr;
-  if (last && last->page_idx == target_page) {
+  if (last && last->page_idx == target_page &&
+      !(last->flags & (kPageBusy | kPageGetInFlight))) {
     hit = last;
   } else {
-    // (2) Block-local linear scan.
-    for (chi::u32 s = 0; s < v.base.pages_per_block; ++s) {
-      if (b->pages[s].page_idx == target_page) {
-        hit = &b->pages[s];
-        last = hit;
-        break;
-      }
+    // (2) Block-local linear scan across BOTH tiers (HBM first).
+    //     Skip slots that are locked (manager prefetch in flight) —
+    //     treat them as not-cached so we fault into a different slot
+    //     rather than spin-waiting on TryAcquireBusy below.
+    chi::u32 total = TotalPagesPerBlock(v.base);
+    for (chi::u32 s = 0; s < total; ++s) {
+      Page *p = &b->pages[s];
+      if (p->page_idx != target_page) continue;
+      if (p->flags & (kPageBusy | kPageGetInFlight)) continue;
+      hit = p;
+      last = hit;
+      break;
     }
   }
   if (!hit) {
-    // (3) Evict, bind, and (read path only) fault.
-    chi::u32 slot = EvictSlot(ipc, v, block_idx);
-    Page *p = &b->pages[slot];
-    p->page_idx = target_page;
-    p->modify_min = -1;
-    p->modify_max = -1;
-    p->flags = 0;
-    if (!is_write) FaultPage(ipc, v, block_idx, p, slot, target_page);
-    hit = p;
-    last = hit;
+    if (v.base.stats) {
+      atomicAdd_system(&v.base.stats->resolve_cold_miss, 1ULL);
+    }
+    if (v.base.allow_cold_miss_fault) {
+      // (3a) Synchronous fault path: evict + bind + (read) fault.
+      if (v.base.stats && !is_write) {
+        atomicAdd_system(&v.base.stats->resolve_fault_get, 1ULL);
+      }
+      chi::u32 slot = EvictSlot(ipc, v, block_idx);
+      Page *p = &b->pages[slot];
+      p->page_idx = target_page;
+      p->lru_clock = clock64();
+      p->modify_min = -1;
+      p->modify_max = -1;
+      p->flags = 0;
+      if (!is_write) FaultPage(ipc, v, block_idx, p, slot, target_page);
+      hit = p;
+      last = hit;
+      detail::RescorePush(&b->rescore_q,
+                          static_cast<chi::u32>(target_page), 1.0f);
+    } else {
+      // (3b) Async-only path: push a high-priority hint and spin-wait
+      // for the manager to populate the page. Score sign distinguishes
+      // alloc-only (writes; negative) from prefetch (reads; positive).
+      float hint_score = is_write ? -1.0f : 1.0f;
+      detail::RescorePush(&b->rescore_q,
+                          static_cast<chi::u32>(target_page), hint_score);
+      chi::u32 total = TotalPagesPerBlock(v.base);
+      while (!hit) {
+        // __threadfence() ensures we observe the manager kernel's
+        // writes to page_idx and flags. Without it, the compiler
+        // may hoist the load out of the loop.
+        __threadfence();
+        for (chi::u32 s = 0; s < total; ++s) {
+          Page *p = &b->pages[s];
+          // Use volatile reads to defeat caching across iterations.
+          int32_t pi = *reinterpret_cast<volatile int32_t *>(&p->page_idx);
+          if (pi != target_page) continue;
+          chi::u32 fl = *reinterpret_cast<volatile chi::u32 *>(&p->flags);
+          if (fl & (kPageBusy | kPageGetInFlight)) continue;
+          hit = p;
+          last = hit;
+          break;
+        }
+        if (!hit) {
+          if (v.base.stats) {
+            atomicAdd_system(&v.base.stats->resolve_spin_iters, 1ULL);
+          }
+          __nanosleep(1000);
+          // Re-push in case the manager dropped it (queue overflow).
+          detail::RescorePush(&b->rescore_q,
+                              static_cast<chi::u32>(target_page),
+                              hint_score);
+        }
+      }
+    }
+  } else {
+    if (v.base.stats) atomicAdd_system(&v.base.stats->resolve_hits, 1ULL);
   }
 
   // Wait on outstanding fault before returning the byte (read path).
   if (!is_write) DrainGet(hit);
 
-  // LRU bookkeeping intentionally elided — clock64() is several hundred
-  // cycles and only useful on miss for victim selection. Eviction
-  // currently falls back to the lowest-numbered free slot or slot 0
-  // when all are bound, which is fine while pages_per_block stays
-  // small. Re-introduce a coarser clock (e.g. monotonic counter
-  // incremented on miss) when LRU quality starts to matter.
+  // LRU bookkeeping: cheap monotonic block-local counter would be ideal,
+  // but lru_clock is read by the manager rescore phase. For now leave
+  // it at 0; the rescore queue carries the hot/cold signal.
 
   if (is_write) {
     int32_t off_i = static_cast<int32_t>(off_t);
     // Plain stores everywhere on the per-page dirty range.
     //
-    // Concurrency assumption: ONE thread mutates a given (block,page) at
-    // a time AND no concurrent CacheMgmtKernel atomicExch'es modify_min
-    // /max to -1 mid-update. The first invariant holds today because
-    // only threadIdx.x == 0 of each block calls Resolve. The second
-    // invariant requires cache_period_ms = 0 (no periodic flush thread).
-    // If you need concurrent flushing, revert this branch to atomicCAS
-    // for the first-write seed and AtomicMinI32 / AtomicMaxI32 for the
-    // range extension — see git history for the prior implementation.
+    // Concurrency assumption in kAsync mode: the caller holds kPageBusy
+    // on `hit` for the duration of the in-page mutation, so the manager
+    // cannot atomicExch modify_min/max underneath us. In kLegacy mode
+    // (host_pages_per_block == 0, manager kernel runs after user
+    // kernel) there is no overlap so the bit isn't required.
     if (hit->modify_min == -1) {
       hit->modify_min = off_i;
       hit->modify_max = off_i;
@@ -380,41 +616,6 @@ template <typename T>
 class vector;
 
 /**
- * Proxy returned by `vector<T>::operator[]`. Defers the read-vs-write
- * decision until the proxy is consumed:
- *   - Implicit conversion to `T` triggers a read (Resolve with
- *     is_write=false → may FaultPage and Wait).
- *   - `operator=`, `operator+=`, etc. trigger a write (Resolve with
- *     is_write=true → records the dirty range, no fault).
- *
- * Stack-only RAII handle; never store across kernel boundaries.
- */
-template <typename T>
-class ElementRef {
- public:
-  HSHM_GPU_FUN ElementRef(vector<T> *v, chi::u64 i) : v_(v), i_(i) {}
-
-  /** Read. */
-  HSHM_GPU_FUN operator T() const;
-
-  /** Write. */
-  HSHM_GPU_FUN ElementRef &operator=(const T &val);
-
-  /** Read-modify-write. */
-  HSHM_GPU_FUN ElementRef &operator+=(const T &val);
-  HSHM_GPU_FUN ElementRef &operator-=(const T &val);
-
-  /** Chained assignment from another ElementRef. */
-  HSHM_GPU_FUN ElementRef &operator=(const ElementRef &other) {
-    return (*this = static_cast<T>(other));
-  }
-
- private:
-  vector<T> *v_;
-  chi::u64 i_;
-};
-
-/**
  * Per-block in-kernel handle to a host-side Vector<T>. Constructed once
  * at the top of a user kernel after CHIMAERA_GPU_INIT. The ctor allocates
  * the per-warp last-page cache in __shared__ memory and zero-initializes
@@ -425,15 +626,15 @@ class ElementRef {
  *                     wrp_cte::gpu_vector::DeviceView<int> view) {
  *     CHIMAERA_GPU_INIT(info, nullptr);
  *     cte::gpu::dev::vector<int> v(view, g_ipc_manager_ptr);
- *     v[i] = 42;            // write
- *     int x = v[j];         // read
- *     v[k] += 1;             // read-modify-write
+ *     v.write_range(lo, hi, [] (chi::u64 i) { return T_for(i); });
+ *     v.read_range (lo, hi, [](chi::u64 i, T val) { use(i, val); });
  *   }
  *
- * Only thread 0 of each warp should call operator[] (matches the
- * IpcGpu2Cpu::ClientSend threadIdx.x==0 contract for the underlying
- * Send). All threads in the block must construct the handle so the
- * ctor's __syncthreads is balanced.
+ * Only thread 0 of each warp issues `Send`s under the hood (matches the
+ * IpcGpu2Cpu::ClientSend threadIdx.x==0 contract). All threads in the
+ * block must construct the handle so the ctor's __syncthreads is
+ * balanced. ElementRef / operator[] is intentionally NOT exposed — the
+ * bulk APIs are the only race-free hot path under kAsync mode.
  */
 template <typename T>
 class vector {
@@ -444,32 +645,15 @@ class vector {
    * @param view DeviceView<T> from `Vector<T>::Device()` (POD, captured
    *             by the kernel by value).
    * @param ipc  Kernel-scope `g_ipc_manager_ptr` declared by
-   *             CHIMAERA_GPU_INIT. CHI_IPC can't be used here because on
-   *             the host pass it expands to chi::IpcManager* (not
-   *             gpu::IpcManager*).
+   *             CHIMAERA_GPU_INIT.
    */
   HSHM_GPU_FUN vector(const DeviceView &view,
                       ::chi::gpu::IpcManager *ipc) noexcept
       : view_(view), ipc_(ipc) {
-    // Function-scope __shared__ has block lifetime, so the address
-    // captured into last_page_array_ stays valid for the whole kernel.
     __shared__ ::wrp_cte::gpu_vector::Page *last_page_storage[32];
     last_page_array_ = last_page_storage;
     if (threadIdx.x < 32) last_page_array_[threadIdx.x] = nullptr;
     __syncthreads();
-  }
-
-  /** Return a proxy for `v[i]`. The proxy resolves the access (and
-   *  records dirty state on write) lazily. */
-  HSHM_GPU_FUN ElementRef<T> operator[](chi::u64 i) {
-    return ElementRef<T>(this, i);
-  }
-
-  /** Read-only overload — returns a value, never an lvalue. */
-  HSHM_GPU_FUN T operator[](chi::u64 i) const {
-    return *::wrp_cte::gpu_vector::Resolve(
-        ipc_, const_cast<DeviceView &>(view_),
-        last_page_array_, i, /*is_write=*/false);
   }
 
   /**
@@ -477,14 +661,7 @@ class vector {
    *   for (i = lo; i < hi; ++i) (*this)[i] = value_at(i);
    * but resolves the page once per page-spanning sub-range and runs a
    * **warp-cooperative** inner loop where all 32 lanes issue coalesced
-   * stores in parallel. value_at must be callable as
-   * `T value_at(chi::u64 i)` from any lane.
-   *
-   * Launch contract: kernel is launched with 32 threads per block (one
-   * warp). Lane 0 does the page resolution + dirty-range bookkeeping;
-   * lanes 0..31 all participate in the inner store loop. The result
-   * `last_page_array_[0]` is broadcast to all lanes via __syncwarp +
-   * shared-memory load.
+   * stores in parallel.
    */
   template <typename F>
   HSHM_GPU_FUN void write_range(chi::u64 lo, chi::u64 hi, F &&value_at) {
@@ -492,34 +669,84 @@ class vector {
     chi::u32 lane = threadIdx.x & 31;
     chi::u64 cap = view_.page_capacity_t;
     while (lo < hi) {
+      int32_t target_page = static_cast<int32_t>(lo / cap);
+      // 1. Cache lookup (lane 0, broadcast). Acquire kPageBusy if hit.
       if (lane == 0) {
-        // Resolve performs the cache lookup, eviction, dirty-range seed
-        // and num_modified inc on the [page_off, page_off] singleton.
-        // We extend modify_max below.
-        (void)::wrp_cte::gpu_vector::Resolve(
-            ipc_, view_, last_page_array_, lo, /*is_write=*/true);
+        ::wrp_cte::gpu_vector::Page *hit = nullptr;
+        ::wrp_cte::gpu_vector::Page *&last =
+            ::wrp_cte::gpu_vector::detail::LaneLastPage(last_page_array_);
+        const chi::u32 busy_mask =
+            ::wrp_cte::gpu_vector::kPageBusy |
+            ::wrp_cte::gpu_vector::kPageGetInFlight;
+        if (last && last->page_idx == target_page &&
+            !(last->flags & busy_mask)) {
+          hit = last;
+        } else {
+          ::wrp_cte::gpu_vector::Block *bx =
+              ::wrp_cte::gpu_vector::GetBlock(view_.base, blockIdx.x);
+          chi::u32 total =
+              ::wrp_cte::gpu_vector::TotalPagesPerBlock(view_.base);
+          for (chi::u32 s = 0; s < total; ++s) {
+            ::wrp_cte::gpu_vector::Page *p = &bx->pages[s];
+            if (p->page_idx != target_page) continue;
+            if (p->flags & busy_mask) continue;
+            hit = p;
+            last = hit;
+            break;
+          }
+        }
+        if (hit) {
+          while (!::wrp_cte::gpu_vector::detail::TryAcquireBusy(hit)) {}
+          if (view_.base.stats) {
+            atomicAdd_system(&view_.base.stats->resolve_hits, 1ULL);
+          }
+        } else if (view_.base.stats) {
+          atomicAdd_system(&view_.base.stats->resolve_cold_miss, 1ULL);
+        }
+        if (view_.base.stats) {
+          atomicAdd_system(&view_.base.stats->resolve_total, 1ULL);
+        }
+        last_page_array_[0] = hit;
       }
       __syncwarp();
       ::wrp_cte::gpu_vector::Page *p = last_page_array_[0];
+      // 2. Cold miss → warp-coop evict HBM→DRAM, bind target_page in HBM.
+      if (p == nullptr) {
+        p = ::wrp_cte::gpu_vector::WarpCoopEvictHbmToDram(
+            ipc_, view_, blockIdx.x, target_page, lane);
+        if (lane == 0) {
+          ::wrp_cte::gpu_vector::detail::LaneLastPage(last_page_array_) = p;
+          last_page_array_[0] = p;
+        }
+        __syncwarp();
+      }
+      // 3. Warp-coop write.
       T *page_base = static_cast<T *>(p->device_ptr);
       chi::u64 page_start_i =
           static_cast<chi::u64>(p->page_idx) * cap;
       chi::u64 page_end_i = page_start_i + cap;
       chi::u64 stop = (hi < page_end_i) ? hi : page_end_i;
       chi::u64 page_off_lo = lo - page_start_i;
-      // Lane 0 extends the dirty range to cover the whole stripe-on-page
-      // in one store; modify_min stays correct because Resolve seeded it
-      // and we only grow right.
       if (lane == 0) {
         int32_t hi_off = static_cast<int32_t>(stop - 1 - page_start_i);
+        if (p->modify_min < 0) {
+          p->modify_min = static_cast<int32_t>(page_off_lo);
+          ::wrp_cte::gpu_vector::detail::AtomicIncU32(
+              &::wrp_cte::gpu_vector::GetBlock(view_.base, blockIdx.x)
+                   ->num_modified);
+        } else if (static_cast<int32_t>(page_off_lo) < p->modify_min) {
+          p->modify_min = static_cast<int32_t>(page_off_lo);
+        }
         if (hi_off > p->modify_max) p->modify_max = hi_off;
       }
       __syncwarp();
-      // Warp-coalesced inner loop. Lane j writes elements
-      // page_off_lo + j, page_off_lo + j + 32, ...
       chi::u64 nelem = stop - lo;
       for (chi::u64 j = lane; j < nelem; j += 32) {
         page_base[page_off_lo + j] = value_at(lo + j);
+      }
+      __syncwarp();
+      if (lane == 0) {
+        ::wrp_cte::gpu_vector::detail::ReleaseBusy(p);
       }
       __syncwarp();
       lo = stop;
@@ -535,10 +762,37 @@ class vector {
     if (lo >= hi) return;
     chi::u32 lane = threadIdx.x & 31;
     chi::u64 cap = view_.page_capacity_t;
+    const chi::u32 first_page = static_cast<chi::u32>(lo / cap);
+    const chi::u32 last_page = static_cast<chi::u32>((hi - 1) / cap);
+    // Lookahead = ~HBM tier size. Larger values just thrash the
+    // rescore_q (it's size 256 with kRescoreQueueCap; each page
+    // transition pushes kLookahead entries, so at lookahead=32 with
+    // 40 pages per block × 4 blocks we push 5120 entries, most
+    // dropped via atomic rollback — pure contention).
+    constexpr int kLookahead = 8;
+    constexpr int kLookbehind = 2;
     while (lo < hi) {
       if (lane == 0) {
+        chi::u32 cur_page = static_cast<chi::u32>(lo / cap);
+        ::wrp_cte::gpu_vector::Block *bx =
+            ::wrp_cte::gpu_vector::GetBlock(view_.base, blockIdx.x);
+        for (int la = 1; la <= kLookahead; ++la) {
+          chi::u32 hint = cur_page + static_cast<chi::u32>(la);
+          if (hint > last_page) break;
+          (void)::wrp_cte::gpu_vector::detail::RescorePush(
+              &bx->rescore_q, hint,
+              1.0f - static_cast<float>(la) / (kLookahead + 1));
+        }
+        for (int lb = 1; lb <= kLookbehind; ++lb) {
+          if (cur_page < first_page + static_cast<chi::u32>(lb)) break;
+          chi::u32 hint = cur_page - static_cast<chi::u32>(lb);
+          (void)::wrp_cte::gpu_vector::detail::RescorePush(
+              &bx->rescore_q, hint, 0.1f);
+        }
         (void)::wrp_cte::gpu_vector::Resolve(
             ipc_, view_, last_page_array_, lo, /*is_write=*/false);
+        ::wrp_cte::gpu_vector::Page *p = last_page_array_[0];
+        while (!::wrp_cte::gpu_vector::detail::TryAcquireBusy(p)) {}
       }
       __syncwarp();
       ::wrp_cte::gpu_vector::Page *p = last_page_array_[0];
@@ -553,58 +807,118 @@ class vector {
         consume(lo + j, page_base[page_off_lo + j]);
       }
       __syncwarp();
+      if (lane == 0) {
+        ::wrp_cte::gpu_vector::detail::ReleaseBusy(p);
+      }
+      __syncwarp();
       lo = stop;
     }
   }
 
-  /** Flush every dirty page in the calling block. */
+  /**
+   * Iterator + rescore write form. `next_i(k)` returns the k-th index
+   * (`k` in [0, n)). `value_at(i)` returns the T to store at element i.
+   * `rescore(cur_k, clipped_lookahead, clipped_lookbehind, queue_ref)`
+   * is called by lane 0 once per page transition; the framework clips
+   * `lookahead` to the rescore queue's remaining capacity so the
+   * lambda cannot overflow.
+   *
+   * Per-element re-resolve makes this slower than the contiguous
+   * (lo, hi) form for arbitrary index streams. For contiguous streams
+   * the lane-fast-path makes consecutive same-page hits free.
+   */
+  template <typename NextI, typename V, typename R>
+  HSHM_GPU_FUN void write_range(NextI next_i, chi::u64 n,
+                                 V value_at, R rescore,
+                                 chi::u32 lookahead, chi::u32 lookbehind) {
+    if (n == 0) return;
+    chi::u32 lane = threadIdx.x & 31;
+    // Iterator form is lane-0 only. Lanes != 0 just return; control
+    // reconverges naturally at the function epilogue (no __syncwarp
+    // here — that would deadlock against the early-returned lanes).
+    if (lane != 0) return;
+    ::wrp_cte::gpu_vector::Block *b =
+        ::wrp_cte::gpu_vector::GetBlock(view_.base, blockIdx.x);
+    chi::u64 cap = view_.page_capacity_t;
+    ::wrp_cte::gpu_vector::Page *held = nullptr;
+    int32_t held_page = -1;
+    for (chi::u64 k = 0; k < n; ++k) {
+      chi::u64 idx = next_i(k);
+      int32_t pg = static_cast<int32_t>(idx / cap);
+      if (pg != held_page) {
+        if (held) ::wrp_cte::gpu_vector::detail::ReleaseBusy(held);
+        chi::u32 cap_left =
+            ::wrp_cte::gpu_vector::detail::RescoreRemaining(&b->rescore_q);
+        chi::u32 clipped_la = (lookahead < cap_left) ? lookahead : cap_left;
+        rescore(k, clipped_la, lookbehind, b->rescore_q);
+        (void)::wrp_cte::gpu_vector::Resolve(
+            ipc_, view_, last_page_array_, idx, /*is_write=*/true);
+        held = last_page_array_[0];
+        while (!::wrp_cte::gpu_vector::detail::TryAcquireBusy(held)) {}
+        held_page = pg;
+      }
+      chi::u64 off_t = idx - static_cast<chi::u64>(pg) * cap;
+      T *page_base = static_cast<T *>(held->device_ptr);
+      page_base[off_t] = value_at(idx);
+      int32_t off_i = static_cast<int32_t>(off_t);
+      if (off_i < held->modify_min || held->modify_min < 0) {
+        held->modify_min = off_i;
+      }
+      if (off_i > held->modify_max) held->modify_max = off_i;
+    }
+    if (held) ::wrp_cte::gpu_vector::detail::ReleaseBusy(held);
+  }
+
+  /** Iterator + rescore read form (lane-0 only). */
+  template <typename NextI, typename C, typename R>
+  HSHM_GPU_FUN void read_range(NextI next_i, chi::u64 n,
+                                C consume, R rescore,
+                                chi::u32 lookahead, chi::u32 lookbehind) {
+    if (n == 0) return;
+    chi::u32 lane = threadIdx.x & 31;
+    if (lane != 0) return;
+    ::wrp_cte::gpu_vector::Block *b =
+        ::wrp_cte::gpu_vector::GetBlock(view_.base, blockIdx.x);
+    chi::u64 cap = view_.page_capacity_t;
+    ::wrp_cte::gpu_vector::Page *held = nullptr;
+    int32_t held_page = -1;
+    for (chi::u64 k = 0; k < n; ++k) {
+      chi::u64 idx = next_i(k);
+      int32_t pg = static_cast<int32_t>(idx / cap);
+      if (pg != held_page) {
+        if (held) ::wrp_cte::gpu_vector::detail::ReleaseBusy(held);
+        chi::u32 cap_left =
+            ::wrp_cte::gpu_vector::detail::RescoreRemaining(&b->rescore_q);
+        chi::u32 clipped_la = (lookahead < cap_left) ? lookahead : cap_left;
+        rescore(k, clipped_la, lookbehind, b->rescore_q);
+        (void)::wrp_cte::gpu_vector::Resolve(
+            ipc_, view_, last_page_array_, idx, /*is_write=*/false);
+        held = last_page_array_[0];
+        while (!::wrp_cte::gpu_vector::detail::TryAcquireBusy(held)) {}
+        held_page = pg;
+      }
+      chi::u64 off_t = idx - static_cast<chi::u64>(pg) * cap;
+      T *page_base = static_cast<T *>(held->device_ptr);
+      consume(idx, page_base[off_t]);
+    }
+    if (held) ::wrp_cte::gpu_vector::detail::ReleaseBusy(held);
+  }
+
+  /** Flush every dirty page in the calling block. Lane-0 only: the
+   *  gpu2cpu Send producer contract requires threadIdx.x == 0. */
   HSHM_GPU_FUN void FlushAll() {
+    if ((threadIdx.x & 31) != 0) return;
+    if (threadIdx.x != 0) return;
     ::wrp_cte::gpu_vector::FlushAllInBlock(ipc_, view_, blockIdx.x);
   }
 
   HSHM_GPU_FUN const DeviceView &view() const { return view_; }
 
  private:
-  friend class ElementRef<T>;
   DeviceView view_;
   ::chi::gpu::IpcManager *ipc_;
   ::wrp_cte::gpu_vector::Page **last_page_array_;
 };
-
-template <typename T>
-HSHM_GPU_FUN ElementRef<T>::operator T() const {
-  return *::wrp_cte::gpu_vector::Resolve(v_->ipc_, v_->view_,
-                                          v_->last_page_array_, i_,
-                                          /*is_write=*/false);
-}
-
-template <typename T>
-HSHM_GPU_FUN ElementRef<T> &ElementRef<T>::operator=(const T &val) {
-  *::wrp_cte::gpu_vector::Resolve(v_->ipc_, v_->view_,
-                                   v_->last_page_array_, i_,
-                                   /*is_write=*/true) = val;
-  return *this;
-}
-
-template <typename T>
-HSHM_GPU_FUN ElementRef<T> &ElementRef<T>::operator+=(const T &val) {
-  T cur = *::wrp_cte::gpu_vector::Resolve(v_->ipc_, v_->view_,
-                                           v_->last_page_array_, i_, false);
-  *::wrp_cte::gpu_vector::Resolve(v_->ipc_, v_->view_,
-                                   v_->last_page_array_, i_, true) =
-      cur + val;
-  return *this;
-}
-
-template <typename T>
-HSHM_GPU_FUN ElementRef<T> &ElementRef<T>::operator-=(const T &val) {
-  T cur = *::wrp_cte::gpu_vector::Resolve(v_->ipc_, v_->view_,
-                                           v_->last_page_array_, i_, false);
-  *::wrp_cte::gpu_vector::Resolve(v_->ipc_, v_->view_,
-                                   v_->last_page_array_, i_, true) =
-      cur - val;
-  return *this;
-}
 
 }  // namespace cte::gpu::dev
 
