@@ -1000,11 +1000,22 @@ class IpcManager {
   void ClearClientPool();
 
   /**
-   * Set the net worker's lane pointer for signaling on EnqueueNetTask
-   * Called by scheduler after DivideWorkers assigns net_worker_
-   * @param lane Pointer to the net worker's TaskLane
+   * Set the net worker's lane pointers for signaling on EnqueueNetTask.
+   * Called by scheduler after DivideWorkers assigns the net workers.
+   *
+   * With the recv/send split, kSendIn / kSendOut priorities are drained by
+   * the send worker (peer DEALERs), while kClientSendTcp / kClientSendIpc
+   * are drained by the recv worker (client-facing ROUTER). EnqueueNetTask
+   * picks the right lane to awaken based on the priority enqueued.
+   *
+   * Passing both lanes equal (single-net-worker fallback) is fine — the
+   * same worker handles both directions.
    */
-  void SetNetLane(TaskLane *lane) { net_lane_ = lane; }
+  void SetNetLane(TaskLane *send_lane, TaskLane *recv_lane) {
+    net_send_lane_ = send_lane;
+    net_recv_lane_ = recv_lane;
+    net_lane_ = send_lane;  // back-compat for callers that haven't updated
+  }
 
   /**
    * Enqueue a Future<SendTask> to the network queue
@@ -1262,8 +1273,13 @@ class IpcManager {
   // Network queue for send operations (one lane, two priorities)
   hipc::FullPtr<NetQueue> net_queue_;
 
-  // Net worker's lane pointer for signaling on EnqueueNetTask
+  // Net workers' lane pointers for signaling on EnqueueNetTask. With the
+  // recv/send split, send-side priorities wake net_send_lane_ and
+  // client-response priorities wake net_recv_lane_. net_lane_ remains as
+  // an alias for legacy callers / logging.
   TaskLane *net_lane_ = nullptr;
+  TaskLane *net_send_lane_ = nullptr;
+  TaskLane *net_recv_lane_ = nullptr;
 
   // GPU per-device queues now live on gpu::IpcManager::per_gpu_devices_.
 
@@ -1713,6 +1729,23 @@ HSHM_CROSS_FUN bool Future<TaskT, AllocT>::Wait(float max_sec,
     task_ptr_.SetNull();
     future_shm_.SetNull();
     return true;
+  }
+
+  // Non-blocking poll (max_sec == 0): check FUTURE_COMPLETE without
+  // entering the recv path. If the task is still in flight, return
+  // false immediately so the caller can do other work. If it IS
+  // complete, fall through; the underlying recv will see the flag and
+  // deserialize without blocking.
+  if (max_sec == 0.0f) {
+    hipc::FullPtr<FutureShm> future_full_poll =
+        CHI_CPU_IPC->ToFullPtr(future_shm_);
+    if (future_full_poll.IsNull()) {
+      return false;
+    }
+    if (!future_full_poll.ptr_->flags_.Any(FutureShm::FUTURE_COMPLETE)) {
+      return false;
+    }
+    // Complete -> fall through to normal wait path (cheap; flag is set).
   }
 
   bool is_runtime = CHI_CHIMAERA_MANAGER->IsRuntime();

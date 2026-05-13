@@ -19,6 +19,11 @@ bool IpcCpu2CpuZmq::RuntimeRecv(IpcManager *ipc, u32 &tasks_received) {
   bool did_work = false;
   tasks_received = 0;
 
+  // Instrumentation: cumulative count of client requests this daemon has
+  // accepted from RuntimeRecv. Printed every 256 to keep log volume sane
+  // but still bracket the 24×128 = 3072-req IOR read phase.
+  static std::atomic<size_t> recv_counter{0};
+
   // Process both TCP and IPC servers
   for (int mode_idx = 0; mode_idx < 2; ++mode_idx) {
     IpcMode mode = (mode_idx == 0) ? IpcMode::kTcp : IpcMode::kIpc;
@@ -106,6 +111,13 @@ bool IpcCpu2CpuZmq::RuntimeRecv(IpcManager *ipc, u32 &tasks_received) {
 
       did_work = true;
       tasks_received++;
+      size_t total = recv_counter.fetch_add(1, std::memory_order_relaxed) + 1;
+      if ((total & 0xff) == 0) {
+        HLOG(kDebug,
+             "[CountRecv] cumulative client requests received = {} "
+             "(mode={}, latest method_id={}, pool_id={})",
+             total, mode_idx, method_id, pool_id);
+      }
     }
   }
 
@@ -135,6 +147,8 @@ bool IpcCpu2CpuZmq::RuntimeSend(
   auto *pool_manager = CHI_POOL_MANAGER;
   bool did_work = false;
   tasks_sent = 0;
+  static std::atomic<size_t> send_counter{0};
+  static std::atomic<size_t> send_fail_counter{0};
 
   // Flush deferred deletes from previous invocation.
   // Zero-copy send (zmq_msg_init_data) lets ZMQ's IO thread read from the
@@ -204,10 +218,21 @@ bool IpcCpu2CpuZmq::RuntimeSend(
         archive.client_info_.fd_ = future_shm->response_fd_;
       }
 
-      // Send via lightbeam
+      // Send via lightbeam. Default LbmContext is non-blocking (DONTWAIT in
+      // zmq_transport.h). On read responses each task ships a 1 MiB bulk
+      // frame; at high concurrency the ROUTER socket can transiently
+      // return EAGAIN. Without retry the response is lost and the client
+      // spins on FUTURE_COMPLETE forever, so re-queue on failure.
       int rc = response_transport->Send(archive, hshm::lbm::LbmContext());
       if (rc != 0) {
-        HLOG(kError, "IpcCpu2CpuZmq::RuntimeSend: Send failed: {}", rc);
+        size_t fail_total =
+            send_fail_counter.fetch_add(1, std::memory_order_relaxed) + 1;
+        HLOG(kError,
+             "[CountSend] Send rc={} fail#{} — re-queueing client response "
+             "(priority={})",
+             rc, fail_total, static_cast<int>(priority));
+        ipc->EnqueueNetTask(queued_future, priority);
+        continue;
       }
 
       // Defer task deletion for zero-copy send safety
@@ -216,6 +241,14 @@ bool IpcCpu2CpuZmq::RuntimeSend(
 
       did_work = true;
       tasks_sent++;
+      size_t total = send_counter.fetch_add(1, std::memory_order_relaxed) + 1;
+      if ((total & 0xff) == 0) {
+        HLOG(kDebug,
+             "[CountSend] cumulative client responses sent = {} "
+             "(mode={}, fails so far = {})",
+             total, mode_idx,
+             send_fail_counter.load(std::memory_order_relaxed));
+      }
     }
   }
 

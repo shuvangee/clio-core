@@ -167,8 +167,6 @@ struct CreateParams {
     // Parse it directly into the Config object
     HLOG(kDebug, "CTE CreateParams::LoadConfig() - config string length: {}",
          pool_config.config_.length());
-    HLOG(kDebug, "CTE CreateParams::LoadConfig() - config string:\n{}",
-         pool_config.config_);
     if (!pool_config.config_.empty()) {
       bool success = config_.LoadFromString(pool_config.config_);
       if (!success) {
@@ -176,7 +174,7 @@ struct CreateParams {
              "CTE CreateParams::LoadConfig() - Failed to load config from "
              "string");
       } else {
-        HLOG(kInfo,
+        HLOG(kDebug,
              "CTE CreateParams::LoadConfig() - Successfully loaded config with "
              "{} storage devices",
              config_.storage_.devices_.size());
@@ -1233,6 +1231,36 @@ struct GetBlobTask : public chi::Task {
     method_ = Method::kGetBlob;
     task_flags_.Clear();
     pool_query_ = pool_query;
+  }
+
+  /** Destructor — frees blob_data_ when this task owns the buffer.
+   *
+   * The destructor runs for every GetBlobTask, but TASK_DATA_OWNER is only
+   * set on cross-node-receiver instances (admin RecvIn sets it when
+   * LoadTaskArchive::bulk had to AllocateBuffer for the BULK_EXPOSE
+   * input — i.e. on the remote daemon that allocated a fresh buffer to
+   * receive the read response from its bdev).
+   *
+   * Client-side GetBlobTask (created by emplace constructor) has
+   * task_flags_.Clear() so the flag is off and the destructor leaves the
+   * client's blob_data_ alone (the client allocated it and will free it
+   * itself after task.Wait() returns).
+   *
+   * Without this destructor the BULK_EXPOSE buffer on the responder side
+   * leaked one 1 MiB allocation per cross-node read; at 24 PPN × 256 MiB
+   * blocks the 1 GiB main shared-memory segment ran out, AllocateBuffer
+   * started failing, RecvIn's deserialization silently dropped the
+   * response, and the client's task.Wait() spun forever.
+   */
+  HSHM_CROSS_FUN ~GetBlobTask() {
+#if !HSHM_IS_DEVICE_PASS
+    if (task_flags_.Any(TASK_DATA_OWNER) && !blob_data_.IsNull()) {
+      auto *ipc_manager = CHI_CPU_IPC;
+      if (ipc_manager) {
+        ipc_manager->FreeBuffer(blob_data_.template Cast<char>());
+      }
+    }
+#endif
   }
 
   // GPU-compatible emplace constructor (const char* instead of std::string)

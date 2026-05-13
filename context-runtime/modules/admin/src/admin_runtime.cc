@@ -49,7 +49,9 @@
 #include <hermes_shm/serialize/msgpack_wrapper.h>
 
 #include "hermes_shm/data_structures/serialization/global_serialize.h"
+#include <cerrno>
 #include <chrono>
+#include <climits>
 #include <filesystem>
 #include <memory>
 #include <unordered_map>
@@ -77,9 +79,10 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   // Note: Admin container is already initialized by the framework before Create
   // is called
 
-  // Note: No locks needed - all Send/Recv tasks are routed to a single
-  // dedicated network worker, ensuring thread-safe access to
-  // send_map_/recv_map_
+  // send_map_/recv_map_ access is now guarded by send_map_mutex_ /
+  // recv_map_mutex_ since DefaultScheduler splits the net worker into a
+  // send worker (SendIn / SendOut / ProcessRetryQueues) and a recv worker
+  // (RecvIn / RecvOut).
 
   create_count_++;
 
@@ -393,9 +396,13 @@ void Runtime::SendIn(hipc::FullPtr<chi::Task> origin_task,
   // This ensures consistent net_key across all replicas
   size_t send_map_key = size_t(origin_task.ptr_);
 
-  // Add the origin task to send_map before creating copies
-  // Note: No lock needed - single net worker processes all Send/Recv tasks
-  send_map_[send_map_key] = origin_task;
+  // Add the origin task to send_map before creating copies.
+  // SendIn runs on net_send_worker; RecvOut/ProcessRetryQueues touch this
+  // map from other threads with the worker split, so the mutex is required.
+  {
+    std::lock_guard<std::mutex> lk(send_map_mutex_);
+    send_map_[send_map_key] = origin_task;
+  }
 
   // Get pool_queries from task's RunContext
   if (!origin_task->GetRunCtx()) {
@@ -526,13 +533,30 @@ void Runtime::SendIn(hipc::FullPtr<chi::Task> origin_task,
          rc);
 
     if (rc != 0) {
-      HLOG(kError,
-           "[SendIn] Task {} Lightbeam async Send FAILED with error code {}",
+      // EAGAIN is just ZMQ back-pressure (HWM hit) on a non-blocking send,
+      // NOT evidence the peer is dead. Marking the peer dead on EAGAIN
+      // flips IsAlive() to false and forces every subsequent SendIn /
+      // SendOut to retry-queue, cascading into the full-stop we used to
+      // see under cross-node read load. Treat EAGAIN as transient: just
+      // re-queue the task for the next periodic tick. Anything else is
+      // genuinely fatal (network error, peer reset).
+      HLOG(kWarning,
+           "[SendIn] Task {} Lightbeam Send rc={} — re-queueing (no dead-mark)",
            origin_task->task_id_, rc);
-      ipc_manager->SetDead(target_node_id);
+      if (rc != EAGAIN) {
+        ipc_manager->SetDead(target_node_id);
+      }
       send_in_retry_.push_back(
           {task_copy, target_node_id, std::chrono::steady_clock::now()});
       continue;
+    }
+
+    {
+      static std::atomic<size_t> ctr{0};
+      size_t t = ctr.fetch_add(1, std::memory_order_relaxed) + 1;
+      if ((t & 0xff) == 0) {
+        HLOG(kDebug, "[CountSendIn] sent {} cross-node tasks to peers", t);
+      }
     }
   }
 }
@@ -572,19 +596,23 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
 
   // Remove task from recv_map as we're completing it
   // Key must match RecvIn: combines net_key and replica_id
-  // Note: No lock needed - single net worker processes all Send/Recv tasks
+  // SendOut runs on net_send_worker; RecvIn writes recv_map_ from
+  // net_recv_worker, so the mutex serialises the find/erase pair.
   size_t recv_key = origin_task->task_id_.net_key_ ^
                     (static_cast<size_t>(origin_task->task_id_.replica_id_) *
                      0x9e3779b97f4a7c15ULL);
-  auto *it = recv_map_.find(recv_key);
-  if (it == nullptr) {
-    HLOG(kError,
-         "[SendOut] Task {} FAILED: Not found in recv_map (size: {}) with "
-         "recv_key {}",
-         origin_task->task_id_, recv_map_.size(), recv_key);
-    return;
+  {
+    std::lock_guard<std::mutex> lk(recv_map_mutex_);
+    auto *it = recv_map_.find(recv_key);
+    if (it == nullptr) {
+      HLOG(kError,
+           "[SendOut] Task {} FAILED: Not found in recv_map (size: {}) with "
+           "recv_key {}",
+           origin_task->task_id_, recv_map_.size(), recv_key);
+      return;
+    }
+    recv_map_.erase(recv_key);
   }
-  recv_map_.erase(recv_key);
 
   // Get return node from pool_query
   chi::u64 target_node_id = origin_task->pool_query_.GetReturnNode();
@@ -635,21 +663,42 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
   hshm::lbm::LbmContext ctx(0);
   int rc = lbm_transport->Send(archive, ctx);
   if (rc != 0) {
-    HLOG(kError, "[SendOut] Task {} Lightbeam Send FAILED with error code {}",
+    // See the matching note in SendIn: EAGAIN means the ZMQ queue to this
+    // peer is full transiently, not that the peer is gone. Re-queue
+    // without flipping IsAlive(), so other in-flight SendOuts don't get
+    // cascaded into the retry path on the same EAGAIN.
+    HLOG(kWarning,
+         "[SendOut] Task {} Lightbeam Send rc={} — re-queueing (no dead-mark)",
          origin_task->task_id_, rc);
-    ipc_manager->SetDead(target_node_id);
+    if (rc != EAGAIN) {
+      ipc_manager->SetDead(target_node_id);
+    }
     send_out_retry_.push_back(
         {origin_task, target_node_id, std::chrono::steady_clock::now()});
     return;
   }
 
+  {
+    static std::atomic<size_t> ctr{0};
+    size_t t = ctr.fetch_add(1, std::memory_order_relaxed) + 1;
+    if ((t & 0xff) == 0) {
+      HLOG(kDebug, "[CountSendOut] sent {} cross-node responses back", t);
+    }
+  }
+
   HLOG(kDebug, "[SendOut] Task {}", origin_task->task_id_);
 
-  // Clear TASK_DATA_OWNER before deferred deletion so the destructor
-  // doesn't try to FreeBuffer on transport-allocated data
-  origin_task->ClearFlags(TASK_DATA_OWNER);
-
-  // Defer task deletion to next invocation for zero-copy send safety
+  // TASK_DATA_OWNER was set by RecvIn iff the receiving archive had
+  // BULK_EXPOSE bulks that we AllocateBuffer'd ourselves (see admin_runtime
+  // RecvIn / task_archive.cc daemon_allocated_bulk_count_). In that case
+  // the buffer is chimaera SHM and the task's destructor will FreeBuffer
+  // it — leave the flag alone. If the input bulk lived in ZMQ-owned
+  // memory (BULK_XFER write data), the flag was never set, so there's
+  // nothing to clear and no double-free risk.
+  //
+  // Defer task deletion one invocation to give ZMQ's I/O thread time to
+  // flush the zero-copy zmq_msg_init_data bulk before the buffer is
+  // released by the destructor.
   deferred_deletes.push_back(origin_task);
 }
 
@@ -671,8 +720,20 @@ chi::TaskResume Runtime::Send(hipc::FullPtr<SendTask> task,
   // Scan send_map_ for timed-out entries from dead nodes
   ScanSendMapTimeouts();
 
+  // With the recv/send worker split (DefaultScheduler::DivideWorkers),
+  // Recv / ClientRecv run on net_recv_worker, NOT this one. So Send no
+  // longer has to share air with them, and the original cap-per-tick to
+  // avoid starving Recv is obsolete. Default is now effectively unbounded
+  // (drain everything queued); the env var stays as an escape hatch.
+  const char *send_burst_env = std::getenv("CHI_SEND_BURST");
+  int send_burst_cap = (send_burst_env && *send_burst_env)
+                           ? std::atoi(send_burst_env)
+                           : INT_MAX;
+  if (send_burst_cap <= 0) send_burst_cap = INT_MAX;
+
   // Poll priority 0 (SendIn) queue - tasks waiting to be sent to remote nodes
-  while (ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendIn,
+  while (send_in_count < send_burst_cap &&
+         ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendIn,
                                     queued_future)) {
     // Get the original task from the Future
     auto origin_task = queued_future.GetTaskPtr();
@@ -691,7 +752,8 @@ chi::TaskResume Runtime::Send(hipc::FullPtr<SendTask> task,
 
   // Poll priority 1 (SendOut) queue - tasks with outputs to send back
   int send_out_count = 0;
-  while (ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendOut,
+  while (send_out_count < send_burst_cap &&
+         ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendOut,
                                     queued_future)) {
     // Get the original task from the Future
     auto origin_task = queued_future.GetTaskPtr();
@@ -773,21 +835,35 @@ void Runtime::RecvIn(hipc::FullPtr<RecvTask> task,
       ipc_manager->SetAlive(sender_node);
     }
 
-    // Mark task as remote, set as data owner, clear sender-side flags
-    // TASK_RUN_CTX_EXISTS and TASK_STARTED must be cleared so the receiving
-    // worker allocates a fresh RunContext via BeginTask
-    task_ptr->SetFlags(TASK_REMOTE | TASK_DATA_OWNER);
+    // Mark task as remote. TASK_DATA_OWNER is set only if the archive
+    // had to AllocateBuffer for any BULK_EXPOSE bulk (typical read
+    // response path: GetBlob's blob_data_ is allocated daemon-side). If
+    // the input was BULK_XFER (write data shipped from peer), the bulk
+    // buffer lives in ZMQ-owned memory and FreeBuffer on it would crash,
+    // so leave TASK_DATA_OWNER clear in that case.
+    //
+    // TASK_RUN_CTX_EXISTS and TASK_STARTED must be cleared so the
+    // receiving worker allocates a fresh RunContext via BeginTask.
+    chi::u32 set_flags = TASK_REMOTE;
+    if (archive.daemon_allocated_bulk_count_ > 0) {
+      set_flags |= TASK_DATA_OWNER;
+    }
+    task_ptr->SetFlags(set_flags);
     task_ptr->ClearFlags(TASK_PERIODIC | TASK_FORCE_NET | TASK_ROUTED |
                          TASK_RUN_CTX_EXISTS | TASK_STARTED);
 
     // Add task to recv_map for later lookup
     // Key combines net_key and replica_id so multiple replicas targeting the
     // same node (e.g., after container migration) get distinct entries.
-    // Note: No lock needed - single net worker processes all Send/Recv tasks
+    // RecvIn runs on net_recv_worker; SendOut reads/erases recv_map_ from
+    // net_send_worker.
     size_t recv_key = task_ptr->task_id_.net_key_ ^
                       (static_cast<size_t>(task_ptr->task_id_.replica_id_) *
                        0x9e3779b97f4a7c15ULL);
-    recv_map_[recv_key] = task_ptr;
+    {
+      std::lock_guard<std::mutex> lk(recv_map_mutex_);
+      recv_map_[recv_key] = task_ptr;
+    }
 
     HLOG(kDebug, "[RecvIn] Task {} method={} pool_id={} dispatching to workers",
          task_ptr->task_id_, task_ptr->method_, task_ptr->pool_id_);
@@ -833,17 +909,22 @@ void Runtime::RecvOut(hipc::FullPtr<RecvTask> task,
     // Locate origin task from send_map using net_key
     size_t net_key = task_info.task_id_.net_key_;
 
-    // Note: No lock needed - single net worker processes all Send/Recv tasks
-    auto send_it = send_map_.find(net_key);
-    if (send_it == nullptr) {
-      HLOG(kError,
-           "[RecvOut] Task {} FAILED: Origin task not found in send_map "
-           "(size: {}) with net_key {}",
-           task_info.task_id_, send_map_.size(), net_key);
-      task->SetReturnCode(5);
-      return;
+    // SendIn (net_send_worker) populates send_map_; copy the value out
+    // under the lock so the rest of the work happens without holding it.
+    hipc::FullPtr<chi::Task> origin_task;
+    {
+      std::lock_guard<std::mutex> lk(send_map_mutex_);
+      auto send_it = send_map_.find(net_key);
+      if (send_it == nullptr) {
+        HLOG(kError,
+             "[RecvOut] Task {} FAILED: Origin task not found in send_map "
+             "(size: {}) with net_key {}",
+             task_info.task_id_, send_map_.size(), net_key);
+        task->SetReturnCode(5);
+        return;
+      }
+      origin_task = *send_it;
     }
-    hipc::FullPtr<chi::Task> origin_task = *send_it;
     if (!origin_task->GetRunCtx()) {
       HLOG(kError, "Admin: origin_task has no RunContext");
       task->SetReturnCode(6);
@@ -881,16 +962,20 @@ void Runtime::RecvOut(hipc::FullPtr<RecvTask> task,
   for (size_t task_idx = 0; task_idx < task_infos.size(); ++task_idx) {
     const auto &task_info = task_infos[task_idx];
 
-    // Locate origin task from send_map using net_key
-    // Note: No lock needed - single net worker processes all Send/Recv tasks
+    // Locate origin task from send_map using net_key. Same locking note as
+    // the first pass — copy out under the lock, then process unlocked.
     size_t net_key = task_info.task_id_.net_key_;
-    auto send_it = send_map_.find(net_key);
-    if (send_it == nullptr) {
-      HLOG(kError, "Admin: Origin task not found in send_map with net_key {}",
-           net_key);
-      continue;
+    hipc::FullPtr<chi::Task> origin_task;
+    {
+      std::lock_guard<std::mutex> lk(send_map_mutex_);
+      auto send_it = send_map_.find(net_key);
+      if (send_it == nullptr) {
+        HLOG(kError, "Admin: Origin task not found in send_map with net_key {}",
+             net_key);
+        continue;
+      }
+      origin_task = *send_it;
     }
-    hipc::FullPtr<chi::Task> origin_task = *send_it;
     if (!origin_task->GetRunCtx()) {
       HLOG(kError, "Admin: origin_task has no RunContext");
       continue;
@@ -943,9 +1028,12 @@ void Runtime::RecvOut(hipc::FullPtr<RecvTask> task,
       // Clear subtasks vector after deleting tasks
       origin_rctx->subtasks_.clear();
 
-      // Remove origin from send_map
-      // Note: No lock needed - single net worker processes all Send/Recv tasks
-      send_map_.erase(net_key);
+      // Remove origin from send_map; serialised against SendIn insertions
+      // and ScanSendMapTimeouts iteration on the send worker.
+      {
+        std::lock_guard<std::mutex> lk(send_map_mutex_);
+        send_map_.erase(net_key);
+      }
 
       // Set container in origin RunContext (may be null if task was routed
       // globally without passing through RouteLocal, e.g. TASK_FORCE_NET)
@@ -1005,6 +1093,20 @@ chi::TaskResume Runtime::Recv(hipc::FullPtr<RecvTask> task,
   chi::MsgType msg_type = archive.GetMsgType();
   HLOG(kDebug, "[Recv] Received message with msg_type={}",
        static_cast<int>(msg_type));
+
+  {
+    static std::atomic<size_t> ctr_in{0};
+    static std::atomic<size_t> ctr_out{0};
+    if (msg_type == chi::MsgType::kSerializeIn) {
+      size_t t = ctr_in.fetch_add(1, std::memory_order_relaxed) + 1;
+      if ((t & 0xff) == 0)
+        HLOG(kDebug, "[CountRecvIn] received {} cross-node task inputs", t);
+    } else if (msg_type == chi::MsgType::kSerializeOut) {
+      size_t t = ctr_out.fetch_add(1, std::memory_order_relaxed) + 1;
+      if ((t & 0xff) == 0)
+        HLOG(kDebug, "[CountRecvOut] received {} cross-node task outputs", t);
+    }
+  }
 
   // Dispatch based on message type
   switch (msg_type) {
@@ -2063,51 +2165,71 @@ void Runtime::ScanSendMapTimeouts() {
     dead_map[entry.node_id] = entry.detected_at;
   }
 
-  // Scan send_map_ for tasks targeting dead nodes using for_each
-  std::vector<size_t> keys_to_remove;
-  send_map_.for_each(
-      [&](const size_t &key, hipc::FullPtr<chi::Task> &origin_task) {
-        if (origin_task.IsNull() || !origin_task->GetRunCtx()) return;
+  // Scan send_map_ for tasks targeting dead nodes using for_each.
+  //
+  // ScanSendMapTimeouts runs on net_send_worker (same thread as SendIn
+  // inserts), but RecvOut on net_recv_worker erases entries concurrently.
+  // Hold the lock for the iteration, but EndTask is called only on
+  // collected keys and may do nontrivial work, so the actual EndTask +
+  // erase pass runs outside the iteration scope. This keeps the critical
+  // section bounded to a hash-bucket walk.
+  std::vector<std::pair<size_t, hipc::FullPtr<chi::Task>>> to_complete;
+  {
+    std::lock_guard<std::mutex> lk(send_map_mutex_);
+    send_map_.for_each(
+        [&](const size_t &key, hipc::FullPtr<chi::Task> &origin_task) {
+          if (origin_task.IsNull() || !origin_task->GetRunCtx()) return;
 
-        chi::RunContext *rctx = origin_task->GetRunCtx();
-        // Use per-task timeout if set, otherwise kRetryTimeoutSec
-        float task_timeout = kRetryTimeoutSec;
-        float task_net_timeout = origin_task->pool_query_.GetNetTimeout();
-        if (task_net_timeout >= 0) {
-          task_timeout = task_net_timeout;
-        }
+          chi::RunContext *rctx = origin_task->GetRunCtx();
+          // Use per-task timeout if set, otherwise kRetryTimeoutSec
+          float task_timeout = kRetryTimeoutSec;
+          float task_net_timeout = origin_task->pool_query_.GetNetTimeout();
+          if (task_net_timeout >= 0) {
+            task_timeout = task_net_timeout;
+          }
 
-        // Check if any replica targets a dead node that has exceeded the
-        // timeout
-        bool any_timed_out = false;
-        for (const auto &pq : rctx->pool_queries_) {
-          if (pq.IsPhysicalMode()) {
-            auto dit = dead_map.find(pq.GetNodeId());
-            if (dit != dead_map.end()) {
-              float dead_elapsed =
-                  std::chrono::duration<float>(now - dit->second).count();
-              if (dead_elapsed >= task_timeout) {
-                any_timed_out = true;
-                break;
+          // Check if any replica targets a dead node that has exceeded the
+          // timeout
+          bool any_timed_out = false;
+          for (const auto &pq : rctx->pool_queries_) {
+            if (pq.IsPhysicalMode()) {
+              auto dit = dead_map.find(pq.GetNodeId());
+              if (dit != dead_map.end()) {
+                float dead_elapsed =
+                    std::chrono::duration<float>(now - dit->second).count();
+                if (dead_elapsed >= task_timeout) {
+                  any_timed_out = true;
+                  break;
+                }
               }
             }
           }
-        }
 
-        if (any_timed_out) {
-          HLOG(kError,
-               "[ScanSendMapTimeouts] Task {} timed out waiting for dead node",
-               origin_task->task_id_);
-          origin_task->SetReturnCode(kNetworkTimeoutRC);
-          // Complete the task as failed
-          auto *worker = CHI_CUR_WORKER;
-          worker->EndTask(origin_task, rctx, true);
-          keys_to_remove.push_back(key);
-        }
-      });
+          if (any_timed_out) {
+            to_complete.emplace_back(key, origin_task);
+          }
+        });
+  }
 
-  for (size_t key : keys_to_remove) {
-    send_map_.erase(key);
+  // Finalise timed-out tasks outside the map lock to keep EndTask from
+  // executing under it (EndTask can re-enter scheduling code).
+  for (auto &entry : to_complete) {
+    auto &origin_task = entry.second;
+    chi::RunContext *rctx = origin_task->GetRunCtx();
+    if (!rctx) continue;
+    HLOG(kError,
+         "[ScanSendMapTimeouts] Task {} timed out waiting for dead node",
+         origin_task->task_id_);
+    origin_task->SetReturnCode(kNetworkTimeoutRC);
+    auto *worker = CHI_CUR_WORKER;
+    worker->EndTask(origin_task, rctx, true);
+  }
+
+  if (!to_complete.empty()) {
+    std::lock_guard<std::mutex> lk(send_map_mutex_);
+    for (auto &entry : to_complete) {
+      send_map_.erase(entry.first);
+    }
   }
 }
 
@@ -2118,12 +2240,16 @@ void Runtime::FlushStaleStateForNode(chi::u64 node_id) {
   for (auto it = send_in_retry_.begin(); it != send_in_retry_.end();) {
     if (it->target_node_id == node_id) {
       size_t net_key = it->task->task_id_.net_key_;
-      auto send_it = send_map_.find(net_key);
-      if (send_it != nullptr) {
-        auto &origin = *send_it;
-        if (origin->GetRunCtx()) {
-          origin->GetRunCtx()->completed_replicas_++;
+      hipc::FullPtr<chi::Task> origin;
+      {
+        std::lock_guard<std::mutex> lk(send_map_mutex_);
+        auto send_it = send_map_.find(net_key);
+        if (send_it != nullptr) {
+          origin = *send_it;
         }
+      }
+      if (!origin.IsNull() && origin->GetRunCtx()) {
+        origin->GetRunCtx()->completed_replicas_++;
       }
       HLOG(kInfo,
            "[FlushStale] Discarding SendIn retry for restarted node {}",
@@ -2215,7 +2341,7 @@ chi::TaskResume Runtime::HeartbeatProbe(hipc::FullPtr<HeartbeatProbeTask> task,
   for (auto it = pending_indirect_probes_.begin();
        it != pending_indirect_probes_.end();) {
     if (it->future.IsComplete()) {
-      it->future.Wait(0);  // Finalize
+      it->future.Wait();   // Finalize (already complete — IsComplete() above)
       if (it->future->probe_result_ == 0) {
         // Indirect probe succeeded - node is alive
         ipc_manager->SetNodeState(it->target_node_id, chi::NodeState::kAlive);
@@ -2387,7 +2513,7 @@ chi::TaskResume Runtime::ProbeRequest(hipc::FullPtr<ProbeRequestTask> task,
   }
 
   if (future.IsComplete()) {
-    future.Wait(0);           // Finalize (already complete)
+    future.Wait();            // Finalize (already complete)
     task->probe_result_ = 0;  // alive
   } else {
     task->probe_result_ = -1;  // unreachable
@@ -2421,8 +2547,18 @@ chi::TaskStat Runtime::GetTaskStats(chi::u32 method_id) const {
 }
 
 chi::u64 Runtime::GetWorkRemaining() const {
-  // Note: No lock needed - single net worker processes all Send/Recv tasks
-  return send_map_.size() + recv_map_.size();
+  // Accessed from non-net workers (the scheduler/shutdown path); briefly
+  // acquire both map locks for a consistent snapshot.
+  size_t send_size, recv_size;
+  {
+    std::lock_guard<std::mutex> lk(send_map_mutex_);
+    send_size = send_map_.size();
+  }
+  {
+    std::lock_guard<std::mutex> lk(recv_map_mutex_);
+    recv_size = recv_map_.size();
+  }
+  return send_size + recv_size;
 }
 
 //===========================================================================

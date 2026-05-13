@@ -52,43 +52,72 @@ void DefaultScheduler::DivideWorkers(WorkOrchestrator *work_orch) {
 
   scheduler_worker_ = nullptr;
   io_workers_.clear();
-  net_worker_ = nullptr;
+  net_send_worker_ = nullptr;
+  net_recv_worker_ = nullptr;
   gpu_worker_ = nullptr;
 
   // Worker 0 is always the scheduler worker
   scheduler_worker_ = work_orch->GetWorker(0);
 
-  // Network worker is always the last worker
-  net_worker_ = work_orch->GetWorker(total_workers - 1);
-
-  // GPU worker is worker N-2 if we have more than 2 workers
-  if (total_workers > 2) {
-    gpu_worker_ = work_orch->GetWorker(total_workers - 2);
+  // Layout, with worker count growing left-to-right:
+  //   N=1: [sched]                                        — net workers alias sched (degenerate)
+  //   N=2: [sched, net]                                   — single net thread (recv+send collapsed)
+  //   N=3: [sched, net_send, net_recv]                    — split nets, no I/O lane
+  //   N>=4: [sched, io..., net_send, net_recv]            — dedicated send + recv
+  // The split decouples ZMQ send-side back-pressure from ROUTER recv polling
+  // so SWIM heartbeat probe responses can drain even while peer DEALERs are
+  // bottlenecked. With N<3 we fall back to a single net worker (degraded, but
+  // keeps the runtime usable for trivial test configs).
+  if (total_workers >= 3) {
+    net_recv_worker_ = work_orch->GetWorker(total_workers - 1);
+    net_send_worker_ = work_orch->GetWorker(total_workers - 2);
+  } else if (total_workers == 2) {
+    net_recv_worker_ = work_orch->GetWorker(1);
+    net_send_worker_ = net_recv_worker_;
+  } else {
+    net_recv_worker_ = scheduler_worker_;
+    net_send_worker_ = scheduler_worker_;
   }
 
-  // I/O workers are workers 1..N-2 (empty if N <= 2)
-  if (total_workers > 2) {
-    for (u32 i = 1; i < total_workers - 1; ++i) {
-      Worker *worker = work_orch->GetWorker(i);
-      if (worker) {
-        io_workers_.push_back(worker);
-      }
+  // GPU worker: needs its own worker so kGpuRecv polling doesn't fight with
+  // periodic net tasks. Carve it out from before the net pair (N-3) when
+  // we have headroom; otherwise leave gpu_worker_ null (callers must
+  // tolerate this — none of the CPU-only paths exercised below need it).
+  if (total_workers >= 5) {
+    gpu_worker_ = work_orch->GetWorker(total_workers - 3);
+  }
+
+  // I/O workers live between the scheduler and the GPU/net block. With the
+  // split there's one fewer worker available for I/O than in the old
+  // layout; small I/O and metadata still fall back to the scheduler worker
+  // via RuntimeMapTask, so this stays correct for any worker count.
+  u32 io_upper_excl = total_workers >= 5 ? total_workers - 3
+                    : total_workers >= 3 ? total_workers - 2
+                                         : 1;
+  for (u32 i = 1; i < io_upper_excl; ++i) {
+    Worker *worker = work_orch->GetWorker(i);
+    if (worker) {
+      io_workers_.push_back(worker);
     }
   }
 
-  // Number of scheduling queues excludes the network worker
+  // Register both net workers' lanes with the IPC manager so
+  // EnqueueNetTask wakes the correct one based on the priority enqueued.
   IpcManager *ipc = CHI_IPC;
   if (ipc) {
     ipc->SetNumSchedQueues(1);
-    if (net_worker_) {
-      ipc->SetNetLane(net_worker_->GetLane());
+    if (net_send_worker_ && net_recv_worker_) {
+      ipc->SetNetLane(net_send_worker_->GetLane(),
+                      net_recv_worker_->GetLane());
     }
   }
 
+  int send_id = net_send_worker_ ? (int)net_send_worker_->GetId() : -1;
+  int recv_id = net_recv_worker_ ? (int)net_recv_worker_->GetId() : -1;
   HLOG(kInfo,
        "DefaultScheduler: 1 scheduler worker (0), {} I/O workers, "
-       "1 network worker ({}), gpu_worker={}",
-       io_workers_.size(), total_workers - 1,
+       "net_send_worker={}, net_recv_worker={}, gpu_worker={}",
+       io_workers_.size(), send_id, recv_id,
        gpu_worker_ ? (int)gpu_worker_->GetId() : -1);
 }
 
@@ -136,14 +165,29 @@ u32 DefaultScheduler::RuntimeMapTask(Worker *worker, const Future<Task> &task,
   // ---- Normal routing: determine selected worker ----
   Worker *selected = nullptr;
 
-  // Periodic Send/Recv → network worker
+  // Periodic Send/Recv routing. The split is by SOCKET OWNERSHIP, not by
+  // verb — ZeroMQ sockets are not safe to share across threads, so each
+  // socket has exactly one owner thread.
+  //   14 = kSend         peer DEALER pool → net_send_worker
+  //   15 = kRecv         peer ROUTER (9413) → net_recv_worker
+  //   20 = kClientRecv   client-facing ROUTER (9416 / IPC) → net_recv_worker
+  //   21 = kClientSend   same client-facing ROUTER → net_recv_worker
+  // ClientSend and ClientRecv share the client server socket, so they
+  // both run on net_recv_worker. The send worker is therefore dedicated
+  // to outbound peer DEALER sends, which is the workload most likely to
+  // back-pressure on ZMQ HWM — keeping it off the recv worker means
+  // inbound SWIM probe responses can still be polled.
   if (task_ptr != nullptr && task_ptr->IsPeriodic()) {
     if (task_ptr->pool_id_ == chi::kAdminPoolId) {
       u32 method_id = task_ptr->method_;
-      if (method_id == 14 || method_id == 15 || method_id == 20 || method_id == 21) {
-        if (net_worker_ != nullptr) {
-          return net_worker_->GetId();
-        }
+      Worker *target = nullptr;
+      if (method_id == 14) {
+        target = net_send_worker_;
+      } else if (method_id == 15 || method_id == 20 || method_id == 21) {
+        target = net_recv_worker_;
+      }
+      if (target != nullptr) {
+        return target->GetId();
       }
     }
   }

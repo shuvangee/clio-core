@@ -1145,10 +1145,20 @@ bool IpcManager::IdentifyThisHost() {
     bool is_loopback = (host.ip_address == "127.0.0.1") ||
                        (host.ip_address == "localhost") ||
                        (host.ip_address == "::1");
+    // The hostfile may use NIC-suffixed names (e.g. "ares-comp-31-40g")
+    // that resolve to a non-default fabric, while gethostname() returns
+    // the plain short name ("ares-comp-31"). Accept a match when the
+    // entry's short name starts with `<local_short>-` so suffixed
+    // hostnames identify the same node correctly.
+    bool suffix_match =
+        entry_short.size() > local_short.size() + 1 &&
+        entry_short.compare(0, local_short.size(), local_short) == 0 &&
+        entry_short[local_short.size()] == '-';
     bool is_me = (host.ip_address == "0.0.0.0") ||
                  is_loopback ||
                  (host.ip_address == local_host) ||
-                 (entry_short == local_short);
+                 (entry_short == local_short) ||
+                 suffix_match;
     if (!is_me) continue;
 
     HLOG(kDebug, "Hostfile entry {} matches local host {}; binding 0.0.0.0",
@@ -1352,12 +1362,27 @@ void IpcManager::FreeBuffer(FullPtr<char> buffer_ptr) {
     return;
   }
 
-  // Check per-process shared memory allocators via alloc_map_
+  // Check per-process shared memory allocators via alloc_map_.
+  //
+  // alloc_map_ is a std::unordered_map; mutation (IncreaseClientShm,
+  // RegisterMemory, WreapDeadIpcs, KillIpcs) is serialised under
+  // allocator_map_lock_'s write-side. A bare find() here races with
+  // those writers, and a concurrent rehash can deref a stale bucket
+  // pointer — caught here under sustained write load as a segfault
+  // in the runtime's bdev path. Match ToFullPtr's read-locked pattern.
   u64 alloc_key = (static_cast<u64>(buffer_ptr.shm_.alloc_id_.major_) << 32) |
                   static_cast<u64>(buffer_ptr.shm_.alloc_id_.minor_);
-  auto it = alloc_map_.find(alloc_key);
-  if (it != alloc_map_.end()) {
-    it->second->Free(buffer_ptr);
+  hipc::MultiProcessAllocator *resolved_alloc = nullptr;
+  {
+    allocator_map_lock_.ReadLock();
+    auto it = alloc_map_.find(alloc_key);
+    if (it != alloc_map_.end()) {
+      resolved_alloc = it->second;
+    }
+    allocator_map_lock_.ReadUnlock();
+  }
+  if (resolved_alloc != nullptr) {
+    resolved_alloc->Free(buffer_ptr);
     return;
   }
 
@@ -1436,14 +1461,31 @@ void IpcManager::EnqueueNetTask(Future<Task> future,
   bool was_empty = lane.Empty();
   lane.Push(future);
 
-  // Signal the net worker if the lane was empty (same pattern as
-  // admin_runtime.cc:1086-1089)
-  if (was_empty && net_lane_) {
-    AwakenWorker(net_lane_);
+  // Pick the worker that drains this priority's queue. Cross-node Send
+  // priorities (kSendIn / kSendOut) are owned by net_send_worker; client
+  // response priorities (kClientSendTcp / kClientSendIpc) are owned by
+  // net_recv_worker (the ROUTER socket is shared with ClientRecv).
+  if (was_empty) {
+    TaskLane *wake_lane = nullptr;
+    switch (priority) {
+      case NetQueuePriority::kSendIn:
+      case NetQueuePriority::kSendOut:
+        wake_lane = net_send_lane_ ? net_send_lane_ : net_lane_;
+        break;
+      case NetQueuePriority::kClientSendTcp:
+      case NetQueuePriority::kClientSendIpc:
+        wake_lane = net_recv_lane_ ? net_recv_lane_ : net_lane_;
+        break;
+    }
+    if (wake_lane) {
+      AwakenWorker(wake_lane);
+    }
   }
 
-  HLOG(kDebug, "EnqueueNetTask: priority={}, was_empty={}, net_lane={}",
-       priority_idx, was_empty, net_lane_ != nullptr);
+  HLOG(kDebug,
+       "EnqueueNetTask: priority={}, was_empty={}, send_lane={}, recv_lane={}",
+       priority_idx, was_empty, net_send_lane_ != nullptr,
+       net_recv_lane_ != nullptr);
 }
 
 bool IpcManager::TryPopNetTask(NetQueuePriority priority,
@@ -2142,6 +2184,11 @@ void IpcManager::RecvZmqClientThread() {
   hshm::lbm::EventManager em;
   zmq_transport_->RegisterEventManager(em);
 
+  // Instrumentation: count of responses this client has received and signaled
+  // (FUTURE_COMPLETE set). Mismatch vs daemon-side send count = lost responses.
+  size_t recv_count = 0;
+  size_t miss_count = 0;
+
   while (zmq_recv_running_.load()) {
     // Drain all available messages first
     bool drained_any = false;
@@ -2174,8 +2221,11 @@ void IpcManager::RecvZmqClientThread() {
       std::lock_guard<std::mutex> lock(pending_futures_mutex_);
       auto it = pending_zmq_futures_.find(net_key);
       if (it == pending_zmq_futures_.end()) {
-        HLOG(kError, "RecvZmqClientThread: No pending future for net_key {}",
-             net_key);
+        ++miss_count;
+        HLOG(kError,
+             "[CountClientRecv] miss#{}: No pending future for net_key {} "
+             "(received={}, misses={})",
+             miss_count, net_key, recv_count, miss_count);
         zmq_transport_->ClearRecvHandles(*archive);
         continue;
       }
@@ -2194,6 +2244,13 @@ void IpcManager::RecvZmqClientThread() {
 
       // Remove from pending futures map
       pending_zmq_futures_.erase(it);
+      ++recv_count;
+      if ((recv_count & 0xff) == 0) {
+        HLOG(kDebug,
+             "[CountClientRecv] cumulative responses received = {} "
+             "(misses so far = {})",
+             recv_count, miss_count);
+      }
     }
 
     // Only block on epoll when the drain loop found nothing;

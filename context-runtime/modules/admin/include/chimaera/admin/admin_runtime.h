@@ -45,6 +45,7 @@
 #include <hermes_shm/memory/allocator/malloc_allocator.h>
 
 #include <deque>
+#include <mutex>
 #include <random>
 #include <unordered_set>
 
@@ -107,9 +108,22 @@ private:
   hshm::CpuTimes prev_cpu_times_;
 
   // Network task tracking maps (keyed by net_key for efficient lookup)
-  // Using lock-free unordered_map_ll with 1024 buckets for high concurrency
-  // Thread safety: All Send/Recv tasks are routed to a single dedicated net worker
+  // Using unordered_map_ll with 1024 buckets.
+  //
+  // Concurrency: with the recv/send worker split (DefaultScheduler::DivideWorkers)
+  // these maps are touched from two threads:
+  //   send_map_: SendIn/ProcessRetryQueues on net_send_worker write & erase;
+  //              RecvOut on net_recv_worker reads & erases when responses
+  //              arrive. Guard with send_map_mutex_.
+  //   recv_map_: RecvIn on net_recv_worker writes & erases;
+  //              SendOut on net_send_worker reads & erases when the
+  //              container finishes the task. Guard with recv_map_mutex_.
+  // Contention is low (worst case is one lookup/insert/erase per task per
+  // direction), so std::mutex is cheap relative to the ZMQ cost of the
+  // surrounding Send/Recv.
   static constexpr size_t kNumMapBuckets = 1024;
+  mutable std::mutex send_map_mutex_;
+  mutable std::mutex recv_map_mutex_;
   hshm::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> send_map_{kNumMapBuckets};  // Tasks sent to remote nodes
   hshm::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> recv_map_{kNumMapBuckets};  // Tasks received from remote nodes
 
@@ -482,10 +496,18 @@ private:
   std::vector<PendingIndirectProbe> pending_indirect_probes_;
   std::mt19937 probe_rng_{std::random_device{}()};
 
-  static constexpr float kDirectProbeTimeoutSec = 5.0f;
-  static constexpr float kIndirectProbeTimeoutSec = 3.0f;
+  // SWIM probe / suspicion timeouts. The prior 5 s direct + 3 s
+  // indirect window was tight enough that any brief Send-side
+  // congestion (e.g. 24 ranks * 256 cross-node PutBlobs ramping up
+  // on the dedicated net worker) drove the round-trip past the
+  // threshold and the peer was wrongly declared kDead, after which
+  // every subsequent SendIn skipped zmq_send entirely. 30 s direct
+  // probe matches what the rest of the codebase already assumes,
+  // and gives the workload's burst phase room to drain.
+  static constexpr float kDirectProbeTimeoutSec = 30.0f;
+  static constexpr float kIndirectProbeTimeoutSec = 15.0f;
   static constexpr size_t kIndirectProbeHelpers = 3;
-  static constexpr float kSuspicionTimeoutSec = 10.0f;
+  static constexpr float kSuspicionTimeoutSec = 60.0f;
 
   // Recovery state
   std::vector<chi::RecoveryAssignment> ComputeRecoveryPlan(chi::u64 dead_node_id);
