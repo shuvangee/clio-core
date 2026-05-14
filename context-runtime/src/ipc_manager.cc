@@ -294,6 +294,14 @@ bool IpcManager::ServerInit() {
   // Clear leftover shared memory segments from previous runs
   ClearUserIpcs();
 
+  {
+    const char *env = std::getenv("CHI_PEER_SOCKETS_PER_PEER");
+    int k = (env && *env) ? std::atoi(env) : 2;
+    if (k < 1) k = 1;
+    peer_sockets_per_peer_ = k;
+    HLOG(kInfo, "IpcManager: peer_sockets_per_peer={}", k);
+  }
+
   // Initialize memory segments for server
   if (!ServerInitShm()) {
     return false;
@@ -1410,41 +1418,35 @@ void IpcManager::FreeBuffer(FullPtr<char> buffer_ptr) {
 
 hshm::lbm::Transport *IpcManager::GetOrCreateClient(const std::string &addr,
                                                     int port) {
-  // Create key for the pool map
   std::string key = addr + ":" + std::to_string(port);
+  const int k = peer_sockets_per_peer_;
+  const int shard_idx = static_cast<int>(
+      client_shard_rotator_.fetch_add(1, std::memory_order_relaxed) % k);
 
-  // Lock the pool for thread-safe access
   std::lock_guard<std::mutex> lock(client_pool_mutex_);
-
-  // Check if client already exists
-  auto it = client_pool_.find(key);
-  if (it != client_pool_.end()) {
-    HLOG(kDebug, "[ClientPool] Reusing existing connection to {}", key);
-    return it->second.get();
+  auto &shards = client_pool_[key];
+  if (static_cast<int>(shards.size()) < k) {
+    shards.reserve(static_cast<size_t>(k));
+    for (int s = static_cast<int>(shards.size()); s < k; ++s) {
+      HLOG(kInfo, "[ClientPool] Creating shard {} connection to {}", s, key);
+      auto transport = hshm::lbm::TransportFactory::Get(
+          addr, hshm::lbm::TransportType::kZeroMq,
+          hshm::lbm::TransportMode::kClient, "tcp", port);
+      if (!transport) {
+        HLOG(kError, "[ClientPool] Failed to create shard {} for {}", s, key);
+        return nullptr;
+      }
+      shards.push_back(std::move(transport));
+    }
   }
-
-  // Create new persistent client connection
-  HLOG(kInfo, "[ClientPool] Creating new persistent connection to {}", key);
-  auto transport = hshm::lbm::TransportFactory::Get(
-      addr, hshm::lbm::TransportType::kZeroMq,
-      hshm::lbm::TransportMode::kClient, "tcp", port);
-
-  if (!transport) {
-    HLOG(kError, "[ClientPool] Failed to create client for {}", key);
-    return nullptr;
-  }
-
-  // Store in pool and return raw pointer
-  hshm::lbm::Transport *raw_ptr = transport.get();
-  client_pool_[key] = std::move(transport);
-
-  HLOG(kInfo, "[ClientPool] Connection established to {}", key);
-  return raw_ptr;
+  return shards[static_cast<size_t>(shard_idx)].get();
 }
 
 void IpcManager::ClearClientPool() {
   std::lock_guard<std::mutex> lock(client_pool_mutex_);
-  HLOG(kInfo, "[ClientPool] Clearing {} persistent connections",
+  size_t total = 0;
+  for (auto &kv : client_pool_) total += kv.second.size();
+  HLOG(kInfo, "[ClientPool] Clearing {} sockets across {} peers", total,
        client_pool_.size());
   client_pool_.clear();
 }
