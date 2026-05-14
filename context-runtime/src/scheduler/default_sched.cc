@@ -192,14 +192,13 @@ u32 DefaultScheduler::RuntimeMapTask(Worker *worker, const Future<Task> &task,
     }
   }
 
-  // Route large I/O to dedicated I/O workers (round-robin)
+  // Route large I/O to dedicated I/O workers (round-robin).
+  // predicted_stat_ is populated by IpcManager::BeginTask via
+  // container->GetTaskStats(task) before this scheduler hook runs.
   if (selected == nullptr && task_ptr != nullptr && !io_workers_.empty()) {
     size_t io_size = 0;
-    bool is_plugged = false;
-    Container *container = CHI_POOL_MANAGER->GetContainer(
-        task_ptr->pool_id_, task_ptr->pool_query_.GetContainerId(), is_plugged);
-    if (container) {
-      io_size = container->GetTaskStats(task_ptr->method_).io_size_;
+    if (task_ptr->GetRunCtx()) {
+      io_size = task_ptr->GetRunCtx()->predicted_stat_.io_size_;
     }
     if (io_size >= kLargeIOThreshold) {
       u32 idx = next_io_idx_.fetch_add(1, std::memory_order_relaxed) %

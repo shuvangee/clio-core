@@ -245,6 +245,16 @@ class Client : public chi::ContainerClient {
         chi::CreateTaskId(), pool_id_, pool_query, tag_id,
         blob_name, offset, size, blob_data, score, context, flags);
 
+    // Stamp submit time so the receiver can compute end-to-end
+    // submit→recv latency. steady_clock is monotonic on each node;
+    // cross-node comparisons assume NTP-synced wall clocks (ares is
+    // ~ms-synced via the cluster's chrony). Set after NewTask so it
+    // overwrites the ctor's 0.
+    task.ptr_->submit_ts_ns_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+
     return ipc_manager->Send(task);
   }
 
@@ -700,6 +710,14 @@ class Tag {
    */
   const TagId &GetTagId() const { return tag_id_; }
 };
+
+// Flush + reset the global Tag::PutBlob(const char*) timing accumulator
+// and print a per-call breakdown of alloc / memcpy / RPC / free.
+// Intended to be called by the POSIX (and other) adapters at the end of
+// a `Filesystem::Write` so a single line summarises one user-visible
+// write operation. Pass a short label that identifies the caller
+// (e.g. "Write off=0 size=4G").
+void FlushPutBlobTiming(const char *label);
 
 }  // namespace wrp_cte::core
 

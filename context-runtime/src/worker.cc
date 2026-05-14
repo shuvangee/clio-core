@@ -911,9 +911,11 @@ void Worker::ExecTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
     StartCoroutine(task_ptr, run_ctx);
     task_ptr->SetFlags(TASK_STARTED);
 
-    // Predict load for new tasks
+    // Predict load for new tasks. predicted_stat_ is populated by
+    // BeginTask via container->GetTaskStats(task), so derive the model
+    // inferences from the already-cached stat instead of re-calling
+    // GetTaskStats here.
     if (run_ctx->container_) {
-      run_ctx->predicted_stat_ = run_ctx->container_->GetTaskStats(task_ptr->method_);
       run_ctx->predicted_load_ = run_ctx->container_->InferCpuTime(task_ptr->method_, run_ctx->predicted_stat_);
       run_ctx->predicted_wall_us_ = run_ctx->container_->InferWallClockTime(task_ptr->method_, run_ctx->predicted_stat_);
       load_ += run_ctx->predicted_load_;
@@ -1003,9 +1005,16 @@ void Worker::EndTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
     return;
   }
 
-  // If task is remote, enqueue to net_queue_ for SendOut
+  // If task is remote, enqueue to net_queue_ for SendOut. Choose the
+  // latency vs I/O lane from the task's cached predicted_stat_ so a
+  // small ACK / heartbeat reply doesn't queue behind a 1 MiB GetBlob
+  // response on the wire.
   if (is_remote) {
-    CHI_IPC->EnqueueNetTask(run_ctx->future_, NetQueuePriority::kSendOut);
+    size_t io_size = run_ctx->predicted_stat_.io_size_;
+    NetQueuePriority prio = (io_size >= kNetQueueIoThreshold)
+                                ? NetQueuePriority::kSendOutIO
+                                : NetQueuePriority::kSendOutLatency;
+    CHI_IPC->EnqueueNetTask(run_ctx->future_, prio);
     return;
   }
 

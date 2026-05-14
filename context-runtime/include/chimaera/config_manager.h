@@ -266,6 +266,34 @@ class ConfigManager : public hshm::BaseConfig {
    */
   u32 GetGpuQueueDepth() const { return gpu_queue_depth_; }
 
+  /**
+   * Whether SWIM membership detection is enabled.
+   * When false: HeartbeatProbe periodic is a no-op (no direct/indirect
+   *   probes, no suspicion timeouts, no SetDead, no recovery). Suitable
+   *   for bring-up + perf debugging where we want to rule out SWIM as
+   *   the cause of mid-run failures.
+   * When true (default): SWIM runs with the timeouts below.
+   */
+  bool GetSwimEnabled() const { return swim_enabled_; }
+
+  /** Direct-probe timeout (seconds). Used by HeartbeatProbe. */
+  float GetSwimDirectProbeTimeoutSec() const {
+    return swim_direct_probe_timeout_sec_;
+  }
+
+  /** Indirect-probe timeout (seconds). Used by HeartbeatProbe. */
+  float GetSwimIndirectProbeTimeoutSec() const {
+    return swim_indirect_probe_timeout_sec_;
+  }
+
+  /**
+   * Suspicion timeout (seconds): how long a node stays in kSuspected
+   * before being promoted to kDead.
+   */
+  float GetSwimSuspicionTimeoutSec() const {
+    return swim_suspicion_timeout_sec_;
+  }
+
  private:
   /**
    * Set default configuration values (implements hshm::BaseConfig)
@@ -317,6 +345,15 @@ class ConfigManager : public hshm::BaseConfig {
   u32 gpu_blocks_ = 1;                       // Default: 1 block
   u32 gpu_threads_per_block_ = 32;           // Default: 32 threads per block
   u32 gpu_queue_depth_ = 16;                 // Default: 16 tasks per queue
+
+  // SWIM membership-detection configuration.
+  // Defaults match the prior hard-coded constants in admin_runtime.cc so
+  // existing deployments behave identically when these fields are absent
+  // from the YAML.
+  bool swim_enabled_ = true;
+  float swim_direct_probe_timeout_sec_ = 30.0f;
+  float swim_indirect_probe_timeout_sec_ = 15.0f;
+  float swim_suspicion_timeout_sec_ = 60.0f;
 
   // Compose configuration
   ComposeConfig compose_config_;

@@ -5,7 +5,7 @@ Manages the Chimaera runtime deployment. Supports both bare-metal (default)
 and container deployment modes via deploy_mode configuration.
 """
 from jarvis_cd.core.pkg import Service
-from jarvis_cd.shell import Exec, PsshExecInfo, LocalExecInfo
+from jarvis_cd.shell import Exec, PsshExecInfo
 from jarvis_cd.shell.process import Kill, GdbServer
 from jarvis_cd.util import SizeType
 from jarvis_cd.util.logger import Color
@@ -126,6 +126,53 @@ class WrpRuntime(Service):
                 'type': str,
                 'default': 'release-adapter'
             },
+            {
+                'name': 'swim_enabled',
+                'msg': ('Whether SWIM membership detection runs. When false, '
+                        'the HeartbeatProbe periodic is a no-op: no direct/'
+                        'indirect probes, no suspicion timeouts, no SetDead, '
+                        'no recovery. Use only on stable multi-node setups '
+                        'where you trust nodes not to disappear mid-run.'),
+                'type': bool,
+                'default': True
+            },
+            {
+                'name': 'swim_direct_probe_timeout_sec',
+                'msg': ('SWIM direct-probe timeout (seconds). A peer that '
+                        'doesn\'t reply to a Heartbeat within this window is '
+                        'escalated to indirect probing. Default 30s matches '
+                        'the prior hard-coded value.'),
+                'type': float,
+                'default': 30.0
+            },
+            {
+                'name': 'swim_indirect_probe_timeout_sec',
+                'msg': ('SWIM indirect-probe timeout (seconds). If a helper '
+                        'node\'s indirect probe doesn\'t return within this '
+                        'window the target is marked suspected.'),
+                'type': float,
+                'default': 15.0
+            },
+            {
+                'name': 'swim_suspicion_timeout_sec',
+                'msg': ('SWIM suspicion timeout (seconds). A node that stays '
+                        'in the suspected state this long is promoted to '
+                        'dead, triggering SetDead + recovery.'),
+                'type': float,
+                'default': 60.0
+            },
+            {
+                'name': 'do_start',
+                'msg': ('Whether this package should actually launch the '
+                        '`chimaera runtime start` daemon. Set to false when '
+                        'another package in the pipeline owns the runtime '
+                        'process (e.g. wrp_cte_libfuse with '
+                        'embedded_runtime=true), in which case wrp_runtime '
+                        'still generates chimaera_config.yaml + manages '
+                        'configure/stop but skips the daemon spawn.'),
+                'type': bool,
+                'default': True
+            },
         ]
 
     # ------------------------------------------------------------------
@@ -219,6 +266,18 @@ class WrpRuntime(Service):
                 'heartbeat_interval': self.config['heartbeat_interval'],
                 'first_busy_wait': self.config['first_busy_wait'],
                 'max_sleep': self.config['max_sleep']
+            },
+            # Parsed by chi::ConfigManager::ParseYAML — keys must match
+            # the names used there (swim.enabled, swim.direct_probe_timeout_sec,
+            # swim.indirect_probe_timeout_sec, swim.suspicion_timeout_sec).
+            'swim': {
+                'enabled': self.config['swim_enabled'],
+                'direct_probe_timeout_sec':
+                    self.config['swim_direct_probe_timeout_sec'],
+                'indirect_probe_timeout_sec':
+                    self.config['swim_indirect_probe_timeout_sec'],
+                'suspicion_timeout_sec':
+                    self.config['swim_suspicion_timeout_sec'],
             }
         }
 
@@ -231,44 +290,42 @@ class WrpRuntime(Service):
     # ------------------------------------------------------------------
 
     def start(self):
-        self.log("Starting IOWarp runtime")
-        # Redirect daemon stdout/stderr to a per-host log so we can
-        # post-mortem silent crashes — pssh with exec_async detaches
-        # remote processes and discards their streams, and apptainer's
-        # starter likewise drains the daemon's stdout into a pipe that
-        # never lands on disk. Shell expansion of $(hostname -s) runs
-        # on the remote, so each host in the hostfile gets its own
-        # file. ulimit -c unlimited leaves a core file in /tmp on
-        # segfault; exec keeps the PID stable across the bash wrapper.
-        cmd = ("bash -c 'ulimit -c unlimited; "
-               "exec chimaera runtime start "
-               ">> /tmp/chimaera_runtime_$(hostname -s).log 2>&1'")
+        # When `do_start: false`, another package in the pipeline owns
+        # the chimaera runtime process (e.g. wrp_cte_libfuse with
+        # embedded_runtime=true). wrp_runtime stays in the pipeline to
+        # generate chimaera_config.yaml and handle configure/stop, but
+        # the daemon spawn is skipped to avoid a port-9413 conflict.
+        # Ordering note: any package that consumes the runtime as a
+        # client (wrp_cte, workloads) must appear *after* the package
+        # that actually owns the runtime in the pipeline pkg list.
+        if not self.config.get('do_start', True):
+            self.log("do_start=false: skipping chimaera daemon spawn "
+                     "(another package owns the runtime)",
+                     color=Color.YELLOW)
+            return
 
+        self.log("Starting IOWarp runtime")
+
+        cmd = 'chimaera runtime start'
+
+        exec_info = PsshExecInfo(
+            env=self.env,
+            hostfile=self.hostfile,
+            exec_async=True,
+            container=self._container_engine,
+            container_image=self.deploy_image_name(),
+            private_dir=self.private_dir,
+            bind_mounts=self.container_mounts,
+        )
         if self.config.get('do_dbg', False):
-            GdbServer(cmd, self.config['dbg_port'], PsshExecInfo(
-                env=self.env,
-                hostfile=self.jarvis.hostfile,
-                exec_async=True,
-                container=self._container_engine,
-                container_image=self.deploy_image_name(),
-                private_dir=self.private_dir,
-                bind_mounts=self.container_mounts,
-            )).run()
+            GdbServer(cmd, self.config['dbg_port'], exec_info).run()
         else:
-            Exec(cmd, PsshExecInfo(
-                env=self.env,
-                hostfile=self.jarvis.hostfile,
-                exec_async=True,
-                container=self._container_engine,
-                container_image=self.deploy_image_name(),
-                private_dir=self.private_dir,
-                bind_mounts=self.container_mounts,
-            )).run()
+            Exec(cmd, exec_info).run()
 
         self.sleep()
 
         port = self.config['port']
-        host = self.jarvis.hostfile.hosts[0] if self.jarvis.hostfile.hosts else '127.0.0.1'
+        host = self.hostfile.hosts[0] if self.hostfile.hosts else '127.0.0.1'
         self.log(f'Waiting for runtime on {host}:{port}', color=Color.YELLOW)
         for i in range(30):
             try:
@@ -287,24 +344,25 @@ class WrpRuntime(Service):
         self.log("IOWarp runtime started")
 
     def stop(self):
+        # Symmetric with start(): when this package didn't spawn the
+        # runtime, it isn't responsible for stopping it either. The
+        # package that owns the runtime (e.g. wrp_cte_libfuse) tears
+        # down its own daemon during its own stop().
+        if not self.config.get('do_start', True):
+            self.log("do_start=false: skipping chimaera daemon stop "
+                     "(another package owns the runtime)",
+                     color=Color.YELLOW)
+            return
+
         self.log("Stopping IOWarp runtime")
 
-        Exec('chimaera runtime stop', PsshExecInfo(
-            env=self.env,
-            hostfile=self.jarvis.hostfile,
-            container=self._container_engine,
-            container_image=self.deploy_image_name(),
-            private_dir=self.private_dir,
-            bind_mounts=self.container_mounts,
-        )).run()
-
+        Exec('chimaera runtime stop',
+             PsshExecInfo(env=self.env, hostfile=self.hostfile)).run()
         Kill('chimaera',
-             PsshExecInfo(env=self.env,
-                          hostfile=self.jarvis.hostfile),
-             partial=False).run()
+             PsshExecInfo(env=self.env, hostfile=self.hostfile)).run()
 
         port = self.config['port']
-        host = self.jarvis.hostfile.hosts[0] if self.jarvis.hostfile.hosts else '127.0.0.1'
+        host = self.hostfile.hosts[0] if self.hostfile.hosts else '127.0.0.1'
         for i in range(10):
             try:
                 ret = subprocess.run(
@@ -322,7 +380,7 @@ class WrpRuntime(Service):
     def kill(self):
         self.log("Forcibly killing IOWarp runtime")
         Kill('chimaera', PsshExecInfo(
-            hostfile=self.jarvis.hostfile
+            hostfile=self.hostfile
         )).run()
 
     def clean(self):
@@ -336,5 +394,5 @@ class WrpRuntime(Service):
             os.remove(log_file)
 
         Exec('rm -f /dev/shm/chi_*', PsshExecInfo(
-            hostfile=self.jarvis.hostfile
+            hostfile=self.hostfile
         )).run()

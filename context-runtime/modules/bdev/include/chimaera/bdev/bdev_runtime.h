@@ -239,10 +239,12 @@ class Runtime : public chi::Container {
   ~Runtime() override;
 
   /**
-   * Get live task statistics per method.
-   * For Read/Write, returns default 1MB io_size routing hint.
+   * Get live task statistics for this task instance.
+   * For Read/Write, reads the task's `length_` so the scheduler routes
+   * actual large I/O to I/O workers and small ops to the scheduler
+   * worker, instead of bucketing every read/write at a placeholder size.
    */
-  chi::TaskStat GetTaskStats(chi::u32 method_id) const override;
+  chi::TaskStat GetTaskStats(const chi::Task *task) const override;
 
   /**
    * Create the container (Method::kCreate)

@@ -347,13 +347,22 @@ WorkerIOContext *Runtime::GetWorkerIOContext(size_t worker_id) {
   return ctx;
 }
 
-chi::TaskStat Runtime::GetTaskStats(chi::u32 method_id) const {
-  switch (method_id) {
-    case Method::kWrite:
-    case Method::kRead: {
+chi::TaskStat Runtime::GetTaskStats(const chi::Task *task) const {
+  if (!task) return chi::TaskStat();
+  switch (task->method_) {
+    case Method::kWrite: {
+      auto *wt = static_cast<const WriteTask *>(task);
       chi::TaskStat stat;
-      stat.io_size_ = 1024 * 1024;
+      stat.io_size_ = wt->length_;
       // wall_time = aligned pages / 500 MB/s
+      size_t aligned = ((stat.io_size_ + 4095) / 4096) * 4096;
+      stat.wall_time_ = static_cast<float>(aligned) / 500.0f;
+      return stat;
+    }
+    case Method::kRead: {
+      auto *rt = static_cast<const ReadTask *>(task);
+      chi::TaskStat stat;
+      stat.io_size_ = rt->length_;
       size_t aligned = ((stat.io_size_ + 4095) / 4096) * 4096;
       stat.wall_time_ = static_cast<float>(aligned) / 500.0f;
       return stat;
@@ -457,32 +466,33 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
 
   } else if (bdev_type_ == BdevType::kRam) {
     // RAM-based storage initialization.
-    //   capacity == 0 → unbounded. Pages are allocated lazily on first
-    //                    write; the OS faults them in then.
-    //   capacity  > 0 → bounded. We eagerly allocate and pre-fault the
-    //                    backing pages here so OS first-touch faults
-    //                    (~3 us / 4 KiB page = ~1 s/GiB) land in bdev
-    //                    create, before any timed PutBlob loop.
+    //   capacity == 0 → unbounded.
+    //   capacity  > 0 → bounded; size enforced lazily on AllocateBlocks /
+    //                    WriteToRam (see file_size_ in the Heap allocator).
+    //
+    // Either way we leave ram_pages_ empty here and grow it on the first
+    // write that targets each 1 GiB slot. The prior eager allocation
+    // path (new char[kRamPageSize] × N + memset) was a benchmark warm-
+    // up: it forced the kernel to commit all N GiB of physical pages
+    // before the timed loop. On a multi-tenant compute node — head node
+    // runs jarvis + ssh fan-outs + FUSE + many IOR ranks + the daemon
+    // itself — a 32 GiB upfront commit pushes physical RAM and the
+    // slurm cgroup vm budget past the limit and the daemon gets killed
+    // (silently: no SEGV trace, just disappears). For a 32 GiB × 4n
+    // workload that's 128 GiB cluster-wide of unneeded RSS at startup.
+    //
+    // Even the cheaper "reserve 1 GiB per slot, touch 1 byte" variant
+    // (which only commits ~128 KiB physical) costs 32 GiB of virtual
+    // address space — and the slurm cgroup or RLIMIT_AS can refuse that
+    // (libzmq inside the daemon then hits an unrelated allocation that
+    // returns EFAULT and asserts "Bad address" in tcp.cpp). Skipping the
+    // reservation entirely is the correct fix: the only producer of
+    // ram_pages_ entries is WriteToRam, which already handles "page not
+    // yet allocated" by allocating on the spot under ram_pages_mu_.
     ram_capacity_ = (params.total_size_ == 0)
                         ? std::numeric_limits<chi::u64>::max()
                         : params.total_size_;
-    file_size_ = ram_capacity_;  // Used by Heap allocator as the cap
-
-    if (params.total_size_ > 0) {
-      size_t num_pages =
-          static_cast<size_t>((params.total_size_ + kRamPageSize - 1) /
-                              kRamPageSize);
-      std::lock_guard<std::mutex> lock(ram_pages_mu_);
-      ram_pages_.resize(num_pages);
-      for (size_t i = 0; i < num_pages; ++i) {
-        auto buf = std::unique_ptr<char[]>(new char[kRamPageSize]);
-        // memset forces physical pages to fault in. Unrelated to the
-        // sparse-zero read semantics of unwritten regions (which work
-        // because the OS hands out zero-filled pages on fault anyway).
-        std::memset(buf.get(), 0, kRamPageSize);
-        ram_pages_[i] = std::move(buf);
-      }
-    }
+    file_size_ = ram_capacity_;  // Heap allocator's soft cap
 
   // BdevType::kHbm and BdevType::kPinned removed — supported tiers
   // are kFile / kRam / kNoop. PutBlob/GetBlob with HBM-resident
@@ -886,9 +896,16 @@ chi::TaskResume Runtime::GetStats(hipc::FullPtr<GetStatsTask> task,
   (void)ctx;
 #endif
   CHI_TASK_BODY_BEGIN
-  // Predict wall time from learned model
-  chi::TaskStat read_stat = GetTaskStats(Method::kRead);
-  chi::TaskStat write_stat = GetTaskStats(Method::kWrite);
+  // Predict wall time from learned model using a synthetic 1 MiB R/W
+  // task as the reference size for the bandwidth/latency estimate.
+  ReadTask r_synthetic;
+  r_synthetic.method_ = Method::kRead;
+  r_synthetic.length_ = 1024 * 1024;
+  WriteTask w_synthetic;
+  w_synthetic.method_ = Method::kWrite;
+  w_synthetic.length_ = 1024 * 1024;
+  chi::TaskStat read_stat = GetTaskStats(&r_synthetic);
+  chi::TaskStat write_stat = GetTaskStats(&w_synthetic);
   float read_wall_us = InferWallClockTime(Method::kRead, read_stat);
   float write_wall_us = InferWallClockTime(Method::kWrite, write_stat);
   double read_size_mb = static_cast<double>(read_stat.io_size_) / (1024.0 * 1024.0);
@@ -1193,9 +1210,16 @@ chi::TaskResume Runtime::Monitor(hipc::FullPtr<MonitorTask> task,
   CHI_TASK_BODY_BEGIN
   (void)rctx;
   if (task->query_ == "stats") {
-    // Predict wall time from learned model
-    chi::TaskStat read_stat = GetTaskStats(Method::kRead);
-    chi::TaskStat write_stat = GetTaskStats(Method::kWrite);
+    // Predict wall time from learned model using a synthetic 1 MiB R/W
+    // task as the reference size (matches GetStats handler above).
+    ReadTask r_synthetic;
+    r_synthetic.method_ = Method::kRead;
+    r_synthetic.length_ = 1024 * 1024;
+    WriteTask w_synthetic;
+    w_synthetic.method_ = Method::kWrite;
+    w_synthetic.length_ = 1024 * 1024;
+    chi::TaskStat read_stat = GetTaskStats(&r_synthetic);
+    chi::TaskStat write_stat = GetTaskStats(&w_synthetic);
     float read_wall_us = InferWallClockTime(Method::kRead, read_stat);
     float write_wall_us = InferWallClockTime(Method::kWrite, write_stat);
     double read_size_mb = static_cast<double>(read_stat.io_size_) / (1024.0 * 1024.0);

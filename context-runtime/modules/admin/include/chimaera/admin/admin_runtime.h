@@ -44,9 +44,11 @@
 #include <hermes_shm/introspect/system_info.h>
 #include <hermes_shm/memory/allocator/malloc_allocator.h>
 
+#include <atomic>
 #include <deque>
 #include <mutex>
 #include <random>
+#include <thread>
 #include <unordered_set>
 
 namespace chimaera::admin {
@@ -127,6 +129,20 @@ private:
   hshm::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> send_map_{kNumMapBuckets};  // Tasks sent to remote nodes
   hshm::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> recv_map_{kNumMapBuckets};  // Tasks received from remote nodes
 
+  // Dedicated recv threads — bypass the Worker scheduler for the hot
+  // inbound network path. Single thread per channel:
+  //   - peer_recv_thread_   owns the cross-node ROUTER (port 9413)
+  //   - client_recv_thread_ owns the client TCP+IPC transports
+  // A multi-thread recv pool was tried; the transport's recv_mtx_
+  // serialises the entire multipart Recv (including bulk frames), so
+  // pooling parallelised only the post-Recv LoadTask/Aggregate work
+  // and bought little once contention overhead was paid. 8n read also
+  // hung under the pool, so we're back to single threads here while
+  // we investigate.
+  std::atomic<bool> recv_shutdown_{false};
+  std::thread peer_recv_thread_;
+  std::thread client_recv_thread_;
+
 public:
   /**
    * Constructor
@@ -134,9 +150,9 @@ public:
   Runtime() = default;
 
   /**
-   * Destructor
+   * Destructor — joins dedicated recv threads (peer / client).
    */
-  virtual ~Runtime() = default;
+  virtual ~Runtime();
 
   /**
    * Initialize container with pool information
@@ -370,10 +386,11 @@ public:
   void RecvOut(hipc::FullPtr<RecvTask> task, chi::LoadTaskArchive& archive, hshm::lbm::Transport* lbm_transport);
 
   /**
-   * Get live task statistics per method.
-   * For network methods, compute = total queue depth across priorities.
+   * Get live task statistics for this task instance.
+   * For network periodics, compute_ = total queue depth across priorities;
+   * io_size_ is a static stand-in (admin periodics don't have a payload).
    */
-  chi::TaskStat GetTaskStats(chi::u32 method_id) const override;
+  chi::TaskStat GetTaskStats(const chi::Task *task) const override;
 
   /**
    * Get remaining work count for this admin container
@@ -474,7 +491,10 @@ private:
    */
   void InitiateShutdown(chi::u32 grace_period_ms);
 
-  // Retry queues for tasks that failed to send due to dead nodes
+  // Retry queues for tasks that failed to send due to dead nodes. With
+  // multi-threaded send, the per-sender-thread writes and the
+  // SendPoll-periodic maintenance reads/erases all need to be serialised.
+  mutable std::mutex retry_queues_mutex_;
   std::deque<RetryEntry> send_in_retry_;
   std::deque<RetryEntry> send_out_retry_;
 
@@ -504,10 +524,12 @@ private:
   // every subsequent SendIn skipped zmq_send entirely. 30 s direct
   // probe matches what the rest of the codebase already assumes,
   // and gives the workload's burst phase room to drain.
-  static constexpr float kDirectProbeTimeoutSec = 30.0f;
-  static constexpr float kIndirectProbeTimeoutSec = 15.0f;
+  // SWIM probe / suspicion timeouts moved to ConfigManager so they can
+  // be tuned from the deployment yaml (see chi::ConfigManager::
+  // GetSwimDirectProbeTimeoutSec, GetSwimIndirectProbeTimeoutSec,
+  // GetSwimSuspicionTimeoutSec, GetSwimEnabled). Defaults there match
+  // the prior values (30s / 15s / 60s).
   static constexpr size_t kIndirectProbeHelpers = 3;
-  static constexpr float kSuspicionTimeoutSec = 60.0f;
 
   // Recovery state
   std::vector<chi::RecoveryAssignment> ComputeRecoveryPlan(chi::u64 dead_node_id);

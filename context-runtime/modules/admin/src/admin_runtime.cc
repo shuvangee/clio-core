@@ -60,6 +60,129 @@
 
 namespace chimaera::admin {
 
+// ============================================================================
+// Network-path instrumentation
+// ============================================================================
+//
+// Counters and timers for diagnosing where cross-node throughput is being
+// lost. Each direction is updated by exactly one worker thread (net_send
+// or net_recv per DefaultScheduler::DivideWorkers), so the per-peer
+// arrays don't need atomics — only the periodic-dump snapshot crosses
+// thread boundaries, and that uses relaxed atomics on the timestamp +
+// "owner has-flushed" flag.
+//
+// Look for "[NetStats] ..." lines in the runtime log. Emitted every
+// kNetStatsDumpIntervalSec wall-clock seconds from the Send periodic.
+//
+// Per-peer rows:
+//   peer=N  sin=<count>/<MiB>  sout=<count>/<MiB>  rin=<count>/<MiB>  rout=<count>/<MiB>
+//   send_lbm_ms=<sum>  send_ser_ms=<sum>  recv_des_ms=<sum>
+//
+// Aggregate row:
+//   total: ... (sum across peers)
+//
+// To reset between runs just restart the runtime; counters are process-
+// scoped.
+struct NetPeerStats {
+  // SendIn (outbound cross-node task forwards)
+  uint64_t sin_count = 0;
+  uint64_t sin_bytes = 0;
+  uint64_t sin_lbm_ns = 0;    // time inside lbm_transport->Send for sin
+  uint64_t sin_ser_ns = 0;    // time inside container->SaveTask for sin
+  // SendOut (outbound cross-node task responses)
+  uint64_t sout_count = 0;
+  uint64_t sout_bytes = 0;
+  uint64_t sout_lbm_ns = 0;
+  uint64_t sout_ser_ns = 0;
+  // RecvIn (inbound cross-node task forwards from peer)
+  uint64_t rin_count = 0;
+  uint64_t rin_bytes = 0;
+  uint64_t rin_des_ns = 0;    // time inside deserialize/dispatch
+  // RecvOut (inbound cross-node task responses from peer)
+  uint64_t rout_count = 0;
+  uint64_t rout_bytes = 0;
+  uint64_t rout_des_ns = 0;
+};
+
+static constexpr size_t kMaxNetPeers = 64;  // soft cap; we just modulo
+static NetPeerStats g_net_peer_stats[kMaxNetPeers];
+
+static inline NetPeerStats &NetStats(chi::u64 peer) {
+  return g_net_peer_stats[peer % kMaxNetPeers];
+}
+
+static constexpr double kNetStatsDumpIntervalSec = 1.0;
+static std::chrono::steady_clock::time_point g_net_stats_last_dump =
+    std::chrono::steady_clock::now();
+
+static inline void DumpNetStatsIfDue(chi::u64 self_node_id, size_t num_peers) {
+  auto now = std::chrono::steady_clock::now();
+  double since =
+      std::chrono::duration<double>(now - g_net_stats_last_dump).count();
+  if (since < kNetStatsDumpIntervalSec) return;
+  g_net_stats_last_dump = now;
+
+  // Aggregates across peers
+  uint64_t tot_sin_c = 0, tot_sin_b = 0, tot_sout_c = 0, tot_sout_b = 0;
+  uint64_t tot_rin_c = 0, tot_rin_b = 0, tot_rout_c = 0, tot_rout_b = 0;
+  uint64_t tot_sin_lbm = 0, tot_sout_lbm = 0;
+  uint64_t tot_sin_ser = 0, tot_sout_ser = 0;
+  uint64_t tot_rin_des = 0, tot_rout_des = 0;
+
+  size_t cap = std::min<size_t>(num_peers, kMaxNetPeers);
+  for (size_t p = 0; p < cap; ++p) {
+    if (p == self_node_id) continue;
+    const auto &s = g_net_peer_stats[p];
+    if (s.sin_count == 0 && s.sout_count == 0 && s.rin_count == 0 &&
+        s.rout_count == 0) {
+      continue;
+    }
+    HLOG(kInfo,
+         "[NetStats] self={} peer={} sin={}/{}MiB sout={}/{}MiB "
+         "rin={}/{}MiB rout={}/{}MiB "
+         "sin_lbm_ms={:.1f} sout_lbm_ms={:.1f} "
+         "sin_ser_ms={:.1f} sout_ser_ms={:.1f} "
+         "rin_des_ms={:.1f} rout_des_ms={:.1f}",
+         self_node_id, p, s.sin_count, s.sin_bytes >> 20, s.sout_count,
+         s.sout_bytes >> 20, s.rin_count, s.rin_bytes >> 20, s.rout_count,
+         s.rout_bytes >> 20, s.sin_lbm_ns / 1e6, s.sout_lbm_ns / 1e6,
+         s.sin_ser_ns / 1e6, s.sout_ser_ns / 1e6, s.rin_des_ns / 1e6,
+         s.rout_des_ns / 1e6);
+    tot_sin_c += s.sin_count;
+    tot_sin_b += s.sin_bytes;
+    tot_sout_c += s.sout_count;
+    tot_sout_b += s.sout_bytes;
+    tot_rin_c += s.rin_count;
+    tot_rin_b += s.rin_bytes;
+    tot_rout_c += s.rout_count;
+    tot_rout_b += s.rout_bytes;
+    tot_sin_lbm += s.sin_lbm_ns;
+    tot_sout_lbm += s.sout_lbm_ns;
+    tot_sin_ser += s.sin_ser_ns;
+    tot_sout_ser += s.sout_ser_ns;
+    tot_rin_des += s.rin_des_ns;
+    tot_rout_des += s.rout_des_ns;
+  }
+  HLOG(kInfo,
+       "[NetStats] self={} TOTAL sin={}/{}MiB sout={}/{}MiB "
+       "rin={}/{}MiB rout={}/{}MiB "
+       "sin_lbm_ms={:.1f} sout_lbm_ms={:.1f} "
+       "sin_ser_ms={:.1f} sout_ser_ms={:.1f} "
+       "rin_des_ms={:.1f} rout_des_ms={:.1f}",
+       self_node_id, tot_sin_c, tot_sin_b >> 20, tot_sout_c,
+       tot_sout_b >> 20, tot_rin_c, tot_rin_b >> 20, tot_rout_c,
+       tot_rout_b >> 20, tot_sin_lbm / 1e6, tot_sout_lbm / 1e6,
+       tot_sin_ser / 1e6, tot_sout_ser / 1e6, tot_rin_des / 1e6,
+       tot_rout_des / 1e6);
+}
+
+static inline uint64_t HrtNs() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
+}
+
+
 // Method implementations for Runtime class
 
 // Virtual method implementations (Init, Run, Del, SaveTask, LoadTask, NewCopy,
@@ -68,6 +191,13 @@ namespace chimaera::admin {
 //===========================================================================
 // Method implementations
 //===========================================================================
+
+Runtime::~Runtime() {
+  // Signal dedicated recv threads to exit and join them.
+  recv_shutdown_.store(true, std::memory_order_release);
+  if (peer_recv_thread_.joinable()) peer_recv_thread_.join();
+  if (client_recv_thread_.joinable()) client_recv_thread_.join();
+}
 
 chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
                                 chi::RunContext &rctx) {
@@ -86,47 +216,101 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
 
   create_count_++;
 
-  // Spawn periodic Recv task with 25 microsecond period (default)
-  // Worker will automatically reschedule periodic tasks
-  client_.AsyncRecv(chi::PoolQuery::Local(), 0, 500);
+  // ===========================================================================
+  // Cross-node inbound network path: dedicated std::thread instead of
+  // worker-periodic Recv. The worker scheduler's yield/wake/epoll cycle
+  // added too much latency between socket-readable and dispatch (see
+  // [PutLat] / [NetStats] dumps showing ~97% of per-blob latency
+  // unaccounted in the network timers). These threads call
+  // lbm_transport->Recv() directly and dispatch via RecvIn / RecvOut.
+  //
+  // Inbound dispatch only pushes Futures to worker lanes:
+  //   - RecvIn  -> IpcManager::Send -> IpcCpu2Self::ClientSend (non-worker
+  //                branch: RouteTask(force_enqueue=true), which is safe
+  //                from a non-worker thread)
+  //   - RecvOut -> direct worker_queues_->GetLane(...).Push(future)
+  //   - RuntimeRecv (client TCP/IPC) -> direct lane push
+  //
+  // None of these go through CHI_CUR_WORKER (TLS) for anything that matters.
+  // The outbound Send path is unchanged: still served by the net_send_worker
+  // via the AsyncSendPoll / AsyncClientSend periodics below.
+  // ===========================================================================
 
-  // Spawn periodic Send task with 25 microsecond period
-  // This task polls net_queue_ for send operations
+  // Spawn periodic Send task — outbound side still runs on the worker
+  // because the per-task send path is bounded by transport capacity, and
+  // EnqueueNetTask is invoked from many worker threads anyway.
   client_.AsyncSendPoll(chi::PoolQuery::Local(), 0, 500);
-
-  // Spawn periodic ClientRecv task for client task reception via lightbeam
-  client_.AsyncClientRecv(chi::PoolQuery::Local(), 100);
 
   // Spawn periodic ClientSend task for client response sending via lightbeam
   client_.AsyncClientSend(chi::PoolQuery::Local(), 100);
 
-  // Register ALL transport FDs with the net worker's EventManager
-  // This ensures epoll wakes the net worker when data arrives on any transport
-  {
+  // Dedicated single peer recv thread: polls the main p2p transport
+  // (port 9413 by default) and dispatches inbound task forwards/responses.
+  peer_recv_thread_ = std::thread([this]() {
+    pthread_setname_np(pthread_self(), "chi-peer-recv");
     auto *ipc_manager = CHI_IPC;
-    chi::Worker *net_worker = ipc_manager->GetScheduler()->GetNetWorker();
-    if (net_worker && ipc_manager) {
-      auto &em = net_worker->GetEventManager();
-      auto *tcp_transport = ipc_manager->GetClientTransport(chi::IpcMode::kTcp);
-      if (tcp_transport) {
-        tcp_transport->RegisterEventManager(em);
-        HLOG(kDebug,
-             "Admin: TCP transport registered with net worker EventManager");
+    hshm::lbm::Transport *lbm_transport = nullptr;
+    for (int spin = 0; spin < 1000 && !recv_shutdown_.load(); ++spin) {
+      lbm_transport = ipc_manager->GetMainTransport();
+      if (lbm_transport) break;
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    if (!lbm_transport) {
+      HLOG(kError, "[PeerRecvThread] main transport never appeared");
+      return;
+    }
+    HLOG(kInfo, "[PeerRecvThread] started");
+    while (!recv_shutdown_.load(std::memory_order_acquire)) {
+      chi::LoadTaskArchive archive;
+      auto info = lbm_transport->Recv(archive);
+      int rc = info.rc;
+      if (rc == EAGAIN) {
+        std::this_thread::sleep_for(std::chrono::microseconds(1));
+        continue;
       }
-      auto *ipc_transport = ipc_manager->GetClientTransport(chi::IpcMode::kIpc);
-      if (ipc_transport) {
-        ipc_transport->RegisterEventManager(em);
-        HLOG(kDebug,
-             "Admin: IPC transport registered with net worker EventManager");
+      if (rc != 0) {
+        if (rc != -1) {
+          HLOG(kError, "[PeerRecvThread] Recv failed rc={}", rc);
+        }
+        continue;
       }
-      auto *main_transport = ipc_manager->GetMainTransport();
-      if (main_transport) {
-        main_transport->RegisterEventManager(em);
-        HLOG(kDebug,
-             "Admin: Main transport registered with net worker EventManager");
+      RecvTask dummy_recv;
+      hipc::FullPtr<RecvTask> recv_fp(&dummy_recv);
+      chi::MsgType msg_type = archive.GetMsgType();
+      switch (msg_type) {
+        case chi::MsgType::kSerializeIn:
+          RecvIn(recv_fp, archive, lbm_transport);
+          break;
+        case chi::MsgType::kSerializeOut:
+          RecvOut(recv_fp, archive, lbm_transport);
+          break;
+        case chi::MsgType::kHeartbeat:
+          break;
+        default:
+          HLOG(kError, "[PeerRecvThread] unknown msg_type={}",
+               static_cast<int>(msg_type));
+          break;
       }
     }
-  }
+    HLOG(kInfo, "[PeerRecvThread] shutting down");
+  });
+
+  // Dedicated single client recv thread: drains TCP (port 9416) and IPC
+  // (unix socket) client transports via IpcCpu2CpuZmq::RuntimeRecv.
+  client_recv_thread_ = std::thread([this]() {
+    pthread_setname_np(pthread_self(), "chi-client-recv");
+    auto *ipc_manager = CHI_IPC;
+    HLOG(kInfo, "[ClientRecvThread] started");
+    while (!recv_shutdown_.load(std::memory_order_acquire)) {
+      chi::u32 tasks_received = 0;
+      bool did_work = chi::IpcCpu2CpuZmq::RuntimeRecv(ipc_manager,
+                                                       tasks_received);
+      if (!did_work) {
+        std::this_thread::sleep_for(std::chrono::microseconds(1));
+      }
+    }
+    HLOG(kInfo, "[ClientRecvThread] shutting down");
+  });
 
   // Spawn periodic WreapDeadIpcs task with 1 second period
   // This task reaps shared memory segments from dead processes
@@ -496,8 +680,11 @@ void Runtime::SendIn(hipc::FullPtr<chi::Task> origin_task,
       HLOG(kWarning,
            "[SendIn] Task {} target node {} is dead, queuing for retry",
            origin_task->task_id_, target_node_id);
-      send_in_retry_.push_back(
-          {task_copy, target_node_id, std::chrono::steady_clock::now()});
+      {
+        std::lock_guard<std::mutex> _rqlk(retry_queues_mutex_);
+        send_in_retry_.push_back(
+            {task_copy, target_node_id, std::chrono::steady_clock::now()});
+      }
       continue;
     }
 
@@ -511,44 +698,61 @@ void Runtime::SendIn(hipc::FullPtr<chi::Task> origin_task,
       HLOG(kError, "[SendIn] Task {} FAILED: Could not get client for {}:{}",
            origin_task->task_id_, target_host->ip_address, port);
       ipc_manager->SetDead(target_node_id);
-      send_in_retry_.push_back(
-          {task_copy, target_node_id, std::chrono::steady_clock::now()});
+      {
+        std::lock_guard<std::mutex> _rqlk(retry_queues_mutex_);
+        send_in_retry_.push_back(
+            {task_copy, target_node_id, std::chrono::steady_clock::now()});
+      }
       continue;
     }
 
     // Create SaveTaskArchive with SerializeIn mode and lbm_transport
     chi::SaveTaskArchive archive(chi::MsgType::kSerializeIn, lbm_transport);
 
-    // Serialize the task using container->SaveTask (Expose will be called
-    // automatically for bulks)
+    uint64_t ser_t0 = HrtNs();
     container->SaveTask(task_copy->method_, archive, task_copy);
+    uint64_t ser_dt = HrtNs() - ser_t0;
 
-    // Send using Lightbeam asynchronously (non-blocking)
-    // Note: No lock needed - single net worker processes all Send/Recv tasks
     hshm::lbm::LbmContext ctx(0);  // Non-blocking async send
     HLOG(kDebug, "[SendIn] Task {} sending to node {} via lightbeam",
          origin_task->task_id_, target_node_id);
+    uint64_t lbm_t0 = HrtNs();
     int rc = lbm_transport->Send(archive, ctx);
+    uint64_t lbm_dt = HrtNs() - lbm_t0;
     HLOG(kDebug, "[SendIn] Task {} lightbeam Send rc={}", origin_task->task_id_,
          rc);
 
+    if (rc == 0) {
+      auto &st = NetStats(target_node_id);
+      st.sin_count += 1;
+      st.sin_bytes += origin_task->GetRunCtx()
+                          ? origin_task->GetRunCtx()->predicted_stat_.io_size_
+                          : 0;
+      st.sin_lbm_ns += lbm_dt;
+      st.sin_ser_ns += ser_dt;
+    }
+
     if (rc != 0) {
-      // EAGAIN is just ZMQ back-pressure (HWM hit) on a non-blocking send,
-      // NOT evidence the peer is dead. Marking the peer dead on EAGAIN
-      // flips IsAlive() to false and forces every subsequent SendIn /
-      // SendOut to retry-queue, cascading into the full-stop we used to
-      // see under cross-node read load. Treat EAGAIN as transient: just
-      // re-queue the task for the next periodic tick. Anything else is
-      // genuinely fatal (network error, peer reset).
       HLOG(kWarning,
            "[SendIn] Task {} Lightbeam Send rc={} — re-queueing (no dead-mark)",
            origin_task->task_id_, rc);
       if (rc != EAGAIN) {
         ipc_manager->SetDead(target_node_id);
       }
-      send_in_retry_.push_back(
-          {task_copy, target_node_id, std::chrono::steady_clock::now()});
+      {
+        std::lock_guard<std::mutex> _rqlk(retry_queues_mutex_);
+        send_in_retry_.push_back(
+            {task_copy, target_node_id, std::chrono::steady_clock::now()});
+      }
       continue;
+    }
+
+    if (origin_task->method_ == Method::kHeartbeatProbe ||
+        origin_task->method_ == Method::kProbeRequest ||
+        origin_task->method_ == Method::kHeartbeat) {
+      HLOG(kInfo,
+           "[ProbeTrace SendIn] method={} task={} -> node={} sent OK",
+           origin_task->method_, origin_task->task_id_, target_node_id);
     }
 
     {
@@ -569,7 +773,8 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
   auto *ipc_manager = CHI_IPC;
   auto *pool_manager = CHI_POOL_MANAGER;
 
-  // Flush deferred deletes from previous invocation (zero-copy send safety)
+  // Flush deferred deletes from previous invocation (zero-copy send safety).
+  // SendOut runs only from net_send_worker SendPoll; static is fine.
   static std::vector<hipc::FullPtr<chi::Task>> deferred_deletes;
   for (auto &t : deferred_deletes) {
     auto *del_container = pool_manager->GetStaticContainer(t->pool_id_);
@@ -594,23 +799,17 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
     return;
   }
 
-  // Remove task from recv_map as we're completing it
-  // Key must match RecvIn: combines net_key and replica_id
-  // SendOut runs on net_send_worker; RecvIn writes recv_map_ from
-  // net_recv_worker, so the mutex serialises the find/erase pair.
+  // Remove task from recv_map as we're completing it.
+  // Erase is idempotent: SendOut can be called again from send_out_retry_
+  // after IsAlive() or Lightbeam Send fails. The first call erases the
+  // entry; subsequent retries no-op here and still attempt the send.
+  // RecvIn writes recv_map_ from net_recv_worker, so the mutex serialises
+  // the erase against concurrent inserts.
   size_t recv_key = origin_task->task_id_.net_key_ ^
                     (static_cast<size_t>(origin_task->task_id_.replica_id_) *
                      0x9e3779b97f4a7c15ULL);
   {
     std::lock_guard<std::mutex> lk(recv_map_mutex_);
-    auto *it = recv_map_.find(recv_key);
-    if (it == nullptr) {
-      HLOG(kError,
-           "[SendOut] Task {} FAILED: Not found in recv_map (size: {}) with "
-           "recv_key {}",
-           origin_task->task_id_, recv_map_.size(), recv_key);
-      return;
-    }
     recv_map_.erase(recv_key);
   }
 
@@ -622,8 +821,11 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
     HLOG(kWarning,
          "[SendOut] Task {} return node {} is dead, queuing for retry",
          origin_task->task_id_, target_node_id);
-    send_out_retry_.push_back(
-        {origin_task, target_node_id, std::chrono::steady_clock::now()});
+    {
+      std::lock_guard<std::mutex> _rqlk(retry_queues_mutex_);
+      send_out_retry_.push_back(
+          {origin_task, target_node_id, std::chrono::steady_clock::now()});
+    }
     return;
   }
 
@@ -635,7 +837,6 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
     return;
   }
 
-  // Get or create persistent Lightbeam client using connection pool
   auto *config_manager = CHI_CONFIG_MANAGER;
   int port = static_cast<int>(config_manager->GetPort());
   hshm::lbm::Transport *lbm_transport =
@@ -645,37 +846,55 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
     HLOG(kError, "[SendOut] Task {} FAILED: Could not get client for {}:{}",
          origin_task->task_id_, target_host->ip_address, port);
     ipc_manager->SetDead(target_node_id);
-    send_out_retry_.push_back(
-        {origin_task, target_node_id, std::chrono::steady_clock::now()});
+    {
+      std::lock_guard<std::mutex> _rqlk(retry_queues_mutex_);
+      send_out_retry_.push_back(
+          {origin_task, target_node_id, std::chrono::steady_clock::now()});
+    }
     return;
   }
 
-  // Create SaveTaskArchive with SerializeOut mode and lbm_transport
-  // The client will automatically call Expose internally during serialization
   chi::SaveTaskArchive archive(chi::MsgType::kSerializeOut, lbm_transport);
 
-  // Serialize the task outputs using container->SaveTask (Expose called
-  // automatically)
+  uint64_t sout_ser_t0 = HrtNs();
   container->SaveTask(origin_task->method_, archive, origin_task);
+  uint64_t sout_ser_dt = HrtNs() - sout_ser_t0;
 
-  // Use non-timed, non-sync context for SendOut
-  // Note: No lock needed - single net worker processes all Send/Recv tasks
   hshm::lbm::LbmContext ctx(0);
+  uint64_t sout_lbm_t0 = HrtNs();
   int rc = lbm_transport->Send(archive, ctx);
+  uint64_t sout_lbm_dt = HrtNs() - sout_lbm_t0;
+
+  if (rc == 0) {
+    auto &st = NetStats(target_node_id);
+    st.sout_count += 1;
+    st.sout_bytes += origin_task->GetRunCtx()
+                         ? origin_task->GetRunCtx()->predicted_stat_.io_size_
+                         : 0;
+    st.sout_lbm_ns += sout_lbm_dt;
+    st.sout_ser_ns += sout_ser_dt;
+  }
   if (rc != 0) {
-    // See the matching note in SendIn: EAGAIN means the ZMQ queue to this
-    // peer is full transiently, not that the peer is gone. Re-queue
-    // without flipping IsAlive(), so other in-flight SendOuts don't get
-    // cascaded into the retry path on the same EAGAIN.
     HLOG(kWarning,
          "[SendOut] Task {} Lightbeam Send rc={} — re-queueing (no dead-mark)",
          origin_task->task_id_, rc);
     if (rc != EAGAIN) {
       ipc_manager->SetDead(target_node_id);
     }
-    send_out_retry_.push_back(
-        {origin_task, target_node_id, std::chrono::steady_clock::now()});
+    {
+      std::lock_guard<std::mutex> _rqlk(retry_queues_mutex_);
+      send_out_retry_.push_back(
+          {origin_task, target_node_id, std::chrono::steady_clock::now()});
+    }
     return;
+  }
+
+  if (origin_task->method_ == Method::kHeartbeatProbe ||
+      origin_task->method_ == Method::kProbeRequest ||
+      origin_task->method_ == Method::kHeartbeat) {
+    HLOG(kInfo,
+         "[ProbeTrace SendOut] method={} task={} -> node={} sent OK",
+         origin_task->method_, origin_task->task_id_, target_node_id);
   }
 
   {
@@ -686,25 +905,34 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
     }
   }
 
-  HLOG(kDebug, "[SendOut] Task {}", origin_task->task_id_);
-
-  // TASK_DATA_OWNER was set by RecvIn iff the receiving archive had
-  // BULK_EXPOSE bulks that we AllocateBuffer'd ourselves (see admin_runtime
-  // RecvIn / task_archive.cc daemon_allocated_bulk_count_). In that case
-  // the buffer is chimaera SHM and the task's destructor will FreeBuffer
-  // it — leave the flag alone. If the input bulk lived in ZMQ-owned
-  // memory (BULK_XFER write data), the flag was never set, so there's
-  // nothing to clear and no double-free risk.
-  //
-  // Defer task deletion one invocation to give ZMQ's I/O thread time to
-  // flush the zero-copy zmq_msg_init_data bulk before the buffer is
-  // released by the destructor.
+  // Defer task delete one iteration to let ZMQ flush the bulk.
   deferred_deletes.push_back(origin_task);
 }
 
 /**
- * Main Send function - periodic task that polls net_queue_ for send operations
- * Polls both SendIn (priority 0) and SendOut (priority 1) queues
+ * Main Send periodic — drains cross-node send queues on net_send_worker.
+ *
+ * Strategy (see NetQueuePriority for the lane definitions):
+ *   1. Drain all kSendInLatency and kSendOutLatency tasks unbounded.
+ *   2. Drain bulk lanes (kSendInIO + kSendOutIO) up to a byte budget
+ *      (kNetQueueIoByteBudget, default 8 MiB) per tick, alternating
+ *      SendIn / SendOut so neither direction starves.
+ *   3. Yield. The next periodic tick re-checks latency first.
+ *
+ * Retry-queue + dead-node scans still run unconditionally each tick.
+ *
+ * Strategy (see NetQueuePriority for the lane definitions):
+ *   1. Drain all kSendInLatency and kSendOutLatency tasks unbounded.
+ *      These are small (<4 KiB) — SWIM heartbeats, ACKs, small metadata
+ *      — so emptying them per tick is cheap and lets control-plane
+ *      round-trips meet their SLA even under bulk-data pressure.
+ *   2. Drain bulk lanes (kSendInIO + kSendOutIO) up to a byte budget
+ *      (kNetQueueIoByteBudget, default 8 MiB) per tick, alternating
+ *      SendIn / SendOut so neither direction starves.
+ *   3. Yield. The next periodic tick re-checks latency first, so any
+ *      probe enqueued during the I/O burst gets prompt attention.
+ *
+ * Retry-queue + dead-node scans still run unconditionally each tick.
  */
 chi::TaskResume Runtime::Send(hipc::FullPtr<SendTask> task,
                               chi::RunContext &rctx) {
@@ -712,67 +940,92 @@ chi::TaskResume Runtime::Send(hipc::FullPtr<SendTask> task,
   auto *ipc_manager = CHI_IPC;
   chi::Future<chi::Task> queued_future;
   bool did_send = false;
-  int send_in_count = 0;
 
-  // Process retry queues before normal sends
+  // Per-tick maintenance: retries and dead-node fanout.
   ProcessRetryQueues();
-
-  // Scan send_map_ for timed-out entries from dead nodes
   ScanSendMapTimeouts();
 
-  // With the recv/send worker split (DefaultScheduler::DivideWorkers),
-  // Recv / ClientRecv run on net_recv_worker, NOT this one. So Send no
-  // longer has to share air with them, and the original cap-per-tick to
-  // avoid starving Recv is obsolete. Default is now effectively unbounded
-  // (drain everything queued); the env var stays as an escape hatch.
-  const char *send_burst_env = std::getenv("CHI_SEND_BURST");
-  int send_burst_cap = (send_burst_env && *send_burst_env)
-                           ? std::atoi(send_burst_env)
-                           : INT_MAX;
-  if (send_burst_cap <= 0) send_burst_cap = INT_MAX;
+  // Snapshot the depth of each priority at function entry so a hot
+  // producer can't monopolise this tick.
+  const size_t n_in_lat =
+      ipc_manager->GetNetQueueSize(chi::NetQueuePriority::kSendInLatency);
+  const size_t n_out_lat =
+      ipc_manager->GetNetQueueSize(chi::NetQueuePriority::kSendOutLatency);
+  const size_t n_in_io =
+      ipc_manager->GetNetQueueSize(chi::NetQueuePriority::kSendInIO);
+  const size_t n_out_io =
+      ipc_manager->GetNetQueueSize(chi::NetQueuePriority::kSendOutIO);
 
-  // Poll priority 0 (SendIn) queue - tasks waiting to be sent to remote nodes
-  while (send_in_count < send_burst_cap &&
-         ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendIn,
+  // --- Phase 1: drain latency-lane sends, bounded by entry depth ------
+  for (size_t i = 0; i < n_in_lat; ++i) {
+    if (!ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendInLatency,
                                     queued_future)) {
-    // Get the original task from the Future
+      break;
+    }
     auto origin_task = queued_future.GetTaskPtr();
     if (!origin_task.IsNull()) {
-      HLOG(kDebug, "[Send] Processing SendIn task method={}, pool_id={}",
-           origin_task->method_, origin_task->pool_id_);
       SendIn(origin_task, rctx);
       did_send = true;
-      send_in_count++;
     }
   }
-
-  if (send_in_count > 0) {
-    HLOG(kDebug, "[Send] Processed {} SendIn tasks", send_in_count);
-  }
-
-  // Poll priority 1 (SendOut) queue - tasks with outputs to send back
-  int send_out_count = 0;
-  while (send_out_count < send_burst_cap &&
-         ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendOut,
+  for (size_t i = 0; i < n_out_lat; ++i) {
+    if (!ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendOutLatency,
                                     queued_future)) {
-    // Get the original task from the Future
+      break;
+    }
     auto origin_task = queued_future.GetTaskPtr();
     if (!origin_task.IsNull()) {
-      HLOG(kDebug, "[Send] Processing SendOut task method={}, pool_id={}",
-           origin_task->method_, origin_task->pool_id_);
       SendOut(origin_task);
       did_send = true;
-      send_out_count++;
     }
   }
 
-  if (send_out_count > 0) {
-    HLOG(kDebug, "[Send] Processed {} SendOut tasks", send_out_count);
+  // --- Phase 2: drain bulk I/O up to byte budget AND entry depth ------
+  size_t io_budget = chi::kNetQueueIoByteBudget;
+  const size_t io_bound = n_in_io + n_out_io;
+  size_t io_in_remaining = n_in_io;
+  size_t io_out_remaining = n_out_io;
+  for (size_t i = 0; i < io_bound && io_budget > 0; ++i) {
+    bool did_any = false;
+    if (io_in_remaining > 0 &&
+        ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendInIO,
+                                   queued_future)) {
+      auto origin_task = queued_future.GetTaskPtr();
+      if (!origin_task.IsNull()) {
+        size_t sz = origin_task->GetRunCtx()
+                        ? origin_task->GetRunCtx()->predicted_stat_.io_size_
+                        : 0;
+        SendIn(origin_task, rctx);
+        did_send = true;
+        io_budget = (sz >= io_budget) ? 0 : (io_budget - sz);
+        --io_in_remaining;
+        did_any = true;
+      }
+    }
+    if (io_budget == 0) break;
+    if (io_out_remaining > 0 &&
+        ipc_manager->TryPopNetTask(chi::NetQueuePriority::kSendOutIO,
+                                   queued_future)) {
+      auto origin_task = queued_future.GetTaskPtr();
+      if (!origin_task.IsNull()) {
+        size_t sz = origin_task->GetRunCtx()
+                        ? origin_task->GetRunCtx()->predicted_stat_.io_size_
+                        : 0;
+        SendOut(origin_task);
+        did_send = true;
+        io_budget = (sz >= io_budget) ? 0 : (io_budget - sz);
+        --io_out_remaining;
+        did_any = true;
+      }
+    }
+    if (!did_any) break;
   }
 
-  // Track whether this execution did actual work
   rctx.did_work_ = did_send;
-
+  {
+    auto *cfg_ipc = CHI_IPC;
+    DumpNetStatsIfDue(cfg_ipc->GetNodeId(), cfg_ipc->GetNumHosts());
+  }
   task->SetReturnCode(0);
   CHI_CO_RETURN;
   CHI_TASK_BODY_END
@@ -810,13 +1063,27 @@ void Runtime::RecvIn(hipc::FullPtr<RecvTask> task,
       continue;
     }
 
+    // Instrumentation: time the deserialize+alloc step so the
+    // dump can show whether the recv-side cost is dominated by
+    // bulk copy or by task object construction.
+    uint64_t des_t0 = HrtNs();
     // Call AllocLoadTask to allocate and deserialize the task
     hipc::FullPtr<chi::Task> task_ptr =
         container->AllocLoadTask(task_info.method_id_, archive);
+    uint64_t des_dt = HrtNs() - des_t0;
 
     if (task_ptr.IsNull()) {
       HLOG(kError, "Admin: Failed to load task");
       continue;
+    }
+    {
+      chi::u64 from_node = task_ptr->pool_query_.GetReturnNode();
+      auto &st = NetStats(from_node);
+      st.rin_count += 1;
+      st.rin_bytes += task_ptr->GetRunCtx()
+                          ? task_ptr->GetRunCtx()->predicted_stat_.io_size_
+                          : 0;
+      st.rin_des_ns += des_dt;
     }
 
     // If the sender is a node we marked kDead, mark it alive.
@@ -868,11 +1135,52 @@ void Runtime::RecvIn(hipc::FullPtr<RecvTask> task,
     HLOG(kDebug, "[RecvIn] Task {} method={} pool_id={} dispatching to workers",
          task_ptr->task_id_, task_ptr->method_, task_ptr->pool_id_);
 
-    // Send task for execution using IpcManager::Send with awake_event=false
-    // Note: This creates a Future and enqueues it to worker lanes
-    // awake_event=false prevents setting parent task for received remote tasks
-    // Note: IsClientThread is false since this is runtime code
-    (void)ipc_manager->Send(task_ptr, false);
+    if (task_ptr->method_ == Method::kHeartbeatProbe ||
+        task_ptr->method_ == Method::kProbeRequest ||
+        task_ptr->method_ == Method::kHeartbeat) {
+      HLOG(kInfo,
+           "[ProbeTrace RecvIn] method={} task={} from node={}",
+           task_ptr->method_, task_ptr->task_id_, sender_node);
+    }
+
+    // Dispatch the received task directly onto a worker lane.
+    //
+    // We deliberately do NOT call ipc_manager->Send here because RecvIn now
+    // runs on a dedicated std::thread (CHI_CUR_WORKER == nullptr). Send's
+    // non-worker branch routes through IpcManager::RouteTask, which respects
+    // pool_query_ and may re-broadcast a task that arrived at us because
+    // we cleared TASK_ROUTED above. Mirror IpcCpu2Self::ClientSend's worker
+    // branch directly: build a pointer-Future, pick a lane via
+    // scheduler->ClientMapTask, push, and AwakenWorker if the lane was empty.
+    // No parent RunContext is set (there is no current run context on a
+    // recv thread, and these are top-level remote tasks anyway).
+    chi::Future<chi::Task> future =
+        ipc_manager->MakePointerFuture(task_ptr);
+    if (future.GetFutureShm().IsNull()) {
+      HLOG(kError, "[RecvIn] MakePointerFuture failed for task {}",
+           task_ptr->task_id_);
+      continue;
+    }
+    if (!task_ptr->task_flags_.Any(TASK_RUN_CTX_EXISTS)) {
+      ipc_manager->BeginTask(future, nullptr, nullptr);
+    }
+    // ROUTED so the worker doesn't re-route this task to peers when it
+    // sees pool_query_ pointing at another node.
+    task_ptr->SetFlags(TASK_ROUTED);
+
+    if (ipc_manager->GetScheduler() != nullptr) {
+      chi::u32 lane_id =
+          ipc_manager->GetScheduler()->ClientMapTask(ipc_manager, future);
+      auto *worker_queues = ipc_manager->GetTaskQueue();
+      if (worker_queues) {
+        auto &dest_lane = worker_queues->GetLane(lane_id, 0);
+        bool was_empty = dest_lane.Empty();
+        dest_lane.Push(future);
+        if (was_empty) {
+          ipc_manager->AwakenWorker(&dest_lane);
+        }
+      }
+    }
   }
 
   task->SetReturnCode(0);
@@ -954,8 +1262,22 @@ void Runtime::RecvOut(hipc::FullPtr<RecvTask> task,
     }
 
     // Deserialize outputs directly into the replica task using LoadTask
-    // This exposes buffers via ar.bulk() and populates archive.recv
+    // This exposes buffers via ar.bulk() and populates archive.recv.
+    // Instrumentation: time the deserialize for rout accounting.
+    uint64_t rout_des_t0 = HrtNs();
     container->LoadTask(origin_task->method_, archive, replica);
+    uint64_t rout_des_dt = HrtNs() - rout_des_t0;
+    {
+      // task_info has sender node via task_id_.node_id_ (the origin node).
+      chi::u64 from_node = task_info.task_id_.node_id_;
+      auto &st = NetStats(from_node);
+      st.rout_count += 1;
+      st.rout_bytes += origin_task->GetRunCtx()
+                           ? origin_task->GetRunCtx()->predicted_stat_.io_size_
+                           : 0;
+      st.rout_des_ns += rout_des_dt;
+    }
+
   }
 
   // Second pass: Aggregate results
@@ -1041,9 +1363,27 @@ void Runtime::RecvOut(hipc::FullPtr<RecvTask> task,
         origin_rctx->container_ = container;
       }
 
-      // Complete the origin task via EndTask
+      // Complete the origin task via EndTask. When RecvOut runs on the
+      // dedicated peer recv thread (CHI_CUR_WORKER == nullptr), borrow the
+      // net_recv_worker pointer for the call. EndTask's per-worker state
+      // updates (num_tasks_processed_, load_) are stats only — the
+      // correctness-bearing paths (EnqueueNetTask for remote origin,
+      // IpcCpu2Self::RuntimeSend for local origin) are thread-safe and
+      // don't depend on CHI_CUR_WORKER being correct. The net_recv_worker
+      // already serialized incoming network responses pre-split, so this
+      // approximates the prior accounting.
       auto *worker = CHI_CUR_WORKER;
-      worker->EndTask(origin_task, origin_rctx, true);
+      if (worker == nullptr) {
+        auto *scheduler = CHI_IPC->GetScheduler();
+        worker = scheduler ? scheduler->GetNetRecvWorker() : nullptr;
+      }
+      if (worker) {
+        worker->EndTask(origin_task, origin_rctx, true);
+      } else {
+        HLOG(kError,
+             "[RecvOut] No worker available to call EndTask for task {}",
+             origin_task->task_id_);
+      }
     }
   }
 
@@ -2080,6 +2420,12 @@ void Runtime::ProcessRetryQueues() {
   auto *ipc_manager = CHI_IPC;
   auto now = std::chrono::steady_clock::now();
 
+  // Sender threads push to send_*_retry_ on EAGAIN / failure.
+  // ProcessRetryQueues runs on the SendPoll periodic thread; serialise
+  // iteration against concurrent pushes. unique_lock so we can release
+  // around the recursive SendOut() call (SendOut may want this lock).
+  std::unique_lock<std::mutex> _rqlk(retry_queues_mutex_);
+
   // Process send_in retry queue
   auto it = send_in_retry_.begin();
   while (it != send_in_retry_.end()) {
@@ -2142,10 +2488,16 @@ void Runtime::ProcessRetryQueues() {
       // For send_out, the result is lost; origin will timeout
       it = send_out_retry_.erase(it);
     } else if (ipc_manager->IsAlive(it->target_node_id)) {
-      // Node came back: retry by calling SendOut
-      SendOut(it->task);
+      // Node came back: retry by calling SendOut. SendOut may push to
+      // send_out_retry_ on a fresh failure — release the lock around it
+      // to avoid self-deadlock, then restart iteration from begin().
+      hipc::FullPtr<chi::Task> retry_task = it->task;
       it = send_out_retry_.erase(it);
-    } else {
+      _rqlk.unlock();
+      SendOut(retry_task);
+      _rqlk.lock();
+      it = send_out_retry_.begin();
+      continue;
       ++it;
     }
   }
@@ -2234,6 +2586,7 @@ void Runtime::ScanSendMapTimeouts() {
 }
 
 void Runtime::FlushStaleStateForNode(chi::u64 node_id) {
+  std::lock_guard<std::mutex> _rqlk(retry_queues_mutex_);
   // 1. Discard send_in retry entries targeting this node.
   //    For each discarded entry, increment the origin task's
   //    completed_replicas so broadcast origins can still complete.
@@ -2287,6 +2640,30 @@ chi::TaskResume Runtime::HeartbeatProbe(hipc::FullPtr<HeartbeatProbeTask> task,
                                         chi::RunContext &rctx) {
   CHI_TASK_BODY_BEGIN
   auto *ipc_manager = CHI_IPC;
+  auto *config_manager = CHI_CONFIG_MANAGER;
+
+  // Master kill-switch: when disabled, the failure-detector is a no-op.
+  // Used for bring-up / perf debugging where we want to take SWIM out
+  // of the picture and trust that nodes don't go away mid-run. Every
+  // task that consults SWIM state (SendIn IsAlive check, SendOut return-
+  // node check, recovery) still works — `kAlive` is the default node
+  // state, so without SWIM mutating it, IsAlive() trivially returns true
+  // and the cross-node paths just keep retrying on transient errors.
+  if (!config_manager->GetSwimEnabled()) {
+    rctx.did_work_ = false;
+    task->SetReturnCode(0);
+    CHI_CO_RETURN;
+  }
+
+  // Pull SWIM timeouts from config each tick so the values are
+  // hot-reloadable in principle and live close to the call site.
+  const float kDirectProbeTimeoutSec_cfg =
+      config_manager->GetSwimDirectProbeTimeoutSec();
+  const float kIndirectProbeTimeoutSec_cfg =
+      config_manager->GetSwimIndirectProbeTimeoutSec();
+  const float kSuspicionTimeoutSec_cfg =
+      config_manager->GetSwimSuspicionTimeoutSec();
+
   auto now = std::chrono::steady_clock::now();
   chi::u64 self_node_id = ipc_manager->GetNodeId();
   bool did_work = false;
@@ -2301,7 +2678,7 @@ chi::TaskResume Runtime::HeartbeatProbe(hipc::FullPtr<HeartbeatProbeTask> task,
       did_work = true;
     } else {
       float elapsed = std::chrono::duration<float>(now - it->sent_at).count();
-      if (elapsed > kDirectProbeTimeoutSec) {
+      if (elapsed > kDirectProbeTimeoutSec_cfg) {
         // Direct probe timed out - escalate to indirect probing
         ipc_manager->SetNodeState(it->target_node_id,
                                   chi::NodeState::kProbeFailed);
@@ -2381,7 +2758,7 @@ chi::TaskResume Runtime::HeartbeatProbe(hipc::FullPtr<HeartbeatProbeTask> task,
       }
     } else {
       float elapsed = std::chrono::duration<float>(now - it->sent_at).count();
-      if (elapsed > kIndirectProbeTimeoutSec) {
+      if (elapsed > kIndirectProbeTimeoutSec_cfg) {
         chi::u64 target = it->target_node_id;
         it = pending_indirect_probes_.erase(it);
         did_work = true;
@@ -2414,7 +2791,7 @@ chi::TaskResume Runtime::HeartbeatProbe(hipc::FullPtr<HeartbeatProbeTask> task,
       if (h.state == chi::NodeState::kSuspected) {
         float since_change =
             std::chrono::duration<float>(now - h.state_changed_at).count();
-        if (since_change >= kSuspicionTimeoutSec) {
+        if (since_change >= kSuspicionTimeoutSec_cfg) {
           HLOG(kError, "SWIM: Node {} confirmed dead after suspicion timeout",
                h.node_id);
           ipc_manager->SetDead(h.node_id);
@@ -2440,8 +2817,20 @@ chi::TaskResume Runtime::HeartbeatProbe(hipc::FullPtr<HeartbeatProbeTask> task,
     }
     if (other_count > 0 && bad_count * 2 > other_count) {
       if (!ipc_manager->IsSelfFenced()) {
-        HLOG(kFatal,
-             "SWIM: Self-fencing! {} of {} other nodes are suspected/dead",
+        // HLOG(kFatal, ...) calls exit(1) (see logging.h:270), which would
+        // tear down the daemon before SetSelfFenced has a chance to run and
+        // before SWIM has any chance to recover. The intent here is "log
+        // loudly and set the flag," not "abort." Use kError so the message
+        // still stands out in stderr but the daemon stays up and keeps
+        // probing — the kInfo branch below clears the fence once peers come
+        // back. Killing the daemon on suspicion was the actual root cause
+        // of the 4n/8n IOR hangs: under bulk-IO bursts a probe round-trip
+        // can miss its window on >=2 peers, the kFatal exit-on-log fires,
+        // the node goes away, and now its peers see >50% bad and self-fence
+        // too -> full cluster collapse.
+        HLOG(kError,
+             "SWIM: Self-fencing (continuing to probe)! {} of {} other "
+             "nodes are suspected/dead",
              bad_count, other_count);
         ipc_manager->SetSelfFenced(true);
       }
@@ -2504,11 +2893,13 @@ chi::TaskResume Runtime::ProbeRequest(hipc::FullPtr<ProbeRequestTask> task,
       client_.AsyncHeartbeat(chi::PoolQuery::Physical(task->target_node_id_));
   auto start = std::chrono::steady_clock::now();
 
+  const float indirect_probe_timeout_sec =
+      CHI_CONFIG_MANAGER->GetSwimIndirectProbeTimeoutSec();
   while (!future.IsComplete()) {
     float elapsed =
         std::chrono::duration<float>(std::chrono::steady_clock::now() - start)
             .count();
-    if (elapsed >= kIndirectProbeTimeoutSec) break;
+    if (elapsed >= indirect_probe_timeout_sec) break;
     CHI_CO_AWAIT(chi::yield(1000.0));
   }
 
@@ -2525,12 +2916,17 @@ chi::TaskResume Runtime::ProbeRequest(hipc::FullPtr<ProbeRequestTask> task,
   CHI_TASK_BODY_END
 }
 
-chi::TaskStat Runtime::GetTaskStats(chi::u32 method_id) const {
-  switch (method_id) {
+chi::TaskStat Runtime::GetTaskStats(const chi::Task *task) const {
+  if (!task) return chi::TaskStat();
+  switch (task->method_) {
     case Method::kSend:
     case Method::kRecv:
     case Method::kClientRecv:
     case Method::kClientSend: {
+      // Admin net periodics don't carry a variable payload of their own;
+      // io_size_ here is just a stand-in so the scheduler doesn't route
+      // them as zero-cost metadata. compute_ reflects the current
+      // net_queue backlog so periodic schedulers can throttle if needed.
       chi::TaskStat stat;
       auto *net_queue = CHI_IPC->GetNetQueue();
       size_t total = 0;

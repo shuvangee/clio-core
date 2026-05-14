@@ -645,15 +645,16 @@ bool IpcManager::ServerInitQueues() {
         queue_depth);  // Use configured depth instead of hardcoded 1024
     worker_queues_off_ = worker_queues_.shm_.off_.load();
 
-    // Initialize network queue for send operations
-    // One lane with four priorities (SendIn, SendOut, ClientSendTcp,
-    // ClientSendIpc)
+    // Initialize network queue for send operations.
+    // Cross-node sends are split latency vs I/O so SWIM probes and
+    // small ACKs never queue behind bulk PutBlob/GetBlob payloads.
+    // See NetQueuePriority for the priority order and the drain
+    // strategy in Runtime::Send.
     net_queue_ = queue_allocator_->NewObj<NetQueue>(
         queue_allocator_,
-        1,             // num_lanes: single lane for network operations
-        4,             // num_priorities: 0=SendIn, 1=SendOut, 2=ClientSendTcp,
-                       // 3=ClientSendIpc
-        queue_depth);  // Use configured depth instead of hardcoded 1024
+        1,                          // num_lanes
+        kNetQueueNumPriorities,     // num_priorities
+        queue_depth);
 
     return !worker_queues_.IsNull() && !net_queue_.IsNull();
   } catch (const std::exception &e) {
@@ -1462,14 +1463,17 @@ void IpcManager::EnqueueNetTask(Future<Task> future,
   lane.Push(future);
 
   // Pick the worker that drains this priority's queue. Cross-node Send
-  // priorities (kSendIn / kSendOut) are owned by net_send_worker; client
-  // response priorities (kClientSendTcp / kClientSendIpc) are owned by
-  // net_recv_worker (the ROUTER socket is shared with ClientRecv).
+  // priorities (kSendIn{Latency,IO} / kSendOut{Latency,IO}) are owned
+  // by net_send_worker; client response priorities (kClientSendTcp /
+  // kClientSendIpc) are owned by net_recv_worker (the ROUTER socket is
+  // shared with ClientRecv).
   if (was_empty) {
     TaskLane *wake_lane = nullptr;
     switch (priority) {
-      case NetQueuePriority::kSendIn:
-      case NetQueuePriority::kSendOut:
+      case NetQueuePriority::kSendInLatency:
+      case NetQueuePriority::kSendInIO:
+      case NetQueuePriority::kSendOutLatency:
+      case NetQueuePriority::kSendOutIO:
         wake_lane = net_send_lane_ ? net_send_lane_ : net_lane_;
         break;
       case NetQueuePriority::kClientSendTcp:
@@ -2412,6 +2416,16 @@ void IpcManager::BeginTask(Future<Task> &future, Container *container,
     run_ctx->did_work_ = false;
   }
 
+  // Populate predicted_stat_ from the container so downstream routing
+  // (RouteGlobal's latency-vs-IO lane choice; worker.cc's predicted-load
+  // tracking) can read the task's actual payload size without re-doing
+  // the GetTaskStats(task) work. Scheduler-class code (RuntimeMapTask)
+  // already calls GetTaskStats; pre-populating it here keeps a single
+  // source of truth and makes the value available before RouteTask.
+  if (container) {
+    run_ctx->predicted_stat_ = container->GetTaskStats(task_ptr.ptr_);
+  }
+
   // Mark that RunContext now exists for this task
   task_ptr->SetFlags(TASK_RUN_CTX_EXISTS);
 
@@ -2623,8 +2637,20 @@ RouteResult IpcManager::RouteGlobal(Future<Task> &future,
     run_ctx->pool_queries_ = pool_queries;
   }
 
-  // Enqueue the original task directly to net_queue_ priority 0 (SendIn)
-  EnqueueNetTask(future, NetQueuePriority::kSendIn);
+  // Pick the latency vs I/O SendIn lane based on the task's actual
+  // payload size — small probes / metadata sit on kSendInLatency so
+  // they're not buried behind 1 MiB PutBlob bulks on the wire. The
+  // scheduler (BeginTask / pre-routing) populates RunContext::
+  // predicted_stat_ from container->GetTaskStats(task), so we just
+  // read it here instead of recomputing.
+  size_t io_size = 0;
+  if (task_ptr->GetRunCtx()) {
+    io_size = task_ptr->GetRunCtx()->predicted_stat_.io_size_;
+  }
+  NetQueuePriority sendin_prio = (io_size >= kNetQueueIoThreshold)
+                                     ? NetQueuePriority::kSendInIO
+                                     : NetQueuePriority::kSendInLatency;
+  EnqueueNetTask(future, sendin_prio);
 
   // Set TASK_ROUTED flag on original task
   task_ptr->SetFlags(TASK_ROUTED);

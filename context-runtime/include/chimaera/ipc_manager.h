@@ -93,11 +93,27 @@ enum class LocalMsgType : uint8_t;
  * Network queue priority levels for send operations
  */
 enum class NetQueuePriority : u32 {
-  kSendIn = 0,   ///< Priority 0: SendIn operations (sending task inputs)
-  kSendOut = 1,  ///< Priority 1: SendOut operations (sending task outputs)
-  kClientSendTcp = 2,  ///< Priority 2: Client response via TCP
-  kClientSendIpc = 3,  ///< Priority 3: Client response via IPC
+  // Cross-node sends are split into latency vs I/O lanes by the
+  // routing layer (RouteGlobal / Worker::EndTask) using
+  // container->GetTaskStats(task).io_size_:
+  //   io_size_ <  kLargeIOThreshold (4 KiB) -> kSendIn/OutLatency
+  //   io_size_ >= kLargeIOThreshold          -> kSendIn/OutIO
+  // The Send periodic drains all latency-lane tasks first, then a
+  // bounded byte budget (~8 MiB) of IO-lane tasks, then re-checks
+  // latency. This is the same admission control the scheduler uses
+  // for routing tasks to scheduler vs I/O workers, applied to the
+  // network plane: SWIM heartbeats (io_size_ == 0) and small ACKs
+  // never sit behind a 1 MiB PutBlob.
+  kSendInLatency = 0,  ///< Cross-node forward, <4 KiB (probes, metadata)
+  kSendInIO = 1,       ///< Cross-node forward, >=4 KiB (bulk data)
+  kSendOutLatency = 2, ///< Cross-node response, <4 KiB
+  kSendOutIO = 3,      ///< Cross-node response, >=4 KiB
+  kClientSendTcp = 4,  ///< Client response via TCP
+  kClientSendIpc = 5,  ///< Client response via IPC
 };
+static constexpr u32 kNetQueueNumPriorities = 6;
+static constexpr size_t kNetQueueIoThreshold = 4096;        // 4 KiB
+static constexpr size_t kNetQueueIoByteBudget = 8u << 20;   // 8 MiB / tick
 
 /**
  * Network queue for storing Future<SendTask> objects
@@ -1003,10 +1019,12 @@ class IpcManager {
    * Set the net worker's lane pointers for signaling on EnqueueNetTask.
    * Called by scheduler after DivideWorkers assigns the net workers.
    *
-   * With the recv/send split, kSendIn / kSendOut priorities are drained by
-   * the send worker (peer DEALERs), while kClientSendTcp / kClientSendIpc
-   * are drained by the recv worker (client-facing ROUTER). EnqueueNetTask
-   * picks the right lane to awaken based on the priority enqueued.
+   * With the recv/send split, the cross-node Send priorities
+   * (kSendIn{Latency,IO} / kSendOut{Latency,IO}) are drained by the
+   * send worker (peer DEALERs), while kClientSendTcp / kClientSendIpc
+   * are drained by the recv worker (client-facing ROUTER).
+   * EnqueueNetTask picks the right lane to awaken based on the
+   * priority enqueued.
    *
    * Passing both lanes equal (single-net-worker fallback) is fine — the
    * same worker handles both directions.
@@ -1018,9 +1036,10 @@ class IpcManager {
   }
 
   /**
-   * Enqueue a Future<SendTask> to the network queue
+   * Enqueue a Future<SendTask> to the network queue.
    * @param future Future containing the SendTask to enqueue
-   * @param priority Network queue priority (kSendIn or kSendOut)
+   * @param priority Network queue priority (see NetQueuePriority for
+   *                 the latency-vs-IO lane split).
    */
   void EnqueueNetTask(Future<Task> future, NetQueuePriority priority);
 
@@ -1031,6 +1050,24 @@ class IpcManager {
    * @return true if a Future was popped, false if queue is empty
    */
   bool TryPopNetTask(NetQueuePriority priority, Future<Task> &future);
+
+  /**
+   * Approximate number of tasks currently queued on the given priority.
+   * Snapshot at call time (MPSC head/tail atomics, no lock); producers
+   * may push more after this returns. Used by the Send periodic to
+   * bound its drain loop to the depth seen on entry — prevents one
+   * priority's hot stream from monopolising the tick at the expense
+   * of the other priorities, retries, and SWIM probes that share the
+   * same periodic.
+   * @return Current size of lane 0 at the given priority, or 0 if the
+   *         net_queue_ isn't initialized.
+   */
+  size_t GetNetQueueSize(NetQueuePriority priority) const {
+    if (net_queue_.IsNull()) {
+      return 0;
+    }
+    return net_queue_->GetLane(0, static_cast<u32>(priority)).Size();
+  }
 
   /**
    * Get the network queue for direct access

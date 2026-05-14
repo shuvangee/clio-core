@@ -260,14 +260,12 @@ TEST_CASE("IpcErrors - Network Queue Operations", "[ipc][errors][queue]") {
   auto *ipc = CHI_IPC;
   REQUIRE(ipc != nullptr);
 
-  // Try to pop from empty network queue
+  // Try to pop from empty network queue across the latency/IO lanes
   Future<Task> future;
-  bool result = ipc->TryPopNetTask(NetQueuePriority::kSendIn, future);
-  REQUIRE(!result);  // Should return false for empty queue
-
-  // Try with different priority
-  result = ipc->TryPopNetTask(NetQueuePriority::kSendOut, future);
-  REQUIRE(!result);
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendInLatency, future));
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendInIO, future));
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutLatency, future));
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutIO, future));
 
   // Note: Cleanup happens once at end of all tests
 }

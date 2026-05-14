@@ -30,7 +30,12 @@ bool IpcCpu2CpuZmq::RuntimeRecv(IpcManager *ipc, u32 &tasks_received) {
     hshm::lbm::Transport *transport = ipc->GetClientTransport(mode);
     if (!transport) continue;
 
-    // Drain all pending messages from this transport
+    // Drain all pending messages from this transport. Unbounded `while`
+    // is intentional: RuntimeRecv is invoked by the ClientRecv periodic
+    // which runs on its own dedicated net_recv worker (see
+    // project_net_worker_split.md / DefaultScheduler::DivideWorkers),
+    // so a hot client stream here doesn't starve any other periodic.
+    // EAGAIN ends the loop when the transport buffer drains.
     while (true) {
       LoadTaskArchive archive;
       auto recv_info = transport->Recv(archive);
@@ -171,7 +176,14 @@ bool IpcCpu2CpuZmq::RuntimeSend(
         (mode_idx == 0) ? IpcMode::kTcp : IpcMode::kIpc;
 
     Future<Task> queued_future;
-    while (ipc->TryPopNetTask(priority, queued_future)) {
+    // Snapshot queue depth at function entry and drain exactly that
+    // many — see admin_runtime.cc Send for the same pattern. Bounds
+    // the per-priority drain so neither kClientSendTcp nor
+    // kClientSendIpc can starve the other (or starve the deferred-
+    // delete reclaim above) when one side has a hot producer.
+    const size_t client_send_bound = ipc->GetNetQueueSize(priority);
+    for (size_t send_i = 0; send_i < client_send_bound; ++send_i) {
+      if (!ipc->TryPopNetTask(priority, queued_future)) break;
       auto origin_task = queued_future.GetTaskPtr();
       if (origin_task.IsNull()) continue;
 

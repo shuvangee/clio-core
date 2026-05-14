@@ -18,6 +18,27 @@ install(TARGETS wrp_run_thrpt_benchmark
   DESTINATION bin
 )
 
+# Cross-node bdev throughput benchmark (MPI). Each rank targets its
+# +1 neighbour's bdev container via DirectHash so all writes cross
+# the network — isolates chimaera's cross-node task path from CTE/
+# FUSE/IOR.
+find_package(MPI QUIET)
+if(MPI_CXX_FOUND)
+  add_executable(wrp_xnode_bdev_bench wrp_xnode_bdev_bench.cc)
+  target_link_libraries(wrp_xnode_bdev_bench
+    cxx
+    chimaera::bdev_client
+    chimaera::admin_client
+    hshm::cxx
+    MPI::MPI_CXX
+  )
+  install(TARGETS wrp_xnode_bdev_bench DESTINATION bin)
+else()
+  message(STATUS
+    "MPI not found — skipping wrp_xnode_bdev_bench target (cross-node "
+    "stress test requires MPI for cluster launch).")
+endif()
+
 # GPU runtime / CDP / SYCL benchmark suites removed along with the GPU
 # runtime concept. Kernels now submit tasks to the CPU runtime via the
 # gpu2cpu_queue; benchmark coverage of that path is via the unit tests
