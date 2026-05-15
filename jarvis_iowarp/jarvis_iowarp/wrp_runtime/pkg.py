@@ -75,7 +75,7 @@ class WrpRuntime(Service):
                 'msg': 'IPC transport mode for client-server communication',
                 'type': str,
                 'choices': ['tcp', 'ipc', 'shm'],
-                'default': 'tcp'
+                'default': 'shm'
             },
             {
                 'name': 'log_level',

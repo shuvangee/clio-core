@@ -175,20 +175,16 @@ class WrpCteBench(Application):
             str(self.config['io_count'])
         ]
 
-        # Execute with MPI if nprocs > 1
-        if self.config['nprocs'] > 1:
-            self.log(f"Running benchmark with MPI: {self.config['nprocs']} processes, {self.config['ppn']} per node")
-
-            exec_info = PsshExecInfo(
-                env=self.mod_env,
-                hostfile=self.hostfile,
-                nprocs=self.config['nprocs'],
-                ppn=self.config['ppn']
-            )
-        else:
-            self.log("Running benchmark without MPI (single process)")
-            from jarvis_cd.shell import LocalExecInfo
-            exec_info = LocalExecInfo(env=self.mod_env)
+        self.log(
+            f"Running benchmark via Pssh: {self.config['nprocs']} procs, "
+            f"{self.config['ppn']} per node"
+        )
+        exec_info = PsshExecInfo(
+            env=self.mod_env,
+            hostfile=self.hostfile,
+            nprocs=self.config['nprocs'],
+            ppn=self.config['ppn'],
+        )
 
         # Execute the benchmark
         cmd_str = ' '.join(cmd)

@@ -1174,11 +1174,9 @@ void Runtime::RecvIn(hipc::FullPtr<RecvTask> task,
       auto *worker_queues = ipc_manager->GetTaskQueue();
       if (worker_queues) {
         auto &dest_lane = worker_queues->GetLane(lane_id, 0);
-        bool was_empty = dest_lane.Empty();
         dest_lane.Push(future);
-        if (was_empty) {
-          ipc_manager->AwakenWorker(&dest_lane);
-        }
+        // Always signal — see ipc_cpu2cpu_impl.h for the race.
+        ipc_manager->AwakenWorker(&dest_lane);
       }
     }
   }
@@ -1328,9 +1326,11 @@ void Runtime::RecvOut(hipc::FullPtr<RecvTask> task,
 
     HLOG(kDebug, "[RecvOut] Task {}", origin_task->task_id_);
 
-    // Increment completed replicas counter in origin's rctx
-    origin_rctx->completed_replicas_++;
-    chi::u32 completed = origin_rctx->completed_replicas_;
+    // Increment completed replicas counter in origin's rctx.
+    // Use the fetch_add return so we observe THIS thread's increment —
+    // a separate load can race a parallel RecvOut/SendIn-skip increment
+    // and miss the "all done" trigger condition.
+    chi::u32 completed = origin_rctx->completed_replicas_.fetch_add(1) + 1;
 
     // If all replicas completed
     if (completed == origin_rctx->subtasks_.size()) {

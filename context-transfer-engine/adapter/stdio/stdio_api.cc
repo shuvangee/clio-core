@@ -49,6 +49,9 @@ using wrp::cae::FsIoOptions;
 using wrp::cae::IoStatus;
 using wrp::cae::MetadataManager;
 using wrp::cae::SeekMode;
+using hshm::u8;  // chimaera relocated u8/u16/... into hshm::; pull
+                  // u8 in by name so the existing getc/putc bodies
+                  // compile without rewriting every typed buffer.
 
 namespace stdfs = std::filesystem;
 

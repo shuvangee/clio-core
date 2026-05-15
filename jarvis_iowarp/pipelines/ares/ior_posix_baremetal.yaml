@@ -1,0 +1,64 @@
+# IOR + CTE via POSIX adapter (bare-metal, single node).
+#
+# Layout:
+#   wrp_runtime    - starts the chimaera/CTE runtime locally (shm IPC).
+#   wrp_adapters   - LD_PRELOADs libwrp_cte_posix.so into ior; binds via
+#                    the `interceptors: [cte_posix]` reference below.
+#   builtin.ior    - runs ior with the output path prefixed by "clio::"
+#                    so every read/write goes through the adapter.
+#
+# Requirements:
+#   ior on PATH (e.g. $HOME/ior_install/bin/ior — bare-metal jarvis run
+#   inherits the user's PATH).
+#
+# Run:
+#   PATH=$HOME/ior_install/bin:$PATH jarvis ppl load yaml <this file>
+#   jarvis ppl run
+
+name: ior_posix_baremetal
+
+install_manager: default
+
+pkgs:
+  - pkg_type: jarvis_iowarp.wrp_runtime
+    pkg_name: cte_runtime
+    ipc_mode: shm
+
+  # Register a RAM-backed storage target with the CTE runtime. The
+  # `ram::` path prefix tells wrp_cte to set bdev_type=ram (volatile,
+  # in-memory) instead of the default file-backed bdev. File-backed
+  # bdevs on this host land on NFS (~229 MB/s raw write), which
+  # bottlenecks IOR well below CTE's design point of ~2 GB/s.
+  #
+  # Sized at 16 GiB: comfortably fits the 12 GiB workload (4G block x
+  # 3 reps) and stays under /dev/shm capacity on this node (24 GiB).
+  - pkg_type: jarvis_iowarp.wrp_cte
+    pkg_name: cte
+    devices:
+      - ["ram::cte_ram", "25G", 1.0]
+
+  - pkg_type: builtin.ior
+    pkg_name: ior
+    nprocs: 1
+    ppn: 1
+    api: posix
+    # 4 GiB per rank, 1 MiB transfers, 3 iterations: ~12 GiB cumulative
+    # I/O — large enough to amortize CTE PutBlob round-trip overhead.
+    xfer: "1m"
+    block: "4g"
+    reps: 3
+    write: true
+    read: true
+    # Route IOR's output file through the WRP CTE POSIX adapter: the
+    # interceptor binding below LD_PRELOADs libwrp_cte_posix.so, and the
+    # clio:: prefix opts every open()/read()/write() on this path into
+    # CTE-routed I/O. The adapter strips the prefix before reaching the
+    # backend filesystem, so the actual on-disk file lives at the bare
+    # path ($HOME/jarvis-runs/ior_posix_baremetal/ior.bin).
+    out: "clio::$HOME/jarvis-runs/ior_posix_baremetal/ior.bin"
+    interceptors: [cte_posix]
+
+interceptors:
+  - pkg_type: jarvis_iowarp.wrp_adapters
+    pkg_name: cte_posix
+    posix: true

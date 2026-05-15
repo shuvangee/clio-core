@@ -480,20 +480,17 @@ void IpcManager::AwakenWorker(TaskLane *lane) {
     return;
   }
 
-  // Park-flag fast path: if the worker is still spinning (active_=true), it
-  // will pick up our enqueued task on its next loop iteration without needing
-  // a signal. Skip the tgkill syscall entirely.
-  //
-  // Race window: producer pushed task → load active_=true → skips signal,
-  // and concurrently worker set active_=false → enters epoll_pwait2. To
-  // prevent a missed wakeup, Worker::SuspendMe rechecks its queues after
-  // storing active_=false but before calling Wait() — see worker.cc.
-  // Both stores/loads are seq_cst on the opt_atomic, so the worker's
-  // post-store recheck is guaranteed to observe a producer push that
-  // happened before the worker's store.
-  if (lane->IsActive()) {
-    return;
-  }
+  // ALWAYS send SIGUSR1, never skip on active_=true. Past attempts to
+  // gate this on the park-flag tripped a lost-wakeup race at scale (4n
+  // 256m FPP) where the producer observed active_=true, skipped the
+  // signal, and the worker then stored active_=false and entered
+  // epoll_pwait2 before noticing the just-pushed task. The
+  // post-store-recheck handshake in Worker::SuspendMe is supposed to
+  // catch this but doesn't fire reliably under heavy multi-tier
+  // scheduling pressure. Skipping the tgkill saved a syscall; the
+  // observed cost was hangs that never recovered. The extra signal is
+  // absorbed harmlessly by signalfd — at worst the worker wakes one
+  // extra time and re-checks its (empty) queue. Worth it.
 
   pid_t tid = lane->GetTid();
   if (tid > 0) {

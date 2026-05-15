@@ -6,7 +6,6 @@
 #   jarvis ppl run yaml
 
 name: cte_integration_test
-
 pkgs:
   # Stage 1: Launch IOWarp runtime on all nodes in the hostfile (via parallel SSH)
   - pkg_type: jarvis_iowarp.wrp_runtime

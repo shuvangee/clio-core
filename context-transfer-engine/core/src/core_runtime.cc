@@ -920,6 +920,11 @@ chi::TaskResume Runtime::PutBlob(hipc::FullPtr<PutBlobTask> task,
   (void)ctx;
 #endif
   CHI_TASK_BODY_BEGIN
+  // Per-PutBlob diagnostic logging — disabled in perf builds. Was burning
+  // an atomic fetch_add + clock_gettime + branch on every 64 KB chunk plus
+  // an HLOG every 8th chunk (300+/s at FUSE saturation), measurably slowing
+  // the FUSE→CTE write path. Re-enable by flipping `#if 0` → `#if 1`.
+#if 0
   // DEBUG: unconditional log to verify the handler is hit and to
   // print whether submit_ts_ns_ survived the client→daemon hop.
   {
@@ -976,6 +981,7 @@ chi::TaskResume Runtime::PutBlob(hipc::FullPtr<PutBlobTask> task,
       }
     }
   }
+#endif
 
   try {
     TagId tag_id = task->tag_id_;

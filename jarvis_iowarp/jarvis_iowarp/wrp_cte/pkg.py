@@ -7,7 +7,7 @@ and running `chimaera compose`. Supports both bare-metal and container modes.
 from jarvis_cd.core.pkg import Service
 from jarvis_cd.util import SizeType
 from jarvis_cd.shell.process import Rm, Mkdir
-from jarvis_cd.shell import PsshExecInfo, Exec, LocalExecInfo
+from jarvis_cd.shell import PsshExecInfo, Exec
 import yaml
 import os
 import re
@@ -28,9 +28,19 @@ class WrpCte(Service):
         return [
             {
                 'name': 'pool_name',
-                'msg': 'Name of the CTE pool',
+                'msg': ('Name of the CTE pool. MUST match the C++ client\'s '
+                        'kCtePoolName constant ("wrp_cte_core") — that\'s '
+                        'the name the FUSE / GPU adapters use when they '
+                        'do AsyncCreate during ClientInit. If compose '
+                        'registers a different name (e.g. "wrp_cte"), the '
+                        'client\'s AsyncCreate then *also* tries to create '
+                        'pool "wrp_cte_core" at the same pool_id; on '
+                        'multi-node the cross-node admin propagation of '
+                        'that second create races with the first, leaving '
+                        'the remote container half-initialized and FUSE '
+                        'callbacks wedged.'),
                 'type': str,
-                'default': 'wrp_cte'
+                'default': 'wrp_cte_core'
             },
             {
                 'name': 'pool_id',
@@ -150,12 +160,14 @@ class WrpCte(Service):
             f.write('# Content Transfer Engine (CTE) Compose Configuration\n\n')
             yaml.dump(compose_config, f, default_flow_style=False, indent=2)
 
-        # Create device directories (skip RAM devices)
         for path, _, _ in devices:
-            if not path.startswith('ram::'):
-                parent_dir = os.path.dirname(path)
-                if parent_dir:
-                    Mkdir(parent_dir, PsshExecInfo(hostfile=self.hostfile)).run()
+            if path.startswith('ram::'):
+                continue
+            parent_dir = os.path.dirname(path)
+            if not parent_dir:
+                continue
+            Mkdir(parent_dir,
+                  PsshExecInfo(env=self.mod_env, hostfile=self.hostfile)).run()
 
         self.log("CTE configuration completed")
 
@@ -204,9 +216,16 @@ class WrpCte(Service):
         # single-node path here the simple form is enough.
         cmd = f'chimaera compose {self.compose_config_path}'
 
+        # Pssh fans the compose out to every node. With pool_query:
+        # broadcast in the compose YAML, each admin container instance
+        # handles a Create replica directly, so the per-node invocations
+        # are idempotent: the first to register the pool wins, the
+        # others see "Pool with name '...' already exists" and return
+        # the existing PoolId. Net effect is one successful pool create
+        # per node, which is exactly what 2n needs.
         Exec(cmd, PsshExecInfo(
             env=self.mod_env,
-            hostfile=self.jarvis.hostfile,
+            hostfile=self.hostfile,
             container=self._container_engine,
             container_image=self.deploy_image_name(),
             private_dir=self.private_dir,

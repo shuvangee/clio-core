@@ -608,11 +608,13 @@ public:
     return remove(path.c_str());
   }
 
-  /** Get initial statistics from the backend */
-  size_t GetBackendSize(const chi::string &bkt_name) override {
+  /** Get initial statistics from the backend.
+   *
+   * Match the post-refactor base signatures: std::string filename and
+   * void*+size payload buffers (no chi::string / Blob). */
+  size_t GetBackendSize(const std::string &bkt_name) override {
     size_t true_size = 0;
-    std::string filename = bkt_name.str();
-    int fd = open(filename.c_str(), O_RDONLY);
+    int fd = open(bkt_name.c_str(), O_RDONLY);
     if (fd < 0) {
       return 0;
     }
@@ -621,20 +623,17 @@ public:
     true_size = buf.st_size;
     close(fd);
 
-    HLOG(kDebug, "The size of the file {} on disk is {} bytes", filename,
+    HLOG(kDebug, "The size of the file {} on disk is {} bytes", bkt_name,
           true_size);
     return true_size;
   }
 
   /** Write blob to backend */
-  void WriteBlob(const std::string &bkt_name, const Blob &full_blob,
+  void WriteBlob(const std::string &bkt_name, const void *data, size_t size,
                  const FsIoOptions &opts, IoStatus &status) override {
     status.success_ = true;
-    HLOG(kDebug,
-          "Write called for: {}"
-          " on offset: {}"
-          " and size: {}",
-          bkt_name, opts.backend_off_, full_blob.size());
+    HLOG(kDebug, "Write called for: {} on offset: {} and size: {}",
+         bkt_name, opts.backend_off_, size);
     MPI_File fh;
     int write_count = 0;
     status.mpi_ret_ = real_api_->MPI_File_open(
@@ -651,7 +650,7 @@ public:
       goto ERROR;
     }
     status.mpi_ret_ =
-        real_api_->MPI_File_write(fh, full_blob.data(), opts.mpi_count_,
+        real_api_->MPI_File_write(fh, data, opts.mpi_count_,
                                   opts.mpi_type_, status.mpi_status_ptr_);
     MPI_Get_count(status.mpi_status_ptr_, opts.mpi_type_, &write_count);
     if (write_count != opts.mpi_count_) {
@@ -662,19 +661,16 @@ public:
 
   ERROR:
     real_api_->MPI_File_close(&fh);
-    status.size_ = full_blob.size();
+    status.size_ = size;
     UpdateIoStatus(opts, status);
   }
 
   /** Read blob from the backend */
-  void ReadBlob(const std::string &bkt_name, Blob &full_blob,
+  void ReadBlob(const std::string &bkt_name, void *data, size_t size,
                 const FsIoOptions &opts, IoStatus &status) override {
     status.success_ = true;
-    HLOG(kDebug,
-          "Reading from: {}"
-          " on offset: {}"
-          " and size: {}",
-          bkt_name, opts.backend_off_, full_blob.size());
+    HLOG(kDebug, "Reading from: {} on offset: {} and size: {}",
+         bkt_name, opts.backend_off_, size);
     MPI_File fh;
     int read_count = 0;
     status.mpi_ret_ = real_api_->MPI_File_open(
@@ -691,7 +687,7 @@ public:
       goto ERROR;
     }
     status.mpi_ret_ =
-        real_api_->MPI_File_read(fh, full_blob.data(), opts.mpi_count_,
+        real_api_->MPI_File_read(fh, data, opts.mpi_count_,
                                  opts.mpi_type_, status.mpi_status_ptr_);
     MPI_Get_count(status.mpi_status_ptr_, opts.mpi_type_, &read_count);
     if (read_count != opts.mpi_count_) {
@@ -702,7 +698,7 @@ public:
 
   ERROR:
     real_api_->MPI_File_close(&fh);
-    status.size_ = full_blob.size();
+    status.size_ = size;
     UpdateIoStatus(opts, status);
   }
 

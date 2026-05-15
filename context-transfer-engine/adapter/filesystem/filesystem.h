@@ -39,6 +39,10 @@
 #endif
 
 #include <ftw.h>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <vector>
 // #include <mpi.h>
 
 #include <filesystem>
@@ -47,7 +51,6 @@
 #include <string>
 
 #include "adapter/adapter_types.h"
-#include "adapter/cae_config.h"
 #include "adapter/mapper/mapper_factory.h"
 #include "chimaera/chimaera.h"
 #include "filesystem_io_client.h"
@@ -60,6 +63,116 @@ namespace wrp::cae {
 
 /** The maximum length of a posix path */
 static inline const int kMaxPathLen = 4096;
+
+/**
+ * Logical-namespace marker that opts a path into CTE interception.
+ *
+ * Any path component that starts with "clio::" turns the entire open()
+ * (or stat/MPI_File_open/fopen/...) call into a CTE-routed I/O. Three
+ * accepted shapes:
+ *
+ *   clio::/tmp/foo.dat              ← marker is the whole leading segment
+ *   data/clio::foo.dat              ← marker on the trailing component
+ *   /abs/cwd/bash/clio::data/foo    ← marker on an interior component
+ *                                    (this is what Python's
+ *                                     rundir.joinpath("clio::data/foo")
+ *                                     produces — common with wfbench
+ *                                     and friends that resolve relative
+ *                                     paths before calling open())
+ *
+ * The marker is stripped from the path before it reaches the backend
+ * filesystem and the CTE tag manager, so on-disk filenames stay clean
+ * (e.g. "/abs/bash/clio::data/foo" → "/abs/bash/data/foo").
+ */
+static constexpr const char kClioPrefix[] = "clio::";
+static constexpr size_t kClioPrefixLen = sizeof(kClioPrefix) - 1;  // 6
+
+/** Return the byte offset where "clio::" appears as a path-component
+ *  prefix in @p path, or std::string::npos if it doesn't.
+ *  A component-prefix appearance is either:
+ *    - position 0 (the whole path begins with "clio::"), or
+ *    - immediately after a '/' (some path component begins with "clio::").
+ *  Matches the first occurrence only — paths with more than one
+ *  "clio::" marker are unusual and only the first is stripped.
+ */
+inline size_t FindClioMarker(const std::string &path) {
+  if (path.size() >= kClioPrefixLen &&
+      path.compare(0, kClioPrefixLen, kClioPrefix) == 0) {
+    return 0;
+  }
+  size_t cur = 0;
+  while ((cur = path.find('/', cur)) != std::string::npos) {
+    if (cur + 1 + kClioPrefixLen <= path.size() &&
+        path.compare(cur + 1, kClioPrefixLen, kClioPrefix) == 0) {
+      return cur + 1;
+    }
+    ++cur;
+  }
+  return std::string::npos;
+}
+
+inline bool HasClioPrefix(const std::string &path) {
+  return FindClioMarker(path) != std::string::npos;
+}
+
+inline std::string StripClioPrefix(const std::string &path) {
+  size_t pos = FindClioMarker(path);
+  if (pos == std::string::npos) {
+    return path;
+  }
+  return path.substr(0, pos) + path.substr(pos + kClioPrefixLen);
+}
+
+/** Hardcoded adapter page size (1 MiB). */
+static constexpr size_t kAdapterPageSize = 1024 * 1024;
+
+/**
+ * Process-wide queue of pending AsyncDelTag (close-time) futures.
+ *
+ * Each Filesystem::Remove fires AsyncDelTag and pushes the resulting
+ * future here instead of waiting on it. Filesystem::Open lazily polls
+ * the first N entries with Future::Wait(0) (non-blocking) at the start
+ * of each new open call, removing any that have completed. The queue
+ * keeps close-time RPCs off the user's critical path; the next open
+ * occurrence does a tiny amount of bookkeeping work.
+ */
+class PendingCloses {
+ public:
+  static PendingCloses &Get() {
+    static PendingCloses inst;
+    return inst;
+  }
+
+  void Push(chi::Future<wrp_cte::core::DelTagTask> &&fut) {
+    std::lock_guard<std::mutex> lock(mu_);
+    closes_.emplace_back(std::move(fut));
+  }
+
+  /**
+   * Poll the first `n` pending closes with Wait(0) and remove any that
+   * have completed. n=0 means scan the whole queue. Default callers
+   * pass 3 — enough to keep the queue bounded under typical workflow
+   * patterns without burning many cycles per open.
+   */
+  void ReapN(size_t n) {
+    std::lock_guard<std::mutex> lock(mu_);
+    size_t limit = (n == 0 || n > closes_.size()) ? closes_.size() : n;
+    size_t i = 0;
+    while (i < limit && i < closes_.size()) {
+      if (closes_[i].Wait(0)) {
+        closes_.erase(closes_.begin() + i);
+        if (limit > 0) --limit;
+      } else {
+        ++i;
+      }
+    }
+  }
+
+ private:
+  PendingCloses() = default;
+  std::mutex mu_;
+  std::vector<chi::Future<wrp_cte::core::DelTagTask>> closes_;
+};
 
 /** The type of seek to perform */
 enum class SeekMode {
@@ -78,66 +191,66 @@ public:
   /** Constructor */
   explicit Filesystem(AdapterType type) : type_(type) {
     wrp_cte::core::WRP_CTE_CLIENT_INIT();
-    wrp::cae::WRP_CAE_CONFIG_INIT();
   }
 
-  /** open \a path */
+  /**
+   * Open \a path.
+   *
+   * The caller hands us a clio::-prefixed path (the prefix is the gate
+   * IsPathTracked checks before calling here). We strip the prefix once
+   * so every downstream consumer — backend RealOpen, CTE tag identity,
+   * stat.path_ — sees the bare path.
+   */
   File Open(AdapterStat &stat, const std::string &path) {
     File f;
+    std::string clean_path = StripClioPrefix(path);
     auto mdm = WRP_CTE_FS_METADATA_MANAGER;
     if (stat.adapter_mode_ == AdapterMode::kNone) {
-      stat.adapter_mode_ = mdm->GetAdapterMode(path);
+      stat.adapter_mode_ = mdm->GetAdapterMode(clean_path);
     }
-    RealOpen(f, stat, path);
+    RealOpen(f, stat, clean_path);
     if (!f.status_) {
       return f;
     }
-    Open(stat, f, path);
+    Open(stat, f, clean_path);
     return f;
   }
 
   /** open \a f File in \a path */
   void Open(AdapterStat &stat, File &f, const std::string &path) {
     auto mdm = WRP_CTE_FS_METADATA_MANAGER;
-    // No longer need Context object for CTE
+
+    // Lazily reap up to 3 completed close-time AsyncDelTag futures
+    // before issuing this open. Wait(0) is non-blocking so this is at
+    // most a few FUTURE_COMPLETE flag reads per open.
+    PendingCloses::Get().ReapN(3);
 
     std::shared_ptr<AdapterStat> exists = mdm->Find(f);
     if (!exists) {
       HLOG(kDebug, "File not opened before by adapter");
-      // Normalize path strings
       stat.path_ = stdfs::absolute(path).string();
-      // CTE uses standard strings, no need for chi::string conversion
-      // CTE will create tags on demand, no need to verify existence
-      // Tag creation is handled in GetOrCreateTag below
-      // Update page size
       stat.page_size_ = mdm->GetAdapterPageSize(path);
-      // CTE doesn't use BinaryFileStager parameters
-      // Page size is managed internally by the CTE runtime
-      // Initialize CTE core client and get or create tag
-      // Use singleton client that should be configured globally
 
-      // Create Tag object for this file - Tag constructor handles
-      // GetOrCreateTag
-      wrp_cte::core::Tag file_tag(stat.path_);
-      stat.tag_id_ = file_tag.GetTagId();
+      // Async tag create: fire AsyncGetOrCreateTag and stash the future
+      // on the stat. tag_id_ is unknown at this point; the first I/O
+      // op (Read/Write/GetSize/...) will call AwaitPendingOpen to
+      // resolve it. This removes the sync RPC from the open critical
+      // path entirely.
+      auto *cte_client = WRP_CTE_CLIENT;
+      stat.pending_open_fut_ = cte_client->AsyncGetOrCreateTag(stat.path_);
+      stat.open_pending_ = true;
+      stat.tag_id_ = wrp_cte::core::TagId();  // sentinel; filled on first wait
 
       if (stat.hflags_.Any(WRP_CTE_FS_TRUNC)) {
-        // The file was opened with TRUNCATION
-        // In CTE, we handle truncation differently - no explicit clear needed
         stat.file_size_ = 0;
       } else {
-        // The file was opened regularly
         stat.file_size_ = GetBackendSize(stat.path_);
       }
-      HLOG(kDebug, "Tag vs file size: tag_id={},{}, file_size={}",
-            stat.tag_id_.major_, stat.tag_id_.minor_, stat.file_size_);
-      // Update file position pointer
       if (stat.hflags_.Any(WRP_CTE_FS_APPEND)) {
         stat.st_ptr_ = std::numeric_limits<size_t>::max();
       } else {
         stat.st_ptr_ = 0;
       }
-      // Allocate internal hermes data
       auto stat_ptr = std::make_shared<AdapterStat>(stat);
       FilesystemIoClientState fs_ctx(&mdm->fs_mdm_, (void *)stat_ptr.get());
       HermesOpen(f, stat, fs_ctx);
@@ -146,6 +259,54 @@ public:
       HLOG(kDebug, "File already opened by adapter");
       exists->UpdateTime();
     }
+  }
+
+  /**
+   * Block on the pending AsyncGetOrCreateTag for this stat (if any),
+   * publish the resulting tag_id_, and (when not truncating) query
+   * the CTE tag size so stat.file_size_ matches what's stored in CTE.
+   *
+   * Why the size query: writes via the CTE path don't touch the
+   * backing FS (no RealWrite call), so GetBackendSize during Open
+   * reports 0 for output files. Reads that hit EOF would then either
+   * (a) return 0 immediately with my clamp, or (b) walk off the end
+   * of the page space, triggering "GetBlob failed for page N" errors.
+   * Filling file_size_ from CTE here fixes both.
+   *
+   * No-op (and zero-cost) when stat.open_pending_ is already false.
+   */
+  static void AwaitPendingOpen(AdapterStat &stat) {
+    if (!stat.open_pending_) return;
+    if (!stat.pending_open_fut_.Wait()) {
+      HLOG(kError, "AwaitPendingOpen: AsyncGetOrCreateTag timed out for {}",
+           stat.path_);
+      stat.open_pending_ = false;
+      return;
+    }
+    if (stat.pending_open_fut_->GetReturnCode() != 0) {
+      HLOG(kError, "AwaitPendingOpen: GetOrCreateTag rc={} for {}",
+           stat.pending_open_fut_->GetReturnCode(), stat.path_);
+    }
+    stat.tag_id_ = stat.pending_open_fut_->tag_id_;
+    stat.open_pending_ = false;
+
+    // Populate file_size_ from the CTE tag (unless we're truncating,
+    // in which case the file is logically empty anyway).
+    if (stat.adapter_mode_ != AdapterMode::kBypass &&
+        !stat.hflags_.Any(WRP_CTE_FS_TRUNC)) {
+      auto *cte_client = WRP_CTE_CLIENT;
+      auto size_fut = cte_client->AsyncGetTagSize(stat.tag_id_);
+      if (size_fut.Wait() && size_fut->GetReturnCode() == 0) {
+        size_t cte_size = size_fut.get()->tag_size_;
+        if (cte_size > 0) {
+          stat.file_size_ = cte_size;
+        }
+      }
+    }
+    HLOG(kDebug,
+         "AwaitPendingOpen: resolved tag_id={},{} file_size={} for {}",
+         stat.tag_id_.major_, stat.tag_id_.minor_, stat.file_size_,
+         stat.path_);
   }
 
 private:
@@ -171,6 +332,8 @@ public:
                size_t total_size, IoStatus &io_status,
                FsIoOptions opts = FsIoOptions()) {
     (void)f;
+    // Resolve a pending async open before issuing any CTE RPC.
+    AwaitPendingOpen(stat);
     std::string filename = stat.path_;
     bool is_append = stat.st_ptr_ == std::numeric_limits<size_t>::max();
 
@@ -208,50 +371,165 @@ public:
       off = stat.file_size_;
     }
 
-    // Use page-based CTE PutBlob operations with Tag API
+    // Page-based CTE PutBlob with bounded-async dispatch.
+    //
+    // The original loop was strictly sync: issue one 1 MiB PutBlob,
+    // block on Wait(), move on. Measured ceiling ~1 GB/s. wrp_cte_bench
+    // got 3.5 GB/s by pipelining 8 AsyncPutBlobs and reusing one SHM
+    // buffer. This loop adopts the same pattern with a ring of slots:
+    //
+    //   - Pre-allocate `depth` SHM buffers (one per slot). Reusing them
+    //     eliminates per-page AllocateBuffer + first-touch faults that
+    //     Tag::PutBlob(const char*) incurs (measured ~340 us/MiB).
+    //   - Issue AsyncPutBlob into the next slot without waiting.
+    //   - Only wait when the next slot we want to dispatch into is
+    //     still in-flight (ring full -> wait for the oldest).
+    //   - Drain remaining in-flight slots at end of Write.
+    //
+    // Default depth = 16. Override at runtime with
+    // CTE_ADAPTER_WRITE_DEPTH (env var).
+    auto __wr_start = std::chrono::steady_clock::now();
+    char __wr_label[96];
+    snprintf(__wr_label, sizeof(__wr_label),
+             "Write off=%zu size=%zu", off, total_size);
     {
+      static const size_t kWriteDepth = []() -> size_t {
+        const char *e = std::getenv("CTE_ADAPTER_WRITE_DEPTH");
+        if (e && *e) {
+          char *end = nullptr;
+          unsigned long v = std::strtoul(e, &end, 10);
+          if (end != e && v > 0 && v < 1024) {
+            return static_cast<size_t>(v);
+          }
+        }
+        return 16;
+      }();
+
       size_t bytes_written = 0;
       size_t current_offset = off;
       const char *data_ptr = static_cast<const char *>(ptr);
+      bool ok = true;
 
-      // Create Tag object from stored TagId
       wrp_cte::core::Tag file_tag(stat.tag_id_);
 
-      while (bytes_written < total_size) {
-        // Calculate current page index and offset within page
-        size_t page_index = CalculatePageIndex(current_offset, stat.page_size_);
+      // Shrink ring to the number of pages actually needed (avoids
+      // allocating 16 MiB of SHM for a 1-page write).
+      size_t pages_needed = total_size == 0
+          ? 0
+          : (total_size + stat.page_size_ - 1) / stat.page_size_;
+      size_t depth = std::min(kWriteDepth, pages_needed);
+      if (depth == 0) depth = 1;
+
+      struct Slot {
+        hipc::FullPtr<char> shm;
+        chi::Future<wrp_cte::core::PutBlobTask> fut;
+        bool in_flight = false;
+      };
+      auto *ipc_manager = CHI_IPC;
+      std::vector<Slot> slots(depth);
+      size_t allocated = 0;
+      for (; allocated < depth; ++allocated) {
+        slots[allocated].shm =
+            ipc_manager->AllocateBuffer(stat.page_size_);
+        if (slots[allocated].shm.IsNull()) {
+          HLOG(kError,
+               "AllocateBuffer({} bytes) failed for write-ring slot {}",
+               stat.page_size_, allocated);
+          ok = false;
+          break;
+        }
+      }
+
+      size_t next_slot = 0;
+      while (ok && bytes_written < total_size) {
+        size_t page_index =
+            CalculatePageIndex(current_offset, stat.page_size_);
         size_t page_offset =
             CalculatePageOffset(current_offset, stat.page_size_);
         size_t remaining_page_space =
             CalculateRemainingPageSpace(current_offset, stat.page_size_);
-
-        // Calculate how much to write in this page
         size_t bytes_to_write =
             std::min(remaining_page_space, total_size - bytes_written);
 
-        // Generate blob name using stringified page index
-        std::string blob_name = std::to_string(page_index);
-
-        // Use Tag API PutBlob with raw char* (handles SHM allocation internally)
-        try {
-          file_tag.PutBlob(blob_name, data_ptr + bytes_written, bytes_to_write,
-                           page_offset);
-        } catch (const std::exception &e) {
-          HLOG(kError, "Tag PutBlob failed for page {}: {}", page_index,
-                e.what());
-          io_status.success_ = false;
-          return bytes_written;
+        Slot &s = slots[next_slot];
+        if (s.in_flight) {
+          // Ring full -> reclaim the oldest slot by waiting on it.
+          // This is the only place we block during the dispatch loop.
+          s.fut.Wait();
+          if (s.fut->GetReturnCode() != 0) {
+            HLOG(kError,
+                 "AsyncPutBlob (ring reclaim) failed slot={} page={} rc={}",
+                 next_slot, page_index, s.fut->GetReturnCode());
+            ok = false;
+            break;
+          }
+          s.in_flight = false;
         }
 
-        // Update counters for next iteration
+        // Copy user data into this slot's pre-allocated SHM buffer.
+        memcpy(s.shm.ptr_, data_ptr + bytes_written, bytes_to_write);
+
+        // Dispatch async, do not wait.
+        std::string blob_name = std::to_string(page_index);
+        hipc::ShmPtr<> shm_ptr(s.shm.shm_);
+        try {
+          s.fut = file_tag.AsyncPutBlob(blob_name, shm_ptr,
+                                        bytes_to_write, page_offset);
+          s.in_flight = true;
+        } catch (const std::exception &e) {
+          HLOG(kError, "AsyncPutBlob threw page={}: {}", page_index,
+               e.what());
+          ok = false;
+          break;
+        }
+
         bytes_written += bytes_to_write;
         current_offset += bytes_to_write;
+        next_slot = (next_slot + 1) % depth;
+      }
+
+      // Drain remaining in-flight slots regardless of `ok` so the
+      // SHM buffers are safe to free.
+      for (size_t i = 0; i < depth; ++i) {
+        if (slots[i].in_flight) {
+          slots[i].fut.Wait();
+          if (slots[i].fut->GetReturnCode() != 0) {
+            HLOG(kError, "AsyncPutBlob (final drain) failed slot={} rc={}",
+                 i, slots[i].fut->GetReturnCode());
+            ok = false;
+          }
+          slots[i].in_flight = false;
+        }
+      }
+
+      // Return the SHM pool to the allocator.
+      for (size_t i = 0; i < allocated; ++i) {
+        ipc_manager->FreeBuffer(slots[i].shm);
+      }
+
+      if (!ok) {
+        io_status.success_ = false;
+        return bytes_written;
       }
 
       if (opts.DoSeek()) {
         stat.st_ptr_ = off + total_size;
       }
+      // Track logical file size so a subsequent read in the same
+      // process / on the same fd doesn't return EOF prematurely.
+      if (off + total_size > stat.file_size_) {
+        stat.file_size_ = off + total_size;
+      }
     }
+    auto __wr_end = std::chrono::steady_clock::now();
+    auto __wr_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       __wr_end - __wr_start)
+                       .count();
+    double __wr_ms = __wr_ns / 1e6;
+    double __wr_mbs = (__wr_ns > 0) ? (total_size * 1e3 / __wr_ns) : 0.0;
+    HLOG(kInfo, "[Filesystem::Write] {} elapsed={:.2f}ms ({:.1f} MB/s)",
+         __wr_label, __wr_ms, __wr_mbs);
+    wrp_cte::core::FlushPutBlobTiming(__wr_label);
     stat.UpdateTime();
     io_status.size_ = total_size;
     UpdateIoStatus(opts, io_status);
@@ -267,6 +545,8 @@ public:
                   std::vector<GetBlobAsyncTask> &tasks, IoStatus &io_status,
                   FsIoOptions opts = FsIoOptions()) {
     (void)f;
+    // Resolve a pending async open before issuing any CTE RPC.
+    AwaitPendingOpen(stat);
     std::string filename = stat.path_;
 
     HLOG(kDebug,
@@ -320,6 +600,22 @@ public:
       // TODO: Async read operations not yet fully supported in CTE adapter
       HLOG(kWarning,
             "Async read operations not yet fully supported, using sync read");
+    }
+
+    // Clamp the request to file_size_ so the page loop never asks for
+    // pages past EOF. Callers (e.g. wfbench's `while fp.read(N): pass`)
+    // routinely issue one extra read at EOF — the kernel/glibc returns
+    // 0 from a real read syscall, but our page loop has no implicit
+    // EOF awareness. Without clamping, an N-byte read at offset
+    // file_size_ would issue ceil(N / page_size) GetBlob calls for
+    // pages that were never written, each failing with rc != 0.
+    if (off >= stat.file_size_) {
+      io_status.size_ = 0;
+      UpdateIoStatus(opts, io_status);
+      return 0;
+    }
+    if (off + total_size > stat.file_size_) {
+      total_size = stat.file_size_ - off;
     }
 
     // Use page-based CTE GetBlob operations with Tag API
@@ -405,23 +701,21 @@ public:
 
   /** wait for \a req_id request ID */
   size_t Wait(FsAsyncTask *fstask) {
-    // CTE async operations - updated for new task types
-    for (hipc::FullPtr<wrp_cte::core::PutBlobTask> &task : fstask->put_tasks_) {
-      task->Wait();
-      CHI_IPC->DelTask(task);
+    // chi::Future::Wait() blocks until the task completes and the
+    // Future destructor cleans up the underlying task ptr — no
+    // explicit CHI_IPC->DelTask call needed any more.
+    for (auto &fut : fstask->put_tasks_) {
+      fut.Wait();
     }
 
-    // Update I/O status for gets
+    // Update I/O status for gets.
     if (!fstask->get_tasks_.empty()) {
       size_t get_size = 0;
       for (GetBlobAsyncTask &task : fstask->get_tasks_) {
-        task.task_->Wait();
-        // TODO: CTE GetBlob tasks may have different result structure
-        // For now, just use the requested size
+        task.task_.Wait();
+        // TODO: when the new GetBlobTask exposes the read size on
+        // completion, use it here instead of the original request size.
         get_size += task.orig_size_;
-        // TODO: CTE may handle data copying differently
-        // memcpy(task.orig_data_, data.ptr_, task.orig_size_);
-        CHI_IPC->DelTask(task.task_);
       }
       fstask->io_status_.size_ = get_size;
       UpdateIoStatus(fstask->opts_, fstask->io_status_);
@@ -476,11 +770,17 @@ public:
   /** file size */
   size_t GetSize(File &f, AdapterStat &stat) {
     (void)f;
+    // Resolve a pending async open before issuing the CTE size RPC.
+    AwaitPendingOpen(stat);
     if (stat.adapter_mode_ != AdapterMode::kBypass) {
-      // For CTE, query the actual tag size from CTE runtime
+      // wrp_cte_core dropped the synchronous GetTagSize wrapper; the
+      // current API is AsyncGetTagSize + Future.Wait(), with the result
+      // surfacing on the task's tag_size_ field via the Future's
+      // task_ptr_.
       auto *cte_client = WRP_CTE_CLIENT;
-      size_t cte_tag_size =
-          cte_client->GetTagSize(hipc::MemContext(), stat.tag_id_);
+      auto fut = cte_client->AsyncGetTagSize(stat.tag_id_);
+      fut.Wait();
+      size_t cte_tag_size = fut.get()->tag_size_;
 
       HLOG(
           kDebug,
@@ -488,7 +788,6 @@ public:
           stat.tag_id_.major_, stat.tag_id_.minor_, cte_tag_size,
           stat.file_size_);
 
-      // Update cached file size with actual CTE tag size
       stat.file_size_ = cte_tag_size;
       return cte_tag_size;
     } else {
@@ -543,18 +842,15 @@ public:
     auto mdm = WRP_CTE_FS_METADATA_MANAGER;
     int ret = RealRemove(pathname);
 
-    // CTE tag cleanup - delete the tag associated with this file using
-    // canonical path as tag name
+    // CTE tag cleanup — async fire-and-forget. The AsyncDelTag future
+    // is parked on the process-wide PendingCloses queue; subsequent
+    // opens lazily poll the first few entries with Future::Wait(0)
+    // (non-blocking) to reap completed ones. This keeps the close-time
+    // round-trip off the caller's critical path.
     std::string canon_path = stdfs::absolute(pathname).string();
-    // Note: Tag API doesn't provide delete functionality yet, so we use core
-    // client directly
     auto *cte_client = WRP_CTE_CLIENT;
-    bool tag_deleted = cte_client->DelTag(hipc::MemContext(), canon_path);
-    if (tag_deleted) {
-      HLOG(kDebug, "Deleted CTE tag for file: {}", pathname);
-    } else {
-      HLOG(kDebug, "No CTE tag found for file: {}", pathname);
-    }
+    PendingCloses::Get().Push(cte_client->AsyncDelTag(canon_path));
+    HLOG(kDebug, "Queued CTE tag delete for file: {}", pathname);
 
     // Destroy all file descriptors
     std::list<File> *filesp = mdm->Find(pathname);
@@ -808,32 +1104,22 @@ public:
   }
 
 public:
-  /** Whether or not \a path PATH is tracked by Hermes */
+  /**
+   * A path is tracked iff it carries the "clio::" prefix.
+   *
+   * No regex, no include/exclude lists, no YAML config: the user opts in
+   * per call by typing the prefix. The CTE manager must also be live;
+   * if it hasn't initialized yet we pass through to the real syscall.
+   */
   static bool IsPathTracked(const std::string &path) {
-    // Check if the CAE config singleton is available
-    auto *cae_config = WRP_CAE_CONF;
-    if (cae_config == nullptr) {
+    if (!HasClioPrefix(path)) {
       return false;
     }
-
-    // Check if interception is enabled
-    if (!cae_config->IsInterceptionEnabled()) {
-      return false;
-    }
-
-    if (path.empty()) {
-      return false;
-    }
-
-    // Check if CTE is not initialized yet
     auto *cte_manager = CTE_MANAGER;
     if (cte_manager != nullptr && !cte_manager->IsInitialized()) {
       return false;
     }
-
-    std::string abs_path = stdfs::absolute(path).string();
-    // Use the CAE config's IsPathTracked method
-    return cae_config->IsPathTracked(abs_path);
+    return true;
   }
 };
 

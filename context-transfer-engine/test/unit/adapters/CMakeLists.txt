@@ -6,6 +6,14 @@ if(WRP_CORE_ENABLE_ELF AND WRP_CTE_ENABLE_POSIX_ADAPTER)
     add_subdirectory(posix)
 endif()
 
+if(WRP_CORE_ENABLE_ELF AND WRP_CTE_ENABLE_STDIO_ADAPTER)
+    add_subdirectory(stdio)
+endif()
+
+if(WRP_CORE_ENABLE_ELF AND WRP_CTE_ENABLE_MPIIO_ADAPTER AND WRP_CORE_ENABLE_MPI)
+    add_subdirectory(mpiio)
+endif()
+
 # ADIOS2 adapter tests (doesn't require ELF interception)
 # Only add if ADIOS2 adapter is enabled
 if(WRP_CTE_ENABLE_ADIOS2_ADAPTER)

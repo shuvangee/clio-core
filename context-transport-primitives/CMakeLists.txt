@@ -170,7 +170,7 @@ if(WRP_CORE_ENABLE_LIBFABRIC)
     target_include_directories(lightbeam INTERFACE ${LIBFABRIC_INCLUDES})
 endif()
 if(WRP_CORE_ENABLE_THALLIUM)
-    # Thallium dependencies would go here
+    target_link_libraries(lightbeam INTERFACE thallium)
 endif()
 if(WRP_CORE_ENABLE_NIXL)
     find_library(NIXL_LIB NAMES nixl PATHS /usr/local/lib /usr/local/lib/x86_64-linux-gnu

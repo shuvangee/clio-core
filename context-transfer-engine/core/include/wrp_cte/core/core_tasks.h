@@ -1057,6 +1057,14 @@ struct PutBlobTask : public chi::Task {
   static constexpr chi::u32 kNoPageIdx = ~static_cast<chi::u32>(0);
   IN chi::u32 gpu_page_idx_;
 
+  // Submit-side timestamp (steady_clock nanoseconds), stamped by the
+  // CTE client just before Send so the receiving daemon can compute
+  // end-to-end submit→recv latency. 0 means "not stamped" and the
+  // receiver-side accumulator ignores those tasks. Cross-node clocks
+  // need ntp synchronization; on the same cluster that's usually
+  // within a few hundred μs which is fine for ms-resolution diagnostics.
+  IN chi::u64 submit_ts_ns_;
+
   // SHM constructor
   // Default score -1.0f means "unknown" - runtime will use 1.0 for new blobs
   // or preserve existing score for modifications
@@ -1070,7 +1078,8 @@ struct PutBlobTask : public chi::Task {
         score_(-1.0f),
         context_(),
         flags_(0),
-        gpu_page_idx_(kNoPageIdx) {}
+        gpu_page_idx_(kNoPageIdx),
+        submit_ts_ns_(0) {}
 
   // Emplace constructor
   HSHM_CROSS_FUN explicit PutBlobTask(const chi::TaskId &task_id,
@@ -1090,7 +1099,8 @@ struct PutBlobTask : public chi::Task {
         score_(score),
         context_(context),
         flags_(flags),
-        gpu_page_idx_(kNoPageIdx) {
+        gpu_page_idx_(kNoPageIdx),
+        submit_ts_ns_(0) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kPutBlob;
@@ -1116,7 +1126,8 @@ struct PutBlobTask : public chi::Task {
         score_(score),
         context_(context),
         flags_(flags),
-        gpu_page_idx_(kNoPageIdx) {
+        gpu_page_idx_(kNoPageIdx),
+        submit_ts_ns_(0) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kPutBlob;
@@ -1132,7 +1143,7 @@ struct PutBlobTask : public chi::Task {
     ar.PushPod(blob_name_.UsingSso());
     Task::SerializeIn(ar);
     ar(tag_id_, blob_name_, offset_, size_, blob_data_,
-       score_, context_, flags_, gpu_page_idx_);
+       score_, context_, flags_, gpu_page_idx_, submit_ts_ns_);
     ar.PopPod();
     ar.bulk(blob_data_, size_, BULK_XFER);
   }
@@ -1145,7 +1156,7 @@ struct PutBlobTask : public chi::Task {
     ar.PushPod(blob_name_.UsingSso());
     Task::SerializeOut(ar);
     ar(tag_id_, blob_name_, offset_, size_, blob_data_,
-       score_, context_, flags_, gpu_page_idx_);
+       score_, context_, flags_, gpu_page_idx_, submit_ts_ns_);
     ar.PopPod();
   }
 
@@ -1169,6 +1180,7 @@ struct PutBlobTask : public chi::Task {
     context_ = other->context_;
     flags_ = other->flags_;
     gpu_page_idx_ = other->gpu_page_idx_;
+    submit_ts_ns_ = other->submit_ts_ns_;
   }
 
   /**

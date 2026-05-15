@@ -16,7 +16,6 @@ target_include_directories(wrp_cte_fs_base PRIVATE
 target_link_libraries(wrp_cte_fs_base
         MPI::MPI_CXX
         wrp_cte_core_client      # Provides core and bdev headers transitively
-        wrp_cte_cae_config
         hshm::cxx
         hshm::interceptor)       # Provides ELF support for posix_api.h
 

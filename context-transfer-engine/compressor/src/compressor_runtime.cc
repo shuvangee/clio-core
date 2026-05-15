@@ -43,6 +43,7 @@
 #include <limits>
 #include <memory>
 #include <sstream>
+#include <unordered_set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -100,11 +101,8 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   // Initialize atomic counters
   compression_logical_time_ = 0;
 
-  // Preallocate the consumer slot vector to its maximum capacity. Slots
-  // [0, consumer_count_) are valid; the rest are zero-initialized but unused.
-  // Doing this once here avoids reallocation under the writer lock.
-  consumers_.assign(kMaxConsumers, 0);
-  consumer_count_.store(0);
+  // tag_consumers_ is lazily populated by RegisterConsumer; nothing to
+  // preallocate here. The map is empty when tracking_enabled_=false.
 
   // Seed previous CPU times so PollNodeLoad's first delta is well-defined.
   prev_cpu_times_ = hshm::SystemInfo::GetCpuTimes();
@@ -219,7 +217,24 @@ chi::TaskResume Runtime::Destroy(hipc::FullPtr<DestroyTask> task,
 }
 
 chi::PoolQuery Runtime::ScheduleTask(const hipc::FullPtr<chi::Task> &task) {
-  // All compressor Dynamic methods resolve to Local
+  // Compress placement: consult per-tag consumer tracking (when enabled)
+  // so the compressed copy lands on the node that most recently read
+  // the tag. Falls through to DirectHash(tag_id) when tracking is off
+  // or the tag has no known consumers yet — keeps placement
+  // deterministic per tag without the tracking overhead.
+  if (task->method_ == Method::kCompress) {
+    auto compress_task = task.template Cast<CompressTask>();
+    chi::u32 consumer_node = 0;
+    if (PickConsumerForTag(compress_task->tag_id_, consumer_node)) {
+      return chi::PoolQuery::Physical(consumer_node);
+    }
+    // No consumer info — hash on tag_id so all blobs of the same tag
+    // converge on the same container regardless of which node submits.
+    chi::u32 hash = static_cast<chi::u32>(
+        std::hash<wrp_cte::core::TagId>{}(compress_task->tag_id_));
+    return chi::PoolQuery::DirectHash(hash);
+  }
+  // Other Dynamic methods (Decompress, periodic ticks) resolve Local.
   return chi::PoolQuery::Local();
 }
 
@@ -813,11 +828,13 @@ chi::TaskResume Runtime::Compress(hipc::FullPtr<CompressTask> task,
 chi::TaskResume Runtime::Decompress(hipc::FullPtr<DecompressTask> task,
                                     chi::RunContext& ctx) {
   try {
-    // Record the originating node (the consumer that issued this Decompress).
-    // pool_query_.ret_node_ was stamped by the sender's IpcManager when the
-    // task was first resolved, so it carries the original sender's node id
-    // even after a network hop.
-    RegisterConsumer(task->pool_query_.GetReturnNode());
+    // Record the originating node (the consumer that issued this Decompress)
+    // against this specific tag. pool_query_.ret_node_ was stamped by the
+    // sender's IpcManager when the task was first resolved, so it carries
+    // the original sender's node id even after a network hop. Per-tag
+    // tracking lets ScheduleTask later route Compress for the same tag
+    // toward this reader. No-op when tracking_enabled_=false.
+    RegisterConsumer(task->tag_id_, task->pool_query_.GetReturnNode());
 
     // Extract task parameters (same as GetBlobTask)
     chi::u64 expected_size = task->size_;
@@ -994,39 +1011,70 @@ chi::u64 Runtime::GetWorkRemaining() const {
 // Consumer Tracking
 // ==============================================================================
 
-void Runtime::RegisterConsumer(chi::u32 node_id) {
-  // Fast path: lookup under reader lock to skip the writer lock when the
-  // consumer is already known. Slots are stable up to consumer_count_, which
-  // only ever grows, so a relaxed-load read is safe.
+void Runtime::RegisterConsumer(const wrp_cte::core::TagId &tag_id,
+                               chi::u32 node_id) {
+  // Tracking knob: when off, no per-tag bookkeeping happens and
+  // ScheduleTask falls through to DirectHash on the tag_id. Use this to
+  // measure the overhead of the tracking mechanism itself, or for
+  // workloads with no producer-consumer locality.
+  if (!config_.tracking_enabled_) {
+    return;
+  }
+
+  // Fast path: lookup under reader lock. The per-tag vector grows only
+  // (entries are never removed), so a stale read at worst sends one
+  // duplicate registration through the writer path — which the writer
+  // re-check absorbs.
   {
-    chi::ScopedCoRwReadLock read_lock(consumers_lock_);
-    chi::u32 count = consumer_count_.load();
-    for (chi::u32 i = 0; i < count; ++i) {
-      if (consumers_[i] == node_id) {
-        return;  // Already registered.
+    chi::ScopedCoRwReadLock read_lock(tag_consumers_lock_);
+    auto it = tag_consumers_.find(tag_id);
+    if (it != tag_consumers_.end()) {
+      for (chi::u32 existing : it->second) {
+        if (existing == node_id) {
+          return;  // Already registered for this tag.
+        }
       }
     }
   }
 
-  // Writer path: re-check (another writer may have inserted the same id while
-  // we were upgrading) and append if there is still room.
-  chi::ScopedCoRwWriteLock write_lock(consumers_lock_);
-  chi::u32 count = consumer_count_.load();
-  for (chi::u32 i = 0; i < count; ++i) {
-    if (consumers_[i] == node_id) {
+  // Writer path: insert/grow under exclusive lock. Re-check first (another
+  // writer may have raced us); cap at kMaxConsumersPerTag.
+  chi::ScopedCoRwWriteLock write_lock(tag_consumers_lock_);
+  auto &slots = tag_consumers_[tag_id];
+  for (chi::u32 existing : slots) {
+    if (existing == node_id) {
       return;
     }
   }
-  if (count >= kMaxConsumers) {
+  if (slots.size() >= kMaxConsumersPerTag) {
     HLOG(kDebug,
-         "Compressor: consumer slot full ({} entries), dropping node {}",
-         count, node_id);
+         "Compressor: consumer slot full for tag ({} entries), dropping node {}",
+         slots.size(), node_id);
     return;
   }
-  consumers_[count] = node_id;
-  consumer_count_.store(count + 1);
-  HLOG(kDebug, "Compressor: registered consumer node {} (slot {}/{})",
-       node_id, count + 1, kMaxConsumers);
+  slots.push_back(node_id);
+  HLOG(kDebug,
+       "Compressor: registered consumer node {} for tag (slot {}/{})",
+       node_id, slots.size(), kMaxConsumersPerTag);
+}
+
+bool Runtime::PickConsumerForTag(const wrp_cte::core::TagId &tag_id,
+                                 chi::u32 &node_id_out) {
+  if (!config_.tracking_enabled_) {
+    return false;
+  }
+  chi::ScopedCoRwReadLock read_lock(tag_consumers_lock_);
+  auto it = tag_consumers_.find(tag_id);
+  if (it == tag_consumers_.end() || it->second.empty()) {
+    return false;
+  }
+  // Most-recent reader heuristic: the latest pushed entry is the most
+  // recent reader of the tag. A future improvement is to fold in the
+  // PollConsumers load samples and pick the least-loaded known reader,
+  // but the most-recent heuristic is cheap and exploits temporal
+  // locality (read-then-recompute patterns).
+  node_id_out = it->second.back();
+  return true;
 }
 
 // ==============================================================================
@@ -1077,15 +1125,24 @@ chi::TaskResume Runtime::PollConsumers(hipc::FullPtr<PollConsumersTask> task,
                                        chi::RunContext& ctx) {
   (void)task;
   (void)ctx;
-  // Snapshot the consumer list under the reader lock so the periodic poll
-  // does not hold a lock while issuing remote tasks.
+  // No-op when tracking is disabled.
+  if (!config_.tracking_enabled_) {
+    CHI_CO_RETURN;
+  }
+  // Snapshot the union of consumers across all tags under the reader
+  // lock so the periodic poll does not hold the lock while issuing
+  // remote tasks. We dedupe to a single PollNodeLoad per node — readers
+  // may appear in multiple tags' lists.
   std::vector<chi::u32> snapshot;
   {
-    chi::ScopedCoRwReadLock read_lock(consumers_lock_);
-    chi::u32 count = consumer_count_.load();
-    snapshot.reserve(count);
-    for (chi::u32 i = 0; i < count; ++i) {
-      snapshot.push_back(consumers_[i]);
+    chi::ScopedCoRwReadLock read_lock(tag_consumers_lock_);
+    std::unordered_set<chi::u32> dedup;
+    for (const auto &kv : tag_consumers_) {
+      for (chi::u32 node : kv.second) {
+        if (dedup.insert(node).second) {
+          snapshot.push_back(node);
+        }
+      }
     }
   }
 

@@ -108,11 +108,9 @@ bool IpcCpu2CpuZmq::RuntimeRecv(IpcManager *ipc, u32 &tasks_received) {
           ipc->GetScheduler()->ClientMapTask(ipc, future);
       auto *worker_queues = ipc->GetTaskQueue();
       auto &lane_ref = worker_queues->GetLane(lane_id, 0);
-      bool was_empty = lane_ref.Empty();
       lane_ref.Push(future);
-      if (was_empty) {
-        ipc->AwakenWorker(&lane_ref);
-      }
+      // Always signal — see ipc_cpu2cpu_impl.h for the race.
+      ipc->AwakenWorker(&lane_ref);
 
       did_work = true;
       tasks_received++;

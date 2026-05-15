@@ -1,0 +1,76 @@
+# IOR + CTE (libfuse) tiering sweep — 4n / 24ppn / 64m block / 1m xfer.
+#
+# Tier config: 2 GB DRAM (fast tier) + 16 GB HDD-backed file (cold tier).
+# Per-node write set ≈ 6 GiB (24 ranks * 256 MiB), so DPE places ~2 GiB
+# in DRAM and spills the remaining ~4 GiB into the HDD-backed file —
+# this is the run that actually exercises the HDD tier.
+#
+# Storage path: /mnt/hdd/llogan/cte_dram_hdd_4n/cte_target.bin
+# (each ares compute node has a local /mnt/hdd on /dev/sdc1 ~ 900 GB
+# free — verified per-node via srun probe before authoring).
+
+name: ior_cte_tiering_dram_hdd_4n
+
+ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
+
+mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include eno1 --prtemca prte_if_include eno1 --prtemca prte_tmpdir_base /home/llogan/iowarp_prte_tmp'
+
+env:
+  TMPDIR: "/home/llogan/iowarp_prte_tmp"
+  CHI_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
+
+scheduler:
+  name: slurm
+  job_name: ior_cte_tiering_dram_hdd_4n
+  nodes: 4
+  ntasks_per_node: 1
+  cpus_per_task: 40
+  partition: debug
+  time: "00:05:00"
+  output: slurm-%j.out
+  error: slurm-%j.err
+  suffix: "-40g"
+  pre_cmds:
+    - 'source /etc/profile.d/lmod.sh 2>/dev/null || source /etc/profile.d/modules.sh'
+    - 'module load gcc/11.4.0/openmpi/5.0.5-x2kvx5l ior/3.3.0-fihmxeb'
+    - 'mkdir -p /home/llogan/iowarp_prte_tmp'
+
+pkgs:
+  - pkg_type: jarvis_iowarp.wrp_runtime
+    pkg_name: runtime
+    num_threads: 4
+    client_data_segment_size: "2G"
+    port: 9413
+    ipc_mode: "shm"
+    log_level: "debug"
+    sleep: 4
+    swim_enabled: false
+
+  - pkg_type: jarvis_iowarp.wrp_cte
+    pkg_name: cte_core
+    devices:
+      - ["ram::cte_ram_tier1", "2GB", 1.0]
+      - ["/mnt/hdd/llogan/cte_dram_hdd_4n/cte_target.bin", "16GB", 0.4]
+    dpe_type: "max_bw"
+    neighborhood: 1
+    default_target_timeout_ms: 30000
+    poll_period_ms: 5000
+    pool_query: "local"
+
+  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+    pkg_name: cte_fuse
+    mountpoint: ${HOME}/cte_tiering_dram_hdd_4n
+    sleep: 2
+    extra_fuse_args: "-f"
+
+  - pkg_type: builtin.ior
+    pkg_name: ior
+    api: posix
+    write: true
+    read: true
+    fpp: true
+    nprocs: 96
+    ppn: 24
+    xfer: 1m
+    block: 256m
+    out: ${HOME}/cte_tiering_dram_hdd_4n/ior_dram_hdd.bin

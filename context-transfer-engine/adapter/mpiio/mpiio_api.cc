@@ -35,8 +35,9 @@ bool mpiio_intercepted = true;
 
 #include "mpiio_api.h"
 
-#include <hermes/bucket.h>
-#include <hermes/hermes.h>
+// hermes/bucket.h and hermes/hermes.h were holdovers from the
+// pre-CTE adapter; nothing in this translation unit references the
+// hermes:: API any more, so they were dropped to unbreak the build.
 
 #include "wrp_cte/core/core_client.h"
 #include "hermes_shm/util/singleton.h"

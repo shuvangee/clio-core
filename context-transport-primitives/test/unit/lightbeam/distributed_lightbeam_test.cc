@@ -32,6 +32,9 @@
  */
 
 #include <arpa/inet.h>
+#if HSHM_ENABLE_THALLIUM
+#include <hermes_shm/lightbeam/thallium_transport.h>
+#endif
 #include <hermes_shm/lightbeam/transport_factory_impl.h>
 #ifndef _WIN32
 #include <ifaddrs.h>
@@ -64,6 +67,9 @@ std::vector<std::string> ReadHosts(const std::string& hostfile) {
 
 TransportType ParseTransport(const std::string& s) {
   if (s == "zeromq") return TransportType::kZeroMq;
+#if HSHM_ENABLE_THALLIUM
+  if (s == "thallium") return TransportType::kThallium;
+#endif
   throw std::runtime_error("Unknown transport type: " + s);
 }
 
@@ -241,18 +247,25 @@ int main(int argc, char** argv) {
               << std::endl;
   }
 
-  // The TransportFactory path doesn't know about Topology yet, so
-  // construct the ZeroMqTransport server directly for the bench. We
-  // only exercise the kZeroMq path for performance work; thallium /
-  // libfabric backends would need their own constructor here.
-  if (transport != TransportType::kZeroMq) {
-    std::cerr << "Bench Topology selection only implemented for zeromq.\n";
+  // ZMQ path uses the topology-aware ctor directly; other transports
+  // go through the factory. The bench treats clients/servers as base
+  // Transport pointers from this point on so the timing / parallel-send
+  // / Allgather logic is transport-agnostic.
+  std::unique_ptr<Transport> server_owned;
+  if (transport == TransportType::kZeroMq) {
+    server_owned = std::unique_ptr<Transport>(new ZeroMqTransport(
+        TransportMode::kServer, bind_addr, protocol, my_port, topology));
+#if HSHM_ENABLE_THALLIUM
+  } else if (transport == TransportType::kThallium) {
+    server_owned = std::unique_ptr<Transport>(new ThalliumTransport(
+        TransportMode::kServer, bind_addr, protocol, my_port));
+#endif
+  } else {
+    std::cerr << "Bench: unsupported transport.\n";
     MPI_Finalize();
     return 1;
   }
-  auto server_owned = std::make_unique<ZeroMqTransport>(
-      TransportMode::kServer, bind_addr, protocol, my_port, topology);
-  ZeroMqTransport *server_ptr = server_owned.get();
+  Transport *server_ptr = server_owned.get();
   std::string actual_addr = server_ptr->GetAddress();
   std::cout << "[Rank " << my_rank << "] Server address: " << actual_addr
             << ", port: " << my_port << std::endl;
@@ -272,6 +285,20 @@ int main(int argc, char** argv) {
     return v && *v && std::atoi(v) != 0;
   }();
 
+  // LBM_BENCH_SKIP_SELF=1: each rank skips its self-send. Useful for
+  // thallium where RPC-to-self via the same engine can deadlock under
+  // certain argobots configurations; this matches chimaera's actual
+  // usage (self fan-out goes via local lanes, not the transport).
+  bool skip_self = []() {
+    const char *v = std::getenv("LBM_BENCH_SKIP_SELF");
+    return v && *v && std::atoi(v) != 0;
+  }();
+  int peers_send_to = skip_self ? (world_size - 1) : world_size;
+  if (my_rank == 0) {
+    std::cout << "[Bench] skip_self=" << (skip_self ? "yes" : "no")
+              << " peers_send_to=" << peers_send_to << std::endl;
+  }
+
   // Start timing before any send
   auto global_start = std::chrono::high_resolution_clock::now();
   // Start server thread with num_msgs
@@ -280,7 +307,7 @@ int main(int argc, char** argv) {
     oss << std::this_thread::get_id();
     std::cout << "[ServerThread] Thread ID: " << oss.str() << std::endl;
     int received = 0;
-    for (int i = 0; i < num_msgs * world_size; ++i) {
+    for (int i = 0; i < num_msgs * peers_send_to; ++i) {
       auto recv_time = std::chrono::high_resolution_clock::now();
 
       // Recv with retry loop (does everything - metadata + bulks). Match
@@ -329,13 +356,24 @@ int main(int argc, char** argv) {
   for (int i = 0; i < world_size; ++i) {
     server_addrs.emplace_back(&all_addrs[i * addr_len]);
   }
-  std::vector<std::unique_ptr<ZeroMqTransport>> clients;
+  auto make_client = [&](const std::string &peer_addr,
+                         int target_port) -> std::unique_ptr<Transport> {
+    if (transport == TransportType::kZeroMq) {
+      return std::unique_ptr<Transport>(new ZeroMqTransport(
+          TransportMode::kClient, peer_addr, protocol, target_port, topology));
+    }
+#if HSHM_ENABLE_THALLIUM
+    if (transport == TransportType::kThallium) {
+      return std::unique_ptr<Transport>(new ThalliumTransport(
+          TransportMode::kClient, peer_addr, protocol, target_port));
+    }
+#endif
+    return nullptr;
+  };
+  std::vector<std::unique_ptr<Transport>> clients;
   for (int i = 0; i < world_size; ++i) {
     int target_port = port + i;
-    auto client_ptr = std::make_unique<ZeroMqTransport>(
-        TransportMode::kClient, server_addrs[i], protocol, target_port,
-        topology);
-    clients.emplace_back(std::move(client_ptr));
+    clients.emplace_back(make_client(server_addrs[i], target_port));
   }
   // LBM_BENCH_PARALLEL_SEND=1: one sender thread per peer (the prior
   //   parallel-send mode; equivalent to LBM_BENCH_THREADS_PER_PEER=1
@@ -365,19 +403,17 @@ int main(int argc, char** argv) {
   // pattern). Each peer's bin has clients[i*tpp + t] for t=0..tpp-1.
   // We construct the extras here; clients[0..world_size-1] from above
   // are reused as the first thread per peer.
-  std::vector<std::unique_ptr<ZeroMqTransport>> extra_clients;
+  std::vector<std::unique_ptr<Transport>> extra_clients;
   if (threads_per_peer > 1) {
     extra_clients.reserve(world_size * (threads_per_peer - 1));
     for (int i = 0; i < world_size; ++i) {
       int target_port = port + i;
       for (int t = 1; t < threads_per_peer; ++t) {
-        extra_clients.emplace_back(std::make_unique<ZeroMqTransport>(
-            TransportMode::kClient, server_addrs[i], protocol, target_port,
-            topology));
+        extra_clients.emplace_back(make_client(server_addrs[i], target_port));
       }
     }
   }
-  auto peer_socket = [&](int peer_idx, int thread_idx) -> ZeroMqTransport * {
+  auto peer_socket = [&](int peer_idx, int thread_idx) -> Transport * {
     if (thread_idx == 0) return clients[peer_idx].get();
     return extra_clients[peer_idx * (threads_per_peer - 1) +
                           (thread_idx - 1)].get();
@@ -390,11 +426,12 @@ int main(int argc, char** argv) {
     std::vector<std::thread> sender_threads;
     sender_threads.reserve(static_cast<size_t>(world_size) * threads_per_peer);
     for (int i = 0; i < world_size; ++i) {
+      if (skip_self && i == my_rank) continue;
       for (int t = 0; t < threads_per_peer; ++t) {
         // Distribute the remainder messages onto the first few threads
         // of each peer so the total per peer-pair is exactly num_msgs.
         int my_msgs = msgs_per_thread + (t < remainder_thread ? 1 : 0);
-        ZeroMqTransport *sock = peer_socket(i, t);
+        Transport *sock = peer_socket(i, t);
         sender_threads.emplace_back([&, i, t, my_msgs, sock]() {
           for (int m = 0; m < my_msgs; ++m) {
             LbmMeta<> meta;
@@ -419,6 +456,7 @@ int main(int argc, char** argv) {
     int sent = 0;
     for (int m = 0; m < num_msgs; ++m) {
       for (size_t i = 0; i < clients.size(); ++i) {
+        if (skip_self && static_cast<int>(i) == my_rank) continue;
         auto send_time = std::chrono::high_resolution_clock::now();
         LbmMeta<> meta;
         Bulk bulk = clients[i]->Expose(
