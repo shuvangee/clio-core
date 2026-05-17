@@ -476,12 +476,18 @@ class Future {
    * Wait for task completion (blocking with optional timeout).
    * Automatically dispatches to the correct path based on origin:
    *   WaitCpu2Cpu, WaitGpu2Cpu, WaitCpu2Gpu, or WaitGpu2Gpu.
-   * @param max_sec Maximum seconds to wait (0 = wait indefinitely)
+   * @param max_sec Wait policy:
+   *                 -1 = wait indefinitely (default; never times out)
+   *                  0 = poll once; return immediately if not yet complete
+   *                       (does NOT enter the recv path when incomplete)
+   *                 >0 = block up to that many seconds; return false on
+   *                       timeout
    * @param reuse_task If true, skip task deletion on destroy so the task
    *                   object can be resubmitted. Caller owns the task lifetime.
-   * @return true if task completed, false if timed out
+   * @return true if task completed, false if not (timeout or non-blocking
+   *         poll that found the future incomplete)
    */
-  HSHM_CROSS_FUN bool Wait(float max_sec = 0, bool reuse_task = false);
+  HSHM_CROSS_FUN bool Wait(float max_sec = -1, bool reuse_task = false);
 
   /**
    * CPU-to-CPU wait path (SHM / ZMQ / IPC).

@@ -286,6 +286,18 @@ private:
   hshm::lbm::Transport *lbm_transport_;
   bool is_pod_ = false;
 
+public:
+  // Number of bulk buffers that LoadTaskArchive::bulk() allocated locally via
+  // CHI_IPC->AllocateBuffer (BULK_EXPOSE on receive). The receiver owns these
+  // and must FreeBuffer them after the task completes — otherwise cross-node
+  // GetBlob responses leak the 1 MiB output buffer per call and the daemon's
+  // SHM segment fills up after a few thousand cross-node reads.
+  // RecvIn promotes this to a TASK_DATA_OWNER flag on the task so the task's
+  // destructor frees the buffer; SendOut skips clearing the flag for tasks
+  // that actually have owned buffers.
+  size_t daemon_allocated_bulk_count_ = 0;
+private:
+
   static const std::vector<char> &GetEmptyBuffer() {
     static const std::vector<char> empty;
     return empty;

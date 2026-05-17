@@ -885,12 +885,28 @@ endif()
 # Component Subdirectories
 #------------------------------------------------------------------------------
 
-# Catch2 testing framework - find from system or install.sh installation
+# Catch2 testing framework.
+#
+# Prefer the in-tree external/Catch2 source over a system/conda
+# find_package. On this build host the conda env ships
+# libCatch2.so.3.14.0 built with a newer gcc (CXXABI_1.3.15); linking
+# the unit-test executables against it with host gcc 11.4 fails at
+# link time with `undefined reference to __cxa_call_terminate@
+# CXXABI_1.3.15`. Building Catch2 from the bundled source with the
+# same host compiler keeps the CXXABI consistent. Falls back to
+# find_package only when the bundled source is absent.
 if(WRP_CORE_ENABLE_TESTS)
-  message(STATUS "Finding Catch2 testing framework")
-  find_package(Catch2 3 REQUIRED)
-  if(Catch2_FOUND)
-    message(STATUS "found Catch2 at ${Catch2_DIR}")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/CMakeLists.txt")
+    message(STATUS "Using bundled Catch2 (external/Catch2) built with host compiler")
+    set(CATCH_INSTALL_DOCS OFF CACHE BOOL "" FORCE)
+    set(CATCH_INSTALL_EXTRAS OFF CACHE BOOL "" FORCE)
+    add_subdirectory(external/Catch2 EXCLUDE_FROM_ALL)
+  else()
+    message(STATUS "Bundled Catch2 absent; finding system Catch2")
+    find_package(Catch2 3 REQUIRED)
+    if(Catch2_FOUND)
+      message(STATUS "found Catch2 at ${Catch2_DIR}")
+    endif()
   endif()
 endif()
 
@@ -1200,9 +1216,6 @@ if(TARGET chimaera_bdev_client)
 endif()
 if(WRP_CORE_ENABLE_CTE AND TARGET wrp_cte_core_client)
   list(APPEND PIP_LIB_TARGETS wrp_cte_core_client wrp_cte_core_runtime)
-  if(TARGET wrp_cte_cae_config)
-    list(APPEND PIP_LIB_TARGETS wrp_cte_cae_config)
-  endif()
 endif()
 if(WRP_CORE_ENABLE_CAE AND TARGET wrp_cae_core_client)
   list(APPEND PIP_LIB_TARGETS wrp_cae_core_client wrp_cae_core_runtime)

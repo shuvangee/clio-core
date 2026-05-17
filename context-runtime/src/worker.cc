@@ -646,20 +646,21 @@ void Worker::SuspendMe() {
       return;
     }
 
-    // Park-flag handshake: publish inactive, then recheck queues. Producers
-    // use IpcManager::AwakenWorker which skips tgkill if active_ is true, so
-    // any push that landed AFTER our store(false) will see active_=false and
-    // signal. Any push that landed BEFORE our store(false) is visible here
-    // in the post-store recheck (seq_cst ordering on the active_ atomic
-    // pairs with the producer's push + active load).
+    // Last-chance recheck: any producer push that landed before we got
+    // here is already visible to a plain Empty() load. Producers now
+    // unconditionally send SIGUSR1 (see IpcManager::AwakenWorker), so we
+    // don't need the active_ park-flag handshake — any push that lands
+    // AFTER this recheck will signal us out of epoll_pwait2 regardless.
+    // The handshake previously here tripped a lost-wakeup race at scale
+    // (4n 256m, multi-tier bdev) where active_=true at the producer's
+    // load suppressed the signal while the worker was already past its
+    // post-store recheck and committed to epoll_pwait2.
     if (assigned_lane_) {
-      assigned_lane_->SetActive(false);
       bool work_pending = !assigned_lane_->Empty();
       if (!work_pending && event_queue_) {
         work_pending = !event_queue_->Empty();
       }
       if (work_pending) {
-        assigned_lane_->SetActive(true);
         return;
       }
     }
@@ -671,12 +672,6 @@ void Worker::SuspendMe() {
 
     // Wait for signal using EventManager
     int nfds = event_manager_.Wait(timeout_us);
-
-    // Restore active_=true so subsequent producers can skip the tgkill
-    // syscall while we're back in the busy-spin / processing path.
-    if (assigned_lane_) {
-      assigned_lane_->SetActive(true);
-    }
 
     if (nfds == 0) {
       sleep_count_++;
@@ -911,9 +906,11 @@ void Worker::ExecTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
     StartCoroutine(task_ptr, run_ctx);
     task_ptr->SetFlags(TASK_STARTED);
 
-    // Predict load for new tasks
+    // Predict load for new tasks. predicted_stat_ is populated by
+    // BeginTask via container->GetTaskStats(task), so derive the model
+    // inferences from the already-cached stat instead of re-calling
+    // GetTaskStats here.
     if (run_ctx->container_) {
-      run_ctx->predicted_stat_ = run_ctx->container_->GetTaskStats(task_ptr->method_);
       run_ctx->predicted_load_ = run_ctx->container_->InferCpuTime(task_ptr->method_, run_ctx->predicted_stat_);
       run_ctx->predicted_wall_us_ = run_ctx->container_->InferWallClockTime(task_ptr->method_, run_ctx->predicted_stat_);
       load_ += run_ctx->predicted_load_;
@@ -1003,9 +1000,16 @@ void Worker::EndTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
     return;
   }
 
-  // If task is remote, enqueue to net_queue_ for SendOut
+  // If task is remote, enqueue to net_queue_ for SendOut. Choose the
+  // latency vs I/O lane from the task's cached predicted_stat_ so a
+  // small ACK / heartbeat reply doesn't queue behind a 1 MiB GetBlob
+  // response on the wire.
   if (is_remote) {
-    CHI_IPC->EnqueueNetTask(run_ctx->future_, NetQueuePriority::kSendOut);
+    size_t io_size = run_ctx->predicted_stat_.io_size_;
+    NetQueuePriority prio = (io_size >= kNetQueueIoThreshold)
+                                ? NetQueuePriority::kSendOutIO
+                                : NetQueuePriority::kSendOutLatency;
+    CHI_IPC->EnqueueNetTask(run_ctx->future_, prio);
     return;
   }
 

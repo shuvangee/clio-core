@@ -1,0 +1,25 @@
+# WfCommons Seismology (30 GiB) - NFS baseline.
+#
+# Same recipe, num_tasks, data_footprint, and I/O-active settings
+# (cpu_work=1, percent_cpu=0.1) as the CTE pipeline; the only
+# difference is that this one doesn't load wrp_runtime/wrp_cte/
+# cte_posix and the workflow I/O hits NFS at $HOME/jarvis-runs/...
+# directly. Comparison artifact for measuring CTE speedup/overhead.
+
+name: wfcommons_seismology_nfs_30gb
+
+install_manager: default
+
+pkgs:
+  - pkg_type: builtin.wfcommons
+    pkg_name: wfcommons
+    recipe: seismology
+    num_tasks: 103
+    cpu_work: 1
+    percent_cpu: 1.0
+    drop_page_cache: true
+    data_footprint: "30G"
+    nprocs: 24
+    ppn: 24
+    out: $HOME/jarvis-runs/wfcommons_seismology_nfs_30gb
+    clio_prefix: false

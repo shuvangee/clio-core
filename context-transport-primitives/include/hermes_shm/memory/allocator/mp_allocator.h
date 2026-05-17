@@ -245,19 +245,17 @@ class _ProducerConsumerAllocator : public Allocator {
    * @return Offset pointer to allocated memory, or null on failure
    */
   OffsetPtr<> AllocateOffset(size_t size) {
-    // Tier 1: Try thread-local PcThreadBlock
-    PcThreadBlock *tblock = EnsureTls();
-    if (tblock == nullptr) {
-      return OffsetPtr<>::GetNull();
-    }
-
-    OffsetPtr<> ptr = tblock->alloc_.AllocateOffset(size);
-    if (!ptr.IsNull()) {
-      return ptr;
-    }
-
-    // Tier 2: Expand PcThreadBlock from global and retry
-    return ExpandAndAllocate(tblock, size);
+    // Per-thread PcThreadBlock fast path is unsafe for cross-process
+    // alloc/free: producer (client) allocates from its tblock; consumer
+    // (daemon) frees on a different thread whose EnsureTls() returns the
+    // daemon's tblock — Free then corrupts the daemon's free lists with
+    // phantom entries pointing into producer memory. Symptom: 4n / 256m
+    // FPP stalls after a few hundred ops with chimaera workers idle and
+    // FUSE adapter threads parked in Future.Wait.
+    // Route all alloc/free through the global buddy allocator under
+    // lock_ so alloc and free hit the same data structure.
+    ScopedMutex scoped_lock(lock_, 0);
+    return alloc_.AllocateOffset(size);
   }
 
   /**
@@ -283,11 +281,10 @@ class _ProducerConsumerAllocator : public Allocator {
    * @param p The offset pointer to free
    */
   void FreeOffsetNoNullCheck(OffsetPtr<> p) {
-    PcThreadBlock *tblock = EnsureTls();
-    if (tblock == nullptr) {
-      return;
-    }
-    tblock->alloc_.FreeOffset(p);
+    // Route to the global allocator under lock_ — see AllocateOffset for
+    // the cross-process per-tblock corruption that this avoids.
+    ScopedMutex scoped_lock(lock_, 0);
+    alloc_.FreeOffset(p);
   }
 
   /**
@@ -302,16 +299,7 @@ class _ProducerConsumerAllocator : public Allocator {
       return AllocateOffset(new_size);
     }
 
-    // Try in-place reallocation from thread block
-    PcThreadBlock *tblock = EnsureTls();
-    if (tblock != nullptr) {
-      OffsetPtr<> new_offset = tblock->alloc_.ReallocateOffset(offset, new_size);
-      if (!new_offset.IsNull()) {
-        return new_offset;
-      }
-    }
-
-    // Allocate new, copy, free old
+    // Per-tblock realloc disabled — same cross-process corruption.
     OffsetPtr<> new_offset = AllocateOffset(new_size);
     if (new_offset.IsNull()) {
       return new_offset;
@@ -341,16 +329,7 @@ class _ProducerConsumerAllocator : public Allocator {
     if (offset.IsNull()) {
       return;
     }
-
-    PcThreadBlock *tblock = EnsureTls();
-    if (tblock != nullptr) {
-      tblock->alloc_.FreeOffset(offset);
-      return;
-    }
-
-    // Fall back to global allocator
-    ScopedMutex scoped_lock(lock_, 0);
-    alloc_.FreeOffset(offset);
+    FreeOffsetNoNullCheck(offset);
   }
 
   /** No-op TLS management (handled by EnsureTls). */

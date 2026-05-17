@@ -43,10 +43,12 @@
 #include <limits>
 #include <memory>
 #include <sstream>
+#include <unordered_set>
 #include <string>
 #include <tuple>
 #include <vector>
 
+#include "chimaera/work_orchestrator.h"
 #include "chimaera/worker.h"
 #include "hermes_shm/compress/compress_factory.h"
 #include "hermes_shm/compress/data_stats.h"
@@ -98,6 +100,12 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
 
   // Initialize atomic counters
   compression_logical_time_ = 0;
+
+  // tag_consumers_ is lazily populated by RegisterConsumer; nothing to
+  // preallocate here. The map is empty when tracking_enabled_=false.
+
+  // Seed previous CPU times so PollNodeLoad's first delta is well-defined.
+  prev_cpu_times_ = hshm::SystemInfo::GetCpuTimes();
 
   // Load Q-table model if configured (primary prediction method)
   if (!config_.qtable_model_path_.empty()) {
@@ -179,6 +187,10 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
        "CTE Compressor container created and initialized for pool: {} (ID: {})",
        pool_name_, pool_id_);
 
+  // Spawn the periodic consumer-poll task (5s period). It iterates this
+  // container's consumer list and dispatches PollNodeLoad to each node.
+  client_.AsyncPollConsumers(chi::PoolQuery::Local(), 5000000);
+
   CHI_CO_RETURN;
 }
 
@@ -205,7 +217,24 @@ chi::TaskResume Runtime::Destroy(hipc::FullPtr<DestroyTask> task,
 }
 
 chi::PoolQuery Runtime::ScheduleTask(const hipc::FullPtr<chi::Task> &task) {
-  // All compressor Dynamic methods resolve to Local
+  // Compress placement: consult per-tag consumer tracking (when enabled)
+  // so the compressed copy lands on the node that most recently read
+  // the tag. Falls through to DirectHash(tag_id) when tracking is off
+  // or the tag has no known consumers yet — keeps placement
+  // deterministic per tag without the tracking overhead.
+  if (task->method_ == Method::kCompress) {
+    auto compress_task = task.template Cast<CompressTask>();
+    chi::u32 consumer_node = 0;
+    if (PickConsumerForTag(compress_task->tag_id_, consumer_node)) {
+      return chi::PoolQuery::Physical(consumer_node);
+    }
+    // No consumer info — hash on tag_id so all blobs of the same tag
+    // converge on the same container regardless of which node submits.
+    chi::u32 hash = static_cast<chi::u32>(
+        std::hash<wrp_cte::core::TagId>{}(compress_task->tag_id_));
+    return chi::PoolQuery::DirectHash(hash);
+  }
+  // Other Dynamic methods (Decompress, periodic ticks) resolve Local.
   return chi::PoolQuery::Local();
 }
 
@@ -799,6 +828,14 @@ chi::TaskResume Runtime::Compress(hipc::FullPtr<CompressTask> task,
 chi::TaskResume Runtime::Decompress(hipc::FullPtr<DecompressTask> task,
                                     chi::RunContext& ctx) {
   try {
+    // Record the originating node (the consumer that issued this Decompress)
+    // against this specific tag. pool_query_.ret_node_ was stamped by the
+    // sender's IpcManager when the task was first resolved, so it carries
+    // the original sender's node id even after a network hop. Per-tag
+    // tracking lets ScheduleTask later route Compress for the same tag
+    // toward this reader. No-op when tracking_enabled_=false.
+    RegisterConsumer(task->tag_id_, task->pool_query_.GetReturnNode());
+
     // Extract task parameters (same as GetBlobTask)
     chi::u64 expected_size = task->size_;
 
@@ -968,6 +1005,176 @@ void Runtime::LogCompressionTelemetry(const CompressionTelemetry& telemetry) {
 chi::u64 Runtime::GetWorkRemaining() const {
   // Return 0 - compressor has no persistent work queue
   return 0;
+}
+
+// ==============================================================================
+// Consumer Tracking
+// ==============================================================================
+
+void Runtime::RegisterConsumer(const wrp_cte::core::TagId &tag_id,
+                               chi::u32 node_id) {
+  // Tracking knob: when off, no per-tag bookkeeping happens and
+  // ScheduleTask falls through to DirectHash on the tag_id. Use this to
+  // measure the overhead of the tracking mechanism itself, or for
+  // workloads with no producer-consumer locality.
+  if (!config_.tracking_enabled_) {
+    return;
+  }
+
+  // Fast path: lookup under reader lock. The per-tag vector grows only
+  // (entries are never removed), so a stale read at worst sends one
+  // duplicate registration through the writer path — which the writer
+  // re-check absorbs.
+  {
+    chi::ScopedCoRwReadLock read_lock(tag_consumers_lock_);
+    auto it = tag_consumers_.find(tag_id);
+    if (it != tag_consumers_.end()) {
+      for (chi::u32 existing : it->second) {
+        if (existing == node_id) {
+          return;  // Already registered for this tag.
+        }
+      }
+    }
+  }
+
+  // Writer path: insert/grow under exclusive lock. Re-check first (another
+  // writer may have raced us); cap at kMaxConsumersPerTag.
+  chi::ScopedCoRwWriteLock write_lock(tag_consumers_lock_);
+  auto &slots = tag_consumers_[tag_id];
+  for (chi::u32 existing : slots) {
+    if (existing == node_id) {
+      return;
+    }
+  }
+  if (slots.size() >= kMaxConsumersPerTag) {
+    HLOG(kDebug,
+         "Compressor: consumer slot full for tag ({} entries), dropping node {}",
+         slots.size(), node_id);
+    return;
+  }
+  slots.push_back(node_id);
+  HLOG(kDebug,
+       "Compressor: registered consumer node {} for tag (slot {}/{})",
+       node_id, slots.size(), kMaxConsumersPerTag);
+}
+
+bool Runtime::PickConsumerForTag(const wrp_cte::core::TagId &tag_id,
+                                 chi::u32 &node_id_out) {
+  if (!config_.tracking_enabled_) {
+    return false;
+  }
+  chi::ScopedCoRwReadLock read_lock(tag_consumers_lock_);
+  auto it = tag_consumers_.find(tag_id);
+  if (it == tag_consumers_.end() || it->second.empty()) {
+    return false;
+  }
+  // Most-recent reader heuristic: the latest pushed entry is the most
+  // recent reader of the tag. A future improvement is to fold in the
+  // PollConsumers load samples and pick the least-loaded known reader,
+  // but the most-recent heuristic is cheap and exploits temporal
+  // locality (read-then-recompute patterns).
+  node_id_out = it->second.back();
+  return true;
+}
+
+// ==============================================================================
+// Node Load Sampling
+// ==============================================================================
+
+chi::TaskResume Runtime::PollNodeLoad(hipc::FullPtr<PollNodeLoadTask> task,
+                                      chi::RunContext& ctx) {
+  (void)ctx;
+  NodeLoadSample sample;
+  auto* ipc_manager = CHI_IPC;
+  sample.node_id_ = ipc_manager ? static_cast<chi::u32>(ipc_manager->GetNodeId())
+                                : 0;
+
+  // CPU utilization since the last sample. Mutex protects prev_cpu_times_
+  // because PollNodeLoad may run concurrently across workers.
+  hshm::CpuTimes cur = hshm::SystemInfo::GetCpuTimes();
+  {
+    std::lock_guard<std::mutex> lk(cpu_times_mutex_);
+    sample.cpu_usage_pct_ =
+        hshm::SystemInfo::ComputeCpuUtilization(prev_cpu_times_, cur);
+    prev_cpu_times_ = cur;
+  }
+
+  // Aggregate worker load across all workers on this node.
+  auto* orchestrator = CHI_WORK_ORCHESTRATOR;
+  if (orchestrator) {
+    std::size_t num_workers = orchestrator->GetWorkerCount();
+    sample.num_workers_ = static_cast<chi::u32>(num_workers);
+    for (std::size_t i = 0; i < num_workers; ++i) {
+      chi::Worker* worker = orchestrator->GetWorker(static_cast<chi::u32>(i));
+      if (!worker) {
+        continue;
+      }
+      chi::WorkerStats stats = worker->GetWorkerStats();
+      sample.worker_load_us_ += stats.load_;
+      sample.num_queued_tasks_ += stats.num_queued_tasks_;
+      sample.num_blocked_tasks_ += stats.num_blocked_tasks_;
+    }
+  }
+
+  task->sample_ = sample;
+  task->SetReturnCode(0);
+  CHI_CO_RETURN;
+}
+
+chi::TaskResume Runtime::PollConsumers(hipc::FullPtr<PollConsumersTask> task,
+                                       chi::RunContext& ctx) {
+  (void)task;
+  (void)ctx;
+  // No-op when tracking is disabled.
+  if (!config_.tracking_enabled_) {
+    CHI_CO_RETURN;
+  }
+  // Snapshot the union of consumers across all tags under the reader
+  // lock so the periodic poll does not hold the lock while issuing
+  // remote tasks. We dedupe to a single PollNodeLoad per node — readers
+  // may appear in multiple tags' lists.
+  std::vector<chi::u32> snapshot;
+  {
+    chi::ScopedCoRwReadLock read_lock(tag_consumers_lock_);
+    std::unordered_set<chi::u32> dedup;
+    for (const auto &kv : tag_consumers_) {
+      for (chi::u32 node : kv.second) {
+        if (dedup.insert(node).second) {
+          snapshot.push_back(node);
+        }
+      }
+    }
+  }
+
+  if (snapshot.empty()) {
+    CHI_CO_RETURN;
+  }
+
+  // Fan out one PollNodeLoad task per consumer node, then await each.
+  std::vector<chi::Future<PollNodeLoadTask>> futures;
+  futures.reserve(snapshot.size());
+  for (chi::u32 node_id : snapshot) {
+    futures.emplace_back(
+        client_.AsyncPollNodeLoad(chi::PoolQuery::Physical(node_id)));
+  }
+
+  for (std::size_t i = 0; i < futures.size(); ++i) {
+    auto& fut = futures[i];
+    fut.Wait();
+    if (fut->GetReturnCode() == 0) {
+      const NodeLoadSample& s = fut->sample_;
+      HLOG(kDebug,
+           "Compressor: consumer node {} cpu={:.1f}% worker_load={:.1f}us "
+           "queued={} blocked={} workers={}",
+           snapshot[i], s.cpu_usage_pct_, s.worker_load_us_,
+           s.num_queued_tasks_, s.num_blocked_tasks_, s.num_workers_);
+    } else {
+      HLOG(kDebug, "Compressor: PollNodeLoad to node {} failed (rc={})",
+           snapshot[i], fut->GetReturnCode());
+    }
+  }
+
+  CHI_CO_RETURN;
 }
 
 }  // namespace wrp_cte::compressor

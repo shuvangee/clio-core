@@ -39,9 +39,16 @@
 
 #include "filesystem_io_client.h"
 #include "hermes_shm/thread/lock.h"
-#include "adapter/cae_config.h"
 
 namespace wrp::cae {
+
+/**
+ * Hardcoded adapter page size. Defined here (instead of using
+ * kAdapterPageSize from filesystem.h) so this header stays free of the
+ * filesystem.h <-> filesystem_mdm.h include cycle.
+ */
+static constexpr size_t kMdmAdapterPageSize = 1024 * 1024;
+
 
 // MDM operation constants for lock priority
 const int kMDM_Create = 1;
@@ -82,15 +89,10 @@ public:
     return AdapterMode::kDefault;
   }
 
-  /** Get the adapter page size for a particular file */
+  /** Get the adapter page size for a particular file (uniform 1 MiB). */
   size_t GetAdapterPageSize(const std::string &path) {
     (void)path;
-    hshm::ScopedRwReadLock md_lock(lock_, 3);
-    auto *cae_config = WRP_CAE_CONF;
-    if (cae_config) {
-      return cae_config->GetAdapterPageSize();
-    }
-    return 4096; // Default fallback
+    return kMdmAdapterPageSize;
   }
 
   /**

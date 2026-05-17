@@ -13848,8 +13848,12 @@ TEST_CASE("Autogen - WorkerStats struct", "[autogen][worker][stats]") {
 // ==========================================================================
 TEST_CASE("Autogen - NetQueuePriority enum", "[autogen][ipc][netqueuepriority]") {
   SECTION("Enum values") {
-    REQUIRE(static_cast<chi::u32>(chi::NetQueuePriority::kSendIn) == 0);
-    REQUIRE(static_cast<chi::u32>(chi::NetQueuePriority::kSendOut) == 1);
+    REQUIRE(static_cast<chi::u32>(chi::NetQueuePriority::kSendInLatency) == 0);
+    REQUIRE(static_cast<chi::u32>(chi::NetQueuePriority::kSendInIO) == 1);
+    REQUIRE(static_cast<chi::u32>(chi::NetQueuePriority::kSendOutLatency) == 2);
+    REQUIRE(static_cast<chi::u32>(chi::NetQueuePriority::kSendOutIO) == 3);
+    REQUIRE(static_cast<chi::u32>(chi::NetQueuePriority::kClientSendTcp) == 4);
+    REQUIRE(static_cast<chi::u32>(chi::NetQueuePriority::kClientSendIpc) == 5);
   }
 }
 

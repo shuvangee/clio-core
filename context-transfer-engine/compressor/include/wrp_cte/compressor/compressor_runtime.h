@@ -37,8 +37,12 @@
 
 #include <atomic>
 #include <chimaera/chimaera.h>
+#include <chimaera/corwlock.h>
 #include <hermes_shm/data_structures/ipc/ring_buffer.h>
+#include <hermes_shm/introspect/system_info.h>
 #include <memory>
+#include <unordered_map>
+#include <vector>
 #include <wrp_cte/compressor/compressor_tasks.h>
 #include <wrp_cte/compressor/compressor_client.h>
 #include <wrp_cte/compressor/models/compression_features.h>
@@ -131,6 +135,20 @@ private:
                               chi::RunContext &ctx);
 
   /**
+   * Sample this node's CPU utilization and aggregated worker load
+   * (Method::kPollNodeLoad). Writes results into task->sample_.
+   */
+  chi::TaskResume PollNodeLoad(hipc::FullPtr<PollNodeLoadTask> task,
+                                chi::RunContext &ctx);
+
+  /**
+   * Periodic task that iterates the tracked consumer list and dispatches
+   * PollNodeLoad to each consumer node (Method::kPollConsumers).
+   */
+  chi::TaskResume PollConsumers(hipc::FullPtr<PollConsumersTask> task,
+                                 chi::RunContext &ctx);
+
+  /**
    * Schedule a task by resolving Dynamic pool queries.
    */
   chi::PoolQuery ScheduleTask(const hipc::FullPtr<chi::Task> &task) override;
@@ -182,6 +200,54 @@ private:
   // Target state cache for compression/tiering decisions
   std::unordered_map<std::string, TargetState> target_states_;
   std::mutex target_states_mutex_;
+
+  // Maximum number of distinct consumer nodes tracked PER TAG. Per-tag
+  // (rather than per-container) tracking lets the compressor route
+  // future Compress traffic for tag T toward the most-recent reader of
+  // T rather than the union of all consumers seen across all tags. The
+  // bound applies per tag so a tag with more readers than this caps at
+  // kMaxConsumersPerTag and silently drops the rest (kDebug-logged).
+  static constexpr std::size_t kMaxConsumersPerTag = 32;
+
+  // Per-tag consumer node-id sets (small unsorted vector per tag, size
+  // capped at kMaxConsumersPerTag). Map entry is created on first
+  // Decompress for the tag. Guarded by tag_consumers_lock_.
+  //
+  // Skipped entirely when CompressorConfig::tracking_enabled_ is false —
+  // ScheduleTask then routes Compress via DirectHash(tag_id) and the
+  // periodic PollConsumers becomes a no-op.
+  std::unordered_map<wrp_cte::core::TagId, std::vector<chi::u32>>
+      tag_consumers_;
+  chi::CoRwLock tag_consumers_lock_;
+
+  // Previous CPU times sample, used by PollNodeLoad to compute CPU%.
+  hshm::CpuTimes prev_cpu_times_;
+  std::mutex cpu_times_mutex_;
+
+  /**
+   * Append node_id to tag_consumers_[tag_id] if not already present and
+   * under the kMaxConsumersPerTag cap. No-op when
+   * CompressorConfig::tracking_enabled_ is false. Acquires
+   * tag_consumers_lock_ as a writer when an insert is needed.
+   * @param tag_id Tag that the inbound Decompress is reading.
+   * @param node_id Originating node ID of the Decompress request.
+   */
+  void RegisterConsumer(const wrp_cte::core::TagId &tag_id, chi::u32 node_id);
+
+  /**
+   * Pick the best consumer node for placing future Compress traffic for
+   * `tag_id`. Returns:
+   *   - When tracking_enabled_=false OR no consumers known: invalid
+   *     (caller should fall back to DirectHash).
+   *   - When tracking_enabled_=true AND consumers known: the most
+   *     recently registered consumer (back of the per-tag vector).
+   * Acquires tag_consumers_lock_ as a reader.
+   * @param tag_id Tag the Compress task is operating on.
+   * @param node_id_out Out param: receives the chosen node ID on success.
+   * @return true if a consumer was found, false otherwise.
+   */
+  bool PickConsumerForTag(const wrp_cte::core::TagId &tag_id,
+                          chi::u32 &node_id_out);
 
   /**
    * Estimate compression statistics using AI models

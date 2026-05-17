@@ -182,7 +182,7 @@ struct LbmContext {
 };
 
 // --- Transport Type Enum ---
-enum class TransportType { kZeroMq, kSocket, kShm, kNixl };
+enum class TransportType { kZeroMq, kSocket, kShm, kNixl, kThallium };
 
 // --- Transport Mode Enum ---
 enum class TransportMode { kClient, kServer };

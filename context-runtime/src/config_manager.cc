@@ -285,6 +285,28 @@ void ConfigManager::ParseYAML(YAML::Node &yaml_conf) {
     }
   }
 
+  // Parse SWIM membership-detection configuration. All fields optional;
+  // unspecified fields keep their compile-time defaults (matches the
+  // prior hard-coded constants in admin_runtime.cc).
+  if (yaml_conf["swim"]) {
+    auto swim = yaml_conf["swim"];
+    if (swim["enabled"]) {
+      swim_enabled_ = swim["enabled"].as<bool>();
+    }
+    if (swim["direct_probe_timeout_sec"]) {
+      swim_direct_probe_timeout_sec_ =
+          swim["direct_probe_timeout_sec"].as<float>();
+    }
+    if (swim["indirect_probe_timeout_sec"]) {
+      swim_indirect_probe_timeout_sec_ =
+          swim["indirect_probe_timeout_sec"].as<float>();
+    }
+    if (swim["suspicion_timeout_sec"]) {
+      swim_suspicion_timeout_sec_ =
+          swim["suspicion_timeout_sec"].as<float>();
+    }
+  }
+
   // Segment names are hardcoded and expanded in ipc_manager.cc
   // No configuration needed here
 

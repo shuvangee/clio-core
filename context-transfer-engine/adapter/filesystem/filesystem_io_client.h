@@ -142,16 +142,20 @@ struct FsIoOptions {
   }
 };
 
-/** The get task */
+/** The get task — holds a chi::Future returned by Client::AsyncGetBlob. */
 struct GetBlobAsyncTask {
-  hipc::FullPtr<wrp_cte::core::GetBlobTask> task_;
+  chi::Future<wrp_cte::core::GetBlobTask> task_;
   char *orig_data_;
   size_t orig_size_;
 };
 
-/** A structure to represent Hermes request */
+/** A structure to represent an async CTE request.
+ *
+ * After the chi::Future-based core API switchover, both put and get
+ * sides hold chi::Future objects; the Future owns the underlying task
+ * and cleans up on destruction, so callers just need .Wait() to drain. */
 struct FsAsyncTask {
-  std::vector<hipc::FullPtr<wrp_cte::core::PutBlobTask>> put_tasks_;
+  std::vector<chi::Future<wrp_cte::core::PutBlobTask>> put_tasks_;
   std::vector<GetBlobAsyncTask> get_tasks_;
   IoStatus io_status_;
   FsIoOptions opts_;
@@ -239,6 +243,16 @@ struct AdapterStat {
   wrp_cte::core::TagId tag_id_; /**< tag associated with the file */
   /** Page size used for file */
   size_t page_size_;
+
+  /**
+   * Pending GetOrCreateTag future from an async Open. Populated when
+   * Filesystem::Open issues AsyncGetOrCreateTag and returns immediately
+   * without waiting. The first I/O op that needs tag_id_ waits on this
+   * future (via AwaitPendingOpen) and clears the flag.
+   */
+  chi::Future<wrp_cte::core::GetOrCreateTagTask<wrp_cte::core::CreateParams>>
+      pending_open_fut_;
+  bool open_pending_ = false;
 
   /** Default constructor */
   AdapterStat()

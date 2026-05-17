@@ -57,48 +57,55 @@ message(STATUS "  - Output: compression_results.csv")
 # Gray-Scott Real Data Compression Analysis Tool
 #------------------------------------------------------------------------------
 
-# Find ADIOS2 (only if not already found)
+# Find ADIOS2 (only if not already found). Optional: gray_scott_analysis
+# is a data-generation utility, not needed for the runtime chimod, so
+# skip it on hosts where ADIOS2 is unavailable rather than hard-failing
+# the whole compressor build.
 if(NOT TARGET adios2::cxx11)
-    find_package(ADIOS2 REQUIRED)
+    find_package(ADIOS2 QUIET)
 endif()
 
-add_executable(gray_scott_analysis
-    gray_scott_analysis.cc
-)
+if(ADIOS2_FOUND OR TARGET adios2::cxx11)
+    add_executable(gray_scott_analysis
+        gray_scott_analysis.cc
+    )
 
-target_include_directories(gray_scott_analysis PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/context-transfer-engine/compressor/include
-    ${CMAKE_SOURCE_DIR}/context-transport-primitives/include
-)
+    target_include_directories(gray_scott_analysis PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/context-transfer-engine/compressor/include
+        ${CMAKE_SOURCE_DIR}/context-transport-primitives/include
+    )
 
-target_link_libraries(gray_scott_analysis PRIVATE
-    adios2::cxx
-    hshm::compress
-    hshm::cxx
-    ${CMAKE_THREAD_LIBS_INIT}
-    curl
-)
+    target_link_libraries(gray_scott_analysis PRIVATE
+        adios2::cxx
+        hshm::compress
+        hshm::cxx
+        ${CMAKE_THREAD_LIBS_INIT}
+        curl
+    )
 
-# Enable compression support
-target_compile_definitions(gray_scott_analysis PRIVATE
-    HSHM_ENABLE_COMPRESS=1
-)
+    # Enable compression support
+    target_compile_definitions(gray_scott_analysis PRIVATE
+        HSHM_ENABLE_COMPRESS=1
+    )
 
-# Add LibPressio support if available
-find_package(LibPressio QUIET)
-if(LibPressio_FOUND)
-    target_link_libraries(gray_scott_analysis PRIVATE LibPressio::libpressio)
-    target_compile_definitions(gray_scott_analysis PRIVATE HSHM_ENABLE_LIBPRESSIO=1)
-    message(STATUS "Gray-Scott: LibPressio found - lossy compression enabled")
+    # Add LibPressio support if available
+    find_package(LibPressio QUIET)
+    if(LibPressio_FOUND)
+        target_link_libraries(gray_scott_analysis PRIVATE LibPressio::libpressio)
+        target_compile_definitions(gray_scott_analysis PRIVATE HSHM_ENABLE_LIBPRESSIO=1)
+        message(STATUS "Gray-Scott: LibPressio found - lossy compression enabled")
+    else()
+        message(STATUS "Gray-Scott: LibPressio not found - only lossless compression available")
+    endif()
+
+    target_compile_features(gray_scott_analysis PRIVATE cxx_std_17)
+
+    install(TARGETS gray_scott_analysis
+        RUNTIME DESTINATION bin
+    )
+
+    message(STATUS "Gray-Scott analysis tool configured with ADIOS2 support")
 else()
-    message(STATUS "Gray-Scott: LibPressio not found - only lossless compression available")
+    message(STATUS "Gray-Scott: ADIOS2 not found - skipping gray_scott_analysis target")
 endif()
-
-target_compile_features(gray_scott_analysis PRIVATE cxx_std_17)
-
-install(TARGETS gray_scott_analysis
-    RUNTIME DESTINATION bin
-)
-
-message(STATUS "Gray-Scott analysis tool configured with ADIOS2 support")

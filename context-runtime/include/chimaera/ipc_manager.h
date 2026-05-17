@@ -93,11 +93,27 @@ enum class LocalMsgType : uint8_t;
  * Network queue priority levels for send operations
  */
 enum class NetQueuePriority : u32 {
-  kSendIn = 0,   ///< Priority 0: SendIn operations (sending task inputs)
-  kSendOut = 1,  ///< Priority 1: SendOut operations (sending task outputs)
-  kClientSendTcp = 2,  ///< Priority 2: Client response via TCP
-  kClientSendIpc = 3,  ///< Priority 3: Client response via IPC
+  // Cross-node sends are split into latency vs I/O lanes by the
+  // routing layer (RouteGlobal / Worker::EndTask) using
+  // container->GetTaskStats(task).io_size_:
+  //   io_size_ <  kLargeIOThreshold (4 KiB) -> kSendIn/OutLatency
+  //   io_size_ >= kLargeIOThreshold          -> kSendIn/OutIO
+  // The Send periodic drains all latency-lane tasks first, then a
+  // bounded byte budget (~8 MiB) of IO-lane tasks, then re-checks
+  // latency. This is the same admission control the scheduler uses
+  // for routing tasks to scheduler vs I/O workers, applied to the
+  // network plane: SWIM heartbeats (io_size_ == 0) and small ACKs
+  // never sit behind a 1 MiB PutBlob.
+  kSendInLatency = 0,  ///< Cross-node forward, <4 KiB (probes, metadata)
+  kSendInIO = 1,       ///< Cross-node forward, >=4 KiB (bulk data)
+  kSendOutLatency = 2, ///< Cross-node response, <4 KiB
+  kSendOutIO = 3,      ///< Cross-node response, >=4 KiB
+  kClientSendTcp = 4,  ///< Client response via TCP
+  kClientSendIpc = 5,  ///< Client response via IPC
 };
+static constexpr u32 kNetQueueNumPriorities = 6;
+static constexpr size_t kNetQueueIoThreshold = 4096;        // 4 KiB
+static constexpr size_t kNetQueueIoByteBudget = 8u << 20;   // 8 MiB / tick
 
 /**
  * Network queue for storing Future<SendTask> objects
@@ -1000,16 +1016,30 @@ class IpcManager {
   void ClearClientPool();
 
   /**
-   * Set the net worker's lane pointer for signaling on EnqueueNetTask
-   * Called by scheduler after DivideWorkers assigns net_worker_
-   * @param lane Pointer to the net worker's TaskLane
+   * Set the net worker's lane pointers for signaling on EnqueueNetTask.
+   * Called by scheduler after DivideWorkers assigns the net workers.
+   *
+   * With the recv/send split, the cross-node Send priorities
+   * (kSendIn{Latency,IO} / kSendOut{Latency,IO}) are drained by the
+   * send worker (peer DEALERs), while kClientSendTcp / kClientSendIpc
+   * are drained by the recv worker (client-facing ROUTER).
+   * EnqueueNetTask picks the right lane to awaken based on the
+   * priority enqueued.
+   *
+   * Passing both lanes equal (single-net-worker fallback) is fine — the
+   * same worker handles both directions.
    */
-  void SetNetLane(TaskLane *lane) { net_lane_ = lane; }
+  void SetNetLane(TaskLane *send_lane, TaskLane *recv_lane) {
+    net_send_lane_ = send_lane;
+    net_recv_lane_ = recv_lane;
+    net_lane_ = send_lane;  // back-compat for callers that haven't updated
+  }
 
   /**
-   * Enqueue a Future<SendTask> to the network queue
+   * Enqueue a Future<SendTask> to the network queue.
    * @param future Future containing the SendTask to enqueue
-   * @param priority Network queue priority (kSendIn or kSendOut)
+   * @param priority Network queue priority (see NetQueuePriority for
+   *                 the latency-vs-IO lane split).
    */
   void EnqueueNetTask(Future<Task> future, NetQueuePriority priority);
 
@@ -1020,6 +1050,24 @@ class IpcManager {
    * @return true if a Future was popped, false if queue is empty
    */
   bool TryPopNetTask(NetQueuePriority priority, Future<Task> &future);
+
+  /**
+   * Approximate number of tasks currently queued on the given priority.
+   * Snapshot at call time (MPSC head/tail atomics, no lock); producers
+   * may push more after this returns. Used by the Send periodic to
+   * bound its drain loop to the depth seen on entry — prevents one
+   * priority's hot stream from monopolising the tick at the expense
+   * of the other priorities, retries, and SWIM probes that share the
+   * same periodic.
+   * @return Current size of lane 0 at the given priority, or 0 if the
+   *         net_queue_ isn't initialized.
+   */
+  size_t GetNetQueueSize(NetQueuePriority priority) const {
+    if (net_queue_.IsNull()) {
+      return 0;
+    }
+    return net_queue_->GetLane(0, static_cast<u32>(priority)).Size();
+  }
 
   /**
    * Get the network queue for direct access
@@ -1262,8 +1310,13 @@ class IpcManager {
   // Network queue for send operations (one lane, two priorities)
   hipc::FullPtr<NetQueue> net_queue_;
 
-  // Net worker's lane pointer for signaling on EnqueueNetTask
+  // Net workers' lane pointers for signaling on EnqueueNetTask. With the
+  // recv/send split, send-side priorities wake net_send_lane_ and
+  // client-response priorities wake net_recv_lane_. net_lane_ remains as
+  // an alias for legacy callers / logging.
   TaskLane *net_lane_ = nullptr;
+  TaskLane *net_send_lane_ = nullptr;
+  TaskLane *net_recv_lane_ = nullptr;
 
   // GPU per-device queues now live on gpu::IpcManager::per_gpu_devices_.
 
@@ -1713,6 +1766,23 @@ HSHM_CROSS_FUN bool Future<TaskT, AllocT>::Wait(float max_sec,
     task_ptr_.SetNull();
     future_shm_.SetNull();
     return true;
+  }
+
+  // Non-blocking poll (max_sec == 0): check FUTURE_COMPLETE without
+  // entering the recv path. If the task is still in flight, return
+  // false immediately so the caller can do other work. If it IS
+  // complete, fall through; the underlying recv will see the flag and
+  // deserialize without blocking.
+  if (max_sec == 0.0f) {
+    hipc::FullPtr<FutureShm> future_full_poll =
+        CHI_CPU_IPC->ToFullPtr(future_shm_);
+    if (future_full_poll.IsNull()) {
+      return false;
+    }
+    if (!future_full_poll.ptr_->flags_.Any(FutureShm::FUTURE_COMPLETE)) {
+      return false;
+    }
+    // Complete -> fall through to normal wait path (cheap; flag is set).
   }
 
   bool is_runtime = CHI_CHIMAERA_MANAGER->IsRuntime();

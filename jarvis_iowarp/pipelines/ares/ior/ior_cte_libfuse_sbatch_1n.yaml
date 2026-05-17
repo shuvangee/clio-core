@@ -1,0 +1,178 @@
+# IOR + CTE (libfuse adapter) — SLURM sbatch deployment.
+#
+# Layout (single-node by default; bump `nodes:` for multi-node):
+#   wrp_runtime      -> chimaera daemon (shm IPC; works in both 1-node
+#                       and multi-node because chimaera uses shm for
+#                       client<->daemon within a node and another
+#                       transport for daemon<->daemon across nodes)
+#   wrp_cte          -> CTE pool with a RAM tier
+#   wrp_cte_libfuse  -> mounts the pool at $HOME/cte_libfuse_sbatch
+#                       (NEVER /tmp on this host — small / partition)
+#   builtin.ior      -> POSIX writes through the mount
+#
+# Usage:
+#   # Dry-run (write the SLURM script but don't submit):
+#   jarvis ppl submit \
+#     ${IOWARP}/jarvis_iowarp/pipelines/ares/ior_cte_libfuse_sbatch.yaml \
+#     +no_submit
+#
+#   # Real submit:
+#   jarvis ppl submit \
+#     ${IOWARP}/jarvis_iowarp/pipelines/ares/ior_cte_libfuse_sbatch.yaml
+#
+# After submission, watch `squeue -u $USER` and inspect
+# ${SHARED_DIR}/slurm-<jobid>.out for progress.
+
+name: ior_cte_libfuse_sbatch_1n
+
+# /usr/bin/ssh was built against OpenSSL 3.0.x; if it inherits a conda
+# env's LD_LIBRARY_PATH (which has libcrypto 3.6.x), ssh aborts with
+# "OpenSSL version mismatch". Strip LD_LIBRARY_PATH for the ssh hop.
+# OpenMpiExec forwards this into `--mca plm_rsh_agent <ssh_cmd>` so
+# prted's remote spawn uses the same fix. Harmless on single-node.
+ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
+
+# Network fabric selection.
+#
+# This cluster has TWO IP fabrics on each compute node:
+#   eno1        -> 172.20.0.0/16  -- 1 GbE management/SLURM network
+#                                    (`scontrol show hostnames` resolves
+#                                    to this NIC; this is what
+#                                    `gethostname()` matches in /etc/hosts)
+#   enp47s0np0  -> 172.25.0.0/16  -- 40 GbE data network, exposed as
+#                                    `<host>-40g` in /etc/hosts.
+#
+# Earlier runs pinned every layer to eno1 because compose / PMIx kept
+# binding to the docker bridge or APIPA links and crashing at MPI_Init.
+# That worked but capped chimaera's cross-node CTE traffic at the 1 GbE
+# line rate (~112 MiB/s single-stream — confirmed with iperf3 +
+# zmq_microbench in the same allocation). Moving the data plane to the
+# 40 GbE NIC requires routing daemon↔daemon and (optionally) IOR ranks
+# through 172.25/16. PRTE / OOB stay on 172.20 so SLURM's spawn graph
+# still works.
+#
+# enp47s0np0's CIDR (172.25.0.0/16) is what btl_tcp_if_include accepts
+# when given an interface name -- we use the explicit interface name
+# rather than the CIDR so OpenMPI doesn't pick a sibling alias.
+mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include eno1 --prtemca prte_if_include eno1 --prtemca prte_tmpdir_base /home/llogan/iowarp_prte_tmp'
+
+# Some compute nodes have a small / partition that fills up (ares-comp-10/11,
+# 28, etc.). PRTE / PMIx default to /tmp for the per-job session directory
+# (prterun.<host>.<pid>...) and aborts with "No space left on device" when
+# /tmp is full. chimaera_runtime puts its per-user memfd symlinks at
+# /tmp/chimaera_$USER for the same reason and gets the same failure mode
+# (`shm_open failed: No such file or directory`).
+#
+# CHI_MEMFD_DIR MUST be node-local (or have hostname baked in). The dir
+# holds symlinks pointing into /proc/<daemon_pid>/fd/<n> — those paths
+# are only resolvable on the node that created them. Putting two daemons
+# on a shared-NFS dir lets them clobber each other's symlinks and the
+# loser-node's client gets ENOENT on shm_open. ${HOSTNAME} is expanded
+# by the remote shell when ssh_exec inlines `KEY="value"` in front of
+# the command on the remote side.
+env:
+  TMPDIR: "/home/llogan/iowarp_prte_tmp"
+  CHI_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
+
+scheduler:
+  name: slurm
+  job_name: ior_cte_libfuse_sbatch_1n
+  nodes: 1
+  ntasks_per_node: 1
+  # Ares SLURM has `ProctrackType=proctrack/cgroup` +
+  # `ConstrainCores=yes`. With ntasks_per_node=1 the per-task cgroup
+  # gets ONE core, and chimaera's 4 worker threads (3 task + 1
+  # dedicated net) all fight for it. The net worker gets starved and
+  # cross-node ZMQ task delivery stalls (HANDSHAKE_SUCCEEDED but
+  # SendIn/RecvOut never make timely progress). Salloc + ssh works
+  # because pam_slurm_adopt drops the ssh session into the whole-node
+  # cgroup, not the per-task one. `cpus_per_task=16` (much larger than
+  # `num_threads=4`) leaves room for the chimaera workers, FUSE, ior,
+  # and mpiexec helper threads. Switch to `--exclusive` if a future
+  # workload needs the whole node.
+  cpus_per_task: 40
+  partition: debug
+  time: "00:15:00"
+  # use 10/11/12/18 (the four idle nodes)
+  output: slurm-%j.out
+  error: slurm-%j.err
+  # `jarvis` snapshots the shell env when it boots, and `builtin.ior` runs
+  # whatever `mpiexec` is on that snapshot's PATH. Without these loads the
+  # captured env has no openmpi/ior and the ior step dies with
+  # "/bin/sh: 1: mpiexec: not found" (silent failure in jarvis -- the
+  # pipeline reports "Pipeline started successfully" anyway). Three plain
+  # `module load` lines, no /tmp salvage, no log scraping, no bash -c.
+  # Append "-40g" to every hostname jarvis-cd writes into the pipeline
+  # hostfile. Routes chimaera daemon↔daemon DEALER/ROUTER over
+  # enp47s0np0 (40 GbE, 172.25/16) instead of eno1 (1 GbE, 172.20/16).
+  # /etc/hosts maps `ares-comp-N-40g` → `172.25.101.N`. jarvis-cd's
+  # `suffix:` key handles this in scheduler.py (post-scontrol awk).
+  suffix: "-40g"
+  pre_cmds:
+    - 'source /etc/profile.d/lmod.sh 2>/dev/null || source /etc/profile.d/modules.sh'
+    # Spec hashes on this cluster (`module spider ior`):
+    #   gcc@11.4.0 / openmpi@5.0.5-x2kvx5l / ior@3.3.0-fihmxeb
+    # Matches the spec the manual 2n ior run used end-to-end.
+    - 'module load gcc/11.4.0/openmpi/5.0.5-x2kvx5l ior/3.3.0-fihmxeb'
+    # Avoid /tmp (small + filled up on some nodes). PRTE/PMIx default
+    # to /tmp for its per-job session dir; route it to NFS.
+    # (CHI_MEMFD_DIR's per-host dir is auto-created by chimaera's
+    # EnsureMemfdDir at first use, so it's not mkdir'd here.)
+    - 'mkdir -p /home/llogan/iowarp_prte_tmp'
+
+pkgs:
+  - pkg_type: jarvis_iowarp.wrp_runtime
+    pkg_name: runtime
+    num_threads: 4
+    client_data_segment_size: "2G"
+    port: 9413
+    ipc_mode: "shm"
+    log_level: "debug"
+    sleep: 4
+    # SWIM disabled for this run to rule it out as the cause of mid-IOR
+    # "node N confirmed dead" cascades. HeartbeatProbe becomes a no-op;
+    # IsAlive() trivially returns true for every peer (kAlive is the
+    # default Host::state). Cross-node SendIn/SendOut keep retrying on
+    # transient TCP/ZMQ errors instead of giving up via SetDead.
+    swim_enabled: false
+
+  - pkg_type: jarvis_iowarp.wrp_cte
+    pkg_name: cte_core
+    devices:
+      # 24 ranks/node x 256 MiB block = 6 GiB written per node. With
+      # HashBlobToContainer spreading PutBlobs ~50/50, each node's
+      # bdev receives ~6 GiB (its own local-hash half + the remote
+      # node's cross-hash half). 32 GB leaves ~5x headroom.
+      - ["ram::cte_ram_tier1", "32GB", 1.0]
+    dpe_type: "max_bw"
+    neighborhood: 1
+    default_target_timeout_ms: 30000
+    poll_period_ms: 5000
+    # pool_query: local + Pssh-fanning the compose to every node means
+    # each node's `chimaera compose` talks to its local admin container
+    # and creates wrp_cte_core there with the proper storage config.
+    # No broadcast routing or cross-node admin propagation required.
+    pool_query: "local"
+
+  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+    pkg_name: cte_fuse
+    mountpoint: ${HOME}/cte_libfuse_sbatch_1n
+    sleep: 2
+    extra_fuse_args: "-f"
+
+  - pkg_type: builtin.ior
+    pkg_name: ior
+    api: posix
+    write: true
+    read: true
+    # Each chimaera daemon + CTE pool + FUSE mount is local to its
+    # own node -- shared-file IOR would have ranks writing through
+    # one node's FUSE/CTE and expecting reads through another, which
+    # is impossible by construction. file-per-process: each rank
+    # writes a unique file on its own node's mount.
+    fpp: true
+    nprocs: 24
+    ppn: 24
+    xfer: 1m
+    block: 64m
+    out: ${HOME}/cte_libfuse_sbatch_1n/ior_sbatch.bin

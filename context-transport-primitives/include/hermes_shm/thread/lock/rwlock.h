@@ -76,9 +76,28 @@ struct RwLock {
     cur_writer_ = 0;
   }
 
-  /** Delete copy constructor */
+  /** Copy constructor (no-op, mirrors hshm::Mutex): copying a live
+   *  lock would clone its state, which is never what callers want, but
+   *  containers (e.g. priv::vector<RwLock>::operator=) need *some*
+   *  copy constructor to be callable. Construct a fresh, unheld lock. */
   HSHM_CROSS_FUN
-  RwLock(const RwLock &other) = delete;
+  RwLock(const RwLock & /*other*/)
+      : readers_(0),
+        writers_(0),
+        ticket_(0),
+        mode_(RwLockMode::kNone),
+        cur_writer_(0) {}
+
+  /** Copy assignment (no-op for state, same rationale as copy ctor). */
+  HSHM_CROSS_FUN
+  RwLock &operator=(const RwLock & /*other*/) {
+    readers_.store(0);
+    writers_.store(0);
+    ticket_.store(0);
+    mode_.store(RwLockMode::kNone);
+    cur_writer_.store(0);
+    return *this;
+  }
 
   /** Move constructor */
   HSHM_CROSS_FUN

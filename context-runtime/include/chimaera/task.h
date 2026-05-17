@@ -601,7 +601,12 @@ struct RunContext {
   std::vector<PoolQuery>
       pool_queries_; /**< Pool queries for task distribution */
   std::vector<FullPtr<Task>> subtasks_; /**< Replica tasks for this execution */
-  u32 completed_replicas_;              /**< Count of completed replicas */
+  // Atomic so SendIn (net_send_worker), RecvOut (net_recv_worker) and
+  // FlushStaleStateForNode can update it concurrently without losing
+  // increments — a missed bump leaves completed_ < subtasks_.size()
+  // forever and the origin task's future never fires, which manifests
+  // as a writer hang under heavy 4n+ FPP load.
+  std::atomic<u32> completed_replicas_;
   u32 yield_count_;                     /**< Number of times task has yielded */
   Future<Task, CHI_QUEUE_ALLOC_T>
       future_;                    /**< Future for async completion tracking */
@@ -647,7 +652,7 @@ struct RunContext {
         event_queue_(other.event_queue_),
         pool_queries_(std::move(other.pool_queries_)),
         subtasks_(std::move(other.subtasks_)),
-        completed_replicas_(other.completed_replicas_),
+        completed_replicas_(other.completed_replicas_.load()),
         yield_count_(other.yield_count_),
         future_(std::move(other.future_)),
         is_notified_(other.is_notified_.load()),
@@ -682,7 +687,7 @@ struct RunContext {
       event_queue_ = other.event_queue_;
       pool_queries_ = std::move(other.pool_queries_);
       subtasks_ = std::move(other.subtasks_);
-      completed_replicas_ = other.completed_replicas_;
+      completed_replicas_.store(other.completed_replicas_.load());
       yield_count_ = other.yield_count_;
       future_ = std::move(other.future_);
       is_notified_.store(other.is_notified_.load());
@@ -714,7 +719,7 @@ struct RunContext {
   void Clear() {
     pool_queries_.clear();
     subtasks_.clear();
-    completed_replicas_ = 0;
+    completed_replicas_.store(0);
     yield_time_us_ = 0.0;
     block_start_ = hshm::Timepoint();
     yield_count_ = 0;

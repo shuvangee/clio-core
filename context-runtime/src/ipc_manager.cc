@@ -42,7 +42,6 @@
 #include <dirent.h>
 #include <endian.h>
 #include <ifaddrs.h>
-#include <net/if.h>
 #include <netdb.h>
 #include <signal.h>
 #include <sys/epoll.h>
@@ -63,6 +62,7 @@
 #include <iostream>
 #include <memory>
 #include <random>
+#include <set>
 
 #include "chimaera/admin.h"
 #include "chimaera/admin/admin_client.h"
@@ -482,20 +482,17 @@ void IpcManager::AwakenWorker(TaskLane *lane) {
     return;
   }
 
-  // Park-flag fast path: if the worker is still spinning (active_=true), it
-  // will pick up our enqueued task on its next loop iteration without needing
-  // a signal. Skip the tgkill syscall entirely.
-  //
-  // Race window: producer pushed task → load active_=true → skips signal,
-  // and concurrently worker set active_=false → enters epoll_pwait2. To
-  // prevent a missed wakeup, Worker::SuspendMe rechecks its queues after
-  // storing active_=false but before calling Wait() — see worker.cc.
-  // Both stores/loads are seq_cst on the opt_atomic, so the worker's
-  // post-store recheck is guaranteed to observe a producer push that
-  // happened before the worker's store.
-  if (lane->IsActive()) {
-    return;
-  }
+  // ALWAYS send SIGUSR1, never skip on active_=true. Past attempts to
+  // gate this on the park-flag tripped a lost-wakeup race at scale (4n
+  // 256m FPP) where the producer observed active_=true, skipped the
+  // signal, and the worker then stored active_=false and entered
+  // epoll_pwait2 before noticing the just-pushed task. The
+  // post-store-recheck handshake in Worker::SuspendMe is supposed to
+  // catch this but doesn't fire reliably under heavy multi-tier
+  // scheduling pressure. Skipping the tgkill saved a syscall; the
+  // observed cost was hangs that never recovered. The extra signal is
+  // absorbed harmlessly by signalfd — at worst the worker wakes one
+  // extra time and re-checks its (empty) queue. Worth it.
 
   pid_t tid = lane->GetTid();
   if (tid > 0) {
@@ -647,15 +644,16 @@ bool IpcManager::ServerInitQueues() {
         queue_depth);  // Use configured depth instead of hardcoded 1024
     worker_queues_off_ = worker_queues_.shm_.off_.load();
 
-    // Initialize network queue for send operations
-    // One lane with four priorities (SendIn, SendOut, ClientSendTcp,
-    // ClientSendIpc)
+    // Initialize network queue for send operations.
+    // Cross-node sends are split latency vs I/O so SWIM probes and
+    // small ACKs never queue behind bulk PutBlob/GetBlob payloads.
+    // See NetQueuePriority for the priority order and the drain
+    // strategy in Runtime::Send.
     net_queue_ = queue_allocator_->NewObj<NetQueue>(
         queue_allocator_,
-        1,             // num_lanes: single lane for network operations
-        4,             // num_priorities: 0=SendIn, 1=SendOut, 2=ClientSendTcp,
-                       // 3=ClientSendIpc
-        queue_depth);  // Use configured depth instead of hardcoded 1024
+        1,                          // num_lanes
+        kNetQueueNumPriorities,     // num_priorities
+        queue_depth);
 
     return !worker_queues_.IsNull() && !net_queue_.IsNull();
   } catch (const std::exception &e) {
@@ -1089,6 +1087,96 @@ u64 IpcManager::AddNode(const std::string &ip_address, u32 port) {
   return new_node_id;
 }
 
+namespace {
+
+// Collect every IPv4/IPv6 address bound to a local network interface
+// (loopback included). Used so IdentifyThisHost can recognize a hostfile
+// entry that is an IP literal (or a hostname resolving to one of our
+// interface IPs) as "this node" — hostname string matching alone breaks
+// when the hostfile uses addresses instead of names.
+std::set<std::string> CollectLocalInterfaceIps() {
+  std::set<std::string> ips;
+  struct ifaddrs *ifaddr = nullptr;
+  if (getifaddrs(&ifaddr) != 0 || ifaddr == nullptr) {
+    return ips;  // Best-effort: empty set just disables IP matching.
+  }
+  for (struct ifaddrs *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+    char buf[INET6_ADDRSTRLEN] = {0};
+    const int fam = ifa->ifa_addr->sa_family;
+    if (fam == AF_INET) {
+      auto *sa = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr);
+      if (inet_ntop(AF_INET, &sa->sin_addr, buf, sizeof(buf))) {
+        ips.insert(buf);
+      }
+    } else if (fam == AF_INET6) {
+      auto *sa = reinterpret_cast<struct sockaddr_in6 *>(ifa->ifa_addr);
+      if (inet_ntop(AF_INET6, &sa->sin6_addr, buf, sizeof(buf))) {
+        // Strip a zone index (e.g. "fe80::1%eth0") for comparison.
+        std::string s(buf);
+        auto pct = s.find('%');
+        ips.insert(pct == std::string::npos ? s : s.substr(0, pct));
+      }
+    }
+  }
+  freeifaddrs(ifaddr);
+  return ips;
+}
+
+// True when `entry` (an IP literal or a resolvable hostname from the
+// hostfile) names an address that is bound to one of this node's local
+// interfaces. Handles the case the hostname-only matcher misses:
+// hostfiles written with raw IPs, or DNS/hosts names that resolve to a
+// local NIC IP whose reverse name differs from gethostname().
+bool HostMatchesLocalIp(const std::string &entry,
+                        const std::set<std::string> &local_ips) {
+  if (entry.empty() || local_ips.empty()) {
+    return false;
+  }
+  // Fast path: the entry is itself a literal IP we already hold.
+  if (local_ips.count(entry)) {
+    return true;
+  }
+  // Otherwise resolve the entry (works for both IP literals and names)
+  // and test each resolved address against the local interface set.
+  struct addrinfo hints {};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  struct addrinfo *res = nullptr;
+  if (getaddrinfo(entry.c_str(), nullptr, &hints, &res) != 0 ||
+      res == nullptr) {
+    return false;
+  }
+  bool matched = false;
+  for (struct addrinfo *ai = res; ai != nullptr && !matched;
+       ai = ai->ai_next) {
+    char buf[INET6_ADDRSTRLEN] = {0};
+    if (ai->ai_family == AF_INET) {
+      auto *sa = reinterpret_cast<struct sockaddr_in *>(ai->ai_addr);
+      if (inet_ntop(AF_INET, &sa->sin_addr, buf, sizeof(buf)) &&
+          local_ips.count(buf)) {
+        matched = true;
+      }
+    } else if (ai->ai_family == AF_INET6) {
+      auto *sa = reinterpret_cast<struct sockaddr_in6 *>(ai->ai_addr);
+      if (inet_ntop(AF_INET6, &sa->sin6_addr, buf, sizeof(buf))) {
+        std::string s(buf);
+        auto pct = s.find('%');
+        if (local_ips.count(pct == std::string::npos ? s
+                                                     : s.substr(0, pct))) {
+          matched = true;
+        }
+      }
+    }
+  }
+  freeaddrinfo(res);
+  return matched;
+}
+
+}  // namespace
+
 bool IpcManager::IdentifyThisHost() {
   HLOG(kDebug, "Identifying current host");
 
@@ -1133,31 +1221,14 @@ bool IpcManager::IdentifyThisHost() {
   std::string local_short =
       local_host.substr(0, local_host.find('.'));
 
-  // Also collect local IPv4 addresses on every UP non-loopback interface
-  // so containerized deployments (Docker networks) can be identified by
-  // their bridge-assigned IP when the hostfile lists IPs but
-  // gethostname() returns the compose service name (e.g. iowarp-node1).
-  std::vector<std::string> local_ips;
-  {
-    struct ifaddrs *ifa_head = nullptr;
-    if (getifaddrs(&ifa_head) == 0 && ifa_head) {
-      for (struct ifaddrs *ifa = ifa_head; ifa; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr) continue;
-        if (ifa->ifa_addr->sa_family != AF_INET) continue;
-        if (!(ifa->ifa_flags & IFF_UP)) continue;
-        if (ifa->ifa_flags & IFF_LOOPBACK) continue;
-        char buf[INET_ADDRSTRLEN] = {0};
-        const sockaddr_in *sin =
-            reinterpret_cast<const sockaddr_in *>(ifa->ifa_addr);
-        if (inet_ntop(AF_INET, &sin->sin_addr, buf, sizeof(buf))) {
-          local_ips.emplace_back(buf);
-        }
-      }
-      freeifaddrs(ifa_head);
-    }
-  }
+  // All IPs bound to local interfaces, so a hostfile entry written as a
+  // raw IP (or a name resolving to a local NIC) is recognized as this
+  // node even when its reverse name differs from gethostname(). This also
+  // covers containerized deployments (Docker networks) where the hostfile
+  // lists IPs but gethostname() returns the compose service name.
+  const std::set<std::string> local_ips = CollectLocalInterfaceIps();
 
-  // Try to identify (by hostname or local-IP match) and start the server.
+  // Try to identify (by hostname OR local-IP match) and start the server.
   for (const auto &pair : hostfile_map_) {
     const Host &host = pair.second;
     attempted_hosts.push_back(host.ip_address);
@@ -1171,18 +1242,21 @@ bool IpcManager::IdentifyThisHost() {
     bool is_loopback = (host.ip_address == "127.0.0.1") ||
                        (host.ip_address == "localhost") ||
                        (host.ip_address == "::1");
-    bool ip_matches_local = false;
-    for (const auto &ip : local_ips) {
-      if (host.ip_address == ip) {
-        ip_matches_local = true;
-        break;
-      }
-    }
+    // The hostfile may use NIC-suffixed names (e.g. "ares-comp-31-40g")
+    // that resolve to a non-default fabric, while gethostname() returns
+    // the plain short name ("ares-comp-31"). Accept a match when the
+    // entry's short name starts with `<local_short>-` so suffixed
+    // hostnames identify the same node correctly.
+    bool suffix_match =
+        entry_short.size() > local_short.size() + 1 &&
+        entry_short.compare(0, local_short.size(), local_short) == 0 &&
+        entry_short[local_short.size()] == '-';
     bool is_me = (host.ip_address == "0.0.0.0") ||
                  is_loopback ||
                  (host.ip_address == local_host) ||
                  (entry_short == local_short) ||
-                 ip_matches_local;
+                 suffix_match ||
+                 HostMatchesLocalIp(host.ip_address, local_ips);
     if (!is_me) continue;
 
     HLOG(kDebug, "Hostfile entry {} matches local host {}; binding 0.0.0.0",
@@ -1386,12 +1460,27 @@ void IpcManager::FreeBuffer(FullPtr<char> buffer_ptr) {
     return;
   }
 
-  // Check per-process shared memory allocators via alloc_map_
+  // Check per-process shared memory allocators via alloc_map_.
+  //
+  // alloc_map_ is a std::unordered_map; mutation (IncreaseClientShm,
+  // RegisterMemory, WreapDeadIpcs, KillIpcs) is serialised under
+  // allocator_map_lock_'s write-side. A bare find() here races with
+  // those writers, and a concurrent rehash can deref a stale bucket
+  // pointer — caught here under sustained write load as a segfault
+  // in the runtime's bdev path. Match ToFullPtr's read-locked pattern.
   u64 alloc_key = (static_cast<u64>(buffer_ptr.shm_.alloc_id_.major_) << 32) |
                   static_cast<u64>(buffer_ptr.shm_.alloc_id_.minor_);
-  auto it = alloc_map_.find(alloc_key);
-  if (it != alloc_map_.end()) {
-    it->second->Free(buffer_ptr);
+  hipc::MultiProcessAllocator *resolved_alloc = nullptr;
+  {
+    allocator_map_lock_.ReadLock();
+    auto it = alloc_map_.find(alloc_key);
+    if (it != alloc_map_.end()) {
+      resolved_alloc = it->second;
+    }
+    allocator_map_lock_.ReadUnlock();
+  }
+  if (resolved_alloc != nullptr) {
+    resolved_alloc->Free(buffer_ptr);
     return;
   }
 
@@ -1470,14 +1559,34 @@ void IpcManager::EnqueueNetTask(Future<Task> future,
   bool was_empty = lane.Empty();
   lane.Push(future);
 
-  // Signal the net worker if the lane was empty (same pattern as
-  // admin_runtime.cc:1086-1089)
-  if (was_empty && net_lane_) {
-    AwakenWorker(net_lane_);
+  // Pick the worker that drains this priority's queue. Cross-node Send
+  // priorities (kSendIn{Latency,IO} / kSendOut{Latency,IO}) are owned
+  // by net_send_worker; client response priorities (kClientSendTcp /
+  // kClientSendIpc) are owned by net_recv_worker (the ROUTER socket is
+  // shared with ClientRecv).
+  if (was_empty) {
+    TaskLane *wake_lane = nullptr;
+    switch (priority) {
+      case NetQueuePriority::kSendInLatency:
+      case NetQueuePriority::kSendInIO:
+      case NetQueuePriority::kSendOutLatency:
+      case NetQueuePriority::kSendOutIO:
+        wake_lane = net_send_lane_ ? net_send_lane_ : net_lane_;
+        break;
+      case NetQueuePriority::kClientSendTcp:
+      case NetQueuePriority::kClientSendIpc:
+        wake_lane = net_recv_lane_ ? net_recv_lane_ : net_lane_;
+        break;
+    }
+    if (wake_lane) {
+      AwakenWorker(wake_lane);
+    }
   }
 
-  HLOG(kDebug, "EnqueueNetTask: priority={}, was_empty={}, net_lane={}",
-       priority_idx, was_empty, net_lane_ != nullptr);
+  HLOG(kDebug,
+       "EnqueueNetTask: priority={}, was_empty={}, send_lane={}, recv_lane={}",
+       priority_idx, was_empty, net_send_lane_ != nullptr,
+       net_recv_lane_ != nullptr);
 }
 
 bool IpcManager::TryPopNetTask(NetQueuePriority priority,
@@ -2176,6 +2285,11 @@ void IpcManager::RecvZmqClientThread() {
   hshm::lbm::EventManager em;
   zmq_transport_->RegisterEventManager(em);
 
+  // Instrumentation: count of responses this client has received and signaled
+  // (FUTURE_COMPLETE set). Mismatch vs daemon-side send count = lost responses.
+  size_t recv_count = 0;
+  size_t miss_count = 0;
+
   while (zmq_recv_running_.load()) {
     // Drain all available messages first
     bool drained_any = false;
@@ -2208,8 +2322,11 @@ void IpcManager::RecvZmqClientThread() {
       std::lock_guard<std::mutex> lock(pending_futures_mutex_);
       auto it = pending_zmq_futures_.find(net_key);
       if (it == pending_zmq_futures_.end()) {
-        HLOG(kError, "RecvZmqClientThread: No pending future for net_key {}",
-             net_key);
+        ++miss_count;
+        HLOG(kError,
+             "[CountClientRecv] miss#{}: No pending future for net_key {} "
+             "(received={}, misses={})",
+             miss_count, net_key, recv_count, miss_count);
         zmq_transport_->ClearRecvHandles(*archive);
         continue;
       }
@@ -2228,6 +2345,13 @@ void IpcManager::RecvZmqClientThread() {
 
       // Remove from pending futures map
       pending_zmq_futures_.erase(it);
+      ++recv_count;
+      if ((recv_count & 0xff) == 0) {
+        HLOG(kDebug,
+             "[CountClientRecv] cumulative responses received = {} "
+             "(misses so far = {})",
+             recv_count, miss_count);
+      }
     }
 
     // Only block on epoll when the drain loop found nothing;
@@ -2387,6 +2511,16 @@ void IpcManager::BeginTask(Future<Task> &future, Container *container,
     run_ctx->true_period_ns_ = 0.0;
     run_ctx->yield_time_us_ = 0.0;
     run_ctx->did_work_ = false;
+  }
+
+  // Populate predicted_stat_ from the container so downstream routing
+  // (RouteGlobal's latency-vs-IO lane choice; worker.cc's predicted-load
+  // tracking) can read the task's actual payload size without re-doing
+  // the GetTaskStats(task) work. Scheduler-class code (RuntimeMapTask)
+  // already calls GetTaskStats; pre-populating it here keeps a single
+  // source of truth and makes the value available before RouteTask.
+  if (container) {
+    run_ctx->predicted_stat_ = container->GetTaskStats(task_ptr.ptr_);
   }
 
   // Mark that RunContext now exists for this task
@@ -2600,8 +2734,20 @@ RouteResult IpcManager::RouteGlobal(Future<Task> &future,
     run_ctx->pool_queries_ = pool_queries;
   }
 
-  // Enqueue the original task directly to net_queue_ priority 0 (SendIn)
-  EnqueueNetTask(future, NetQueuePriority::kSendIn);
+  // Pick the latency vs I/O SendIn lane based on the task's actual
+  // payload size — small probes / metadata sit on kSendInLatency so
+  // they're not buried behind 1 MiB PutBlob bulks on the wire. The
+  // scheduler (BeginTask / pre-routing) populates RunContext::
+  // predicted_stat_ from container->GetTaskStats(task), so we just
+  // read it here instead of recomputing.
+  size_t io_size = 0;
+  if (task_ptr->GetRunCtx()) {
+    io_size = task_ptr->GetRunCtx()->predicted_stat_.io_size_;
+  }
+  NetQueuePriority sendin_prio = (io_size >= kNetQueueIoThreshold)
+                                     ? NetQueuePriority::kSendInIO
+                                     : NetQueuePriority::kSendInLatency;
+  EnqueueNetTask(future, sendin_prio);
 
   // Set TASK_ROUTED flag on original task
   task_ptr->SetFlags(TASK_ROUTED);

@@ -80,7 +80,10 @@ void LocalScheduler::DivideWorkers(WorkOrchestrator *work_orch) {
   if (ipc) {
     ipc->SetNumSchedQueues(num_sched_workers);
     if (net_worker_) {
-      ipc->SetNetLane(net_worker_->GetLane());
+      // LocalScheduler keeps a single net worker — pass the same lane for
+      // both send and recv so EnqueueNetTask's priority-based dispatch
+      // still works.
+      ipc->SetNetLane(net_worker_->GetLane(), net_worker_->GetLane());
     }
   }
 

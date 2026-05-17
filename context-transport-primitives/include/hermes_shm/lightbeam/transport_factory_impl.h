@@ -61,6 +61,11 @@ inline void TransportDeleter::operator()(Transport* t) const {
       delete static_cast<ZeroMqTransport*>(t);
       break;
 #endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      delete static_cast<ThalliumTransport*>(t);
+      break;
+#endif
     case TransportType::kSocket:
       delete static_cast<SocketTransport*>(t);
       break;
@@ -93,6 +98,10 @@ inline Bulk Transport::Expose(const hipc::FullPtr<char>& ptr, size_t data_size, 
     case TransportType::kNixl:
       return static_cast<NixlTransport*>(this)->Expose(ptr, data_size, flags);
 #endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      return static_cast<ThalliumTransport*>(this)->Expose(ptr, data_size, flags);
+#endif
     default:
       return Bulk{};
   }
@@ -111,6 +120,10 @@ inline std::string Transport::GetAddress() const {
 #if HSHM_ENABLE_NIXL
     case TransportType::kNixl:
       return static_cast<const NixlTransport*>(this)->GetAddress();
+#endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      return static_cast<const ThalliumTransport*>(this)->GetAddress();
 #endif
     default:
       return "";
@@ -133,6 +146,11 @@ inline void Transport::ClearRecvHandles(LbmMeta<>& meta) {
 #if HSHM_ENABLE_NIXL
     case TransportType::kNixl:
       static_cast<NixlTransport*>(this)->ClearRecvHandles(meta);
+      break;
+#endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      static_cast<ThalliumTransport*>(this)->ClearRecvHandles(meta);
       break;
 #endif
     default:
@@ -158,6 +176,11 @@ inline void Transport::RegisterEventManager(EventManager &em) {
       static_cast<NixlTransport*>(this)->RegisterEventManager(em);
       break;
 #endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      static_cast<ThalliumTransport*>(this)->RegisterEventManager(em);
+      break;
+#endif
     default:
       break;
   }
@@ -176,6 +199,10 @@ inline bool Transport::IsServerAlive(const LbmContext& ctx) const {
 #if HSHM_ENABLE_NIXL
     case TransportType::kNixl:
       return static_cast<const NixlTransport*>(this)->IsServerAlive(ctx);
+#endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      return static_cast<const ThalliumTransport*>(this)->IsServerAlive(ctx);
 #endif
     default:
       return false;
@@ -200,6 +227,10 @@ int Transport::Send(MetaT& meta, const LbmContext& ctx) {
     case TransportType::kNixl:
       return static_cast<NixlTransport*>(this)->Send(meta, ctx);
 #endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      return static_cast<ThalliumTransport*>(this)->Send(meta, ctx);
+#endif
     default:
       return -1;
   }
@@ -219,6 +250,10 @@ ClientInfo Transport::Recv(MetaT& meta, const LbmContext& ctx) {
 #if HSHM_ENABLE_NIXL
     case TransportType::kNixl:
       return static_cast<NixlTransport*>(this)->Recv(meta, ctx);
+#endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      return static_cast<ThalliumTransport*>(this)->Recv(meta, ctx);
 #endif
     default:
       return ClientInfo{-1, -1, {}};
@@ -246,6 +281,11 @@ inline TransportPtr TransportFactory::Get(
     case TransportType::kNixl:
       return TransportPtr(new NixlTransport(mode, addr));
 #endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      return TransportPtr(new ThalliumTransport(
+          mode, addr, protocol.empty() ? "tcp" : protocol, port));
+#endif
     default:
       return nullptr;
   }
@@ -271,6 +311,11 @@ inline TransportPtr TransportFactory::Get(
 #if HSHM_ENABLE_NIXL
     case TransportType::kNixl:
       return TransportPtr(new NixlTransport(mode, addr));
+#endif
+#if HSHM_ENABLE_THALLIUM
+    case TransportType::kThallium:
+      return TransportPtr(new ThalliumTransport(
+          mode, addr, protocol.empty() ? "tcp" : protocol, port));
 #endif
     default:
       return nullptr;

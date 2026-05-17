@@ -22,9 +22,6 @@
 #include <wrp_cte/core/content_transfer_engine.h>
 #include <chimaera/chimaera.h>
 
-// Adapter includes for testing filesystem integration
-#include <adapter/cae_config.h>
-
 // HSHM includes
 #include <hermes_shm/util/singleton.h>
 

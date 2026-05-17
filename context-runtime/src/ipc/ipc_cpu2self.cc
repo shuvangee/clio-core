@@ -62,11 +62,9 @@ Future<Task> IpcCpu2Self::ClientSend(IpcManager *ipc,
       u32 lane_id = ipc->scheduler_->ClientMapTask(ipc, future);
       if (!ipc->worker_queues_.IsNull()) {
         auto &dest_lane = ipc->worker_queues_->GetLane(lane_id, 0);
-        bool was_empty = dest_lane.Empty();
         dest_lane.Push(future);
-        if (was_empty) {
-          ipc->AwakenWorker(&dest_lane);
-        }
+        // Always signal — see ipc_cpu2cpu_impl.h for the race.
+        ipc->AwakenWorker(&dest_lane);
       }
     }
   } else {
@@ -111,9 +109,9 @@ void IpcCpu2Self::RuntimeSend(const FullPtr<Task> &task_ptr,
         reinterpret_cast<hipc::mpsc_ring_buffer<Future<Task, CHI_QUEUE_ALLOC_T>,
                                                 hshm::ipc::MallocAllocator> *>(
             parent_task->event_queue_);
-    bool was_empty = parent_event_queue->Empty();
     parent_event_queue->Emplace(run_ctx->future_);
-    if (was_empty && parent_task->lane_) {
+    if (parent_task->lane_) {
+      // Always signal — see ipc_cpu2cpu_impl.h for the race.
       CHI_IPC->AwakenWorker(parent_task->lane_);
     }
   } else {

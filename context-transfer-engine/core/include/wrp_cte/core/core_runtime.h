@@ -178,6 +178,15 @@ public:
                       chi::RunContext &rctx) override;
   chi::u64 GetWorkRemaining() const override;
 
+  /**
+   * Override GetTaskStats so PutBlob / GetBlob report their actual byte
+   * payload size (size_) for routing. Otherwise the scheduler buckets
+   * every blob op as "metadata" and lands them on the scheduler worker,
+   * making large blob transfers compete with latency-sensitive admin
+   * traffic instead of going to dedicated I/O workers.
+   */
+  chi::TaskStat GetTaskStats(const chi::Task *task) const override;
+
   // Container virtual method implementations (defined in autogen/core_lib_exec.cc)
   void SaveTask(chi::u32 method, chi::SaveTaskArchive &archive,
                 hipc::FullPtr<chi::Task> task_ptr) override;

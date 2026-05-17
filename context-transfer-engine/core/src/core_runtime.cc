@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -206,32 +207,39 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   // Initialize the client with the pool ID
   client_.Init(task->new_pool_id_);
 
-  // Register targets for each configured storage device and neighborhood node
+  // Register targets across this container's `neighborhood` window.
+  //
+  // The prior buggy loop used `target_query = DirectHash(i)` where
+  // `i` was the loop iterator alone — every wrp_cte_core container
+  // on every node registered targets to the same bdev containers
+  // (0, 1, ..., neighborhood-1) — and HashBlobToContainer-distributed
+  // PutBlobs all funnelled into bdev container 0 (since neighborhood=1
+  // made every target route via DirectHash(0)). At 4n × 48 PPN this
+  // 144→1 cross-node fan-in saturated libzmq's DEALER send path and
+  // the receiving daemon aborted with "Bad address" in tcp.cpp.
+  //
+  // The intended pattern is a sliding window around the current
+  // container: target_query = DirectHash((container_id_ + i) %
+  // num_nodes). So wrp_cte_core container 0 registers neighborhood
+  // targets at bdev containers 0..neighborhood-1, container 1 at
+  // 1..neighborhood, etc. With neighborhood=1 each wrp_cte_core
+  // container registers exactly one target — its own local bdev —
+  // and HashBlobToContainer spreads blobs across the N wrp_cte_core
+  // containers, keeping the write path node-local. Higher neighborhood
+  // values give replication breadth without collapsing onto one node.
   if (!storage_devices_.empty()) {
-    // Get neighborhood size from configuration
     chi::u32 neighborhood_size = config_.targets_.neighborhood_;
-
-    // Get number of nodes from IPC manager
     chi::u32 num_nodes = ipc_manager->GetNumHosts();
-
-    // Set actual neighborhood size to minimum of configured size and available
-    // nodes
     chi::u32 actual_neighborhood = std::min(neighborhood_size, num_nodes);
-
     HLOG(kDebug,
-         "Registering targets for storage devices across neighborhood (size: "
-         "{} nodes):",
-         actual_neighborhood);
+         "Registering targets across neighborhood window (size: {} nodes, "
+         "this container_id_={})",
+         actual_neighborhood, container_id_);
 
-    // Iterate over storage devices
     for (size_t device_idx = 0; device_idx < storage_devices_.size();
          ++device_idx) {
       const auto &device = storage_devices_[device_idx];
-
-      // Capacity is already in bytes
       chi::u64 capacity_bytes = device.capacity_limit_;
-
-      // Determine bdev type enum
       chimaera::bdev::BdevType bdev_type = chimaera::bdev::BdevType::kFile;
       if (device.bdev_type_ == "ram") {
         bdev_type = chimaera::bdev::BdevType::kRam;
@@ -243,42 +251,35 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
         bdev_type = chimaera::bdev::BdevType::kNoop;
       }
 
-      // Iterate over neighborhood nodes (container hashes from 0 to
-      // actual_neighborhood-1)
-      for (chi::u32 container_hash = 0; container_hash < actual_neighborhood;
-           ++container_hash) {
-        // Generate unique target path for this device-node combination
+      for (chi::u32 i = 0; i < actual_neighborhood; ++i) {
+        // Sliding-window neighbor index. Modulo num_nodes wraps the
+        // window for containers near the end of the cluster.
+        chi::u32 target_node =
+            (container_id_ + i) % std::max<chi::u32>(num_nodes, 1u);
+
         std::string target_path =
-            device.path_ + "_node" + std::to_string(container_hash);
-
-        // Create target query using DirectHash for this specific container
+            device.path_ + "_node" + std::to_string(target_node);
         chi::PoolQuery target_query =
-            chi::PoolQuery::DirectHash(container_hash);
-
-        // Generate unique bdev_id per (device, container_hash) combination:
-        // major encodes device index, minor encodes container hash
+            chi::PoolQuery::DirectHash(target_node);
         chi::PoolId bdev_id(512 + static_cast<chi::u32>(device_idx),
-                            1 + container_hash);
+                            1 + target_node);
 
-        // Call RegisterTarget using client member variable with target_query
-        // and bdev_id
         HLOG(kDebug,
-             "Registering target ({}): {} ({}, {} bytes) on node {} with "
-             "bdev_id=({},{})",
+             "Registering target ({}): {} ({}, {} bytes) on node {} (i={}) "
+             "with bdev_id=({},{})",
              client_.pool_id_, target_path, device.bdev_type_, capacity_bytes,
-             container_hash, bdev_id.major_, bdev_id.minor_);
+             target_node, i, bdev_id.major_, bdev_id.minor_);
         auto reg_task = client_.AsyncRegisterTarget(
             target_path, bdev_type, capacity_bytes, target_query, bdev_id);
         CHI_CO_AWAIT(reg_task);
         chi::u32 result = reg_task->GetReturnCode();
-
         if (result == 0) {
-          HLOG(kDebug, "  - Registered target: {} ({}, {} bytes) on node {}",
-               target_path, device.bdev_type_, capacity_bytes, container_hash);
+          HLOG(kDebug, "  - Registered target: {} on node {}", target_path,
+               target_node);
         } else {
           HLOG(kWarning,
                "  - Failed to register target {} on node {} (error code: {})",
-               target_path, container_hash, result);
+               target_path, target_node, result);
         }
       }
     }
@@ -919,6 +920,69 @@ chi::TaskResume Runtime::PutBlob(hipc::FullPtr<PutBlobTask> task,
   (void)ctx;
 #endif
   CHI_TASK_BODY_BEGIN
+  // Per-PutBlob diagnostic logging — disabled in perf builds. Was burning
+  // an atomic fetch_add + clock_gettime + branch on every 64 KB chunk plus
+  // an HLOG every 8th chunk (300+/s at FUSE saturation), measurably slowing
+  // the FUSE→CTE write path. Re-enable by flipping `#if 0` → `#if 1`.
+#if 0
+  // DEBUG: unconditional log to verify the handler is hit and to
+  // print whether submit_ts_ns_ survived the client→daemon hop.
+  {
+    static std::atomic<uint64_t> s_seen{0};
+    uint64_t n = s_seen.fetch_add(1, std::memory_order_relaxed) + 1;
+    if ((n & 7) == 0 || n <= 4) {
+      HLOG(kInfo,
+           "[PutLat-DBG] handler entered #{} submit_ts_ns={} size={}",
+           n, task->submit_ts_ns_, task->size_);
+    }
+  }
+  // Submit→handler-entry latency. submit_ts_ns_ is stamped at
+  // AsyncPutBlob time on the client; reading it here measures
+  // (client newtask) + (ipc send) + (cross-node serialize+wire+
+  // deserialize, if remote) + (lane queue wait) + (worker dispatch)
+  // — i.e. everything between when the rank issued the put and when
+  // chimaera actually started executing it. Dumped sparsely to keep
+  // log volume sane; the per-task ns are kInfo at 1 in 64 and the
+  // running aggregate is kInfo every kPutLatDumpPeriod tasks.
+  {
+    static std::atomic<uint64_t> s_n{0};
+    static std::atomic<uint64_t> s_sum_ns{0};
+    static std::atomic<uint64_t> s_max_ns{0};
+    static constexpr uint64_t kPutLatDumpPeriod = 16;
+    if (task->submit_ts_ns_ != 0) {
+      uint64_t now_ns =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::steady_clock::now().time_since_epoch())
+              .count();
+      // Guard against clock skew on cross-node tasks: drop negatives.
+      if (now_ns > task->submit_ts_ns_) {
+        uint64_t dt = now_ns - task->submit_ts_ns_;
+        uint64_t n = s_n.fetch_add(1, std::memory_order_relaxed) + 1;
+        s_sum_ns.fetch_add(dt, std::memory_order_relaxed);
+        // Lock-free max
+        uint64_t cur_max = s_max_ns.load(std::memory_order_relaxed);
+        while (dt > cur_max &&
+               !s_max_ns.compare_exchange_weak(cur_max, dt,
+                                               std::memory_order_relaxed)) {
+        }
+        if ((n & 7) == 0) {
+          HLOG(kInfo,
+               "[PutLat] sample dt_us={} task={} size={}",
+               dt / 1000, task->task_id_, task->size_);
+        }
+        if ((n % kPutLatDumpPeriod) == 0) {
+          uint64_t avg_us =
+              (s_sum_ns.load(std::memory_order_relaxed) / n) / 1000;
+          uint64_t max_us =
+              s_max_ns.load(std::memory_order_relaxed) / 1000;
+          HLOG(kInfo,
+               "[PutLat] n={} avg_us={} max_us={}", n, avg_us, max_us);
+        }
+      }
+    }
+  }
+#endif
+
   try {
     TagId tag_id = task->tag_id_;
     std::string blob_name = task->blob_name_.str();
@@ -1043,16 +1107,37 @@ chi::TaskResume Runtime::PutBlob(hipc::FullPtr<PutBlobTask> task,
     blob_info_ptr->last_modified_ = now;
     blob_info_ptr->score_ = blob_score;
     {
-      chi::ScopedCoRwReadLock lock(tag_map_lock_);
+      // Write lock: we may need to insert a fresh tag_info entry. The
+      // tag's name lives on whichever container `GetOrCreateTag`'s
+      // `DirectHash(tag_name)` selected; this container only owns the
+      // blobs that `HashBlobToContainer(tag_id, blob_name)` routed
+      // here. To keep the `GetTagSize` broadcast-and-Aggregate sum
+      // correct, every container that holds any of the tag's bytes
+      // must carry a `TagInfo` whose `total_size_` reflects its share.
+      // The silent-skip variant of this block dropped the accounting
+      // when the tag wasn't locally registered, so on 2n the
+      // tag-owning container saw total_size_ = 0 (no PutBlobs hashed
+      // to it) and the blob-owning container had no TagInfo at all
+      // (rc=1, tag_size_=0). stat() then returned 0 after writes.
+      chi::ScopedCoRwWriteLock lock(tag_map_lock_);
       TagInfo *tag_info_ptr = tag_id_to_info_.find(tag_id);
+      if (tag_info_ptr == nullptr) {
+        // No prior local accounting; seed an entry. tag_name_ stays
+        // empty -- the canonical name<->id binding lives on the
+        // tag-owning container and isn't this container's concern.
+        TagInfo seed;
+        seed.tag_id_ = tag_id;
+        seed.last_modified_ = now;
+        seed.last_read_ = now;
+        seed.total_size_ = 0;
+        auto ins = tag_id_to_info_.insert_or_assign(tag_id, seed);
+        tag_info_ptr = ins.value;
+      }
       if (tag_info_ptr) {
         tag_info_ptr->last_modified_ = now;
         if (size_change >= 0) {
           tag_info_ptr->total_size_ += static_cast<chi::u64>(size_change);
         } else {
-          // HLOG(kError, "Size should not decrease");
-          // task->return_code_ = 1;
-          // co_return;
           chi::u64 abs_change = static_cast<chi::u64>(-size_change);
           tag_info_ptr->total_size_ -= abs_change;
         }
@@ -2279,6 +2364,33 @@ chi::u64 Runtime::GetWorkRemaining() const {
   // Return approximate work remaining (simple implementation)
   // In a real implementation, this would sum tasks across all queues
   return 0;  // For now, always return 0 work remaining
+}
+
+chi::TaskStat Runtime::GetTaskStats(const chi::Task *task) const {
+  if (!task) return chi::TaskStat();
+  switch (task->method_) {
+    case Method::kPutBlob: {
+      auto *t = static_cast<const PutBlobTask *>(task);
+      chi::TaskStat stat;
+      stat.io_size_ = t->size_;
+      // Rough wall-time estimate at ~500 MB/s for routing decisions only.
+      // The learned model in InferWallClockTime adjusts the coefficient
+      // over time; this is just the initial seed.
+      stat.wall_time_ =
+          static_cast<float>(t->size_) / 500.0f;
+      return stat;
+    }
+    case Method::kGetBlob: {
+      auto *t = static_cast<const GetBlobTask *>(task);
+      chi::TaskStat stat;
+      stat.io_size_ = t->size_;
+      stat.wall_time_ =
+          static_cast<float>(t->size_) / 500.0f;
+      return stat;
+    }
+    default:
+      return chi::TaskStat();
+  }
 }
 
 // Helper methods for lock index calculation
