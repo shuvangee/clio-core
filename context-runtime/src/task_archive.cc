@@ -89,9 +89,13 @@ void LoadTaskArchive::bulk(hipc::ShmPtr<> &ptr, size_t size, uint32_t flags) {
       } else {
         // Null ShmPtr: BULK_EXPOSE via ZMQ/socket where no data was sent.
         // Allocate a buffer for the receiver to fill (e.g., ReadTask).
+        // This buffer is owned by the daemon and must be freed when the
+        // task is deleted (see daemon_allocated_bulk_count_ usage in
+        // admin_runtime.cc RecvIn / SendOut).
         hipc::FullPtr<char> buf = CHI_IPC->AllocateBuffer(size);
         ptr = buf.shm_.template Cast<void>();
         recv[current_bulk_index_].data = buf;
+        ++daemon_allocated_bulk_count_;
       }
       current_bulk_index_++;
     } else {

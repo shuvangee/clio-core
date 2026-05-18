@@ -1259,8 +1259,20 @@ void run_bdev_file_explicit_backend_test(const char *mode_name) {
 
   std::this_thread::sleep_for(100ms);
 
-  // Create bdev client with explicit file backend
-  chi::PoolId custom_pool_id(8008, 0);
+  // Create bdev client with explicit file backend.
+  // Pool ID is process-unique: the chimaera runtime daemon outlives a
+  // single chimaera_bdev_chimod_tests invocation (the distributed test
+  // runner does `docker exec` three times for shm/tcp/ipc against the
+  // same daemon), and a hardcoded pool ID would let the second test
+  // attach to the FIRST test's stale pool whose file has already been
+  // unlinked by the prior fixture dtor — every read would then return
+  // 0 bytes. Using pid + a per-mode salt makes each invocation own
+  // its own pool. Major must fit u32 (PoolId(u32, u32)).
+  unsigned mode_salt = (mode_name && mode_name[0]) ?
+      static_cast<unsigned>(mode_name[0]) : 0u;
+  chi::PoolId custom_pool_id(
+      (8008u + (static_cast<unsigned>(getpid()) & 0xFFFFu) * 16u + mode_salt),
+      0);
   chimaera::bdev::Client bdev_client(custom_pool_id);
 
   auto create_task = bdev_client.AsyncCreate(

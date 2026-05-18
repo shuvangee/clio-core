@@ -71,6 +71,10 @@ class Iowarp(CMakePackage):
     depends_on('adios2', when='+adios2')
 
     # Networking libraries
+    # +ares: build libfabric with the full Ares-rail fabric set. The
+    # spec is a single node in the concretized graph, so this constraint
+    # propagates to mochi-thallium's mercury dep automatically when
+    # both +ares and +mochi are set.
     depends_on('libfabric fabrics=sockets,tcp,udp,verbs,mlx,rxm,rxd,shm', when='+ares')
     depends_on('mochi-thallium+cereal', when='+mochi')
     depends_on('argobots@1.1+affinity', when='+mochi')
@@ -119,7 +123,7 @@ class Iowarp(CMakePackage):
         if '+encrypt' in self.spec:
             args.append(self.define('HSHM_ENABLE_ENCRYPT', 'ON'))
         if '+mochi' in self.spec:
-            args.append(self.define('HSHM_RPC_THALLIUM', 'ON'))
+            args.append(self.define('WRP_CORE_ENABLE_THALLIUM', 'ON'))
         if '+zmq' in self.spec:
             args.append(self.define('HSHM_ENABLE_ZMQ_TESTS', 'ON'))
         if '+elf' in self.spec:

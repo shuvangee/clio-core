@@ -148,10 +148,29 @@ struct FutureShm {
   /** Number of warps sharing this FutureShm */
   u32 total_warps_;
 
-  /** Device pointer to POD task for cudaMemcpy (POD copy paths) */
-  uintptr_t task_device_ptr_;
-  /** sizeof(TaskT) for POD copy sizing */
-  u32 task_size_;
+  /**
+   * GPU device-memory pointer to the *task POD* (set when the kernel
+   * placed the Task struct in kDeviceMem). The CPU worker D2H-copies
+   * `gpu_task_size_` bytes from here into a host scratch slot for
+   * dispatch, and on completion H2D-copies the (mutated) POD bytes
+   * back to this address so the kernel sees output fields. Zero when
+   * the task is in kPinnedHost / kManagedUvm (host-dereferenceable).
+   */
+  uintptr_t gpu_task_device_ptr_;
+
+  /**
+   * sizeof(TaskT) for the H2D writeback copy. Mirrors
+   * gpu::FutureShm::task_size_ which the kernel filled in via Reset.
+   */
+  u32 gpu_task_size_;
+
+  /**
+   * GPU device-memory pointer to the *gpu::FutureShm* co-located with
+   * the task. RuntimeSend writes FUTURE_COMPLETE to this address (via
+   * cudaMemcpy when the FutureShm itself is in kDeviceMem) so the
+   * kernel poll-loop unblocks. Always non-zero on the GPU origin path.
+   */
+  uintptr_t gpu_fshm_device_ptr_;
 
   /** Copy space for serialized task data (flexible array member).
    *  Must be 4-byte aligned for WarpMemCpy uint32_t strided access. */
@@ -173,8 +192,9 @@ struct FutureShm {
     parent_gpu_rctx_ = nullptr;
     completion_counter_.store(0);
     total_warps_ = 1;
-    task_device_ptr_ = 0;
-    task_size_ = 0;
+    gpu_task_device_ptr_ = 0;
+    gpu_task_size_ = 0;
+    gpu_fshm_device_ptr_ = 0;
     flags_.Clear();
   }
 
@@ -191,8 +211,9 @@ struct FutureShm {
     method_id_ = method_id;
     client_task_vaddr_ = 0;
     parent_gpu_rctx_ = nullptr;
-    task_device_ptr_ = 0;
-    task_size_ = 0;
+    gpu_task_device_ptr_ = 0;
+    gpu_task_size_ = 0;
+    gpu_fshm_device_ptr_ = 0;
     flags_.Clear();
     input_.total_written_.store(0);
     input_.total_read_.store(0);
@@ -455,12 +476,18 @@ class Future {
    * Wait for task completion (blocking with optional timeout).
    * Automatically dispatches to the correct path based on origin:
    *   WaitCpu2Cpu, WaitGpu2Cpu, WaitCpu2Gpu, or WaitGpu2Gpu.
-   * @param max_sec Maximum seconds to wait (0 = wait indefinitely)
+   * @param max_sec Wait policy:
+   *                 -1 = wait indefinitely (default; never times out)
+   *                  0 = poll once; return immediately if not yet complete
+   *                       (does NOT enter the recv path when incomplete)
+   *                 >0 = block up to that many seconds; return false on
+   *                       timeout
    * @param reuse_task If true, skip task deletion on destroy so the task
    *                   object can be resubmitted. Caller owns the task lifetime.
-   * @return true if task completed, false if timed out
+   * @return true if task completed, false if not (timeout or non-blocking
+   *         poll that found the future incomplete)
    */
-  HSHM_CROSS_FUN bool Wait(float max_sec = 0, bool reuse_task = false);
+  HSHM_CROSS_FUN bool Wait(float max_sec = -1, bool reuse_task = false);
 
   /**
    * CPU-to-CPU wait path (SHM / ZMQ / IPC).

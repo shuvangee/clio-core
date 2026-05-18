@@ -14,17 +14,19 @@ file(GLOB_RECURSE CHIMAERA_SOURCES
 file(GLOB_RECURSE CHIMAERA_MODULE_GPU_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/../modules/*/src/*_gpu.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/../modules/*/src/*_sycl.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/../modules/*/src/*_hip.cc
 )
 
-# Separate GPU sources (_gpu.cc / _sycl.cc files) from CPU sources.
-# _gpu.cc is compiled by NVCC/HIPCC under WRP_CORE_ENABLE_CUDA/ROCM,
-# and ignored under SYCL via its own #if HSHM_ENABLE_CUDA||HSHM_ENABLE_ROCM
-# guard. _sycl.cc is the SYCL twin: gated by #if HSHM_ENABLE_SYCL and
-# compiled by add_sycl_library() when WRP_CORE_ENABLE_SYCL is on.
+# Separate GPU sources (_gpu.cc / _sycl.cc / _hip.cc files) from CPU
+# sources. _gpu.cc and _hip.cc are compiled by NVCC/HIPCC under
+# WRP_CORE_ENABLE_CUDA/ROCM, and skipped under SYCL via their own
+# `#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM` guard. _sycl.cc is the
+# SYCL twin: gated by `#if HSHM_ENABLE_SYCL` and compiled by
+# add_sycl_library() when WRP_CORE_ENABLE_SYCL is on.
 set(CHIMAERA_GPU_SOURCES "")
 set(CHIMAERA_CPU_SOURCES "")
 foreach(src ${CHIMAERA_SOURCES})
-  if(src MATCHES "_(gpu|sycl)\\.cc$")
+  if(src MATCHES "_(gpu|sycl|hip)\\.cc$")
     list(APPEND CHIMAERA_GPU_SOURCES ${src})
   else()
     list(APPEND CHIMAERA_CPU_SOURCES ${src})
@@ -99,14 +101,37 @@ if(CHIMAERA_GPU_SOURCES)
     )
     target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC hshm::cxx)
     target_link_libraries(${CHIMAERA_LIB_NAME} PRIVATE ${CHIMAERA_LIB_NAME}_gpu)
+    # Add HSHM_ENABLE_SYCL=1 + sycl headers to the host library (NOT -fsycl,
+    # which would force a device-pass parse of every host TU and trip
+    # type-mismatches on host-only methods accessed via CHI_IPC). Without
+    # -fsycl, host code uses sycl::malloc_host / sycl::queue / sycl::free
+    # as plain runtime API calls. The chimaera_cxx_gpu library compiled by
+    # add_sycl_library still gets full -fsycl + device-pass treatment.
+    target_compile_definitions(${CHIMAERA_LIB_NAME} PRIVATE HSHM_ENABLE_SYCL=1)
+    if(EXISTS "/opt/intel/dpcpp/include/sycl/sycl.hpp")
+      target_include_directories(${CHIMAERA_LIB_NAME} PRIVATE
+          /opt/intel/dpcpp/include
+          /opt/intel/dpcpp/include/sycl)
+    elseif(EXISTS "/opt/adaptivecpp/include/AdaptiveCpp/sycl/sycl.hpp")
+      target_include_directories(${CHIMAERA_LIB_NAME} PRIVATE
+          /opt/adaptivecpp/include/AdaptiveCpp)
+    endif()
   elseif(WRP_CORE_ENABLE_ROCM)
-    add_rocm_gpu_library(${CHIMAERA_LIB_NAME}_gpu SHARED ${CHIMAERA_GPU_SOURCES})
+    add_rocm_gpu_library(${CHIMAERA_LIB_NAME}_gpu SHARED FALSE ${CHIMAERA_GPU_SOURCES})
     target_include_directories(${CHIMAERA_LIB_NAME}_gpu PUBLIC
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../modules/admin/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../modules/MOD_NAME/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../modules/bdev/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../context-transport-primitives/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../context-transfer-engine/core/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     )
-    target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC hshm::cxx)
+    # Link hshm::rocm_cxx so HSHM_ENABLE_ROCM=1 propagates to chimaera_cxx
+    # (PRIVATE link to ${CHIMAERA_LIB_NAME}_gpu carries those compile
+    # definitions into chimaera_cxx's own TUs without exposing them to
+    # external consumers — same model as the CUDA branch above).
+    target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC hshm::rocm_cxx)
     target_link_libraries(${CHIMAERA_LIB_NAME} PRIVATE ${CHIMAERA_LIB_NAME}_gpu)
   endif()
 endif()
@@ -131,6 +156,28 @@ if(WRP_CORE_ENABLE_CUDA AND CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
   )
   # Link cudart for host-callable CUDA runtime functions used in ipc_manager.cc etc.
   target_link_libraries(${CHIMAERA_LIB_NAME} PUBLIC CUDA::cudart)
+endif()
+
+# ROCm twin: g++ source files get HSHM_ENABLE_ROCM=1 from the chimaera_cxx_gpu
+# PRIVATE link, so they need the HIP host-API headers (hip/hip_runtime_api.h) to
+# resolve hipMalloc / hipMemcpy / hipIpcMemHandle_t etc. Under HIP_PLATFORM=nvidia
+# the HIP runtime forwards to cudart, so cudart needs to be linked too.
+if(WRP_CORE_ENABLE_ROCM)
+  target_include_directories(${CHIMAERA_LIB_NAME} PUBLIC ${ROCM_ROOT}/include)
+  target_compile_definitions(${CHIMAERA_LIB_NAME} PUBLIC HSHM_ENABLE_ROCM=1)
+  if(WRP_ROCM_HIP_PLATFORM STREQUAL "nvidia")
+    target_compile_definitions(${CHIMAERA_LIB_NAME} PUBLIC
+      __HIP_PLATFORM_NVIDIA__=1
+      __HIP_PLATFORM_NVCC__=1)
+    find_package(CUDAToolkit QUIET)
+    if(TARGET CUDA::cudart)
+      target_link_libraries(${CHIMAERA_LIB_NAME} PUBLIC CUDA::cudart)
+    endif()
+    if(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
+      target_include_directories(${CHIMAERA_LIB_NAME} PUBLIC
+        ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+    endif()
+  endif()
 endif()
 
 # Add runtime definition
@@ -164,12 +211,16 @@ set_target_properties(${CHIMAERA_LIB_NAME} PROPERTIES
 # Export target for parent scope
 set_target_properties(${CHIMAERA_LIB_NAME} PROPERTIES EXPORT_NAME cxx)
 
-# Precompiled headers for faster builds
-target_precompile_headers(${CHIMAERA_LIB_NAME} PRIVATE
-    <string> <vector> <memory> <unordered_map>
-    <functional> <algorithm> <cstdint> <cstring> <iostream>
-    <sstream> <fstream> <chrono> <mutex> <thread>
-)
+# Precompiled headers for faster builds. Skipped under SYCL because the
+# SYCL flag set (`-fsycl`) is incompatible with clang's PCH bundler:
+# clang-offload-bundler refuses 'pch' as an input file type.
+if(NOT WRP_CORE_ENABLE_SYCL)
+  target_precompile_headers(${CHIMAERA_LIB_NAME} PRIVATE
+      <string> <vector> <memory> <unordered_map>
+      <functional> <algorithm> <cstdint> <cstring> <iostream>
+      <sstream> <fstream> <chrono> <mutex> <thread>
+  )
+endif()
 
 # Create namespace alias for external consumption
 add_library(${CHIMAERA_NAMESPACE}::cxx ALIAS ${CHIMAERA_LIB_NAME})

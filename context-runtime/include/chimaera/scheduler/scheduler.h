@@ -114,10 +114,28 @@ class Scheduler {
   virtual Worker *GetGpuWorker() const { return nullptr; }
 
   /**
-   * Get the designated network worker (handles Send/Recv/ClientRecv/ClientSend).
-   * @return Pointer to net worker, or nullptr if none assigned
+   * Get the designated network worker. With the recv/send split this aliases
+   * the recv worker (so callers that register sockets with an EventManager
+   * still talk to the thread that polls them); use the more specific
+   * GetNetSendWorker() / GetNetRecvWorker() when routing periodic tasks.
+   * @return Pointer to net (recv) worker, or nullptr if none assigned
    */
   virtual Worker *GetNetWorker() const { return nullptr; }
+
+  /**
+   * Drains net_queue_ (SendIn / SendOut) and writes via per-peer DEALERs;
+   * also runs the ClientSend periodic that writes to client return sockets.
+   * @return Pointer to net send worker, or nullptr if none assigned
+   */
+  virtual Worker *GetNetSendWorker() const { return GetNetWorker(); }
+
+  /**
+   * Polls the inbound ROUTER (kRecv) and the client-facing server (kClientRecv).
+   * Owns the EventManager that the transport FDs are registered with so it
+   * wakes on socket readability instead of busy-polling.
+   * @return Pointer to net recv worker, or nullptr if none assigned
+   */
+  virtual Worker *GetNetRecvWorker() const { return GetNetWorker(); }
 };
 
 }  // namespace chi

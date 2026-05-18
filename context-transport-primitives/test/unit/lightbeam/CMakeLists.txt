@@ -96,6 +96,21 @@ if(WRP_CORE_ENABLE_ZMQ)
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 
+# Thallium transport test (conditional on Thallium)
+if(WRP_CORE_ENABLE_THALLIUM)
+    add_executable(thallium_transport_test thallium_transport_test.cc)
+    target_link_libraries(thallium_transport_test hermes_shm_host hshm::lightbeam hshm::serialize)
+    add_test(NAME ctp_thallium_transport COMMAND thallium_transport_test)
+    set_tests_properties(ctp_thallium_transport PROPERTIES
+        LABELS "msan_skip"
+        RESOURCE_LOCK "lightbeam_port"
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}")
+    install(TARGETS thallium_transport_test
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 # Socket transport full test (always enabled)
 add_executable(socket_transport_full_test socket_transport_full_test.cc)
 target_link_libraries(socket_transport_full_test hermes_shm_host hshm::lightbeam hshm::serialize)

@@ -106,6 +106,15 @@ struct CreateParams {
   // CTE configuration object (not serialized, loaded from pool_config)
   Config config_;
 
+  // OUT: Raw pointer (uintptr_t cast) to GpuMetadataCacheHeader allocated by
+  // the server during Create. Zero when the GPU metadata cache is disabled
+  // or no GPU backend is built in. The pointer is a managed/shared USM
+  // address valid for both host and device access in the SAME process; it
+  // is NOT a cross-process IPC handle (cross-process sharing requires
+  // Level-Zero IPC on SYCL or cudaIpc on CUDA — see
+  // gpu_metadata_cache.h header for the eventual extension).
+  chi::u64 gpu_cache_ptr_ = 0;
+
   // Required: chimod library name for module manager
   static constexpr const char *chimod_lib_name = "wrp_cte_core";
 
@@ -113,12 +122,15 @@ struct CreateParams {
   CreateParams() {}
 
   // Copy constructor (required for task creation)
-  CreateParams(const CreateParams &other) : config_(other.config_) {}
+  CreateParams(const CreateParams &other)
+      : config_(other.config_),
+        gpu_cache_ptr_(other.gpu_cache_ptr_) {}
 
   // Constructor with pool_id and CreateParams (required for admin
   // task creation)
   CreateParams(const chi::PoolId &pool_id, const CreateParams &other)
-      : config_(other.config_) {
+      : config_(other.config_),
+        gpu_cache_ptr_(other.gpu_cache_ptr_) {
     // pool_id is used by the admin task framework, but we don't need to store
     // it
     (void)pool_id;  // Suppress unused parameter warning
@@ -128,9 +140,20 @@ struct CreateParams {
   // Serialization support for cereal
   template <class Archive>
   void serialize(Archive &ar) {
-    // Config is not serialized - it's loaded from pool_config.config_ in
-    // LoadConfig
-    (void)ar;
+    // Most of Config is loaded server-side from pool_config.config_ via
+    // LoadConfig (compose mode). The GPU metadata cache settings are
+    // serialized explicitly so callers can opt in directly via
+    // CreateParams (no compose YAML required) — the server reads them
+    // from CreateParams::config_.gpu_metadata_cache_.
+    //
+    // gpu_cache_ptr_ flows back on the OUT path: the server writes the
+    // managed-USM cache pointer into chimod_params_ at the end of
+    // Create, and the client's GetParams() returns it.
+    ar(config_.gpu_metadata_cache_.enabled_,
+       config_.gpu_metadata_cache_.capacity_bytes_,
+       config_.gpu_metadata_cache_.max_blobs_,
+       config_.gpu_metadata_cache_.max_tags_,
+       gpu_cache_ptr_);
   }
 
   /**
@@ -144,8 +167,6 @@ struct CreateParams {
     // Parse it directly into the Config object
     HLOG(kDebug, "CTE CreateParams::LoadConfig() - config string length: {}",
          pool_config.config_.length());
-    HLOG(kDebug, "CTE CreateParams::LoadConfig() - config string:\n{}",
-         pool_config.config_);
     if (!pool_config.config_.empty()) {
       bool success = config_.LoadFromString(pool_config.config_);
       if (!success) {
@@ -153,7 +174,7 @@ struct CreateParams {
              "CTE CreateParams::LoadConfig() - Failed to load config from "
              "string");
       } else {
-        HLOG(kInfo,
+        HLOG(kDebug,
              "CTE CreateParams::LoadConfig() - Successfully loaded config with "
              "{} storage devices",
              config_.storage_.devices_.size());
@@ -196,6 +217,10 @@ struct TargetInfo {
   chi::u64 remaining_space_;  // Remaining allocatable space in bytes
   chimaera::bdev::PerfMetrics perf_metrics_;  // Performance metrics from bdev
   chimaera::bdev::PersistenceLevel persistence_level_;
+  // Underlying bdev type, captured at RegisterTarget time. Used by the
+  // GPU metadata cache projection to decide whether a blob landed in a
+  // GPU-reachable tier (kRam / kHbm / kPinned).
+  chimaera::bdev::BdevType bdev_type_;
 
   HSHM_CROSS_FUN TargetInfo()
       : target_name_(CHI_PRIV_ALLOC),
@@ -206,7 +231,8 @@ struct TargetInfo {
         ops_written_(0),
         target_score_(0.0f),
         remaining_space_(0),
-        persistence_level_(chimaera::bdev::PersistenceLevel::kVolatile) {}
+        persistence_level_(chimaera::bdev::PersistenceLevel::kVolatile),
+        bdev_type_(chimaera::bdev::BdevType::kFile) {}
 
 #if HSHM_IS_HOST
   TargetInfo(const std::string &name, const std::string &bdev_name)
@@ -233,7 +259,8 @@ struct TargetInfo {
         target_score_(other.target_score_),
         remaining_space_(other.remaining_space_),
         perf_metrics_(other.perf_metrics_),
-        persistence_level_(other.persistence_level_) {}
+        persistence_level_(other.persistence_level_),
+        bdev_type_(other.bdev_type_) {}
 
   HSHM_CROSS_FUN TargetInfo &operator=(const TargetInfo &other) {
     if (this != &other) {
@@ -249,6 +276,7 @@ struct TargetInfo {
       remaining_space_ = other.remaining_space_;
       perf_metrics_ = other.perf_metrics_;
       persistence_level_ = other.persistence_level_;
+      bdev_type_ = other.bdev_type_;
     }
     return *this;
   }
@@ -1018,6 +1046,24 @@ struct PutBlobTask : public chi::Task {
                            // 0.0-1.0=explicit
   INOUT Context context_;  // Context for compression control and statistics
   IN chi::u32 flags_;      // Operation flags
+  /**
+   * Optional page index appended to blob_name_ at handler time as
+   * "_pi<gpu_page_idx_>" so each cache page in a gpu_vector::Vector
+   * resolves to its own blob. Sentinel kNoPageIdx (~0u) disables the
+   * suffix (default for non-GPU clients). Mutated from device kernels
+   * (FlushPage / FaultPage) which can't safely rebuild a chi::priv::
+   * string at flush time, so the suffix is composed runtime-side.
+   */
+  static constexpr chi::u32 kNoPageIdx = ~static_cast<chi::u32>(0);
+  IN chi::u32 gpu_page_idx_;
+
+  // Submit-side timestamp (steady_clock nanoseconds), stamped by the
+  // CTE client just before Send so the receiving daemon can compute
+  // end-to-end submit→recv latency. 0 means "not stamped" and the
+  // receiver-side accumulator ignores those tasks. Cross-node clocks
+  // need ntp synchronization; on the same cluster that's usually
+  // within a few hundred μs which is fine for ms-resolution diagnostics.
+  IN chi::u64 submit_ts_ns_;
 
   // SHM constructor
   // Default score -1.0f means "unknown" - runtime will use 1.0 for new blobs
@@ -1031,7 +1077,9 @@ struct PutBlobTask : public chi::Task {
         blob_data_(hipc::ShmPtr<>::GetNull()),
         score_(-1.0f),
         context_(),
-        flags_(0) {}
+        flags_(0),
+        gpu_page_idx_(kNoPageIdx),
+        submit_ts_ns_(0) {}
 
   // Emplace constructor
   HSHM_CROSS_FUN explicit PutBlobTask(const chi::TaskId &task_id,
@@ -1050,7 +1098,9 @@ struct PutBlobTask : public chi::Task {
         blob_data_(blob_data),
         score_(score),
         context_(context),
-        flags_(flags) {
+        flags_(flags),
+        gpu_page_idx_(kNoPageIdx),
+        submit_ts_ns_(0) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kPutBlob;
@@ -1075,7 +1125,9 @@ struct PutBlobTask : public chi::Task {
         blob_data_(blob_data),
         score_(score),
         context_(context),
-        flags_(flags) {
+        flags_(flags),
+        gpu_page_idx_(kNoPageIdx),
+        submit_ts_ns_(0) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kPutBlob;
@@ -1091,7 +1143,7 @@ struct PutBlobTask : public chi::Task {
     ar.PushPod(blob_name_.UsingSso());
     Task::SerializeIn(ar);
     ar(tag_id_, blob_name_, offset_, size_, blob_data_,
-       score_, context_, flags_);
+       score_, context_, flags_, gpu_page_idx_, submit_ts_ns_);
     ar.PopPod();
     ar.bulk(blob_data_, size_, BULK_XFER);
   }
@@ -1104,7 +1156,7 @@ struct PutBlobTask : public chi::Task {
     ar.PushPod(blob_name_.UsingSso());
     Task::SerializeOut(ar);
     ar(tag_id_, blob_name_, offset_, size_, blob_data_,
-       score_, context_, flags_);
+       score_, context_, flags_, gpu_page_idx_, submit_ts_ns_);
     ar.PopPod();
   }
 
@@ -1127,6 +1179,8 @@ struct PutBlobTask : public chi::Task {
     score_ = other->score_;
     context_ = other->context_;
     flags_ = other->flags_;
+    gpu_page_idx_ = other->gpu_page_idx_;
+    submit_ts_ns_ = other->submit_ts_ns_;
   }
 
   /**
@@ -1150,6 +1204,12 @@ struct GetBlobTask : public chi::Task {
   IN chi::u32 flags_;               // Operation flags
   IN hipc::ShmPtr<>
       blob_data_;  // Input buffer for blob data (shared memory pointer)
+  /**
+   * Optional page index appended to blob_name_ at handler time as
+   * "_pi<gpu_page_idx_>". See PutBlobTask::gpu_page_idx_ for rationale.
+   */
+  static constexpr chi::u32 kNoPageIdx = ~static_cast<chi::u32>(0);
+  IN chi::u32 gpu_page_idx_;
 
   // SHM constructor
   HSHM_CROSS_FUN GetBlobTask()
@@ -1159,7 +1219,8 @@ struct GetBlobTask : public chi::Task {
         offset_(0),
         size_(0),
         flags_(0),
-        blob_data_(hipc::ShmPtr<>::GetNull()) {}
+        blob_data_(hipc::ShmPtr<>::GetNull()),
+        gpu_page_idx_(kNoPageIdx) {}
 
   // Emplace constructor
   HSHM_CROSS_FUN explicit GetBlobTask(const chi::TaskId &task_id,
@@ -1175,12 +1236,43 @@ struct GetBlobTask : public chi::Task {
         offset_(offset),
         size_(size),
         flags_(flags),
-        blob_data_(blob_data) {
+        blob_data_(blob_data),
+        gpu_page_idx_(kNoPageIdx) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kGetBlob;
     task_flags_.Clear();
     pool_query_ = pool_query;
+  }
+
+  /** Destructor — frees blob_data_ when this task owns the buffer.
+   *
+   * The destructor runs for every GetBlobTask, but TASK_DATA_OWNER is only
+   * set on cross-node-receiver instances (admin RecvIn sets it when
+   * LoadTaskArchive::bulk had to AllocateBuffer for the BULK_EXPOSE
+   * input — i.e. on the remote daemon that allocated a fresh buffer to
+   * receive the read response from its bdev).
+   *
+   * Client-side GetBlobTask (created by emplace constructor) has
+   * task_flags_.Clear() so the flag is off and the destructor leaves the
+   * client's blob_data_ alone (the client allocated it and will free it
+   * itself after task.Wait() returns).
+   *
+   * Without this destructor the BULK_EXPOSE buffer on the responder side
+   * leaked one 1 MiB allocation per cross-node read; at 24 PPN × 256 MiB
+   * blocks the 1 GiB main shared-memory segment ran out, AllocateBuffer
+   * started failing, RecvIn's deserialization silently dropped the
+   * response, and the client's task.Wait() spun forever.
+   */
+  HSHM_CROSS_FUN ~GetBlobTask() {
+#if !HSHM_IS_DEVICE_PASS
+    if (task_flags_.Any(TASK_DATA_OWNER) && !blob_data_.IsNull()) {
+      auto *ipc_manager = CHI_CPU_IPC;
+      if (ipc_manager) {
+        ipc_manager->FreeBuffer(blob_data_.template Cast<char>());
+      }
+    }
+#endif
   }
 
   // GPU-compatible emplace constructor (const char* instead of std::string)
@@ -1197,7 +1289,8 @@ struct GetBlobTask : public chi::Task {
         offset_(offset),
         size_(size),
         flags_(flags),
-        blob_data_(blob_data) {
+        blob_data_(blob_data),
+        gpu_page_idx_(kNoPageIdx) {
     task_id_ = task_id;
     pool_id_ = pool_id;
     method_ = Method::kGetBlob;
@@ -1212,7 +1305,8 @@ struct GetBlobTask : public chi::Task {
   HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
     ar.PushPod(blob_name_.UsingSso());
     Task::SerializeIn(ar);
-    ar(tag_id_, blob_name_, offset_, size_, flags_, blob_data_);
+    ar(tag_id_, blob_name_, offset_, size_, flags_, blob_data_,
+       gpu_page_idx_);
     ar.PopPod();
     ar.bulk(blob_data_, size_, BULK_EXPOSE);
   }
@@ -1243,6 +1337,7 @@ struct GetBlobTask : public chi::Task {
     size_ = other->size_;
     flags_ = other->flags_;
     blob_data_ = other->blob_data_;
+    gpu_page_idx_ = other->gpu_page_idx_;
   }
 
   /**

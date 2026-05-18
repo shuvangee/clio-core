@@ -315,10 +315,23 @@ if(WRP_CORE_ENABLE_MPI)
     message(STATUS "found mpi.h at ${MPI_CXX_INCLUDE_DIRS}")
 endif()
 
-# ROCm (conditional)
+# ROCm (conditional). Only require the HIP CMake package when HIP-AMD is
+# in use; the HIP-NVCC path goes through CMake's CUDA language and the
+# HIP CMake package isn't shipped by ROCm builds that target NVIDIA.
 if(WRP_CORE_ENABLE_ROCM)
-    find_package(HIP REQUIRED)
-    message(STATUS "found ROCm/HIP support")
+    if(NOT DEFINED WRP_ROCM_HIP_PLATFORM)
+        if(DEFINED ENV{HIP_PLATFORM})
+            set(WRP_ROCM_HIP_PLATFORM "$ENV{HIP_PLATFORM}" CACHE STRING
+                "HIP platform (amd|nvidia)")
+        else()
+            set(WRP_ROCM_HIP_PLATFORM "amd" CACHE STRING
+                "HIP platform (amd|nvidia)")
+        endif()
+    endif()
+    if(NOT WRP_ROCM_HIP_PLATFORM STREQUAL "nvidia")
+        find_package(HIP REQUIRED)
+    endif()
+    message(STATUS "found ROCm/HIP support (HIP_PLATFORM=${WRP_ROCM_HIP_PLATFORM})")
 endif()
 
 # OpenMP (conditional)
@@ -846,25 +859,42 @@ if(WRP_CORE_ENABLE_TESTS)
     include(CTest)
 
     # -----------------------------------------------------------------------
-    # Pre-test cleanup fixture
+    # Test cleanup fixture (pre + post)
     # Kills any orphaned Chimaera server processes and removes leftover shared
-    # state (IPC socket files, shared memory, memfd) that a previous crashed
-    # test run may have left behind.  Runs once before any other CTest test.
+    # state (IPC socket files, shared memory, memfd) plus build-dir test
+    # artifacts.  The pre-test variant runs once before any other CTest test.
+    # The post-test variant is registered as FIXTURES_CLEANUP and is invoked
+    # after every test that requires the fixture, even if those tests fail
+    # or crash, ensuring temp files do not persist between runs.
     # -----------------------------------------------------------------------
+    set(_chimaera_cleanup_cmd
+        "fuser -k 5555/tcp 5558/tcp 9413/tcp 9414/tcp 9416/tcp 2>/dev/null; \
+         rm -f /tmp/chimaera_*.ipc 2>/dev/null; \
+         rm -f /tmp/chimaera_server_timing.log 2>/dev/null; \
+         rm -rf /tmp/chimaera_memfd 2>/dev/null; \
+         rm -rf /tmp/chimaera_${USER} 2>/dev/null; \
+         rm -f /dev/shm/sm_segment.* 2>/dev/null; \
+         rm -f /dev/shm/test_buddy_bench_* 2>/dev/null; \
+         rm -f \"${CMAKE_BINARY_DIR}\"/cte_*.dat* \"${CMAKE_BINARY_DIR}\"/cte_*.yaml \"${CMAKE_BINARY_DIR}\"/*stress*.bin* \"${CMAKE_BINARY_DIR}\"/*reorganize*.bin* \"${CMAKE_BINARY_DIR}\"/*reorganize*.yaml \"${CMAKE_BINARY_DIR}\"/temp_unregister_test.dat 2>/dev/null; \
+         rm -rf \"${CMAKE_BINARY_DIR}\"/cee_test_data 2>/dev/null; \
+         exit 0")
+
     add_test(
         NAME chimaera_pre_test_cleanup
-        COMMAND bash -c
-            "fuser -k 5555/tcp 5558/tcp 9413/tcp 9414/tcp 9416/tcp 2>/dev/null; \
-             rm -f /tmp/chimaera_*.ipc 2>/dev/null; \
-             rm -f /tmp/chimaera_server_timing.log 2>/dev/null; \
-             rm -rf /tmp/chimaera_memfd 2>/dev/null; \
-             rm -rf /tmp/chimaera_${USER} 2>/dev/null; \
-             rm -f /dev/shm/sm_segment.* 2>/dev/null; \
-             exit 0"
+        COMMAND bash -c "${_chimaera_cleanup_cmd}"
     )
     set_tests_properties(chimaera_pre_test_cleanup PROPERTIES
         TIMEOUT 30
-        FIXTURES_SETUP chimaera_pre_test_cleanup_fixture
+        FIXTURES_SETUP chimaera_test_cleanup_fixture
+    )
+
+    add_test(
+        NAME chimaera_post_test_cleanup
+        COMMAND bash -c "${_chimaera_cleanup_cmd}"
+    )
+    set_tests_properties(chimaera_post_test_cleanup PROPERTIES
+        TIMEOUT 30
+        FIXTURES_CLEANUP chimaera_test_cleanup_fixture
     )
 endif()
 
@@ -872,12 +902,28 @@ endif()
 # Component Subdirectories
 #------------------------------------------------------------------------------
 
-# Catch2 testing framework - find from system or install.sh installation
+# Catch2 testing framework.
+#
+# Prefer the in-tree external/Catch2 source over a system/conda
+# find_package. On this build host the conda env ships
+# libCatch2.so.3.14.0 built with a newer gcc (CXXABI_1.3.15); linking
+# the unit-test executables against it with host gcc 11.4 fails at
+# link time with `undefined reference to __cxa_call_terminate@
+# CXXABI_1.3.15`. Building Catch2 from the bundled source with the
+# same host compiler keeps the CXXABI consistent. Falls back to
+# find_package only when the bundled source is absent.
 if(WRP_CORE_ENABLE_TESTS)
-  message(STATUS "Finding Catch2 testing framework")
-  find_package(Catch2 3 REQUIRED)
-  if(Catch2_FOUND)
-    message(STATUS "found Catch2 at ${Catch2_DIR}")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/CMakeLists.txt")
+    message(STATUS "Using bundled Catch2 (external/Catch2) built with host compiler")
+    set(CATCH_INSTALL_DOCS OFF CACHE BOOL "" FORCE)
+    set(CATCH_INSTALL_EXTRAS OFF CACHE BOOL "" FORCE)
+    add_subdirectory(external/Catch2 EXCLUDE_FROM_ALL)
+  else()
+    message(STATUS "Bundled Catch2 absent; finding system Catch2")
+    find_package(Catch2 3 REQUIRED)
+    if(Catch2_FOUND)
+      message(STATUS "found Catch2 at ${Catch2_DIR}")
+    endif()
   endif()
 endif()
 
@@ -1027,6 +1073,41 @@ if(WRP_CORE_ENABLE_TESTS)
             _chimaera_lock_tests_recursive(
                 "${CMAKE_CURRENT_SOURCE_DIR}/${_component_dir}"
                 "${_lsan_opts}")
+        endif()
+    endforeach()
+
+    # -----------------------------------------------------------------------
+    # Apply the cleanup fixture to every component test so that the
+    # chimaera_post_test_cleanup hook runs after the whole suite, even when
+    # individual tests fail. Excludes the cleanup fixtures themselves.
+    # -----------------------------------------------------------------------
+    function(_chimaera_require_cleanup_fixture_recursive dir)
+        get_directory_property(_tests DIRECTORY "${dir}" TESTS)
+        foreach(_t ${_tests})
+            if(NOT _t STREQUAL "chimaera_pre_test_cleanup" AND
+               NOT _t STREQUAL "chimaera_post_test_cleanup")
+                set_property(TEST ${_t} DIRECTORY "${dir}" APPEND PROPERTY
+                    FIXTURES_REQUIRED chimaera_test_cleanup_fixture)
+            endif()
+        endforeach()
+        get_directory_property(_subdirs DIRECTORY "${dir}" SUBDIRECTORIES)
+        foreach(_sub ${_subdirs})
+            _chimaera_require_cleanup_fixture_recursive("${_sub}")
+        endforeach()
+    endfunction()
+
+    foreach(_component_dir_pair
+            "context-transport-primitives:WRP_CORE_ENABLE_TESTS"
+            "context-runtime:WRP_CORE_ENABLE_RUNTIME"
+            "context-transfer-engine:WRP_CORE_ENABLE_CTE"
+            "context-assimilation-engine:WRP_CORE_ENABLE_CAE"
+            "context-exploration-engine:WRP_CORE_ENABLE_CEE")
+        string(REPLACE ":" ";" _pair "${_component_dir_pair}")
+        list(GET _pair 0 _component_dir)
+        list(GET _pair 1 _component_flag)
+        if(${_component_flag} AND IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${_component_dir}")
+            _chimaera_require_cleanup_fixture_recursive(
+                "${CMAKE_CURRENT_SOURCE_DIR}/${_component_dir}")
         endif()
     endforeach()
 endif()
@@ -1187,9 +1268,6 @@ if(TARGET chimaera_bdev_client)
 endif()
 if(WRP_CORE_ENABLE_CTE AND TARGET wrp_cte_core_client)
   list(APPEND PIP_LIB_TARGETS wrp_cte_core_client wrp_cte_core_runtime)
-  if(TARGET wrp_cte_cae_config)
-    list(APPEND PIP_LIB_TARGETS wrp_cte_cae_config)
-  endif()
 endif()
 if(WRP_CORE_ENABLE_CAE AND TARGET wrp_cae_core_client)
   list(APPEND PIP_LIB_TARGETS wrp_cae_core_client wrp_cae_core_runtime)

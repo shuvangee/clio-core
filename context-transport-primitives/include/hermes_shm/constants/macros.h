@@ -125,7 +125,11 @@
 #define HSHM_IS_CUDA_COMPILER 0
 #endif
 
-#if HSHM_ENABLE_ROCM && defined(__HIPCC__)
+/** HIP-NVCC: when WRP_ROCM_HIP_PLATFORM=nvidia, hipcc invokes nvcc and
+ *  __CUDACC__ is defined (not __HIPCC__) — but we still want
+ *  HSHM_IS_ROCM_COMPILER=1 since the build was configured for ROCm and
+ *  the headers expose HIP types via the HIP-NVCC shim. */
+#if HSHM_ENABLE_ROCM && (defined(__HIPCC__) || defined(__CUDACC__))
 #define HSHM_IS_ROCM_COMPILER 1
 #else
 #define HSHM_IS_ROCM_COMPILER 0
@@ -179,9 +183,21 @@
 
 #if HSHM_IS_ROCM_COMPILER
 #include <hip/hip_runtime.h>
+#elif HSHM_ENABLE_ROCM
+// g++/clang++ host TUs with HSHM_ENABLE_ROCM get the host-callable HIP
+// runtime API header (hipMalloc, hipMemcpy, hipIpcMemHandle_t, etc.)
+// without device builtins. Under HIP_PLATFORM=nvidia these forward to
+// cudart symbols at link time.
+#include <hip/hip_runtime_api.h>
 #endif
 
-#if HSHM_IS_SYCL_COMPILER
+// Pull <sycl/sycl.hpp> in whenever the SYCL backend is enabled, not only
+// when this TU is being compiled with -fsycl. Host TUs in chimaera_cxx
+// (compiled by dpcpp without -fsycl) still need sycl::malloc_host /
+// sycl::queue / sycl::free declarations because gpu_api.h's sycl::
+// branches activate on HSHM_ENABLE_SYCL=1. The header is plain C++ —
+// safe to parse without the SYCL compiler frontend.
+#if HSHM_ENABLE_SYCL
 #include <sycl/sycl.hpp>
 #endif
 

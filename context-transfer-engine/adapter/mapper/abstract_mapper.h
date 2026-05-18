@@ -56,18 +56,20 @@ struct BlobPlacement {
   size_t blob_size_;  /**< Size after offset to read */
 
   /** create a BLOB name from index. */
-  static chi::string CreateBlobName(size_t page) {
-    chi::string buf(sizeof(page));
-    hipc::LocalSerialize srl(buf);
+  static std::string CreateBlobName(size_t page) {
+    std::string buf;
+    hshm::ipc::LocalSerialize<std::string> srl(buf);
     srl << page;
+    srl.Finalize();
     return buf;
   }
 
   /** create a BLOB name from index. */
-  chi::string CreateBlobName() const {
-    chi::string buf(sizeof(page_));
-    hipc::LocalSerialize srl(buf);
+  std::string CreateBlobName() const {
+    std::string buf;
+    hshm::ipc::LocalSerialize<std::string> srl(buf);
     srl << page_;
+    srl.Finalize();
     return buf;
   }
 

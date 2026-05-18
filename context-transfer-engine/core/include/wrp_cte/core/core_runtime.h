@@ -43,7 +43,9 @@
 #include <hermes_shm/memory/allocator/malloc_allocator.h>
 #include <wrp_cte/core/core_client.h>
 #include <wrp_cte/core/core_config.h>
+#include <wrp_cte/core/core_dpe.h>
 #include <wrp_cte/core/core_tasks.h>
+#include <wrp_cte/core/gpu_metadata_cache.h>
 #include <wrp_cte/core/transaction_log.h>
 
 // Forward declarations to avoid circular dependency
@@ -64,6 +66,14 @@ public:
 
   Runtime() = default;
   ~Runtime() override = default;
+
+  /**
+   * Fix up POD task members (chi::priv::string SSO data_ pointers,
+   * etc.) after a GPU2CPU D2H POD memcpy. Dispatched by the GPU pop
+   * path on the worker before Run.
+   */
+  void FixupAfterCopy(chi::u32 method,
+                      hipc::FullPtr<chi::Task> task_ptr) override;
 
   /**
    * Create the container (Method::kCreate)
@@ -168,6 +178,15 @@ public:
                       chi::RunContext &rctx) override;
   chi::u64 GetWorkRemaining() const override;
 
+  /**
+   * Override GetTaskStats so PutBlob / GetBlob report their actual byte
+   * payload size (size_) for routing. Otherwise the scheduler buckets
+   * every blob op as "metadata" and lands them on the scheduler worker,
+   * making large blob transfers compete with latency-sensitive admin
+   * traffic instead of going to dedicated I/O workers.
+   */
+  chi::TaskStat GetTaskStats(const chi::Task *task) const override;
+
   // Container virtual method implementations (defined in autogen/core_lib_exec.cc)
   void SaveTask(chi::u32 method, chi::SaveTaskArchive &archive,
                 hipc::FullPtr<chi::Task> task_ptr) override;
@@ -197,9 +216,17 @@ private:
   // Client for this ChiMod
   Client client_;
 
-  // Target management data structures (using hshm::priv::unordered_map_ll for
-  // thread-safe concurrent access)
+  // Target management data structures.
+  //
+  // Two parallel structures, kept in sync under target_lock_:
+  //   - registered_targets_: hash map for O(1) lookup by PoolId
+  //   - target_list_:        contiguous vector for O(N_live) iteration
+  //                          (avoids scanning the map's empty slots; size()
+  //                          returns exact live count)
+  // The DPE consumes std::vector<TargetInfo>, so ExtendBlob hands it
+  // target_list_ directly with no materialization step.
   hshm::priv::unordered_map_ll<chi::PoolId, TargetInfo> registered_targets_;
+  std::vector<TargetInfo> target_list_;
   hshm::priv::unordered_map_ll<std::string, chi::PoolId>
       target_name_to_id_; // reverse lookup: target_name -> target_id
 
@@ -238,8 +265,76 @@ private:
   // CTE configuration (replaces ConfigManager singleton)
   Config config_;
 
+  // Cached Data Placement Engine — built once from config_ in Create() so
+  // ExtendBlob does not allocate a fresh DPE on every PutBlob.
+  std::unique_ptr<DataPlacementEngine> dpe_;
+
   // Restart flag: set by Restart() before calling Init()/Create()
   bool is_restart_ = false;
+
+  // -----------------------------------------------------------------
+  // GPU metadata cache (optional; populated when
+  // config_.gpu_metadata_cache_.enabled_ is true).
+  //
+  // Owned by the CTE Core server. The header pointer addresses
+  // GPU-managed USM (sycl::malloc_shared on SYCL, cudaMallocManaged on
+  // CUDA). All mutations go through GpuCache* helpers below, which are
+  // the ONLY places that touch this state from PutBlob / GetOrCreateTag /
+  // DelBlob / DelTag.
+  // -----------------------------------------------------------------
+  GpuMetadataCacheHeader *gpu_cache_ = nullptr;
+  size_t gpu_cache_bytes_ = 0;
+
+  /**
+   * Allocate and initialize the GPU metadata cache region. No-op if
+   * the feature is disabled or no GPU backend is built in. Sets
+   * gpu_cache_ / gpu_cache_bytes_ on success.
+   *
+   * @return true on success (or feature-disabled), false on allocation
+   *         failure.
+   */
+  bool GpuCacheCreate();
+
+  /** Free the GPU metadata cache region. Safe to call when disabled. */
+  void GpuCacheDestroy();
+
+  /**
+   * Add or update a blob entry in the cache. Called from PutBlob right
+   * after the blob has been placed. Resolves the bdev_type of the
+   * blob's first block via registered_targets_ + storage_devices_,
+   * and either projects the blob into the cache (DRAM-tier targets) or
+   * removes any stale projection (file/noop targets).
+   *
+   * The PutBlob call site stays a single line; all bdev-type lookup
+   * logic lives here.
+   */
+  void GpuCacheOnPutBlob(const TagId &tag_id, const std::string &blob_name,
+                         const BlobInfo &blob_info);
+
+  /**
+   * Resolve the bdev_type string ("ram", "hbm", "pinned", "file", "noop",
+   * "") for a blob given its BlobInfo. Returns an empty string when
+   * registered_targets_ has no entry for the first block's pool id.
+   *
+   * Caller must hold no locks (this acquires target_lock_ for read).
+   */
+  std::string GetBdevTypeForBlob(const BlobInfo &blob_info);
+
+  /** Remove a blob entry. Called from DelBlob. */
+  void GpuCacheOnDelBlob(const TagId &tag_id, const std::string &blob_name);
+
+  /** Add (or refresh) a tag entry. Called from GetOrCreateTag. */
+  void GpuCacheOnGetOrCreateTag(const TagId &tag_id,
+                                const std::string &tag_name);
+
+  /** Remove a tag entry and cascade-remove all blob entries owning it. */
+  void GpuCacheOnDelTag(const TagId &tag_id);
+
+  /**
+   * Read-only accessor (host-side) for tests / diagnostics. Returns
+   * the cache header pointer if enabled, else nullptr.
+   */
+  GpuMetadataCacheHeader *GetGpuCache() const { return gpu_cache_; }
 
   // Telemetry ring buffer for performance monitoring
   static inline constexpr size_t kTelemetryRingSize = 1024; // Ring buffer size

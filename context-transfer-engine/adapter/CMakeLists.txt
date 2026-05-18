@@ -2,25 +2,6 @@
 # Build adapters
 #------------------------------------------------------------------------------
 
-# Create the CAE configuration library
-add_library(wrp_cte_cae_config SHARED
-    cae_config.cc
-    cae_config.h
-)
-
-# Note: wrp_cte_core_client provides core/include via transitive includes
-# LOCAL includes for this library's own headers and adapter/ path resolution
-target_include_directories(wrp_cte_cae_config PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}  # For cae_config.h in same directory
-    ${WRP_CTE_ROOT}              # For adapter/cae_config.h and adapter/adapter_types.h include paths
-)
-
-target_link_libraries(wrp_cte_cae_config
-    hshm::configure
-    hshm::cxx
-    wrp_cte_core_client  # Provides core headers transitively
-)
-
 # CTE adapter singleton implementation - moved to filesystem directory
 # to leverage existing working build configuration
 
@@ -68,6 +49,11 @@ if (WRP_CTE_ENABLE_HDF5_VOL)
     add_subdirectory(hdf5_vol)
 endif()
 
+# GPU Vector adapter (CUDA/ROCm only; producer-only kernel API)
+if (WRP_CORE_ENABLE_CUDA OR WRP_CORE_ENABLE_ROCM)
+    add_subdirectory(gpu_vector)
+endif()
+
 #-----------------------------------------------------------------------------
 # Install adapter headers
 #-----------------------------------------------------------------------------
@@ -81,12 +67,3 @@ install(
         headers
 )
 install(DIRECTORY mapper DESTINATION include/adapter)
-
-#-----------------------------------------------------------------------------
-# Install CAE config library
-#-----------------------------------------------------------------------------
-install(TARGETS wrp_cte_cae_config
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-)

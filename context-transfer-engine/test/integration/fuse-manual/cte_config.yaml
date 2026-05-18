@@ -1,27 +1,16 @@
 ---
-# CTE Configuration for FUSE manual testing
-# RAM-only storage, sized for copying /workspace source tree
+# Chimaera runtime config for FUSE manual testing.
+#
+# NOTE: the CTE pool is no longer composed here. The manual test now mirrors
+# the jarvis pipeline shape:
+#   1. chimaera runtime start   (this file, no compose section)
+#   2. chimaera compose cte_compose.yaml   (the compose lives in a sibling file)
+#   3. wrp_cte_fuse <mountpoint> -f
+#
+# Doing compose separately exercises the same admin-pool CreatePool path that
+# `wrp_cte` jarvis package uses, so any cross-node propagation bug shows up
+# the same way in both flows.
 
 runtime:
   num_threads: 4
   queue_depth: 1024
-
-compose:
-  - mod_name: wrp_cte_core
-    pool_name: wrp_cte
-    pool_query: local
-    pool_id: "512.0"
-
-    targets:
-      neighborhood: 1
-      default_target_timeout_ms: 30000
-      poll_period_ms: 5000
-
-    storage:
-      - path: "ram::cte_fuse_ram"
-        bdev_type: "ram"
-        capacity_limit: "4GB"
-        score: 0.0
-
-    dpe:
-      dpe_type: "max_bw"

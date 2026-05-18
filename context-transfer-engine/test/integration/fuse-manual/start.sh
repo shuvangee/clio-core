@@ -33,6 +33,7 @@ die()   { echo -e "${RED}[ERR]${NC}  $1" >&2; exit 1; }
 
 [ -x "$BUILD_BIN/chimaera" ]      || die "chimaera not found — build with: cmake --preset release-fuse && cmake --build build -j\$(nproc)"
 [ -x "$BUILD_BIN/wrp_cte_fuse" ]  || die "wrp_cte_fuse not found — build with: cmake --preset release-fuse && cmake --build build -j\$(nproc)"
+[ -f "$SCRIPT_DIR/cte_compose.yaml" ] || die "cte_compose.yaml missing next to cte_config.yaml"
 command -v fusermount3 &>/dev/null || die "fusermount3 not found — install fuse3: sudo apt install fuse3"
 [ -c /dev/fuse ]                   || die "/dev/fuse not available"
 
@@ -58,6 +59,14 @@ if ! kill -0 "$RUNTIME_PID" 2>/dev/null; then
     die "Chimaera runtime failed to start"
 fi
 ok "Chimaera runtime started (PID $RUNTIME_PID)"
+
+# --- Compose the CTE pool (separate step, mirrors jarvis wrp_cte) -----------
+
+info "Running chimaera compose for the CTE pool..."
+if ! chimaera compose "$SCRIPT_DIR/cte_compose.yaml"; then
+    die "chimaera compose failed -- check that the runtime is reachable"
+fi
+ok "CTE pool composed (wrp_cte_core)"
 
 # --- Start FUSE daemon -------------------------------------------------------
 

@@ -4,13 +4,16 @@
 # It will automatically install Miniconda if conda is not detected
 #
 # Usage:
-#   ./install.sh              # Build with default (release) preset
-#   ./install.sh release      # Build with release preset
-#   ./install.sh release-fuse # Build with FUSE adapter enabled
-#   ./install.sh debug        # Build with debug preset
-#   ./install.sh conda        # Build with conda-optimized preset
-#   ./install.sh cuda         # Build with CUDA preset
-#   ./install.sh rocm         # Build with ROCm preset
+#   ./install.sh                          # Build with default (release) preset
+#   ./install.sh release                  # Build with release preset
+#   ./install.sh release-fuse             # Build with FUSE adapter enabled
+#   ./install.sh debug                    # Build with debug preset
+#   ./install.sh conda                    # Build with conda-optimized preset
+#   ./install.sh cuda                     # Build with CUDA preset
+#   ./install.sh rocm                     # Build with ROCm preset
+#   ./install.sh --only-deps [preset]     # Install ONLY iowarp-core's deps
+#                                         # (build+host+run from the recipe),
+#                                         # skip conda-build of iowarp-core itself.
 
 set -e  # Exit on error
 
@@ -18,8 +21,21 @@ set -e  # Exit on error
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Parse preset argument (default to release)
-PRESET="${1:-release}"
+# Parse arguments: --only-deps flag + optional positional preset
+ONLY_DEPS=false
+PRESET=""
+for arg in "$@"; do
+    case "$arg" in
+        --only-deps) ONLY_DEPS=true ;;
+        --*)
+            echo "Unknown flag: $arg" >&2
+            echo "Usage: $0 [--only-deps] [preset]" >&2
+            exit 1
+            ;;
+        *) PRESET="${PRESET:-$arg}" ;;
+    esac
+done
+PRESET="${PRESET:-release}"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -206,10 +222,6 @@ fi
 # Build the conda package
 RECIPE_DIR="$SCRIPT_DIR/installers/conda"
 
-echo -e "${BLUE}>>> Building conda package with conda-build...${NC}"
-echo -e "${YELLOW}This may take 10-30 minutes depending on your system${NC}"
-echo ""
-
 OUTPUT_DIR="$SCRIPT_DIR/build/conda-output"
 mkdir -p "$OUTPUT_DIR"
 
@@ -219,6 +231,83 @@ export IOWARP_PRESET="$PRESET"
 # the built package's python pin is satisfiable at install time.
 TARGET_PYTHON="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
 echo -e "${BLUE}Target Python version: $TARGET_PYTHON${NC}"
+
+# --only-deps: render the recipe to resolve jinja, extract the union
+# of build/host/run requirements, and conda-install them. Skip the
+# conda-build of iowarp-core itself. Useful for dev iteration when
+# you want to compile the tree manually (cmake --build) but let
+# conda manage the C++/python dependencies.
+if [ "$ONLY_DEPS" = true ]; then
+    echo -e "${BLUE}>>> --only-deps: installing iowarp-core dependencies (no build)${NC}"
+    echo ""
+    RENDERED="$(mktemp --suffix=.yaml)"
+    # -f writes the rendered YAML to FILE without the "Hash contents:"
+    # / "meta.yaml:" prelude that `conda render` would otherwise emit
+    # on stdout (which is not parseable as pure YAML).
+    if ! "$CONDA_BIN" render "$RECIPE_DIR" \
+            -c conda-forge \
+            --python="$TARGET_PYTHON" \
+            -f "$RENDERED" >/dev/null 2>&1; then
+        echo -e "${RED}conda render failed${NC}"
+        rm -f "$RENDERED"
+        exit 1
+    fi
+
+    # Parse rendered meta.yaml with python+yaml (conda-build pulls in
+    # pyyaml into base, so $CONDA_BIN's python has it).
+    DEPS="$("$CONDA_BASE/bin/python" - "$RENDERED" <<'PY'
+import sys, yaml
+with open(sys.argv[1]) as f:
+    data = yaml.safe_load(f)
+reqs = (data or {}).get("requirements", {}) or {}
+# `conda render` resolves each dep to "name version build" with the
+# exact transitive build hash; for a dev "install deps" flow we want
+# the loosest practical pin so the solver can fit them into the user's
+# active env. Strip to just the package name (drop version and build
+# hash). Users who need strict pinning should `conda build` the full
+# package, which already encodes them.
+seen_names = set()
+ordered = []
+for section in ("build", "host", "run"):
+    for dep in reqs.get(section, []) or []:
+        if not isinstance(dep, str):
+            continue
+        name = dep.split()[0]
+        if name in seen_names:
+            continue
+        seen_names.add(name)
+        ordered.append(name)
+print(" ".join(ordered))
+PY
+)"
+    rm -f "$RENDERED"
+
+    if [ -z "$DEPS" ]; then
+        echo -e "${RED}No dependencies extracted from recipe.${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}Dependencies to install:${NC}"
+    echo "  $DEPS"
+    echo ""
+
+    # shellcheck disable=SC2086  # intentional word-splitting of $DEPS
+    if conda install -y -c conda-forge $DEPS; then
+        echo ""
+        echo -e "${GREEN}======================================================================"
+        echo -e "Dependencies installed (iowarp-core itself was NOT built/installed)"
+        echo -e "======================================================================${NC}"
+        echo -e "${BLUE}Active env: ${CONDA_PREFIX}${NC}"
+        exit 0
+    else
+        echo -e "${RED}conda install of dependencies failed.${NC}"
+        exit 1
+    fi
+fi
+
+echo -e "${BLUE}>>> Building conda package with conda-build...${NC}"
+echo -e "${YELLOW}This may take 10-30 minutes depending on your system${NC}"
+echo ""
 
 if "$CONDA_BIN" build "$RECIPE_DIR" \
     --output-folder "$OUTPUT_DIR" \

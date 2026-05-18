@@ -20,12 +20,14 @@ target_compile_definitions(wrp_cte_fuse PRIVATE
 target_include_directories(wrp_cte_fuse PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${WRP_CTE_ROOT}
-    ${FUSE3_INCLUDE_DIRS})
+    ${FUSE3_INCLUDE_DIRS}
+    ${FUSE3_INCLUDEDIR})  # parent of include/fuse3 so
+                          # `#include <fuse3/fuse.h>` resolves
 
+target_link_directories(wrp_cte_fuse PRIVATE ${FUSE3_LIBRARY_DIRS})
 target_link_libraries(wrp_cte_fuse
     ${FUSE3_LIBRARIES}
     wrp_cte_core_client
-    wrp_cte_cae_config
     hshm::cxx)
 
 install(TARGETS wrp_cte_fuse

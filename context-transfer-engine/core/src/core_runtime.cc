@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -55,6 +56,7 @@
 #include <vector>
 
 #include "chimaera/worker.h"
+#include "hermes_shm/util/gpu_api.h"
 #include "hermes_shm/util/logging.h"
 #include "hermes_shm/util/timer.h"
 
@@ -109,6 +111,27 @@ chi::u64 Runtime::ParseCapacityToBytes(const std::string &capacity_str) {
   return static_cast<chi::u64>(value * multiplier);
 }
 
+void Runtime::FixupAfterCopy(chi::u32 method,
+                              hipc::FullPtr<chi::Task> task_ptr) {
+  switch (method) {
+    case Method::kRegisterTarget:
+      task_ptr.template Cast<RegisterTargetTask>().ptr_->FixupAfterCopy();
+      break;
+    case Method::kGetOrCreateTag:
+      task_ptr.template Cast<GetOrCreateTagTask<CreateParams>>()
+          .ptr_->FixupAfterCopy();
+      break;
+    case Method::kPutBlob:
+      task_ptr.template Cast<PutBlobTask>().ptr_->FixupAfterCopy();
+      break;
+    case Method::kGetBlob:
+      task_ptr.template Cast<GetBlobTask>().ptr_->FixupAfterCopy();
+      break;
+    default:
+      break;
+  }
+}
+
 chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
                                 chi::RunContext &ctx) {
 #ifdef __NVCOMPILER
@@ -118,12 +141,15 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
 #endif
   CHI_TASK_BODY_BEGIN
   // Initialize unordered_map_ll instances with appropriately sized bucket
-  // counts Tag/blob maps are large to avoid excessive collisions at scale
-  // Target maps use tag size since target counts are similar
+  // counts. Tag/blob maps are large to avoid excessive collisions at scale.
+  // Target maps stay small — target counts are O(1–10), not O(100K) — so
+  // for_each over registered_targets_ does not have to scan 100K empty slots
+  // on every PutBlob.
+  static const size_t kTargetMapSize = 64;
   registered_targets_ =
-      hshm::priv::unordered_map_ll<chi::PoolId, TargetInfo>(kTagMapSize);
+      hshm::priv::unordered_map_ll<chi::PoolId, TargetInfo>(kTargetMapSize);
   target_name_to_id_ =
-      hshm::priv::unordered_map_ll<std::string, chi::PoolId>(kTagMapSize);
+      hshm::priv::unordered_map_ll<std::string, chi::PoolId>(kTargetMapSize);
   tag_name_to_id_ =
       hshm::priv::unordered_map_ll<std::string, TagId>(kTagMapSize);
   tag_id_to_info_ = hshm::priv::unordered_map_ll<TagId, TagInfo>(kTagMapSize);
@@ -161,11 +187,17 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   auto params = task->GetParams();
   config_ = params.config_;
   HLOG(kDebug,
-       "CTE Create: GetParams() returned, storage devices in config: {}",
-       config_.storage_.devices_.size());
+       "CTE Create: GetParams() returned, storage devices in config: {}, "
+       "gpu_metadata_cache.enabled={}",
+       config_.storage_.devices_.size(),
+       config_.gpu_metadata_cache_.enabled_);
 
   // Configuration is now loaded from compose pool_config via
   // CreateParams::LoadConfig()
+
+  // Build the DPE once from config so ExtendBlob does not pay a heap alloc
+  // (and the per-call vtable construction) on every PutBlob.
+  dpe_ = DpeFactory::CreateDpe(config_.dpe_.dpe_type_);
 
   // Store storage configuration in runtime
   storage_devices_ = config_.storage_.devices_;
@@ -175,32 +207,39 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   // Initialize the client with the pool ID
   client_.Init(task->new_pool_id_);
 
-  // Register targets for each configured storage device and neighborhood node
+  // Register targets across this container's `neighborhood` window.
+  //
+  // The prior buggy loop used `target_query = DirectHash(i)` where
+  // `i` was the loop iterator alone — every wrp_cte_core container
+  // on every node registered targets to the same bdev containers
+  // (0, 1, ..., neighborhood-1) — and HashBlobToContainer-distributed
+  // PutBlobs all funnelled into bdev container 0 (since neighborhood=1
+  // made every target route via DirectHash(0)). At 4n × 48 PPN this
+  // 144→1 cross-node fan-in saturated libzmq's DEALER send path and
+  // the receiving daemon aborted with "Bad address" in tcp.cpp.
+  //
+  // The intended pattern is a sliding window around the current
+  // container: target_query = DirectHash((container_id_ + i) %
+  // num_nodes). So wrp_cte_core container 0 registers neighborhood
+  // targets at bdev containers 0..neighborhood-1, container 1 at
+  // 1..neighborhood, etc. With neighborhood=1 each wrp_cte_core
+  // container registers exactly one target — its own local bdev —
+  // and HashBlobToContainer spreads blobs across the N wrp_cte_core
+  // containers, keeping the write path node-local. Higher neighborhood
+  // values give replication breadth without collapsing onto one node.
   if (!storage_devices_.empty()) {
-    // Get neighborhood size from configuration
     chi::u32 neighborhood_size = config_.targets_.neighborhood_;
-
-    // Get number of nodes from IPC manager
     chi::u32 num_nodes = ipc_manager->GetNumHosts();
-
-    // Set actual neighborhood size to minimum of configured size and available
-    // nodes
     chi::u32 actual_neighborhood = std::min(neighborhood_size, num_nodes);
-
     HLOG(kDebug,
-         "Registering targets for storage devices across neighborhood (size: "
-         "{} nodes):",
-         actual_neighborhood);
+         "Registering targets across neighborhood window (size: {} nodes, "
+         "this container_id_={})",
+         actual_neighborhood, container_id_);
 
-    // Iterate over storage devices
     for (size_t device_idx = 0; device_idx < storage_devices_.size();
          ++device_idx) {
       const auto &device = storage_devices_[device_idx];
-
-      // Capacity is already in bytes
       chi::u64 capacity_bytes = device.capacity_limit_;
-
-      // Determine bdev type enum
       chimaera::bdev::BdevType bdev_type = chimaera::bdev::BdevType::kFile;
       if (device.bdev_type_ == "ram") {
         bdev_type = chimaera::bdev::BdevType::kRam;
@@ -212,42 +251,35 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
         bdev_type = chimaera::bdev::BdevType::kNoop;
       }
 
-      // Iterate over neighborhood nodes (container hashes from 0 to
-      // actual_neighborhood-1)
-      for (chi::u32 container_hash = 0; container_hash < actual_neighborhood;
-           ++container_hash) {
-        // Generate unique target path for this device-node combination
+      for (chi::u32 i = 0; i < actual_neighborhood; ++i) {
+        // Sliding-window neighbor index. Modulo num_nodes wraps the
+        // window for containers near the end of the cluster.
+        chi::u32 target_node =
+            (container_id_ + i) % std::max<chi::u32>(num_nodes, 1u);
+
         std::string target_path =
-            device.path_ + "_node" + std::to_string(container_hash);
-
-        // Create target query using DirectHash for this specific container
+            device.path_ + "_node" + std::to_string(target_node);
         chi::PoolQuery target_query =
-            chi::PoolQuery::DirectHash(container_hash);
-
-        // Generate unique bdev_id per (device, container_hash) combination:
-        // major encodes device index, minor encodes container hash
+            chi::PoolQuery::DirectHash(target_node);
         chi::PoolId bdev_id(512 + static_cast<chi::u32>(device_idx),
-                            1 + container_hash);
+                            1 + target_node);
 
-        // Call RegisterTarget using client member variable with target_query
-        // and bdev_id
         HLOG(kDebug,
-             "Registering target ({}): {} ({}, {} bytes) on node {} with "
-             "bdev_id=({},{})",
+             "Registering target ({}): {} ({}, {} bytes) on node {} (i={}) "
+             "with bdev_id=({},{})",
              client_.pool_id_, target_path, device.bdev_type_, capacity_bytes,
-             container_hash, bdev_id.major_, bdev_id.minor_);
+             target_node, i, bdev_id.major_, bdev_id.minor_);
         auto reg_task = client_.AsyncRegisterTarget(
             target_path, bdev_type, capacity_bytes, target_query, bdev_id);
         CHI_CO_AWAIT(reg_task);
         chi::u32 result = reg_task->GetReturnCode();
-
         if (result == 0) {
-          HLOG(kDebug, "  - Registered target: {} ({}, {} bytes) on node {}",
-               target_path, device.bdev_type_, capacity_bytes, container_hash);
+          HLOG(kDebug, "  - Registered target: {} on node {}", target_path,
+               target_node);
         } else {
           HLOG(kWarning,
                "  - Failed to register target {} on node {} (error code: {})",
-               target_path, container_hash, result);
+               target_path, target_node, result);
         }
       }
     }
@@ -321,6 +353,18 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
                            config_.performance_.flush_data_min_persistence_,
                            config_.performance_.flush_data_period_ms_ * 1000.0);
   }
+
+  // Allocate the optional GPU metadata cache. The OUT pointer is
+  // re-serialized back into chimod_params_ (a chi::priv::string) so
+  // the client's GetParams() sees the populated gpu_cache_ptr_ after
+  // Wait().
+  CreateParams out_params;
+  out_params.config_ = config_;
+  out_params.gpu_cache_ptr_ =
+      GpuCacheCreate() ? reinterpret_cast<chi::u64>(gpu_cache_)
+                       : static_cast<chi::u64>(0);
+  chi::Task::Serialize(CHI_PRIV_ALLOC, task->chimod_params_, out_params);
+
   CHI_CO_RETURN;
   CHI_TASK_BODY_END
 }
@@ -346,6 +390,7 @@ chi::TaskResume Runtime::Destroy(hipc::FullPtr<DestroyTask> task,
 
     // Clear all registered targets and their associated data
     registered_targets_.clear();
+    target_list_.clear();
     target_name_to_id_.clear();
 
     // Clear tag and blob management structures
@@ -547,14 +592,29 @@ chi::TaskResume Runtime::RegisterTarget(hipc::FullPtr<RegisterTargetTask> task,
     target_info.perf_metrics_ =
         perf_metrics;  // Store the entire PerfMetrics structure
     target_info.persistence_level_ = GetPersistenceLevelForTarget(target_name);
+    target_info.bdev_type_ = task->bdev_type_;
 
-    // Register the target using TargetId as key
+    // Register the target using TargetId as key. Mirror into target_list_ so
+    // iteration sites (ExtendBlob, ListTargets, StatTargets, FlushData) can
+    // walk live entries directly without scanning empty map slots.
     {
       chi::ScopedCoRwWriteLock write_lock(target_lock_);
       registered_targets_.insert_or_assign(target_id, target_info);
       target_name_to_id_.insert_or_assign(
           target_name,
           target_id);  // Maintain reverse lookup
+      // Replace existing entry if present, else append.
+      bool found_in_list = false;
+      for (auto &t : target_list_) {
+        if (t.bdev_client_.pool_id_ == target_id) {
+          t = target_info;
+          found_in_list = true;
+          break;
+        }
+      }
+      if (!found_in_list) {
+        target_list_.push_back(target_info);
+      }
     }
 
     task->return_code_ = 0;  // Success
@@ -610,6 +670,16 @@ chi::TaskResume Runtime::UnregisterTarget(
 
       registered_targets_.erase(target_id);
       target_name_to_id_.erase(target_name);  // Remove reverse lookup
+      // Remove from target_list_ via swap-and-pop (order doesn't matter)
+      for (size_t i = 0; i < target_list_.size(); ++i) {
+        if (target_list_[i].bdev_client_.pool_id_ == target_id) {
+          if (i + 1 != target_list_.size()) {
+            target_list_[i] = target_list_.back();
+          }
+          target_list_.pop_back();
+          break;
+        }
+      }
     }
 
     task->return_code_ = 0;  // Success
@@ -636,12 +706,11 @@ chi::TaskResume Runtime::ListTargets(hipc::FullPtr<ListTargetsTask> task,
 
     chi::ScopedCoRwReadLock read_lock(target_lock_);
 
-    // Populate target name list while lock is held
-    task->target_names_.reserve(registered_targets_.size());
-    registered_targets_.for_each(
-        [&task](const chi::PoolId &target_id, const TargetInfo &target_info) {
-          task->target_names_.push_back(target_info.target_name_.str());
-        });
+    // Populate target name list from the contiguous mirror (live entries only)
+    task->target_names_.reserve(target_list_.size());
+    for (const auto &t : target_list_) {
+      task->target_names_.push_back(t.target_name_.str());
+    }
 
     task->return_code_ = 0;  // Success
 
@@ -665,11 +734,10 @@ chi::TaskResume Runtime::StatTargets(hipc::FullPtr<StatTargetsTask> task,
     std::vector<chi::PoolId> target_ids;
     {
       chi::ScopedCoRwReadLock read_lock(target_lock_);
-      registered_targets_.for_each(
-          [&target_ids](const chi::PoolId &target_id, TargetInfo &target_info) {
-            (void)target_info;
-            target_ids.push_back(target_id);
-          });
+      target_ids.reserve(target_list_.size());
+      for (const auto &t : target_list_) {
+        target_ids.push_back(t.bdev_client_.pool_id_);
+      }
     }
 
     // Now iterate and co_await each UpdateTargetStats call
@@ -695,7 +763,8 @@ chi::TaskResume Runtime::StatTargets(hipc::FullPtr<StatTargetsTask> task,
       chimaera::bdev::PerfMetrics perf_metrics = stats_task->metrics_;
       remaining_size = stats_task->remaining_size_;
 
-      // Re-acquire write lock to update target info
+      // Re-acquire write lock to update target info. Mutate the map and the
+      // mirror in target_list_ in lockstep so DPE selection sees fresh stats.
       {
         chi::ScopedCoRwWriteLock write_lock(target_lock_);
         TargetInfo *target_info = registered_targets_.find(target_id);
@@ -718,6 +787,15 @@ chi::TaskResume Runtime::StatTargets(hipc::FullPtr<StatTargetsTask> task,
                                      std::log(global_max_bandwidth + 1.0));
               target_info->target_score_ =
                   std::max(0.0f, std::min(1.0f, target_info->target_score_));
+            }
+          }
+          // Mirror into target_list_
+          for (auto &t : target_list_) {
+            if (t.bdev_client_.pool_id_ == target_id) {
+              t.perf_metrics_ = target_info->perf_metrics_;
+              t.remaining_space_ = target_info->remaining_space_;
+              t.target_score_ = target_info->target_score_;
+              break;
             }
           }
         }
@@ -760,6 +838,7 @@ chi::TaskResume Runtime::GetOrCreateTag(
         tag_name_to_id_.insert_or_assign(tag_name, preferred_id);
       }
       task->tag_id_ = preferred_id;
+      GpuCacheOnGetOrCreateTag(preferred_id, tag_name);
       task->return_code_ = 0;
       CHI_CO_RETURN;
     }
@@ -777,6 +856,7 @@ chi::TaskResume Runtime::GetOrCreateTag(
                      tag_info_ptr->last_modified_, now);
       }
     }
+    GpuCacheOnGetOrCreateTag(tag_id, tag_name);
     task->return_code_ = 0;
 
   } catch (const std::exception &e) {
@@ -840,9 +920,79 @@ chi::TaskResume Runtime::PutBlob(hipc::FullPtr<PutBlobTask> task,
   (void)ctx;
 #endif
   CHI_TASK_BODY_BEGIN
+  // Per-PutBlob diagnostic logging — disabled in perf builds. Was burning
+  // an atomic fetch_add + clock_gettime + branch on every 64 KB chunk plus
+  // an HLOG every 8th chunk (300+/s at FUSE saturation), measurably slowing
+  // the FUSE→CTE write path. Re-enable by flipping `#if 0` → `#if 1`.
+#if 0
+  // DEBUG: unconditional log to verify the handler is hit and to
+  // print whether submit_ts_ns_ survived the client→daemon hop.
+  {
+    static std::atomic<uint64_t> s_seen{0};
+    uint64_t n = s_seen.fetch_add(1, std::memory_order_relaxed) + 1;
+    if ((n & 7) == 0 || n <= 4) {
+      HLOG(kInfo,
+           "[PutLat-DBG] handler entered #{} submit_ts_ns={} size={}",
+           n, task->submit_ts_ns_, task->size_);
+    }
+  }
+  // Submit→handler-entry latency. submit_ts_ns_ is stamped at
+  // AsyncPutBlob time on the client; reading it here measures
+  // (client newtask) + (ipc send) + (cross-node serialize+wire+
+  // deserialize, if remote) + (lane queue wait) + (worker dispatch)
+  // — i.e. everything between when the rank issued the put and when
+  // chimaera actually started executing it. Dumped sparsely to keep
+  // log volume sane; the per-task ns are kInfo at 1 in 64 and the
+  // running aggregate is kInfo every kPutLatDumpPeriod tasks.
+  {
+    static std::atomic<uint64_t> s_n{0};
+    static std::atomic<uint64_t> s_sum_ns{0};
+    static std::atomic<uint64_t> s_max_ns{0};
+    static constexpr uint64_t kPutLatDumpPeriod = 16;
+    if (task->submit_ts_ns_ != 0) {
+      uint64_t now_ns =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::steady_clock::now().time_since_epoch())
+              .count();
+      // Guard against clock skew on cross-node tasks: drop negatives.
+      if (now_ns > task->submit_ts_ns_) {
+        uint64_t dt = now_ns - task->submit_ts_ns_;
+        uint64_t n = s_n.fetch_add(1, std::memory_order_relaxed) + 1;
+        s_sum_ns.fetch_add(dt, std::memory_order_relaxed);
+        // Lock-free max
+        uint64_t cur_max = s_max_ns.load(std::memory_order_relaxed);
+        while (dt > cur_max &&
+               !s_max_ns.compare_exchange_weak(cur_max, dt,
+                                               std::memory_order_relaxed)) {
+        }
+        if ((n & 7) == 0) {
+          HLOG(kInfo,
+               "[PutLat] sample dt_us={} task={} size={}",
+               dt / 1000, task->task_id_, task->size_);
+        }
+        if ((n % kPutLatDumpPeriod) == 0) {
+          uint64_t avg_us =
+              (s_sum_ns.load(std::memory_order_relaxed) / n) / 1000;
+          uint64_t max_us =
+              s_max_ns.load(std::memory_order_relaxed) / 1000;
+          HLOG(kInfo,
+               "[PutLat] n={} avg_us={} max_us={}", n, avg_us, max_us);
+        }
+      }
+    }
+  }
+#endif
+
   try {
     TagId tag_id = task->tag_id_;
     std::string blob_name = task->blob_name_.str();
+    // Append the per-page suffix when a GPU client (gpu_vector::Vector)
+    // routed this put through a per-(block, page) sub-blob — keeps cache
+    // pages from colliding on a shared blob name. Sentinel kNoPageIdx
+    // means "no suffix", which is the path non-GPU clients take.
+    if (task->gpu_page_idx_ != PutBlobTask::kNoPageIdx) {
+      blob_name += "_pi" + std::to_string(task->gpu_page_idx_);
+    }
     chi::u64 offset = task->offset_;
     chi::u64 size = task->size_;
     hipc::ShmPtr<> blob_data = task->blob_data_;
@@ -957,16 +1107,37 @@ chi::TaskResume Runtime::PutBlob(hipc::FullPtr<PutBlobTask> task,
     blob_info_ptr->last_modified_ = now;
     blob_info_ptr->score_ = blob_score;
     {
-      chi::ScopedCoRwReadLock lock(tag_map_lock_);
+      // Write lock: we may need to insert a fresh tag_info entry. The
+      // tag's name lives on whichever container `GetOrCreateTag`'s
+      // `DirectHash(tag_name)` selected; this container only owns the
+      // blobs that `HashBlobToContainer(tag_id, blob_name)` routed
+      // here. To keep the `GetTagSize` broadcast-and-Aggregate sum
+      // correct, every container that holds any of the tag's bytes
+      // must carry a `TagInfo` whose `total_size_` reflects its share.
+      // The silent-skip variant of this block dropped the accounting
+      // when the tag wasn't locally registered, so on 2n the
+      // tag-owning container saw total_size_ = 0 (no PutBlobs hashed
+      // to it) and the blob-owning container had no TagInfo at all
+      // (rc=1, tag_size_=0). stat() then returned 0 after writes.
+      chi::ScopedCoRwWriteLock lock(tag_map_lock_);
       TagInfo *tag_info_ptr = tag_id_to_info_.find(tag_id);
+      if (tag_info_ptr == nullptr) {
+        // No prior local accounting; seed an entry. tag_name_ stays
+        // empty -- the canonical name<->id binding lives on the
+        // tag-owning container and isn't this container's concern.
+        TagInfo seed;
+        seed.tag_id_ = tag_id;
+        seed.last_modified_ = now;
+        seed.last_read_ = now;
+        seed.total_size_ = 0;
+        auto ins = tag_id_to_info_.insert_or_assign(tag_id, seed);
+        tag_info_ptr = ins.value;
+      }
       if (tag_info_ptr) {
         tag_info_ptr->last_modified_ = now;
         if (size_change >= 0) {
           tag_info_ptr->total_size_ += static_cast<chi::u64>(size_change);
         } else {
-          // HLOG(kError, "Size should not decrease");
-          // task->return_code_ = 1;
-          // co_return;
           chi::u64 abs_change = static_cast<chi::u64>(-size_change);
           tag_info_ptr->total_size_ -= abs_change;
         }
@@ -975,6 +1146,7 @@ chi::TaskResume Runtime::PutBlob(hipc::FullPtr<PutBlobTask> task,
 
     LogTelemetry(CteOp::kPutBlob, offset, size, tag_id, now,
                  blob_info_ptr->last_read_);
+    GpuCacheOnPutBlob(tag_id, blob_name, *blob_info_ptr);
     task->return_code_ = 0;
   } catch (const std::exception &e) {
     HLOG(kError, "PutBlob failed with exception: {}", e.what());
@@ -996,6 +1168,9 @@ chi::TaskResume Runtime::GetBlob(hipc::FullPtr<GetBlobTask> task,
     // Extract input parameters
     TagId tag_id = task->tag_id_;
     std::string blob_name = task->blob_name_.str();
+    if (task->gpu_page_idx_ != GetBlobTask::kNoPageIdx) {
+      blob_name += "_pi" + std::to_string(task->gpu_page_idx_);
+    }
     chi::u64 offset = task->offset_;
     chi::u64 size = task->size_;
     chi::u32 flags = task->flags_;
@@ -1254,6 +1429,7 @@ chi::TaskResume Runtime::DelBlob(hipc::FullPtr<DelBlobTask> task,
     }
 
     // Success
+    GpuCacheOnDelBlob(tag_id, blob_name);
     task->return_code_ = 0;
     HLOG(kDebug, "DelBlob successful: name={}, blob_size={}", blob_name,
          blob_size);
@@ -1405,6 +1581,7 @@ chi::TaskResume Runtime::DelTag(hipc::FullPtr<DelTagTask> task,
     }
 
     // Success
+    GpuCacheOnDelTag(tag_id);
     task->return_code_ = 0;
     HLOG(kDebug,
          "DelTag successful: tag_id={},{}, removed {} blobs, total_size={}",
@@ -1699,12 +1876,11 @@ chi::TaskResume Runtime::FlushData(hipc::FullPtr<FlushDataTask> task,
   std::vector<chi::PoolId> nonvolatile_targets;
   {
     chi::ScopedCoRwReadLock read_lock(target_lock_);
-    registered_targets_.for_each(
-        [&](const chi::PoolId &id, const TargetInfo &info) {
-          if (static_cast<int>(info.persistence_level_) >= target_level) {
-            nonvolatile_targets.push_back(id);
-          }
-        });
+    for (const auto &t : target_list_) {
+      if (static_cast<int>(t.persistence_level_) >= target_level) {
+        nonvolatile_targets.push_back(t.bdev_client_.pool_id_);
+      }
+    }
   }
 
   if (nonvolatile_targets.empty()) {
@@ -2190,6 +2366,33 @@ chi::u64 Runtime::GetWorkRemaining() const {
   return 0;  // For now, always return 0 work remaining
 }
 
+chi::TaskStat Runtime::GetTaskStats(const chi::Task *task) const {
+  if (!task) return chi::TaskStat();
+  switch (task->method_) {
+    case Method::kPutBlob: {
+      auto *t = static_cast<const PutBlobTask *>(task);
+      chi::TaskStat stat;
+      stat.io_size_ = t->size_;
+      // Rough wall-time estimate at ~500 MB/s for routing decisions only.
+      // The learned model in InferWallClockTime adjusts the coefficient
+      // over time; this is just the initial seed.
+      stat.wall_time_ =
+          static_cast<float>(t->size_) / 500.0f;
+      return stat;
+    }
+    case Method::kGetBlob: {
+      auto *t = static_cast<const GetBlobTask *>(task);
+      chi::TaskStat stat;
+      stat.io_size_ = t->size_;
+      stat.wall_time_ =
+          static_cast<float>(t->size_) / 500.0f;
+      return stat;
+    }
+    default:
+      return chi::TaskStat();
+  }
+}
+
 // Helper methods for lock index calculation
 size_t Runtime::GetTargetLockIndex(const chi::PoolId &target_id) const {
   // Use hash of target_id to distribute locks evenly
@@ -2312,31 +2515,22 @@ chi::TaskResume Runtime::ExtendBlob(BlobInfo &blob_info, chi::u64 offset,
 
   chi::u64 additional_size = required_size - current_blob_size;
 
-  // Get ALL available targets for data placement (no pre-filtering)
+  // Snapshot available targets for the DPE. target_list_ is the contiguous
+  // mirror of registered_targets_ — copying it under the read lock is O(N_live)
+  // with no map iteration over empty slots.
   std::vector<TargetInfo> available_targets;
   {
     chi::ScopedCoRwReadLock read_lock(target_lock_);
-    available_targets.reserve(registered_targets_.size());
-    registered_targets_.for_each(
-        [&available_targets](const chi::PoolId &target_id,
-                             const TargetInfo &target_info) {
-          (void)target_id;
-          available_targets.push_back(target_info);
-        });
+    available_targets = target_list_;
   }
   if (available_targets.empty()) {
     error_code = 1;
     CHI_CO_RETURN;
   }
 
-  // Create Data Placement Engine based on configuration
-  const Config &config = GetConfig();
-  std::unique_ptr<DataPlacementEngine> dpe =
-      DpeFactory::CreateDpe(config.dpe_.dpe_type_);
-
-  // DPE selects targets from ALL available targets
+  // Use cached Data Placement Engine (built once in Create() from config)
   std::vector<TargetInfo> ordered_targets =
-      dpe->SelectTargets(available_targets, blob_score, additional_size);
+      dpe_->SelectTargets(available_targets, blob_score, additional_size);
 
   // Filter AFTER DPE by persistence level
   if (min_persistence_level > 0) {
@@ -3286,6 +3480,152 @@ chi::TaskResume Runtime::Monitor(hipc::FullPtr<MonitorTask> task,
   task->SetReturnCode(0);
   (void)rctx;
   CHI_CO_RETURN;
+}
+
+// =====================================================================
+// GPU metadata cache helpers
+// ---------------------------------------------------------------------
+// These helpers are the ONLY places that mutate the GPU cache. Methods
+// like PutBlob / DelBlob / GetOrCreateTag / DelTag stay free of cache-
+// management noise — they invoke the matching GpuCacheOn* helper and
+// move on. The cache lives in managed/shared USM, so calls to the
+// inline GpuCacheUpsert* / GpuCacheRemove* primitives in
+// gpu_metadata_cache.h work directly from the host. A pure-device-
+// memory variant (one-WI kernel per mutation) is a future extension.
+// =====================================================================
+
+bool Runtime::GpuCacheCreate() {
+  if (!config_.gpu_metadata_cache_.enabled_) {
+    gpu_cache_ = nullptr;
+    gpu_cache_bytes_ = 0;
+    return true;
+  }
+
+#if !(HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL)
+  HLOG(kWarning,
+       "GpuMetadataCache: enabled in config, but no GPU backend was built "
+       "in. Cache will not be allocated.");
+  gpu_cache_ = nullptr;
+  gpu_cache_bytes_ = 0;
+  return false;
+#else
+  // Cap the slot counts at what the requested capacity can fit.
+  chi::u32 max_tags = config_.gpu_metadata_cache_.max_tags_;
+  chi::u32 max_blobs = config_.gpu_metadata_cache_.max_blobs_;
+  size_t needed = GpuMetadataCacheHeader::Layout(max_tags, max_blobs);
+  size_t cap = static_cast<size_t>(config_.gpu_metadata_cache_.capacity_bytes_);
+  if (needed > cap) {
+    // Shrink slot counts proportionally so we stay within budget.
+    double scale =
+        static_cast<double>(cap - sizeof(GpuMetadataCacheHeader)) /
+        static_cast<double>(needed - sizeof(GpuMetadataCacheHeader));
+    if (scale < 0.0) scale = 0.0;
+    if (scale > 1.0) scale = 1.0;
+    max_tags = std::max<chi::u32>(
+        1u, static_cast<chi::u32>(static_cast<double>(max_tags) * scale));
+    max_blobs = std::max<chi::u32>(
+        1u, static_cast<chi::u32>(static_cast<double>(max_blobs) * scale));
+    needed = GpuMetadataCacheHeader::Layout(max_tags, max_blobs);
+    HLOG(kWarning,
+         "GpuMetadataCache: requested capacity {} bytes too small for the "
+         "configured slot counts; rescaled to max_tags={} max_blobs={} "
+         "({} bytes).",
+         cap, max_tags, max_blobs, needed);
+  }
+
+  // Managed/shared USM is host- and device-readable through the same
+  // virtual address. CUDA -> cudaMallocManaged, ROCm -> hipMallocManaged,
+  // SYCL -> sycl::malloc_shared. All three give us a pointer the CPU can
+  // call GpuCacheUpsert*/Remove* through directly.
+  void *region = hshm::GpuApi::MallocManaged<char>(needed);
+  if (!region) {
+    HLOG(kError,
+         "GpuMetadataCache: MallocManaged({} bytes) failed", needed);
+    gpu_cache_ = nullptr;
+    gpu_cache_bytes_ = 0;
+    return false;
+  }
+  std::memset(region, 0, needed);
+  gpu_cache_ = reinterpret_cast<GpuMetadataCacheHeader *>(region);
+  gpu_cache_bytes_ = needed;
+  gpu_cache_->Init(max_tags, max_blobs, needed);
+  HLOG(kInfo,
+       "GpuMetadataCache: allocated {} bytes (max_tags={}, max_blobs={}) "
+       "at {}",
+       needed, max_tags, max_blobs, static_cast<void *>(gpu_cache_));
+  return true;
+#endif
+}
+
+void Runtime::GpuCacheDestroy() {
+#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+  if (gpu_cache_ != nullptr) {
+    hshm::GpuApi::Free(reinterpret_cast<char *>(gpu_cache_));
+    gpu_cache_ = nullptr;
+    gpu_cache_bytes_ = 0;
+  }
+#else
+  gpu_cache_ = nullptr;
+  gpu_cache_bytes_ = 0;
+#endif
+}
+
+void Runtime::GpuCacheOnPutBlob(const TagId &tag_id,
+                                const std::string &blob_name,
+                                const BlobInfo &blob_info) {
+  if (gpu_cache_ == nullptr) return;
+  std::string bdev_type = GetBdevTypeForBlob(blob_info);
+  chi::u32 sc = gpu_cache::BdevTypeToStorageClass(bdev_type.c_str());
+  chi::u64 size = blob_info.GetTotalSize();
+  float score = blob_info.score_;
+  if (gpu_cache::IsGpuVisible(sc)) {
+    GpuCacheUpsertBlob(gpu_cache_, tag_id.major_, tag_id.minor_,
+                       blob_name.c_str(), size, score, sc);
+  } else {
+    GpuCacheRemoveBlob(gpu_cache_, tag_id.major_, tag_id.minor_,
+                       blob_name.c_str());
+  }
+}
+
+std::string Runtime::GetBdevTypeForBlob(const BlobInfo &blob_info) {
+  // Empty-blob (no blocks placed yet) -> nothing the GPU can reach.
+  if (blob_info.blocks_.empty()) return std::string();
+
+  // Resolve the bdev_type from the TargetInfo recorded at RegisterTarget
+  // time. This is the source of truth for any target — both YAML-composed
+  // ones AND those registered programmatically by tests / external code.
+  const auto &first_block = blob_info.blocks_[0];
+  chi::ScopedCoRwReadLock lock(target_lock_);
+  TargetInfo *target_info =
+      registered_targets_.find(first_block.bdev_client_.pool_id_);
+  if (!target_info) return std::string();
+  switch (target_info->bdev_type_) {
+    case chimaera::bdev::BdevType::kRam:    return std::string("ram");
+    case chimaera::bdev::BdevType::kHbm:    return std::string("hbm");
+    case chimaera::bdev::BdevType::kPinned: return std::string("pinned");
+    case chimaera::bdev::BdevType::kFile:   return std::string("file");
+    case chimaera::bdev::BdevType::kNoop:   return std::string("noop");
+    default:                                return std::string();
+  }
+}
+
+void Runtime::GpuCacheOnDelBlob(const TagId &tag_id,
+                                const std::string &blob_name) {
+  if (gpu_cache_ == nullptr) return;
+  GpuCacheRemoveBlob(gpu_cache_, tag_id.major_, tag_id.minor_,
+                     blob_name.c_str());
+}
+
+void Runtime::GpuCacheOnGetOrCreateTag(const TagId &tag_id,
+                                       const std::string &tag_name) {
+  if (gpu_cache_ == nullptr) return;
+  GpuCacheUpsertTag(gpu_cache_, tag_id.major_, tag_id.minor_,
+                    tag_name.c_str());
+}
+
+void Runtime::GpuCacheOnDelTag(const TagId &tag_id) {
+  if (gpu_cache_ == nullptr) return;
+  GpuCacheRemoveTag(gpu_cache_, tag_id.major_, tag_id.minor_);
 }
 
 }  // namespace wrp_cte::core

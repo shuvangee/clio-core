@@ -67,7 +67,11 @@ struct PerformanceConfig {
 
   PerformanceConfig()
       : target_stat_interval_ms_(5000),
-        stat_targets_period_ms_(50),
+        // 5000 ms — fires 12×/min so target stats stay fresh without
+        // saturating the bdev pool's worker (50 ms default fired
+        // 20×/s and starved real PutBlob/GetBlob traffic on a single-
+        // worker setup).
+        stat_targets_period_ms_(5000),
         max_concurrent_operations_(64),
         score_threshold_(0.7f),
         score_difference_threshold_(0.05f),
@@ -137,6 +141,34 @@ struct DpeConfig {
 };
 
 /**
+ * GPU metadata cache configuration.
+ *
+ * When enabled, CTE Core allocates a chunk of GPU-accessible memory
+ * (managed/shared USM) at Create time and projects a fixed-capacity
+ * snapshot of tag and blob metadata into it. The cache is updated by
+ * GPU kernels launched from the CTE Core server side as PutBlob /
+ * GetOrCreateTag / DelBlob / DelTag run on the CPU; downstream GPU
+ * kernels can read entries directly to discover what the CTE has
+ * placed in DRAM-tier (GPU-reachable) storage.
+ *
+ * Sizing: capacity_bytes_ caps the memory footprint of the cache. The
+ * actual map slot counts (max_blobs_ / max_tags_) are derived from
+ * capacity_bytes_ / sizeof(GpuBlobEntry|GpuTagEntry) in the Create path.
+ */
+struct GpuMetadataCacheConfig {
+  bool enabled_;             /**< Master switch — off by default. */
+  chi::u64 capacity_bytes_;  /**< Total GPU memory footprint cap. */
+  chi::u32 max_blobs_;       /**< Hash slot count for blob entries.  */
+  chi::u32 max_tags_;        /**< Hash slot count for tag entries.   */
+
+  GpuMetadataCacheConfig()
+      : enabled_(false),
+        capacity_bytes_(64ULL * 1024ULL * 1024ULL),  // 64 MB default
+        max_blobs_(8192),
+        max_tags_(1024) {}
+};
+
+/**
  * CTE Core Configuration Manager
  * Provides YAML parsing and validation for CTE Core configuration
  */
@@ -161,6 +193,11 @@ class Config {
    * Data Placement Engine configuration
    */
   DpeConfig dpe_;
+
+  /**
+   * GPU metadata cache (optional, off by default).
+   */
+  GpuMetadataCacheConfig gpu_metadata_cache_;
 
   /**
    * Default constructor

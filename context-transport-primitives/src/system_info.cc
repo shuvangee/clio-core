@@ -397,6 +397,17 @@ void *SystemInfo::GetTls(const ThreadLocalKey &key) {
 }
 
 std::string SystemInfo::GetMemfdDir() {
+  // Default is /tmp/chimaera_$USER, but some sites have a tiny /
+  // partition where /tmp fills up (ares compute nodes are a known
+  // example: a stale prior run -- or any other user's clutter --
+  // can leave no space, mkdir under /tmp silently fails, and the
+  // subsequent memfd symlink + shm_open returns ENOENT here. Allow
+  // env override so deployments can point chimaera's per-user
+  // bookkeeping at an NFS-backed location (e.g. $HOME).
+  const char *override_dir = getenv("CHI_MEMFD_DIR");
+  if (override_dir && *override_dir) {
+    return std::string(override_dir);
+  }
   const char *user = getenv("USER");
   if (!user) user = "unknown";
   return std::string("/tmp/chimaera_") + user;

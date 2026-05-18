@@ -43,6 +43,8 @@
 #include <list>
 #include <atomic>
 #include <chrono>
+#include <memory>
+#include <mutex>
 
 /**
  * Runtime container for bdev ChiMod
@@ -228,10 +230,8 @@ class Runtime : public chi::Container {
   using CreateParams = chimaera::bdev::CreateParams;
   
   Runtime() : bdev_type_(BdevType::kFile), file_size_(0), alignment_(4096),
-              io_depth_(32), max_blocks_per_operation_(64),
-              ram_buffer_(nullptr), ram_size_(0),
-              hbm_buffer_(nullptr), hbm_size_(0),
-              pinned_buffer_(nullptr), pinned_size_(0),
+              io_depth_(32),
+              ram_capacity_(0),
               total_reads_(0), total_writes_(0),
               total_bytes_read_(0), total_bytes_written_(0) {
     start_time_ = std::chrono::high_resolution_clock::now();
@@ -239,10 +239,12 @@ class Runtime : public chi::Container {
   ~Runtime() override;
 
   /**
-   * Get live task statistics per method.
-   * For Read/Write, returns default 1MB io_size routing hint.
+   * Get live task statistics for this task instance.
+   * For Read/Write, reads the task's `length_` so the scheduler routes
+   * actual large I/O to I/O workers and small ops to the scheduler
+   * worker, instead of bucketing every read/write at a placeholder size.
    */
-  chi::TaskStat GetTaskStats(chi::u32 method_id) const override;
+  chi::TaskStat GetTaskStats(const chi::Task *task) const override;
 
   /**
    * Create the container (Method::kCreate)
@@ -379,19 +381,17 @@ class Runtime : public chi::Container {
   chi::u64 file_size_;                            // Total file size
   chi::u32 alignment_;                            // I/O alignment requirement
   chi::u32 io_depth_;                             // Max concurrent I/O operations
-  chi::u32 max_blocks_per_operation_;             // Maximum blocks per I/O operation
 
-  // RAM-based storage (kRam)
-  char* ram_buffer_;                              // RAM storage buffer
-  chi::u64 ram_size_;                            // Total RAM buffer size
+  // RAM-based storage (kRam) — vector of fixed-size pages, lazily allocated.
+  // Pages are not pre-faulted: each page is allocated only when first written
+  // to, and the OS faults the underlying physical pages on first touch. This
+  // keeps memory usage proportional to data actually stored, not capacity.
+  static constexpr chi::u64 kRamPageSize = 1ULL << 30;  // 1 GiB
+  std::vector<std::unique_ptr<char[]>> ram_pages_;
+  chi::u64 ram_capacity_;  // Soft cap; UINT64_MAX = unbounded
+  mutable std::mutex ram_pages_mu_;
 
-  // GPU HBM storage (kHbm) — device memory via cudaMalloc
-  char* hbm_buffer_;
-  chi::u64 hbm_size_;
-
-  // Pinned host storage (kPinned) — pinned memory via cudaMallocHost
-  char* pinned_buffer_;
-  chi::u64 pinned_size_;
+  // kHbm / kPinned removed — see WriteToRam comment above.
 
   // New allocator components
   GlobalBlockMap global_block_map_;              // Global block cache with per-worker locking
@@ -468,24 +468,25 @@ class Runtime : public chi::Container {
   chi::TaskResume ReadFromFile(hipc::FullPtr<ReadTask> task, chi::RunContext &ctx);
 
   /**
-   * Backend-specific RAM operations (synchronous, no coroutine needed)
+   * Backend-specific RAM operations (synchronous, no coroutine needed).
+   * Uses chi::DeviceAwareMemcpy so the data ShmPtr may resolve to either
+   * a host or a device-USM pointer.
    */
   void WriteToRam(hipc::FullPtr<WriteTask> task);
   void ReadFromRam(hipc::FullPtr<ReadTask> task);
 
-  /**
-   * Backend-specific HBM operations (GPU device memory, async cudaMemcpyAsync)
-   * Uses cudaMemcpyAsync + cudaStreamQuery polling with coroutine yield.
-   */
-  chi::TaskResume WriteToHbm(hipc::FullPtr<WriteTask> task, chi::RunContext &ctx);
-  chi::TaskResume ReadFromHbm(hipc::FullPtr<ReadTask> task, chi::RunContext &ctx);
+  // BdevType::kHbm / BdevType::kPinned tiers were removed. PutBlob /
+  // GetBlob with HBM-resident ShmPtr data buffers route through kRam
+  // (or kFile, with host-buffer staging) and the bdev uses the
+  // device-aware memcpy + IsDevicePointer hooks installed at server
+  // init by gpu/gpu2cpu_init_sycl.cc.
 
-  /**
-   * Backend-specific pinned-host-memory operations (async cudaMemcpyAsync)
-   * Uses cudaMemcpyAsync + cudaStreamQuery polling with coroutine yield.
-   */
-  chi::TaskResume WriteToPinned(hipc::FullPtr<WriteTask> task, chi::RunContext &ctx);
-  chi::TaskResume ReadFromPinned(hipc::FullPtr<ReadTask> task, chi::RunContext &ctx);
+  // Get (allocating if needed) the page at page_idx. Allocation uses
+  // default-initialized new char[] so the OS reserves virtual address space
+  // without pre-faulting physical pages.
+  char* EnsureRamPage(size_t page_idx);
+  // Lookup without allocating; returns nullptr for never-written pages.
+  char* GetRamPage(size_t page_idx) const;
 
   /**
    * Update performance metrics

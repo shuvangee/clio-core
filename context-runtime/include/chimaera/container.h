@@ -161,14 +161,25 @@ class Container {
   }
 
   /**
-   * Get live task statistics for a method.
-   * Override in modules to provide dynamic stats (e.g., queue depth).
-   * Default returns zeros.
-   * @param method_id Method to query
-   * @return TaskStat with current compute/io_size values
+   * Get live task statistics for THIS specific task instance.
+   *
+   * Receives a pointer to the actual task so the override can read its
+   * payload-bearing fields (e.g. WriteTask::length_, PutBlobTask::size_)
+   * and report the real I/O size for routing/scheduling. Returning a
+   * static per-method estimate is almost never what callers want — the
+   * scheduler routes "large I/O" tasks to I/O workers and "small/
+   * metadata" tasks to the scheduler worker, and that decision needs the
+   * actual byte count, not a placeholder constant.
+   *
+   * Default returns zeros; override in modules whose tasks carry
+   * variable-size payloads.
+   *
+   * @param task Pointer to the task instance (must not be null; cast to
+   *             the module's concrete task type to read payload fields).
+   * @return TaskStat with compute/io_size/wall_time populated for this task.
    */
-  virtual TaskStat GetTaskStats(u32 method_id) const {
-    (void)method_id;
+  virtual TaskStat GetTaskStats(const Task *task) const {
+    (void)task;
     return TaskStat();
   }
 
@@ -282,6 +293,24 @@ class Container {
    */
   virtual TaskResume Run(u32 method, hipc::FullPtr<Task> task_ptr,
                          RunContext& rctx) = 0;
+
+  /**
+   * Fix up POD bytewise-copied tasks (chi::priv::string SSO data_
+   * pointers, etc.) before dispatching Run. Called by the GPU2CPU pop
+   * path when the kernel's task was in kDeviceMem and the worker had
+   * to D2H-copy the POD bytes into a host scratch buffer — at that
+   * point any embedded `data_` pointers still reference the original
+   * device buffer offsets and must be re-pointed at the scratch copy.
+   *
+   * Default no-op for chimods whose tasks are already trivially
+   * relocatable (no SSO strings, no SVO vectors). Each chimod that
+   * has SSO/SVO members should override and dispatch per method to
+   * the per-task `FixupAfterCopy()`.
+   */
+  virtual void FixupAfterCopy(u32 method, hipc::FullPtr<Task> task_ptr) {
+    (void)method;
+    (void)task_ptr;
+  }
 
 
   /**

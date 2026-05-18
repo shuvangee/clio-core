@@ -58,99 +58,12 @@ add_executable(test_reorganize_blob
     test_reorganize_blob.cc
 )
 
-# Create test_gpu_core executable for GPU client API tests (AsyncPutBlob/AsyncGetBlob)
-# GPU-initiated kernel compiled via add_cuda_library (clang-cuda dual-pass)
-if(WRP_CORE_ENABLE_CUDA)
-  # Unified CUDA GPU kernel library: all CTE GPU test + benchmark kernels
-  # compiled into a single device-link unit alongside chimaera_cxx_gpu.
-  # This ensures volatile completion flag reads see CDP child writes.
-  # Glob all GPU workload/test kernel sources that need unified device linking
-  file(GLOB _CTE_BENCH_GPU_SOURCES
-      ${CMAKE_SOURCE_DIR}/context-transfer-engine/benchmark/gpu/workload_*.cc)
-  file(GLOB _CR_MOD_GPU_SOURCES
-      ${CMAKE_SOURCE_DIR}/context-runtime/modules/MOD_NAME/test/test_gpu_*_gpu.cc)
-  add_cuda_library(test_gpu_initiated_kernels STATIC TRUE
-      gpu/test_gpu_initiated_gpu.cc
-      gpu/test_gpu_coroutine_gpu.cc
-      gpu/test_gpu_tiered_gpu.cc
-      ${_CTE_BENCH_GPU_SOURCES}
-      ${_CR_MOD_GPU_SOURCES}
-      INCLUDE_DIRS
-          ${CMAKE_SOURCE_DIR}/context-transfer-engine/core/include
-          ${CMAKE_SOURCE_DIR}/context-transfer-engine/benchmark
-          ${CMAKE_SOURCE_DIR}/context-transfer-engine/benchmark/gpu
-          ${CMAKE_SOURCE_DIR}/context-runtime/modules/MOD_NAME/include
-          ${CMAKE_SOURCE_DIR}/context-runtime/modules/bdev/include
-      LINK_LIBS hshm::cuda_cxx chimaera_cxx_gpu
-  )
-  target_link_libraries(test_gpu_initiated_kernels hshm::cuda_cxx)
-
-  # GPU-tiered test: PutBlob 200MB + GetBlob 100MB with HBM+pinned tiers
-  # GPU kernel compiled by nvcc, host code compiled by g++ (avoids CHI_IPC
-  # macro resolving to gpu::GetGpuIpcManager() which is nullptr on host).
-  add_executable(test_gpu_tiered
-      gpu/test_gpu_tiered.cc
-  )
-  set_target_properties(test_gpu_tiered PROPERTIES
-      CUDA_SEPARABLE_COMPILATION ON
-      LINKER_LANGUAGE CUDA
-      POSITION_INDEPENDENT_CODE ON
-  )
-  install(TARGETS test_gpu_tiered RUNTIME DESTINATION bin)
-
-  # Copy config yaml next to the source (where __FILE__ resolves)
-  add_custom_command(TARGET test_gpu_tiered POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      ${CMAKE_CURRENT_SOURCE_DIR}/gpu/test_gpu_tiered_config.yaml
-      ${CMAKE_CURRENT_BINARY_DIR}/gpu/test_gpu_tiered_config.yaml
-  )
-
-  add_test(NAME cte_gpu_tiered_test COMMAND test_gpu_tiered)
-  set_tests_properties(cte_gpu_tiered_test PROPERTIES
-      TIMEOUT 180
-      LABELS "msan_skip"
-      ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}")
-endif()
-
-if(WRP_CORE_ENABLE_CUDA)
-add_executable(test_cte_gpu_coroutine
-    gpu/test_gpu_coroutine.cc
-)
-
-add_executable(test_gpu_core
-    gpu/test_gpu_core.cc
-)
-
-# Create test_gpu_create executable for GPU AsyncCreate tests
-# GPU kernel file compiled with HSHM_ENABLE_CUDA=1 so device APIs are available
-add_library(test_gpu_create_kernels OBJECT gpu/test_gpu_create_gpu.cu)
-target_include_directories(test_gpu_create_kernels PRIVATE
-    ${CMAKE_SOURCE_DIR}/context-transfer-engine/core/include
-    ${CMAKE_SOURCE_DIR}/context-runtime/include
-    ${CMAKE_SOURCE_DIR}/context-runtime/modules/admin/include
-    ${CMAKE_SOURCE_DIR}/context-transport-primitives/include
-    ${CMAKE_SOURCE_DIR}/build/context-transport-primitives/src/include
-)
-target_compile_definitions(test_gpu_create_kernels PRIVATE HSHM_ENABLE_CUDA=1)
-target_link_libraries(test_gpu_create_kernels PRIVATE hermes_shm_cuda)
-set_target_properties(test_gpu_create_kernels PROPERTIES
-    CUDA_SEPARABLE_COMPILATION ON
-    POSITION_INDEPENDENT_CODE ON
-)
-target_compile_options(test_gpu_create_kernels PUBLIC
-    $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
-)
-
-add_executable(test_gpu_create
-    gpu/test_gpu_create_cpu.cc
-    $<TARGET_OBJECTS:test_gpu_create_kernels>
-)
-set_target_properties(test_gpu_create PROPERTIES
-    CUDA_SEPARABLE_COMPILATION ON
-    LINKER_LANGUAGE CUDA
-    POSITION_INDEPENDENT_CODE ON
-)
-endif()  # WRP_CORE_ENABLE_CUDA (GPU test executables)
+# GPU-runtime-era CUDA tests were removed when the GPU runtime concept
+# was retired. The kernel→CPU submission path is now exercised by:
+#   - context-runtime/test/unit/gpu/test_gpu_kernel_stress_*
+#     (kPinnedHost task submission to a dummy chimod).
+#   - context-transfer-engine/adapter/gpu_vector/test/test_gpu_vector_gpu.cc
+#     (kDeviceMem-backed pages flushed to bdev kRam via PutBlob).
 
 # Include directories for all tests - using unified simple_test.h framework
 target_include_directories(cte_core_unit_tests PRIVATE
@@ -189,29 +102,7 @@ target_include_directories(test_reorganize_blob PRIVATE
 
 )
 
-if(WRP_CORE_ENABLE_CUDA)
-target_include_directories(test_cte_gpu_coroutine PRIVATE
-  ${CMAKE_SOURCE_DIR}/context-runtime/test  # For simple_test.h with g_test_finalize
-  ${CMAKE_SOURCE_DIR}/context-runtime/modules/MOD_NAME/include
-)
-
-target_include_directories(test_gpu_core PRIVATE
-
-)
-
-target_include_directories(test_gpu_create PRIVATE
-
-)
-
-target_include_directories(test_gpu_tiered PRIVATE
-  ${CMAKE_SOURCE_DIR}/context-transfer-engine/core/include
-  ${CMAKE_SOURCE_DIR}/context-runtime/include
-  ${CMAKE_SOURCE_DIR}/context-runtime/modules/admin/include
-  ${CMAKE_SOURCE_DIR}/context-runtime/modules/bdev/include
-  ${CMAKE_SOURCE_DIR}/context-transport-primitives/include
-  ${CMAKE_SOURCE_DIR}/build/context-transport-primitives/src/include
-)
-endif()  # WRP_CORE_ENABLE_CUDA (GPU include dirs)
+# GPU runtime tests + their include directories removed.
 
 # Link against required libraries using simple_test.h framework (NOT Catch2)
 target_link_libraries(cte_core_unit_tests
@@ -321,69 +212,7 @@ target_link_libraries(test_reorganize_blob
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
-if(WRP_CORE_ENABLE_CUDA)
-# Link test_cte_gpu_coroutine
-target_link_libraries(test_cte_gpu_coroutine
-    wrp_cte_core_runtime
-    wrp_cte_core_client
-    chimaera::admin_runtime
-    chimaera::admin_client
-    chimaera::bdev_runtime
-    chimaera::bdev_client
-    hshm::cxx
-    hermes_shm_cuda
-    test_gpu_initiated_kernels
-    ${CMAKE_THREAD_LIBS_INIT}
-)
-
-# Link test_gpu_core
-target_link_libraries(test_gpu_core
-    wrp_cte_core_runtime
-    wrp_cte_core_client
-    chimaera::admin_runtime
-    chimaera::admin_client
-    chimaera::bdev_runtime
-    chimaera::bdev_client
-    hshm::cxx
-    hermes_shm_cuda
-    test_gpu_initiated_kernels
-    ${CMAKE_THREAD_LIBS_INIT}
-)
-
-# Link test_gpu_create
-target_link_libraries(test_gpu_create
-    wrp_cte_core_runtime
-    wrp_cte_core_client
-    chimaera::admin_runtime
-    chimaera::admin_client
-    chimaera::bdev_runtime
-    chimaera::bdev_client
-    hshm::cxx
-    hermes_shm_cuda
-    ${CMAKE_THREAD_LIBS_INIT}
-)
-
-# Link test_gpu_tiered
-target_link_libraries(test_gpu_tiered
-    wrp_cte_core_runtime
-    wrp_cte_core_client
-    chimaera::admin_runtime
-    chimaera::admin_client
-    chimaera::bdev_runtime
-    chimaera::bdev_client
-    hshm::cxx
-    hermes_shm_cuda
-    test_gpu_initiated_kernels
-    ${CMAKE_THREAD_LIBS_INIT}
-)
-
-if(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
-  find_package(CUDAToolkit QUIET)
-  set_property(TARGET test_cte_gpu_coroutine APPEND PROPERTY LINK_LIBRARIES "CUDA::cudart")
-  set_property(TARGET test_gpu_core APPEND PROPERTY LINK_LIBRARIES "CUDA::cudart")
-  set_property(TARGET test_gpu_tiered APPEND PROPERTY LINK_LIBRARIES "CUDA::cudart")
-endif()
-endif()  # WRP_CORE_ENABLE_CUDA (GPU link libraries)
+# GPU-runtime-era link rules removed.
 
 # Note: Include directories are provided automatically via linked ChiMod targets
 # wrp_cte_core_client provides ${WRP_CTE_ROOT}/core/include via transitive includes
@@ -549,7 +378,7 @@ set_tests_properties(
     PROPERTIES
         TIMEOUT 300  # 5 minute timeout
         LABELS "functional;core;cte"
-        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHI_TEST_DATA_DIR=${CMAKE_BINARY_DIR}"
 )
 
 set_tests_properties(
@@ -568,7 +397,7 @@ set_tests_properties(
     PROPERTIES
         TIMEOUT 300  # 5 minute timeout for each test
         LABELS "query;core;cte"
-        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHI_TEST_DATA_DIR=${CMAKE_BINARY_DIR}"
 )
 
 set_tests_properties(
@@ -584,7 +413,7 @@ set_tests_properties(
     PROPERTIES
         TIMEOUT 300  # 5 minute timeout for each test
         LABELS "unit;tag;cte"
-        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHI_TEST_DATA_DIR=${CMAKE_BINARY_DIR}"
 )
 
 set_tests_properties(cte_client_config_all PROPERTIES
@@ -596,7 +425,7 @@ set_tests_properties(cte_client_config_all PROPERTIES
 set_tests_properties(cte_runtime_coverage_all PROPERTIES
     TIMEOUT 600
     LABELS "unit;core;cte;runtime;coverage"
-    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHI_TEST_DATA_DIR=${CMAKE_BINARY_DIR}"
 )
 
 # Add tiered storage stress tests
@@ -611,7 +440,7 @@ set_tests_properties(
     PROPERTIES
         TIMEOUT 300  # 5 minute timeout
         LABELS "stress;tiered;cte"
-        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHI_TEST_DATA_DIR=${CMAKE_BINARY_DIR}"
 )
 
 # Add reorganize blob tests
@@ -626,7 +455,7 @@ set_tests_properties(
     PROPERTIES
         TIMEOUT 300  # 5 minute timeout
         LABELS "unit;reorganize;cte"
-        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHI_TEST_DATA_DIR=${CMAKE_BINARY_DIR}"
 )
 
 if(WRP_CORE_ENABLE_CUDA OR WRP_CORE_ENABLE_ROCM)
@@ -726,6 +555,18 @@ endif()
 # Tests that start a full Chimaera runtime share /tmp/chimaera_iowarp SHM
 # segments and TCP/IPC ports, so they must NOT run in parallel.
 set_tests_properties(
+    cte_query_tag_exact
+    cte_query_tag_wildcard
+    cte_query_tag_alternation
+    cte_query_tag_matchall
+    cte_query_tag_nomatch
+    cte_query_blob_exact
+    cte_query_blob_wildcard
+    cte_query_blob_multitag
+    cte_query_blob_matchall
+    cte_query_blob_no_blob
+    cte_query_blob_no_tag
+    cte_query_local_poolquery
     cte_tag_construction
     cte_tag_putblob
     cte_tag_getblob
@@ -767,14 +608,91 @@ set_tests_properties(
 # Install Targets
 # ------------------------------------------------------------------------------
 set(_CTE_TEST_TARGETS cte_core_unit_tests test_core_functionality test_query test_cte_config_dpe test_tag_operations test_core_client_config test_core_runtime_coverage test_tiered_storage_stress test_reorganize_blob)
-if(WRP_CORE_ENABLE_CUDA)
-  list(APPEND _CTE_TEST_TARGETS test_cte_gpu_coroutine test_gpu_core test_gpu_create)
-endif()
+# (Legacy test_cte_gpu_coroutine / test_gpu_core / test_gpu_create were
+# removed along with the GPU runtime — see deletions earlier in this
+# file. The new CUDA test target test_cuda_cte_kernel_putget is added
+# below with its own install rule via add_cuda_executable.)
 install(TARGETS ${_CTE_TEST_TARGETS}
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# ------------------------------------------------------------------------------
+# CTE PutBlob+GetBlob device-memory round-trip (CUDA / ROCm).
+# Validates that the producer-only gpu2cpu path correctly handles tasks
+# AND blob payload data that live entirely in kDeviceMem (no pinned
+# host fallback).
+# ------------------------------------------------------------------------------
+if(WRP_CORE_ENABLE_CUDA)
+  add_cuda_executable(test_cte_devmem_putget FALSE
+    gpu/test_cte_devmem_putget.cc
+    INCLUDE_DIRS
+      ${CMAKE_SOURCE_DIR}/context-runtime/include
+      ${CMAKE_SOURCE_DIR}/context-runtime/test
+      ${CMAKE_SOURCE_DIR}/context-runtime/modules/admin/include
+      ${CMAKE_SOURCE_DIR}/context-transfer-engine/core/include
+    LINK_LIBS
+      chimaera_cxx
+      chimaera_cxx_gpu
+      chimaera_admin_client
+      chimaera_bdev_client
+      wrp_cte_core_client
+      wrp_cte_core_runtime
+      hshm::cuda_cxx
+      ${CMAKE_THREAD_LIBS_INIT}
+  )
+  set_target_properties(test_cte_devmem_putget PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+  )
+  add_test(NAME cte_devmem_putget_cuda COMMAND test_cte_devmem_putget
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+  )
+  set_tests_properties(cte_devmem_putget_cuda PROPERTIES
+    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin"
+    TIMEOUT 120
+    LABELS "gpu;cuda;cte;devmem;putblob"
+  )
+endif()
+
+if(WRP_CORE_ENABLE_ROCM)
+  add_rocm_gpu_executable(test_cte_devmem_putget FALSE
+    gpu/test_cte_devmem_putget.cc
+  )
+  target_compile_options(test_cte_devmem_putget PRIVATE
+    "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--generate-code=arch=compute_89,code=sm_89>"
+  )
+  set_target_properties(test_cte_devmem_putget PROPERTIES
+    CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}"
+    CUDA_STANDARD 17
+    CUDA_STANDARD_REQUIRED ON
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+  )
+  target_include_directories(test_cte_devmem_putget PUBLIC
+    ${CMAKE_SOURCE_DIR}/context-runtime/include
+    ${CMAKE_SOURCE_DIR}/context-runtime/test
+    ${CMAKE_SOURCE_DIR}/context-runtime/modules/admin/include
+    ${CMAKE_SOURCE_DIR}/context-transfer-engine/core/include
+  )
+  target_link_libraries(test_cte_devmem_putget PUBLIC
+    chimaera_cxx
+    chimaera_cxx_gpu
+    chimaera_admin_client
+    chimaera_bdev_client
+    wrp_cte_core_client
+    wrp_cte_core_runtime
+    hshm::rocm_cxx
+    ${CMAKE_THREAD_LIBS_INIT}
+  )
+  add_test(NAME cte_devmem_putget_rocm COMMAND test_cte_devmem_putget
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+  )
+  set_tests_properties(cte_devmem_putget_rocm PROPERTIES
+    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin"
+    TIMEOUT 120
+    LABELS "gpu;rocm;cte;devmem;putblob"
+  )
+endif()
 
 # ------------------------------------------------------------------------------
 # Note: Compression tests have been moved to compressor chimod tests

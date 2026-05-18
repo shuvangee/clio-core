@@ -195,7 +195,7 @@ void ConfigManager::LoadDefault() {
   wait_for_restart_poll_period_ = 1;   // 1 second
 
   // Set default worker sleep configuration (in microseconds)
-  first_busy_wait_ = 50;               // 50us busy wait
+  first_busy_wait_ = 1000;             // 1000us busy wait
   max_sleep_ = 50000;                  // 50000us (50ms) maximum sleep
 
   // Set default task load prediction model learning rate
@@ -282,6 +282,28 @@ void ConfigManager::ParseYAML(YAML::Node &yaml_conf) {
     }
     if (networking["wait_for_restart_poll_period"]) {
       wait_for_restart_poll_period_ = networking["wait_for_restart_poll_period"].as<u32>();
+    }
+  }
+
+  // Parse SWIM membership-detection configuration. All fields optional;
+  // unspecified fields keep their compile-time defaults (matches the
+  // prior hard-coded constants in admin_runtime.cc).
+  if (yaml_conf["swim"]) {
+    auto swim = yaml_conf["swim"];
+    if (swim["enabled"]) {
+      swim_enabled_ = swim["enabled"].as<bool>();
+    }
+    if (swim["direct_probe_timeout_sec"]) {
+      swim_direct_probe_timeout_sec_ =
+          swim["direct_probe_timeout_sec"].as<float>();
+    }
+    if (swim["indirect_probe_timeout_sec"]) {
+      swim_indirect_probe_timeout_sec_ =
+          swim["indirect_probe_timeout_sec"].as<float>();
+    }
+    if (swim["suspicion_timeout_sec"]) {
+      swim_suspicion_timeout_sec_ =
+          swim["suspicion_timeout_sec"].as<float>();
     }
   }
 

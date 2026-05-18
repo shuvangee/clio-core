@@ -7,80 +7,92 @@
 
 #include "chimaera/ipc/ipc_gpu2cpu.h"
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
 
-#include "chimaera/ipc_manager.h"
+#include "chimaera/device_memcpy.h"
 #include "chimaera/gpu/future.h"
+#include "chimaera/gpu/gpu_ipc_manager.h"
+#include "chimaera/ipc_manager.h"
 
 namespace chi {
 
+/**
+ * RuntimeRecv: producer-only — the GPU never serializes a task through
+ * lightbeam. Worker::ProcessNewTaskGpu already wrapped the popped task
+ * pointer in a chi::Future<Task> (for kDeviceMem the wrapped pointer
+ * is a host scratch copy of the device POD). We just hand it back.
+ */
 hipc::FullPtr<Task> IpcGpu2Cpu::RuntimeRecv(
     IpcManager *ipc, Future<Task> &future, Container *container,
     u32 method_id, hshm::lbm::Transport *recv_transport) {
-  auto future_shm = future.GetFutureShm();
-  FullPtr<Task> task_full_ptr = future.GetTaskPtr();
-
-  if (!future_shm->flags_.Any(FutureShm::FUTURE_COPY_FROM_CLIENT) ||
-      future_shm->flags_.Any(FutureShm::FUTURE_WAS_COPIED)) {
-    return task_full_ptr;
-  }
-
-  // GPU->CPU: task was serialized with DefaultSaveArchive
-  hshm::lbm::LbmContext ctx;
-  ctx.copy_space = future_shm->copy_space;
-  ctx.shm_info_ = &future_shm->input_;
-
-  chi::priv::vector<char> recv_buf(CHI_PRIV_ALLOC);
-  recv_buf.reserve(256);
-  DefaultLoadArchive local_archive(recv_buf);
-  recv_transport->Recv(local_archive, ctx);
-  task_full_ptr = container->LocalAllocLoadTask(method_id, local_archive);
-
-  future.GetTaskPtr() = task_full_ptr;
-  future_shm->flags_.SetBits(FutureShm::FUTURE_WAS_COPIED);
-  return task_full_ptr;
+  (void)ipc; (void)container; (void)method_id; (void)recv_transport;
+  return future.GetTaskPtr();
 }
 
+/**
+ * RuntimeSend: writes the (mutated) POD task bytes back to the original
+ * device address (when the kernel allocated in kDeviceMem) and sets
+ * FUTURE_COMPLETE on the device-side gpu::FutureShm so the kernel
+ * poll-loop unblocks.
+ *
+ * For kPinnedHost / kManagedUvm backends the host scratch copy IS the
+ * authoritative storage (CPU and GPU share the same address) so no
+ * writeback is needed; we just SetBits on the host-mapped flags. For
+ * kDeviceMem we issue cudaMemcpy of the POD payload + a 4-byte cudaMemcpy
+ * of the flag word to flip FUTURE_COMPLETE atomically — single-aligned-
+ * 32-bit writes are observed atomically by the device's volatile read.
+ */
 void IpcGpu2Cpu::RuntimeSend(
     IpcManager *ipc, const FullPtr<Task> &task_ptr,
     RunContext *run_ctx, Container *container) {
+  (void)container;
   auto future_shm = run_ctx->future_.GetFutureShm();
-  HLOG(kInfo, "IpcGpu2Cpu::RuntimeSend: pool={} method={} device_ptr=0x{:x}",
-       task_ptr->pool_id_, task_ptr->method_,
-       (size_t)future_shm->task_device_ptr_);
+  HLOG(kDebug, "IpcGpu2Cpu::RuntimeSend: pool={} method={}",
+       task_ptr->pool_id_, task_ptr->method_);
 
-  // Signal the device-side gpu::FutureShm so the GPU waiter sees COMPLETE.
-  // Use direct volatile write to the flags field. The gpu::FutureShm lives
-  // in pinned host memory (cudaMallocHost), so CPU stores are visible to
-  // GPU volatile reads through PCIe cache snooping.
-  if (future_shm->task_device_ptr_) {
-    auto *gpu_fshm = reinterpret_cast<gpu::FutureShm *>(
-        future_shm->task_device_ptr_);
-    // Direct volatile RMW on the raw storage to ensure the write is not
-    // reordered or held in a CPU store buffer.
-    volatile u32 *flags_ptr = reinterpret_cast<volatile u32 *>(
-        &gpu_fshm->flags_.bits_.x);
-    __sync_fetch_and_or(flags_ptr, gpu::FutureShm::FUTURE_COMPLETE);
+  // 1) Writeback the POD task bytes to device memory if the kernel
+  //    allocated the task there. Worker::ProcessNewTaskGpu set
+  //    gpu_task_device_ptr_ only when D2H-copy was needed.
+  if (future_shm->gpu_task_device_ptr_ && future_shm->gpu_task_size_) {
+    void *dst = reinterpret_cast<void *>(future_shm->gpu_task_device_ptr_);
+    chi::DeviceAwareMemcpy(dst, task_ptr.ptr_, future_shm->gpu_task_size_);
   }
 
-  // Also mark chi-side future complete for host-side waiters
-  future_shm->flags_.SetBitsSystem(FutureShm::FUTURE_COMPLETE);
-
-  // Free the task from the GPU orchestrator's scratch allocator.
-  // The task lives in pinned host memory allocated by the GPU-side
-  // RoundRobinAllocator. The GPU kernel does NOT free it (ClientRecv
-  // skips Destroy), so the CPU handles cleanup here.
-  auto *gpu_mgr = ipc->GetGpuIpcManager();
-  if (gpu_mgr) {
-    auto *alloc = reinterpret_cast<hipc::RoundRobinAllocator *>(
-        gpu_mgr->gpu_orchestrator_info_.backend.data_);
-    if (alloc && alloc->ContainsPtr(task_ptr.ptr_)) {
-      task_ptr->ClearFlags(TASK_DATA_OWNER);
-      alloc->Free(task_ptr.template Cast<char>());
+  // 2) Signal FUTURE_COMPLETE on the device-side gpu::FutureShm. For
+  //    pinned host / UVM the address is dereferenceable and we use a
+  //    fenced atomic OR. For kDeviceMem we cudaMemcpy a 4-byte word.
+  if (future_shm->gpu_fshm_device_ptr_) {
+    auto *gpu_fshm = reinterpret_cast<gpu::FutureShm *>(
+        future_shm->gpu_fshm_device_ptr_);
+    auto is_device_ptr = chi::g_is_device_pointer.load(
+        std::memory_order_acquire);
+    bool fshm_on_device =
+        is_device_ptr && is_device_ptr(static_cast<void *>(gpu_fshm));
+    if (fshm_on_device) {
+      // GPU's volatile read of bits_.x sees the 4-byte write whole.
+      // We OR-in the bit by reading then writing rather than racing
+      // against the kernel — the kernel never writes flags_ while a
+      // task is in-flight (it only reads), so a plain write of
+      // FUTURE_COMPLETE is safe here.
+      u32 new_flags = gpu::FutureShm::FUTURE_COMPLETE;
+      chi::DeviceAwareMemcpy(&gpu_fshm->flags_.bits_.x, &new_flags,
+                             sizeof(u32));
+    } else {
+      volatile u32 *flags_ptr = reinterpret_cast<volatile u32 *>(
+          &gpu_fshm->flags_.bits_.x);
+      __sync_fetch_and_or(flags_ptr, gpu::FutureShm::FUTURE_COMPLETE);
     }
   }
+
+  // Mark the chi-side future complete for any host-side waiters.
+  future_shm->flags_.SetBitsSystem(FutureShm::FUTURE_COMPLETE);
+
+  // Producer-only model: the client owns the device-memory backend that
+  // holds the task — the runtime does not free it.
+  task_ptr->ClearFlags(TASK_DATA_OWNER);
+  (void)ipc;
 }
 
 }  // namespace chi
 
-#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL

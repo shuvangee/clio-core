@@ -44,8 +44,11 @@
 #include <hermes_shm/introspect/system_info.h>
 #include <hermes_shm/memory/allocator/malloc_allocator.h>
 
+#include <atomic>
 #include <deque>
+#include <mutex>
 #include <random>
+#include <thread>
 #include <unordered_set>
 
 namespace chimaera::admin {
@@ -107,11 +110,38 @@ private:
   hshm::CpuTimes prev_cpu_times_;
 
   // Network task tracking maps (keyed by net_key for efficient lookup)
-  // Using lock-free unordered_map_ll with 1024 buckets for high concurrency
-  // Thread safety: All Send/Recv tasks are routed to a single dedicated net worker
+  // Using unordered_map_ll with 1024 buckets.
+  //
+  // Concurrency: with the recv/send worker split (DefaultScheduler::DivideWorkers)
+  // these maps are touched from two threads:
+  //   send_map_: SendIn/ProcessRetryQueues on net_send_worker write & erase;
+  //              RecvOut on net_recv_worker reads & erases when responses
+  //              arrive. Guard with send_map_mutex_.
+  //   recv_map_: RecvIn on net_recv_worker writes & erases;
+  //              SendOut on net_send_worker reads & erases when the
+  //              container finishes the task. Guard with recv_map_mutex_.
+  // Contention is low (worst case is one lookup/insert/erase per task per
+  // direction), so std::mutex is cheap relative to the ZMQ cost of the
+  // surrounding Send/Recv.
   static constexpr size_t kNumMapBuckets = 1024;
+  mutable std::mutex send_map_mutex_;
+  mutable std::mutex recv_map_mutex_;
   hshm::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> send_map_{kNumMapBuckets};  // Tasks sent to remote nodes
   hshm::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> recv_map_{kNumMapBuckets};  // Tasks received from remote nodes
+
+  // Dedicated recv threads — bypass the Worker scheduler for the hot
+  // inbound network path. Single thread per channel:
+  //   - peer_recv_thread_   owns the cross-node ROUTER (port 9413)
+  //   - client_recv_thread_ owns the client TCP+IPC transports
+  // A multi-thread recv pool was tried; the transport's recv_mtx_
+  // serialises the entire multipart Recv (including bulk frames), so
+  // pooling parallelised only the post-Recv LoadTask/Aggregate work
+  // and bought little once contention overhead was paid. 8n read also
+  // hung under the pool, so we're back to single threads here while
+  // we investigate.
+  std::atomic<bool> recv_shutdown_{false};
+  std::thread peer_recv_thread_;
+  std::thread client_recv_thread_;
 
 public:
   /**
@@ -120,9 +150,9 @@ public:
   Runtime() = default;
 
   /**
-   * Destructor
+   * Destructor — joins dedicated recv threads (peer / client).
    */
-  virtual ~Runtime() = default;
+  virtual ~Runtime();
 
   /**
    * Initialize container with pool information
@@ -356,10 +386,11 @@ public:
   void RecvOut(hipc::FullPtr<RecvTask> task, chi::LoadTaskArchive& archive, hshm::lbm::Transport* lbm_transport);
 
   /**
-   * Get live task statistics per method.
-   * For network methods, compute = total queue depth across priorities.
+   * Get live task statistics for this task instance.
+   * For network periodics, compute_ = total queue depth across priorities;
+   * io_size_ is a static stand-in (admin periodics don't have a payload).
    */
-  chi::TaskStat GetTaskStats(chi::u32 method_id) const override;
+  chi::TaskStat GetTaskStats(const chi::Task *task) const override;
 
   /**
    * Get remaining work count for this admin container
@@ -460,7 +491,10 @@ private:
    */
   void InitiateShutdown(chi::u32 grace_period_ms);
 
-  // Retry queues for tasks that failed to send due to dead nodes
+  // Retry queues for tasks that failed to send due to dead nodes. With
+  // multi-threaded send, the per-sender-thread writes and the
+  // SendPoll-periodic maintenance reads/erases all need to be serialised.
+  mutable std::mutex retry_queues_mutex_;
   std::deque<RetryEntry> send_in_retry_;
   std::deque<RetryEntry> send_out_retry_;
 
@@ -482,10 +516,20 @@ private:
   std::vector<PendingIndirectProbe> pending_indirect_probes_;
   std::mt19937 probe_rng_{std::random_device{}()};
 
-  static constexpr float kDirectProbeTimeoutSec = 5.0f;
-  static constexpr float kIndirectProbeTimeoutSec = 3.0f;
+  // SWIM probe / suspicion timeouts. The prior 5 s direct + 3 s
+  // indirect window was tight enough that any brief Send-side
+  // congestion (e.g. 24 ranks * 256 cross-node PutBlobs ramping up
+  // on the dedicated net worker) drove the round-trip past the
+  // threshold and the peer was wrongly declared kDead, after which
+  // every subsequent SendIn skipped zmq_send entirely. 30 s direct
+  // probe matches what the rest of the codebase already assumes,
+  // and gives the workload's burst phase room to drain.
+  // SWIM probe / suspicion timeouts moved to ConfigManager so they can
+  // be tuned from the deployment yaml (see chi::ConfigManager::
+  // GetSwimDirectProbeTimeoutSec, GetSwimIndirectProbeTimeoutSec,
+  // GetSwimSuspicionTimeoutSec, GetSwimEnabled). Defaults there match
+  // the prior values (30s / 15s / 60s).
   static constexpr size_t kIndirectProbeHelpers = 3;
-  static constexpr float kSuspicionTimeoutSec = 10.0f;
 
   // Recovery state
   std::vector<chi::RecoveryAssignment> ComputeRecoveryPlan(chi::u64 dead_node_id);

@@ -61,6 +61,17 @@ struct CompressorConfig {
   std::string trace_folder_path_;
   chi::PoolId next_pool_id_;  ///< Pool ID of the next module in the pipeline
                                ///< (e.g., CTE core at 513.0)
+  /**
+   * When true (default), the compressor tracks per-tag consumer node sets
+   * via Decompress requests and uses them to route Compress placement
+   * toward the most recent consumer of the same tag. When false, the
+   * tracking map and PollConsumers periodic are bypassed and Compress
+   * tasks fall back to pure DirectHash routing on the tag_id. Set false
+   * for benchmarks where you want to isolate the cost of the tracking
+   * mechanism itself, or for workloads with no clear producer-consumer
+   * locality.
+   */
+  bool tracking_enabled_ = true;
 
   CompressorConfig() : next_pool_id_(chi::PoolId::GetNull()) {}
 
@@ -70,14 +81,15 @@ struct CompressorConfig {
         distribution_model_path_(other.distribution_model_path_),
         dnn_model_weights_path_(other.dnn_model_weights_path_),
         trace_folder_path_(other.trace_folder_path_),
-        next_pool_id_(other.next_pool_id_) {
+        next_pool_id_(other.next_pool_id_),
+        tracking_enabled_(other.tracking_enabled_) {
     (void)pool_id;
   }
 
   template <class Archive>
   void serialize(Archive &ar) {
     ar(qtable_model_path_, linreg_model_path_, distribution_model_path_,
-       dnn_model_weights_path_, trace_folder_path_);
+       dnn_model_weights_path_, trace_folder_path_, tracking_enabled_);
   }
 
   /**
@@ -98,6 +110,9 @@ struct CompressorConfig {
             chi::u32 minor = std::stoul(next_str.substr(dot + 1));
             next_pool_id_ = chi::PoolId(major, minor);
           }
+        }
+        if (node["tracking_enabled"]) {
+          tracking_enabled_ = node["tracking_enabled"].as<bool>();
         }
       } catch (...) {
         // Config parsing is best-effort
@@ -416,6 +431,89 @@ struct DecompressTask : public chi::Task {
     ar(output_size_, decompress_time_ms_);
     ar.bulk(blob_data_, size_, BULK_XFER);
   }
+};
+
+/**
+ * NodeLoadSample - Snapshot of a node's CPU utilization and worker load.
+ * Returned as the OUT payload of a PollNodeLoadTask.
+ */
+struct NodeLoadSample {
+  chi::u32 node_id_;          ///< Node ID being sampled
+  float cpu_usage_pct_;       ///< Aggregate CPU utilization (0-100)
+  float worker_load_us_;      ///< Sum of WorkerStats::load_ across all workers (us)
+  chi::u32 num_queued_tasks_; ///< Sum of queued tasks across all workers
+  chi::u32 num_blocked_tasks_;///< Sum of blocked tasks across all workers
+  chi::u32 num_workers_;      ///< Total worker count on this node
+
+  NodeLoadSample()
+      : node_id_(0), cpu_usage_pct_(0.0f), worker_load_us_(0.0f),
+        num_queued_tasks_(0), num_blocked_tasks_(0), num_workers_(0) {}
+
+  template <class Archive>
+  void serialize(Archive &ar) {
+    ar(node_id_, cpu_usage_pct_, worker_load_us_, num_queued_tasks_,
+       num_blocked_tasks_, num_workers_);
+  }
+};
+
+/**
+ * PollNodeLoadTask - Query a node's CPU% and worker load.
+ *
+ * No inputs. The task is routed to a target node via PoolQuery::Physical(node_id)
+ * and the runtime samples the local node's stats and writes them into the OUT
+ * NodeLoadSample.
+ */
+struct PollNodeLoadTask : public chi::Task {
+  OUT NodeLoadSample sample_;  ///< Sampled node load (filled by runtime)
+
+  PollNodeLoadTask() : chi::Task(), sample_() {}
+
+  explicit PollNodeLoadTask(const chi::TaskId &task_id,
+                            const chi::PoolId &pool_id,
+                            const chi::PoolQuery &pool_query)
+      : chi::Task(task_id, pool_id, pool_query, Method::kPollNodeLoad),
+        sample_() {}
+
+  void Copy(const hipc::FullPtr<PollNodeLoadTask> &other) {
+    sample_ = other->sample_;
+  }
+
+  template <typename Ar>
+  void SerializeStart(Ar &ar) {
+    task_serialize<Ar>(ar);
+    ar(sample_);
+  }
+
+  template <typename Ar>
+  void SerializeEnd(Ar &ar) {
+    ar(sample_);
+  }
+};
+
+/**
+ * PollConsumersTask - Periodic task that, when fired, iterates the
+ * compressor's tracked consumer list and dispatches PollNodeLoad to each
+ * consumer node. Has no IN/OUT fields — it is a trigger.
+ */
+struct PollConsumersTask : public chi::Task {
+  PollConsumersTask() : chi::Task() {}
+
+  explicit PollConsumersTask(const chi::TaskId &task_id,
+                             const chi::PoolId &pool_id,
+                             const chi::PoolQuery &pool_query)
+      : chi::Task(task_id, pool_id, pool_query, Method::kPollConsumers) {}
+
+  void Copy(const hipc::FullPtr<PollConsumersTask> &other) {
+    (void)other;
+  }
+
+  template <typename Ar>
+  void SerializeStart(Ar &ar) {
+    task_serialize<Ar>(ar);
+  }
+
+  template <typename Ar>
+  void SerializeEnd(Ar &ar) {}
 };
 
 }  // namespace wrp_cte::compressor

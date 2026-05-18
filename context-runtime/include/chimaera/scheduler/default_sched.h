@@ -46,13 +46,16 @@ namespace chi {
  * Default scheduler implementation with I/O-size-based routing.
  * Routes tasks based on io_size_: small I/O and metadata go to the scheduler
  * worker (worker 0), large I/O (>= 4KB) goes to dedicated I/O workers via
- * round-robin, and network tasks go to the last worker.
+ * round-robin, and network tasks split across two dedicated workers — one
+ * owns ROUTER recvs (kRecv / kClientRecv), the other owns DEALER sends
+ * (kSend / kClientSend) — so a backlog on either direction can't starve
+ * SWIM heartbeat probes on the other.
  */
 class DefaultScheduler : public Scheduler {
  public:
   DefaultScheduler()
-      : scheduler_worker_(nullptr), net_worker_(nullptr),
-        gpu_worker_(nullptr), next_io_idx_{0} {}
+      : scheduler_worker_(nullptr), net_send_worker_(nullptr),
+        net_recv_worker_(nullptr), gpu_worker_(nullptr), next_io_idx_{0} {}
   ~DefaultScheduler() override = default;
 
   void DivideWorkers(WorkOrchestrator *work_orch) override;
@@ -62,14 +65,20 @@ class DefaultScheduler : public Scheduler {
   void RebalanceWorker(Worker *worker) override;
   void AdjustPolling(RunContext *run_ctx) override;
   Worker *GetGpuWorker() const override { return gpu_worker_; }
-  Worker *GetNetWorker() const override { return net_worker_; }
+  // Legacy alias — admin_runtime.cc:Create registers transport FDs with the
+  // net worker's EventManager. The recv worker is the one that polls those
+  // FDs, so it's the natural EventManager owner.
+  Worker *GetNetWorker() const override { return net_recv_worker_; }
+  Worker *GetNetSendWorker() const override { return net_send_worker_; }
+  Worker *GetNetRecvWorker() const override { return net_recv_worker_; }
 
  private:
   static constexpr size_t kLargeIOThreshold = 4096;  ///< I/O size threshold
 
   Worker *scheduler_worker_;              ///< Worker 0: metadata + small I/O
-  std::vector<Worker *> io_workers_;      ///< Workers 1..N-2: large I/O
-  Worker *net_worker_;                    ///< Worker N-1: network
+  std::vector<Worker *> io_workers_;      ///< Workers 1..N-3: large I/O
+  Worker *net_send_worker_;               ///< Worker N-2: kSend / kClientSend
+  Worker *net_recv_worker_;               ///< Worker N-1: kRecv / kClientRecv
   Worker *gpu_worker_;                    ///< GPU queue polling worker
   std::atomic<u32> next_io_idx_{0};       ///< Round-robin index for I/O workers
 };
