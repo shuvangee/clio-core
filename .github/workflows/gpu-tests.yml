@@ -67,7 +67,7 @@ jobs:
       shell: bash -el {0}
       run: |
         chmod +x install.sh
-        ./install.sh cuda-debug
+        ./install.sh cuda-release
 
     # ── Verify installation ──────────────────────────────────────────
     - name: Verify CUDA package installed
