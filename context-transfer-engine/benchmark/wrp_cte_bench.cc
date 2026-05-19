@@ -32,21 +32,16 @@
  */
 
 /**
- * CTE Core Benchmark Application
+ * CTE Core throughput benchmark (Put / Get / PutGet).
  *
- * This benchmark measures the performance of Put, Get, and GetTagSize
- * operations in the Content Transfer Engine (CTE) with multi-threaded support.
- *
- * Usage:
- *   wrp_cte_bench <test_case> <num_threads> <depth> <io_size> <io_count>
- *
- * Parameters:
- *   test_case: Benchmark to conduct (Put, Get, PutGet)
- *   num_threads: Number of worker threads to spawn (e.g., 4)
- *   depth: Number of async requests to generate per thread
- *   io_size: Size of I/O operations in bytes (supports k/K, m/M, g/G suffixes)
- *   io_count: Number of I/O operations to generate per thread
+ * Shares its CLI + metrics with wrp_redis_bench via bench_common.h so the
+ * two are apples-to-apples. See bench_common.h for the full flag list;
+ * notable additions: --max-total-blobs (global bounded keyspace split
+ * evenly across threads, keys cycle) and --time-limit SECONDS (run for
+ * a duration instead of a fixed count).
  */
+
+#include "bench_common.h"
 
 #include <chimaera/chimaera.h>
 #include <wrp_cte/core/core_client.h>
@@ -57,547 +52,192 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cstdlib>
 #include <cstring>
-#include <iomanip>
-#include <iostream>
-#include <mutex>
+#include <limits>
 #include <string>
 #include <thread>
 #include <vector>
 
 using namespace std::chrono;
+using wrp_bench::BenchArgs;
 
 namespace {
 
-/**
- * Parse size string with k/K, m/M, g/G suffixes
- * Supports decimal numbers (e.g., 0.5g, 1.5m, 2.5k)
- */
-chi::u64 ParseSize(const std::string &size_str) {
-  double size = 0.0;
-  chi::u64 multiplier = 1;
-
-  std::string num_str;
-  char suffix = 0;
-
-  for (char c : size_str) {
-    if (std::isdigit(c) || c == '.') {
-      num_str += c;
-    } else if (c == 'k' || c == 'K' || c == 'm' || c == 'M' || c == 'g' ||
-               c == 'G') {
-      suffix = std::tolower(c);
-      break;
-    }
-  }
-
-  if (num_str.empty()) {
-    HLOG(kError, "Invalid size format: {}", size_str);
-    return 0;
-  }
-
-  size = std::stod(num_str);
-
-  switch (suffix) {
-    case 'k':
-      multiplier = 1024;
-      break;
-    case 'm':
-      multiplier = 1024 * 1024;
-      break;
-    case 'g':
-      multiplier = 1024 * 1024 * 1024;
-      break;
-    default:
-      multiplier = 1;
-      break;
-  }
-
-  return static_cast<chi::u64>(size * multiplier);
+/** True once the time limit (if any) has elapsed since `start`. */
+inline bool TimeUp(const steady_clock::time_point &start, double limit_s) {
+  if (limit_s <= 0.0) return false;
+  return duration<double>(steady_clock::now() - start).count() >= limit_s;
 }
 
-/**
- * Convert bytes to human-readable string with units
- */
-std::string FormatSize(chi::u64 bytes) {
-  if (bytes >= 1024ULL * 1024 * 1024) {
-    return std::to_string(bytes / (1024ULL * 1024 * 1024)) + " GB";
-  } else if (bytes >= 1024 * 1024) {
-    return std::to_string(bytes / (1024 * 1024)) + " MB";
-  } else if (bytes >= 1024) {
-    return std::to_string(bytes / 1024) + " KB";
-  } else {
-    return std::to_string(bytes) + " B";
-  }
-}
-
-/**
- * Convert microseconds to appropriate unit
- */
-std::string FormatTime(double microseconds) {
-  if (microseconds >= 1000000.0) {
-    return std::to_string(microseconds / 1000000.0) + " s";
-  } else if (microseconds >= 1000.0) {
-    return std::to_string(microseconds / 1000.0) + " ms";
-  } else {
-    return std::to_string(microseconds) + " us";
-  }
-}
-
-/**
- * Calculate bandwidth in MB/s
- */
-double CalcBandwidth(chi::u64 total_bytes, double microseconds) {
-  if (microseconds <= 0.0) return 0.0;
-  double seconds = microseconds / 1000000.0;
-  double megabytes = static_cast<double>(total_bytes) / (1024.0 * 1024.0);
-  return megabytes / seconds;
+/** blob index for op n: cycle within [0, keyspace) when bounded. */
+inline long KeyIndex(long n, wrp_bench::u64 keyspace) {
+  return keyspace > 0 ? static_cast<long>(n % static_cast<long>(keyspace))
+                      : n;
 }
 
 }  // namespace
 
-/**
- * Main benchmark class
- */
 class CTEBenchmark {
  public:
-  CTEBenchmark(size_t num_threads, const std::string &test_case, int depth,
-               chi::u64 io_size, int io_count, const std::string &node_id)
-      : num_threads_(num_threads),
-        test_case_(test_case),
-        depth_(depth),
-        io_size_(io_size),
-        io_count_(io_count),
-        node_id_(node_id) {}
+  CTEBenchmark(const BenchArgs &a, std::string node_id)
+      : a_(a),
+        node_id_(std::move(node_id)),
+        per_thread_blobs_(a.PerThreadBlobs()) {}
 
-  ~CTEBenchmark() = default;
-
-  /**
-   * Run the benchmark
-   * @return true on success, false if any PutBlob/GetBlob returned a
-   *         non-zero return_code_ in any worker thread.
-   */
   bool Run() {
-    PrintBenchmarkInfo();
-
-    if (test_case_ == "Put") {
-      return RunPutBenchmark();
-    } else if (test_case_ == "Get") {
-      return RunGetBenchmark();
-    } else if (test_case_ == "PutGet") {
-      return RunPutGetBenchmark();
-    } else {
-      HLOG(kError, "Unknown test case: {}", test_case_);
-      HLOG(kError, "Valid options: Put, Get, PutGet");
-      return false;
-    }
+    PrintInfo();
+    if (a_.test_case == "Put") return RunGeneric(Mode::kPut);
+    if (a_.test_case == "Get") return RunGeneric(Mode::kGet);
+    if (a_.test_case == "PutGet") return RunGeneric(Mode::kPutGet);
+    HLOG(kError, "Unknown test case: {} (Put|Get|PutGet)", a_.test_case);
+    return false;
   }
 
  private:
-  void PrintBenchmarkInfo() {
+  enum class Mode { kPut, kGet, kPutGet };
+
+  void PrintInfo() {
     HLOG(kInfo, "=== CTE Core Benchmark ===");
-    HLOG(kInfo, "Node ID: {}", node_id_);
-    HLOG(kInfo, "Test case: {}", test_case_);
-    HLOG(kInfo, "Worker threads: {}", num_threads_);
-    HLOG(kInfo, "Async depth per thread: {}", depth_);
-    HLOG(kInfo, "I/O size: {}", FormatSize(io_size_));
-    HLOG(kInfo, "I/O count per thread: {}", io_count_);
-    HLOG(kInfo, "Total I/O per thread: {}", FormatSize(io_size_ * io_count_));
-    HLOG(kInfo, "Total I/O (all threads): {}",
-         FormatSize(io_size_ * io_count_ * num_threads_));
+    HLOG(kInfo, "Node ID: {}  Test: {}  Threads: {}  Depth: {}", node_id_,
+         a_.test_case, a_.threads, a_.depth);
+    HLOG(kInfo, "I/O size: {}  io-count/thread: {}  max-total-blobs: {} "
+                "({}/thread)  time-limit: {}s",
+         wrp_bench::FormatSize(a_.io_size), a_.io_count, a_.max_total_blobs,
+         per_thread_blobs_, a_.time_limit_s);
     HLOG(kInfo, "===========================");
   }
 
-  /**
-   * Worker thread for Put benchmark
-   */
-  void PutWorkerThread(size_t thread_id, std::atomic<bool> &error_flag,
-                       std::vector<long long> &thread_times) {
-    auto *cte_client = WRP_CTE_CLIENT;
-
-    // Allocate shared memory buffer
-    auto shm_buffer = CHI_IPC->AllocateBuffer(io_size_);
-    std::memset(shm_buffer.ptr_, thread_id & 0xFF, io_size_);
-    hipc::ShmPtr<> shm_ptr = shm_buffer.shm_.template Cast<void>();
-
-    // Create one tag per node+thread so replicas on different nodes never clash
-    std::string tag_name = "tag_n" + node_id_ + "_t" + std::to_string(thread_id);
-    auto tag_task = cte_client->AsyncGetOrCreateTag(tag_name);
-    tag_task.Wait();
-    wrp_cte::core::TagId tag_id = tag_task->tag_id_;
-
-    auto start_time = high_resolution_clock::now();
-
-    for (int i = 0; i < io_count_; i += depth_) {
-      if (error_flag.load(std::memory_order_relaxed)) {
-        break;
-      }
-
-      int batch_size = std::min(depth_, io_count_ - i);
-      std::vector<chi::Future<wrp_cte::core::PutBlobTask>> tasks;
-      tasks.reserve(batch_size);
-
-      for (int j = 0; j < batch_size; ++j) {
-        std::string blob_name = "blob_t" + std::to_string(thread_id) + "_" + std::to_string(i + j);
-        auto task = cte_client->AsyncPutBlob(tag_id, blob_name, 0, io_size_,
-                                             shm_ptr, 0.8f);
-        tasks.push_back(task);
-      }
-
-      for (auto &task : tasks) {
-        task.Wait();
-        if (task->return_code_.load() != 0) {
-          HLOG(kError,
-               "[PutWorker {}] PutBlob failed with return_code_={}",
-               thread_id, task->return_code_.load());
-          error_flag.store(true, std::memory_order_relaxed);
-        }
-      }
-    }
-
-    auto end_time = high_resolution_clock::now();
-    thread_times[thread_id] =
-        duration_cast<microseconds>(end_time - start_time).count();
-
-    CHI_IPC->FreeBuffer(shm_buffer);
+  // Number of distinct keys a thread uses (finite pool for Get to read).
+  long KeyspaceSize() const {
+    if (per_thread_blobs_ > 0) return static_cast<long>(per_thread_blobs_);
+    return a_.io_count > 0 ? a_.io_count : 1;
   }
 
-  bool RunPutBenchmark() {
-    std::vector<std::thread> threads;
-    std::vector<long long> thread_times(num_threads_);
-    std::atomic<bool> error_flag{false};
-
-    // Spawn worker threads
-    for (size_t i = 0; i < num_threads_; ++i) {
-      threads.emplace_back(&CTEBenchmark::PutWorkerThread, this, i,
-                           std::ref(error_flag), std::ref(thread_times));
-    }
-
-    // Wait for all threads to complete
-    for (auto &thread : threads) {
-      thread.join();
-    }
-
-    PrintResults("Put", thread_times);
-    return !error_flag.load();
-  }
-
-  /**
-   * Worker thread for Get benchmark
-   */
-  void GetWorkerThread(size_t thread_id, std::atomic<bool> &error_flag,
-                       std::vector<long long> &thread_times) {
-    auto *cte_client = WRP_CTE_CLIENT;
-
-    // Allocate shared memory buffers
-    auto put_shm = CHI_IPC->AllocateBuffer(io_size_);
-    auto get_shm = CHI_IPC->AllocateBuffer(io_size_);
+  void Worker(Mode mode, size_t tid, std::atomic<bool> &err,
+              std::vector<long long> &times, std::vector<wrp_bench::u64> &ops) {
+    auto *cte = WRP_CTE_CLIENT;
+    auto put_shm = CHI_IPC->AllocateBuffer(a_.io_size);
+    auto get_shm = CHI_IPC->AllocateBuffer(a_.io_size);
+    std::memset(put_shm.ptr_, static_cast<int>(tid & 0xFF), a_.io_size);
+    std::memset(get_shm.ptr_, 0, a_.io_size);  // pre-fault dest pages
     hipc::ShmPtr<> put_ptr = put_shm.shm_.template Cast<void>();
     hipc::ShmPtr<> get_ptr = get_shm.shm_.template Cast<void>();
 
-    // Pre-fault both buffers so OS page faults don't leak into the timed
-    // loop. AllocateBuffer hands back virtually-mapped shm; the first
-    // write to each 4 KiB OS page faults at ~3-5 us/page, which is ~1 s
-    // of overhead per GiB if the buffer is fresh.
-    std::memset(put_shm.ptr_, 0, io_size_);
-    std::memset(get_shm.ptr_, 0, io_size_);
-
-    // Create one tag per node+thread so replicas on different nodes never clash
-    std::string tag_name = "tag_n" + node_id_ + "_t" + std::to_string(thread_id);
-    auto tag_task = cte_client->AsyncGetOrCreateTag(tag_name);
+    std::string tag_name = "tag_n" + node_id_ + "_t" + std::to_string(tid);
+    auto tag_task = cte->AsyncGetOrCreateTag(tag_name);
     tag_task.Wait();
     wrp_cte::core::TagId tag_id = tag_task->tag_id_;
+    auto blob_name = [&](long k) {
+      return "blob_t" + std::to_string(tid) + "_" + std::to_string(k);
+    };
 
-    // Populate data using Put operations
-    for (int i = 0; i < io_count_; ++i) {
-      std::memset(put_shm.ptr_, (thread_id + i) & 0xFF, io_size_);
-      std::string blob_name = "blob_t" + std::to_string(thread_id) + "_" + std::to_string(i);
-      auto task = cte_client->AsyncPutBlob(tag_id, blob_name, 0, io_size_,
-                                           put_ptr, 0.8f);
-      task.Wait();
-      if (task->return_code_.load() != 0) {
-        HLOG(kError,
-             "[GetWorker {}] populate-PutBlob failed with return_code_={}",
-             thread_id, task->return_code_.load());
-        error_flag.store(true, std::memory_order_relaxed);
-        CHI_IPC->FreeBuffer(put_shm);
-        CHI_IPC->FreeBuffer(get_shm);
-        return;
-      }
-    }
-
-    auto start_time = high_resolution_clock::now();
-
-    for (int i = 0; i < io_count_; i += depth_) {
-      if (error_flag.load(std::memory_order_relaxed)) {
-        break;
-      }
-
-      int batch_size = std::min(depth_, io_count_ - i);
-
-      for (int j = 0; j < batch_size; ++j) {
-        std::string blob_name = "blob_t" + std::to_string(thread_id) + "_" + std::to_string(i + j);
-        auto task = cte_client->AsyncGetBlob(tag_id, blob_name, 0, io_size_, 0,
-                                             get_ptr);
-        task.Wait();
-        if (task->return_code_.load() != 0) {
-          HLOG(kError,
-               "[GetWorker {}] GetBlob failed with return_code_={}",
-               thread_id, task->return_code_.load());
-          error_flag.store(true, std::memory_order_relaxed);
+    // Get needs the keyspace populated first (untimed).
+    if (mode == Mode::kGet) {
+      for (long k = 0; k < KeyspaceSize(); ++k) {
+        auto t = cte->AsyncPutBlob(tag_id, blob_name(k), 0, a_.io_size,
+                                   put_ptr, 0.8f);
+        t.Wait();
+        if (t->return_code_.load() != 0) {
+          err.store(true, std::memory_order_relaxed);
+          CHI_IPC->FreeBuffer(put_shm);
+          CHI_IPC->FreeBuffer(get_shm);
+          return;
         }
       }
     }
 
-    auto end_time = high_resolution_clock::now();
-    thread_times[thread_id] =
-        duration_cast<microseconds>(end_time - start_time).count();
+    const bool timed = a_.time_limit_s > 0.0;
+    const long target = timed ? std::numeric_limits<long>::max() : a_.io_count;
+    wrp_bench::u64 done = 0;
+    auto start = steady_clock::now();
 
+    for (long i = 0; i < target; i += a_.depth) {
+      if (err.load(std::memory_order_relaxed)) break;
+      if (timed && TimeUp(start, a_.time_limit_s)) break;
+      long batch = timed ? a_.depth : std::min<long>(a_.depth, target - i);
+
+      if (mode == Mode::kPut || mode == Mode::kPutGet) {
+        std::vector<chi::Future<wrp_cte::core::PutBlobTask>> pts;
+        pts.reserve(batch);
+        for (long j = 0; j < batch; ++j) {
+          pts.push_back(cte->AsyncPutBlob(
+              tag_id, blob_name(KeyIndex(i + j, per_thread_blobs_)), 0,
+              a_.io_size, put_ptr, 0.8f));
+        }
+        for (auto &t : pts) {
+          t.Wait();
+          if (t->return_code_.load() != 0) {
+            HLOG(kError, "[t{}] PutBlob rc={}", tid, t->return_code_.load());
+            err.store(true, std::memory_order_relaxed);
+          }
+        }
+      }
+      if (mode == Mode::kGet || mode == Mode::kPutGet) {
+        for (long j = 0; j < batch; ++j) {
+          auto t = cte->AsyncGetBlob(
+              tag_id, blob_name(KeyIndex(i + j, per_thread_blobs_)), 0,
+              a_.io_size, 0, get_ptr);
+          t.Wait();
+          if (t->return_code_.load() != 0) {
+            HLOG(kError, "[t{}] GetBlob rc={}", tid, t->return_code_.load());
+            err.store(true, std::memory_order_relaxed);
+          }
+        }
+      }
+      done += static_cast<wrp_bench::u64>(batch);
+    }
+
+    times[tid] =
+        duration_cast<microseconds>(steady_clock::now() - start).count();
+    ops[tid] = done;
     CHI_IPC->FreeBuffer(put_shm);
     CHI_IPC->FreeBuffer(get_shm);
   }
 
-  bool RunGetBenchmark() {
-    HLOG(kInfo, "Populating data for Get benchmark...");
-
+  bool RunGeneric(Mode mode) {
+    if (mode == Mode::kGet) {
+      HLOG(kInfo, "Populating {} keys/thread for Get...", KeyspaceSize());
+    }
     std::vector<std::thread> threads;
-    std::vector<long long> thread_times(num_threads_);
-    std::atomic<bool> error_flag{false};
-
-    // Spawn worker threads
-    for (size_t i = 0; i < num_threads_; ++i) {
-      threads.emplace_back(&CTEBenchmark::GetWorkerThread, this, i,
-                           std::ref(error_flag), std::ref(thread_times));
+    std::vector<long long> times(a_.threads);
+    std::vector<wrp_bench::u64> ops(a_.threads);
+    std::atomic<bool> err{false};
+    for (size_t i = 0; i < a_.threads; ++i) {
+      threads.emplace_back(&CTEBenchmark::Worker, this, mode, i,
+                           std::ref(err), std::ref(times), std::ref(ops));
     }
-
-    // Wait for all threads to complete
-    for (auto &thread : threads) {
-      thread.join();
-    }
-
-    PrintResults("Get", thread_times);
-    return !error_flag.load();
+    for (auto &t : threads) t.join();
+    wrp_bench::PrintResults(a_.test_case, a_, times, ops);
+    return !err.load();
   }
 
-  /**
-   * Worker thread for PutGet benchmark
-   */
-  void PutGetWorkerThread(size_t thread_id, std::atomic<bool> &error_flag,
-                          std::vector<long long> &thread_times) {
-    auto *cte_client = WRP_CTE_CLIENT;
-
-    // Allocate shared memory buffers
-    auto put_shm = CHI_IPC->AllocateBuffer(io_size_);
-    auto get_shm = CHI_IPC->AllocateBuffer(io_size_);
-    // Pre-fault both buffers (see GetWorkerThread for rationale). put_shm
-    // gets a real fill below; get_shm is a GetBlob destination, so zero-
-    // fill is purely to land the page faults before the timed loop.
-    std::memset(put_shm.ptr_, thread_id & 0xFF, io_size_);
-    std::memset(get_shm.ptr_, 0, io_size_);
-    hipc::ShmPtr<> put_ptr = put_shm.shm_.template Cast<void>();
-    hipc::ShmPtr<> get_ptr = get_shm.shm_.template Cast<void>();
-
-    // Create one tag per node+thread so replicas on different nodes never clash
-    std::string tag_name = "tag_n" + node_id_ + "_t" + std::to_string(thread_id);
-    auto tag_task = cte_client->AsyncGetOrCreateTag(tag_name);
-    tag_task.Wait();
-    wrp_cte::core::TagId tag_id = tag_task->tag_id_;
-
-    auto start_time = high_resolution_clock::now();
-
-    for (int i = 0; i < io_count_; i += depth_) {
-      if (error_flag.load(std::memory_order_relaxed)) {
-        break;
-      }
-
-      int batch_size = std::min(depth_, io_count_ - i);
-      std::vector<chi::Future<wrp_cte::core::PutBlobTask>> put_tasks;
-      put_tasks.reserve(batch_size);
-
-      for (int j = 0; j < batch_size; ++j) {
-        std::string blob_name = "blob_t" + std::to_string(thread_id) + "_" + std::to_string(i + j);
-        auto task = cte_client->AsyncPutBlob(tag_id, blob_name, 0, io_size_,
-                                             put_ptr, 0.8f);
-        put_tasks.push_back(task);
-      }
-
-      for (auto &task : put_tasks) {
-        task.Wait();
-        if (task->return_code_.load() != 0) {
-          HLOG(kError,
-               "[PutGetWorker {}] PutBlob failed with return_code_={}",
-               thread_id, task->return_code_.load());
-          error_flag.store(true, std::memory_order_relaxed);
-        }
-      }
-
-      for (int j = 0; j < batch_size; ++j) {
-        std::string blob_name = "blob_t" + std::to_string(thread_id) + "_" + std::to_string(i + j);
-        auto task = cte_client->AsyncGetBlob(tag_id, blob_name, 0, io_size_, 0,
-                                             get_ptr);
-        task.Wait();
-        if (task->return_code_.load() != 0) {
-          HLOG(kError,
-               "[PutGetWorker {}] GetBlob failed with return_code_={}",
-               thread_id, task->return_code_.load());
-          error_flag.store(true, std::memory_order_relaxed);
-        }
-      }
-    }
-
-    auto end_time = high_resolution_clock::now();
-    thread_times[thread_id] =
-        duration_cast<microseconds>(end_time - start_time).count();
-
-    CHI_IPC->FreeBuffer(put_shm);
-    CHI_IPC->FreeBuffer(get_shm);
-  }
-
-  bool RunPutGetBenchmark() {
-    std::vector<std::thread> threads;
-    std::vector<long long> thread_times(num_threads_);
-    std::atomic<bool> error_flag{false};
-
-    // Spawn worker threads
-    for (size_t i = 0; i < num_threads_; ++i) {
-      threads.emplace_back(&CTEBenchmark::PutGetWorkerThread, this, i,
-                           std::ref(error_flag), std::ref(thread_times));
-    }
-
-    // Wait for all threads to complete
-    for (auto &thread : threads) {
-      thread.join();
-    }
-
-    PrintResults("PutGet", thread_times);
-    return !error_flag.load();
-  }
-
-  void PrintResults(const std::string &operation,
-                    const std::vector<long long> &thread_times) {
-    // Calculate statistics
-    long long min_time =
-        *std::min_element(thread_times.begin(), thread_times.end());
-    long long max_time =
-        *std::max_element(thread_times.begin(), thread_times.end());
-    long long sum_time = 0;
-    for (auto t : thread_times) {
-      sum_time += t;
-    }
-    double avg_time = static_cast<double>(sum_time) / num_threads_;
-
-    chi::u64 total_bytes = io_size_ * io_count_;
-    chi::u64 aggregate_bytes = total_bytes * num_threads_;
-
-    double min_bw = CalcBandwidth(total_bytes, min_time);
-    double max_bw = CalcBandwidth(total_bytes, max_time);
-    double avg_bw = CalcBandwidth(total_bytes, avg_time);
-    double agg_bw = CalcBandwidth(aggregate_bytes, avg_time);
-
-    // Calculate bandwidth in bytes/sec for finer granularity
-    double min_bw_bytes =
-        min_time > 0
-            ? (static_cast<double>(total_bytes) / (min_time / 1000000.0))
-            : 0.0;
-    double max_bw_bytes =
-        max_time > 0
-            ? (static_cast<double>(total_bytes) / (max_time / 1000000.0))
-            : 0.0;
-    double avg_bw_bytes =
-        avg_time > 0
-            ? (static_cast<double>(total_bytes) / (avg_time / 1000000.0))
-            : 0.0;
-    double agg_bw_bytes =
-        avg_time > 0
-            ? (static_cast<double>(aggregate_bytes) / (avg_time / 1000000.0))
-            : 0.0;
-
-    HLOG(kInfo, "");
-    HLOG(kInfo, "=== {} Benchmark Results ===", operation);
-    HLOG(kInfo, "Time (min): {} us ({} ms)", min_time, min_time / 1000.0);
-    HLOG(kInfo, "Time (max): {} us ({} ms)", max_time, max_time / 1000.0);
-    HLOG(kInfo, "Time (avg): {} us ({} ms)", avg_time, avg_time / 1000.0);
-    HLOG(kInfo, "");
-    HLOG(kInfo, "Bandwidth per thread (min): {} MB/s ({} bytes/s)", min_bw,
-         min_bw_bytes);
-    HLOG(kInfo, "Bandwidth per thread (max): {} MB/s ({} bytes/s)", max_bw,
-         max_bw_bytes);
-    HLOG(kInfo, "Bandwidth per thread (avg): {} MB/s ({} bytes/s)", avg_bw,
-         avg_bw_bytes);
-    HLOG(kInfo, "Aggregate bandwidth: {} MB/s ({} bytes/s)", agg_bw,
-         agg_bw_bytes);
-    HLOG(kInfo, "===========================");
-  }
-
-  size_t num_threads_;
-  std::string test_case_;
-  int depth_;
-  chi::u64 io_size_;
-  int io_count_;
+  BenchArgs a_;
   std::string node_id_;
+  wrp_bench::u64 per_thread_blobs_;  // a_.max_total_blobs / threads
 };
 
 int main(int argc, char **argv) {
-  // Check arguments
-  if (argc != 6) {
-    HLOG(kError, "Usage: {} <test_case> <num_threads> <depth> <io_size> <io_count>",
-         argv[0]);
-    HLOG(kError, "  test_case: Put, Get, or PutGet");
-    HLOG(kError, "  num_threads: Number of worker threads (e.g., 4)");
-    HLOG(kError, "  depth: Number of async requests per thread (e.g., 4)");
-    HLOG(kError, "  io_size: Size of I/O operations (e.g., 1m, 4k, 1g)");
-    HLOG(kError, "  io_count: Number of I/O operations per thread (e.g., 100)");
-    HLOG(kError, "");
-    HLOG(kError, "Environment variables:");
-    HLOG(kError,
-         "  CHI_WITH_RUNTIME: Set to '1', 'true', 'yes', or 'on' to "
-         "initialize runtime");
-    HLOG(kError, "                         Default: assumes runtime already initialized");
-    return 1;
-  }
+  BenchArgs args = wrp_bench::ParseBenchArgs(argc, argv);
+  if (!args.ok) return 1;
 
-  // Initialize Chimaera runtime and client
   HLOG(kInfo, "Initializing Chimaera runtime...");
-
-  // Initialize Chimaera (client with embedded runtime)
   if (!chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, false)) {
     HLOG(kError, "Failed to initialize Chimaera runtime");
     return 1;
   }
-
-  // RAII guard: call ClientFinalize() on every return path so the background
-  // ZMQ receive thread is joined and the DEALER socket is closed before the
-  // ZMQ shared-context static destructor runs.
   struct ClientFinalizeGuard {
     ~ClientFinalizeGuard() {
-      auto* mgr = CHI_CHIMAERA_MANAGER;
-      if (mgr) {
-        mgr->ClientFinalize();
-      }
+      auto *mgr = CHI_CHIMAERA_MANAGER;
+      if (mgr) mgr->ClientFinalize();
     }
   } finalize_guard;
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-  // Initialize CTE client
+  std::this_thread::sleep_for(milliseconds(500));
   if (!wrp_cte::core::WRP_CTE_CLIENT_INIT()) {
     HLOG(kError, "Failed to initialize CTE client");
     return 1;
   }
+  std::this_thread::sleep_for(milliseconds(200));
 
-  HLOG(kInfo, "Runtime and client initialized successfully");
-
-  // Small delay to ensure initialization is complete
-  std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-  std::string test_case = argv[1];
-  size_t num_threads = std::stoull(argv[2]);
-  int depth = std::atoi(argv[3]);
-  chi::u64 io_size = ParseSize(argv[4]);
-  int io_count = std::atoi(argv[5]);
-
-  // NODE_ID distinguishes benchmark replicas on different swarm nodes so their
-  // tags and blobs never collide.  Defaults to hostname if not set.
   const char *node_id_env = std::getenv("NODE_ID");
   std::string node_id;
   if (node_id_env && node_id_env[0] != '\0') {
@@ -608,24 +248,10 @@ int main(int argc, char **argv) {
     node_id = hostname;
   }
 
-  // Validate parameters
-  if (num_threads == 0 || depth <= 0 || io_size == 0 || io_count <= 0) {
-    HLOG(kError, "Invalid parameters");
-    HLOG(kError, "  num_threads must be > 0");
-    HLOG(kError, "  depth must be > 0");
-    HLOG(kError, "  io_size must be > 0");
-    HLOG(kError, "  io_count must be > 0");
+  CTEBenchmark bench(args, node_id);
+  if (!bench.Run()) {
+    HLOG(kError, "Benchmark failed: a PutBlob/GetBlob returned non-zero rc");
     return 1;
   }
-
-  // Run benchmark
-  CTEBenchmark benchmark(num_threads, test_case, depth, io_size, io_count, node_id);
-  bool ok = benchmark.Run();
-  if (!ok) {
-    HLOG(kError, "Benchmark failed: at least one PutBlob/GetBlob "
-                 "returned a non-zero return_code_");
-    return 1;
-  }
-
   return 0;
 }
