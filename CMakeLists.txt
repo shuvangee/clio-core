@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(iowarp-core VERSION 1.5.5 LANGUAGES C CXX)
+project(iowarp-core VERSION 1.5.7 LANGUAGES C CXX)
 
 #------------------------------------------------------------------------------
 # Project Options
@@ -1288,6 +1288,14 @@ endif()
 if(TARGET chimaera_bdev_client)
   list(APPEND PIP_LIB_TARGETS chimaera_bdev_client chimaera_bdev_runtime)
 endif()
+# Template chimod (used by clio_run_thrpt_benchmark's "latency" test case via
+# chimaera::MOD_NAME_client).  Without this the benchmark binary's NEEDED list
+# references libchimaera_MOD_NAME_client.so but the wheel doesn't contain it,
+# and the dynamic linker segfaults at load time on glibc/patchelf combinations
+# instead of failing cleanly.  See #429.
+if(TARGET chimaera_MOD_NAME_client)
+  list(APPEND PIP_LIB_TARGETS chimaera_MOD_NAME_client chimaera_MOD_NAME_runtime)
+endif()
 if(WRP_CORE_ENABLE_CTE AND TARGET clio_cte_core_client)
   list(APPEND PIP_LIB_TARGETS clio_cte_core_client clio_cte_core_runtime)
 endif()
@@ -1350,15 +1358,11 @@ if(WRP_CORE_ENABLE_PYTHON)
       COMPONENT pip_package
       LIBRARY DESTINATION ext)
   endif()
-  # Context Visualizer -> iowarp_core/visualizer/
-  install(DIRECTORY context-visualizer/context_visualizer/
-    COMPONENT pip_package
-    DESTINATION visualizer
-    FILES_MATCHING
-      PATTERN "*.py"
-      PATTERN "*.html"
-      PATTERN "*.css"
-      PATTERN "*.js")
+  # Note: the context_visualizer Python package ships at the wheel root
+  # (top-level "context_visualizer/") via scikit-build-core's wheel.packages
+  # setting in pyproject.toml, not via CMake install.  That keeps the
+  # `python -m context_visualizer` and `context-visualizer` entry-point
+  # paths consistent with the package's own __main__.py.
 endif()
 
 # Default config -> iowarp_core/data/
