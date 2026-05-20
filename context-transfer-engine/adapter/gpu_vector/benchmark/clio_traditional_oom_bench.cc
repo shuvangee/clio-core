@@ -20,7 +20,7 @@
  *
  * The read mirror does AsyncGetBlob().Wait() then cudaMemcpy host->device.
  *
- * CLI is identical to wrp_cte_gpu_vector_bench so the two can be compared
+ * CLI is identical to clio_cte_gpu_vector_bench so the two can be compared
  * apples-to-apples (same total I/O, same page geometry, same iters).
  */
 

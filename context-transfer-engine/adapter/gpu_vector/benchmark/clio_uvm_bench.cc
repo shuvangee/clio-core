@@ -22,7 +22,7 @@
  * The read mirror does AsyncGetBlob().Wait() into the managed buffer, then
  * a kernel touches the data so the read driver migrates pages to device.
  *
- * CLI is identical to wrp_cte_gpu_vector_bench so the three benches can
+ * CLI is identical to clio_cte_gpu_vector_bench so the three benches can
  * be compared apples-to-apples.
  */
 
