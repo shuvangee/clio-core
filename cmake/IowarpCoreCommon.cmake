@@ -1160,6 +1160,17 @@ function(add_chimod_runtime)
       DESTINATION lib/cmake/${MODULE_PACKAGE_NAME}
     )
 
+    # Compute the legacy namespace for backward-compat target aliases.
+    # The clio_* CMake namespaces (clio_cte, clio_cae, …) were renamed from
+    # wrp_* in the WRP_->CLIO_ pass. External code that still references
+    # wrp_cte::core_client etc. needs an IMPORTED alias resolving back to
+    # the new target. Modules whose namespace doesn't start with "clio_"
+    # (e.g. the chimaera::* runtime modules) get no legacy alias block.
+    set(LEGACY_NAMESPACE "")
+    if("${CHIMAERA_NAMESPACE}" MATCHES "^clio_(.*)$")
+      set(LEGACY_NAMESPACE "wrp_${CMAKE_MATCH_1}")
+    endif()
+
     # Generate Config.cmake file
     set(CONFIG_CONTENT "
 @PACKAGE_INIT@
@@ -1171,7 +1182,29 @@ find_dependency(chimaera REQUIRED)
 
 # Include the exported targets
 include(\"\${CMAKE_CURRENT_LIST_DIR}/${MODULE_EXPORT_NAME}.cmake\")
+")
 
+    # Append backward-compat legacy-namespace aliases if applicable. The
+    # aliases are INTERFACE IMPORTED libraries that forward to the new
+    # canonical targets, so downstream `target_link_libraries(... wrp_cte::core_client)`
+    # transparently picks up clio_cte::core_client and everything it carries
+    # (include dirs, link dependencies, compile defs).
+    if(LEGACY_NAMESPACE)
+      string(APPEND CONFIG_CONTENT "
+# --- Backward-compat aliases for the WRP_ -> CLIO_ namespace rename ---
+# Lets downstream projects that still reference ${LEGACY_NAMESPACE}::*
+# resolve transparently to ${CHIMAERA_NAMESPACE}::*. See rebranding.md.
+foreach(_legacy_tgt IN ITEMS ${CHIMAERA_MODULE_NAME}_client ${CHIMAERA_MODULE_NAME}_runtime)
+  if(TARGET ${CHIMAERA_NAMESPACE}::\${_legacy_tgt} AND NOT TARGET ${LEGACY_NAMESPACE}::\${_legacy_tgt})
+    add_library(${LEGACY_NAMESPACE}::\${_legacy_tgt} INTERFACE IMPORTED)
+    set_target_properties(${LEGACY_NAMESPACE}::\${_legacy_tgt} PROPERTIES
+      INTERFACE_LINK_LIBRARIES ${CHIMAERA_NAMESPACE}::\${_legacy_tgt})
+  endif()
+endforeach()
+")
+    endif()
+
+    string(APPEND CONFIG_CONTENT "
 # Provide components
 check_required_components(${MODULE_PACKAGE_NAME})
 ")

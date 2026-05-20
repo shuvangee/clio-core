@@ -50,6 +50,22 @@ include(CMakeFindDependencyMacro)
 # 3. The headers that external users include don't expose Boost/cereal types in public APIs
 find_package(Boost QUIET COMPONENTS fiber context filesystem)
 find_package(cereal QUIET CONFIG)
+# msgpack-c provides the `msgpack-c-static` (or `msgpack-c`) imported target
+# referenced from ClioCtp's INTERFACE_LINK_LIBRARIES. Downstream projects
+# must have this target visible at find_package(iowarp-core) time, otherwise
+# the literal name "msgpack-c-static" leaks to the linker as -lmsgpack-c-static
+# and link fails. v6+ first, fall back to legacy v3.x.
+find_package(msgpack-c QUIET CONFIG)
+if(NOT msgpack-c_FOUND)
+    find_package(msgpack QUIET CONFIG)
+    # v3.x exports `msgpackc-static` / `msgpackc`; alias to v6+ names.
+    if(TARGET msgpackc-static AND NOT TARGET msgpack-c-static)
+        add_library(msgpack-c-static ALIAS msgpackc-static)
+    endif()
+    if(TARGET msgpackc AND NOT TARGET msgpack-c)
+        add_library(msgpack-c ALIAS msgpackc)
+    endif()
+endif()
 
 # Find HDF5 if CAE is enabled (required for CAE runtime)
 if(@CLIO_CORE_ENABLE_CAE@)
@@ -102,6 +118,27 @@ if(@CLIO_CORE_ENABLE_CAE@)
     include("${CMAKE_CURRENT_LIST_DIR}/../clio_cae_core/clio_cae_core.cmake")
     list(APPEND _IOWARP_OPTIONAL_CHIMODS "clio_cae_core")
 endif()
+
+# --- Backward-compat target-name aliases for the WRP_ -> CLIO_ rename ---
+# Downstream projects that still reference wrp_cte::* / wrp_cae::* get
+# INTERFACE IMPORTED targets that forward to the canonical clio_*::* names.
+# Skipped silently if the originals aren't loaded (CTE/CAE disabled at
+# build time) or if downstream code already created them. See rebranding.md.
+foreach(_compat_pair "clio_cte;wrp_cte" "clio_cae;wrp_cae")
+    list(GET _compat_pair 0 _new_ns)
+    list(GET _compat_pair 1 _legacy_ns)
+    foreach(_tgt IN ITEMS core_client core_runtime)
+        if(TARGET ${_new_ns}::${_tgt} AND NOT TARGET ${_legacy_ns}::${_tgt})
+            add_library(${_legacy_ns}::${_tgt} INTERFACE IMPORTED)
+            set_target_properties(${_legacy_ns}::${_tgt} PROPERTIES
+                INTERFACE_LINK_LIBRARIES ${_new_ns}::${_tgt})
+        endif()
+    endforeach()
+endforeach()
+unset(_compat_pair)
+unset(_new_ns)
+unset(_legacy_ns)
+unset(_tgt)
 
 # RPATH configuration (conditional based on build-time setting)
 if(@CLIO_CORE_ENABLE_RPATH@)

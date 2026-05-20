@@ -726,4 +726,20 @@ void FlushPutBlobTiming(const char *label);
   (&(*CTP_GET_GLOBAL_PTR_VAR(clio_cte::core::Client, \
                               clio_cte::core::g_cte_client)))
 
+// Backward-compat aliases for the WRP_ -> CLIO_ rename. External code that
+// still uses wrp_cte::core::* (e.g. wrp_cte::core::g_cte_client) resolves
+// transparently to clio_cte::core::*. Paired with the wrp_cte/ forwarder
+// shim header tree, this gives source-level compat for downstream projects
+// that haven't migrated their identifiers yet. See rebranding.md.
+namespace wrp_cte = clio_cte;
+
+// Client singleton accessor macro: legacy name.
+#define WRP_CTE_CLIENT CLIO_CTE_CLIENT
+
+// Client init function: legacy name aliased to canonical via #define so the
+// call `wrp_cte::core::WRP_CTE_CLIENT_INIT(...)` expands to
+// `wrp_cte::core::CLIO_CTE_CLIENT_INIT(...)` and resolves through the
+// `wrp_cte = clio_cte` namespace alias.
+#define WRP_CTE_CLIENT_INIT CLIO_CTE_CLIENT_INIT
+
 #endif  // WRPCTE_CORE_CLIENT_H_

@@ -122,17 +122,24 @@ if(TARGET ${CHIMAERA_NAMESPACE}_cxx_gpu)
   set(_GPU_TARGET ${CHIMAERA_NAMESPACE}_cxx_gpu)
 endif()
 
-# Install main library (and GPU library if built)
+# Install main library (and GPU library if built).
+# PUBLIC_HEADER points at the new canonical path; the legacy chimaera/chimaera.h
+# is installed via the DIRECTORY install below (as a forwarder shim).
 install(TARGETS ${CHIMAERA_NAMESPACE}_cxx ${_GPU_TARGET} ${_CEREAL_TARGET}
   EXPORT ${MAIN_EXPORT_NAME}
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   RUNTIME DESTINATION bin
-  PUBLIC_HEADER DESTINATION include/chimaera
+  PUBLIC_HEADER DESTINATION include/clio_runtime
   INCLUDES DESTINATION include
 )
 
-# Install headers
+# Install canonical headers (new name) AND the legacy forwarder-shim tree
+# (so external code using `#include <chimaera/...>` still resolves).
+install(DIRECTORY include/clio_runtime
+  DESTINATION include
+  FILES_MATCHING PATTERN "*.h"
+)
 install(DIRECTORY include/chimaera
   DESTINATION include
   FILES_MATCHING PATTERN "*.h"
