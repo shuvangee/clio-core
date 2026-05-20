@@ -13,7 +13,7 @@
 #   cte, bam, direct, hbm
 #
 # Requirements:
-#   - wrp_cte_gpu_bench in PATH
+#   - clio_cte_gpu_bench in PATH
 #   - CUDA-capable GPU
 #   - BaM tests require -DWRP_CORE_ENABLE_BAM=ON
 #
@@ -23,7 +23,7 @@
 config:
   name: bam_vs_cte_cache
   pkgs:
-    - pkg_type: jarvis_iowarp.wrp_cte_gpu_bench
+    - pkg_type: jarvis_iowarp.clio_cte_gpu_bench
       pkg_name: bench
       test_case: "synthetic"
       workload_mode: "hbm"

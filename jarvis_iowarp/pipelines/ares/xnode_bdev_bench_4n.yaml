@@ -1,13 +1,13 @@
 # Cross-node chimaera bdev throughput benchmark — SLURM sbatch deployment.
 #
 # Layout:
-#   wrp_runtime              -> chimaera daemon (one per node)
+#   clio_runtime              -> chimaera daemon (one per node)
 #   clio_xnode_bdev_bench     -> mpiexec across all ranks, each issuing
 #                               AsyncWrite to DirectHash((my_node + 1)
 #                               % num_nodes) so every op crosses the
 #                               network.
 #
-# No wrp_cte / wrp_cte_libfuse: the bench creates its own bdev pool
+# No clio_cte / clio_cte_libfuse: the bench creates its own bdev pool
 # (id 777.0) directly via admin Broadcast at rank 0, then ranks issue
 # bdev::Client::AsyncWrite. CTE and FUSE are not on the path.
 #
@@ -71,7 +71,7 @@ scheduler:
     - 'mkdir -p /home/llogan/iowarp_prte_tmp'
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: runtime
     num_threads: 4
     client_data_segment_size: "2G"

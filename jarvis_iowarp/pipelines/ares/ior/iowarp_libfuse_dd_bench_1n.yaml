@@ -1,8 +1,8 @@
-# Pipeline: dd benchmark through wrp_cte_libfuse with the chimaera
+# Pipeline: dd benchmark through clio_cte_libfuse with the chimaera
 # runtime embedded in the FUSE process (CHI_WITH_RUNTIME=1).
 #
-# No wrp_runtime package -- clio_cte_fuse owns the runtime. The pool is
-# composed by wrp_cte (deploy_mode default) which connects via SHM to
+# No clio_runtime package -- clio_cte_fuse owns the runtime. The pool is
+# composed by clio_cte (deploy_mode default) which connects via SHM to
 # clio_cte_fuse's embedded runtime.
 #
 # Runs bare-metal on host; no container needed for the bench itself.
@@ -12,14 +12,14 @@ name: iowarp_libfuse_dd_bench_1n
 install_manager: native
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     pkg_name: cte_fuse
     deploy_mode: default
-    mountpoint: /home/llogan/wrp_cte
+    mountpoint: /home/llogan/clio_cte
     embedded_runtime: true
     sleep: 4
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte_core
     deploy_mode: default
     devices:

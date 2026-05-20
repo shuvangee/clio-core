@@ -5,7 +5,7 @@
 #   2. I/O size/warp:         16k..32m (iterations scaled to 1GB/warp)
 #   3. Storage backend:       hbm
 #
-# Requirements: wrp_cte_gpu_bench in PATH, CUDA-capable GPU
+# Requirements: clio_cte_gpu_bench in PATH, CUDA-capable GPU
 #
 # Usage:
 #   jarvis pipeline test gpu/cte_gpu_scaling_test.yaml
@@ -13,7 +13,7 @@
 config:
   name: cte_gpu_scaling
   pkgs:
-    - pkg_type: jarvis_iowarp.wrp_cte_gpu_bench
+    - pkg_type: jarvis_iowarp.clio_cte_gpu_bench
       pkg_name: bench
       test_case: "putblob_gpu"
       client_blocks: 1

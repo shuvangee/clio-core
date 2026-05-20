@@ -4,12 +4,12 @@
 # Matched baseline for metagem_iowarp_libfuse_compress_real_4n.yaml.
 # Same scheduler, same SIF, same real_workflow=true (snakemake + fastp
 # on the bundled toy FASTQ), same 4-host fan-out. Only differences:
-#   - No wrp_compress pkg.
-#   - wrp_cte stays at the default pool 512.0 (adapter entrypoint),
+#   - No clio_compress pkg.
+#   - clio_cte stays at the default pool 512.0 (adapter entrypoint),
 #     no 512->513 hop through the compressor.
 #
 # Use this to factor out the compressor cost: wall-clock diff vs the
-# compress variant is the wrp_compress overhead (or savings) for real
+# compress variant is the clio_compress overhead (or savings) for real
 # fastp FASTQ output.
 
 name: metagem_iowarp_libfuse_real_4n
@@ -21,7 +21,7 @@ container_image: metagem_apptainer_test
 container_binds:
   - ${HOME}/jarvis-bench-cache/metagem-stage:/tmp/metagem-cache:ro
   - ${HOME}/jarvis-runs:${HOME}/jarvis-runs
-  - ${HOME}/wrp_cte_metagem_real_4n:/mnt/wrp_cte
+  - ${HOME}/wrp_cte_metagem_real_4n:/mnt/clio_cte
 
 ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
 
@@ -50,7 +50,7 @@ scheduler:
     - 'mkdir -p /home/llogan/wrp_cte_metagem_real_4n'
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: runtime
     deploy_mode: default
     num_threads: 4
@@ -61,7 +61,7 @@ pkgs:
     sleep: 4
     swim_enabled: false
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte_core
     deploy_mode: default
     devices:
@@ -73,7 +73,7 @@ pkgs:
     iowarp_compress: none
     pool_query: "local"
 
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     pkg_name: cte_fuse
     deploy_mode: default
     mountpoint: ${HOME}/wrp_cte_metagem_real_4n
@@ -88,4 +88,4 @@ pkgs:
     parallel_reps: 4
     omp_threads: 4
     real_workflow: true
-    out: /mnt/wrp_cte/metagem
+    out: /mnt/clio_cte/metagem

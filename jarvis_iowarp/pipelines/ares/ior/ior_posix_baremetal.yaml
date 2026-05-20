@@ -1,8 +1,8 @@
 # IOR + CTE via POSIX adapter (bare-metal, single node).
 #
 # Layout:
-#   wrp_runtime    - starts the chimaera/CTE runtime locally (shm IPC).
-#   wrp_adapters   - LD_PRELOADs libwrp_cte_posix.so into ior; binds via
+#   clio_runtime    - starts the chimaera/CTE runtime locally (shm IPC).
+#   clio_adapters   - LD_PRELOADs libwrp_cte_posix.so into ior; binds via
 #                    the `interceptors: [cte_posix]` reference below.
 #   builtin.ior    - runs ior with the output path prefixed by "clio::"
 #                    so every read/write goes through the adapter.
@@ -20,19 +20,19 @@ name: ior_posix_baremetal
 install_manager: default
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: cte_runtime
     ipc_mode: shm
 
   # Register a RAM-backed storage target with the CTE runtime. The
-  # `ram::` path prefix tells wrp_cte to set bdev_type=ram (volatile,
+  # `ram::` path prefix tells clio_cte to set bdev_type=ram (volatile,
   # in-memory) instead of the default file-backed bdev. File-backed
   # bdevs on this host land on NFS (~229 MB/s raw write), which
   # bottlenecks IOR well below CTE's design point of ~2 GB/s.
   #
   # Sized at 16 GiB: comfortably fits the 12 GiB workload (4G block x
   # 3 reps) and stays under /dev/shm capacity on this node (24 GiB).
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte
     devices:
       - ["ram::cte_ram", "25G", 1.0]
@@ -59,6 +59,6 @@ pkgs:
     interceptors: [cte_posix]
 
 interceptors:
-  - pkg_type: jarvis_iowarp.wrp_adapters
+  - pkg_type: jarvis_iowarp.clio_adapters
     pkg_name: cte_posix
     posix: true

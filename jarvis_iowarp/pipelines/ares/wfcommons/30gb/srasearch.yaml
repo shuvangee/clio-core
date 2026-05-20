@@ -1,7 +1,7 @@
 # WfCommons Srasearch (30 GiB) + CTE POSIX adapter (bare-metal).
 #
 # Stack mirrors ior_posix_baremetal.yaml:
-#   wrp_runtime (shm IPC) -> wrp_cte (25 GiB RAM bdev) -> wfbench tasks
+#   clio_runtime (shm IPC) -> clio_cte (25 GiB RAM bdev) -> wfbench tasks
 #   are LD_PRELOAD'd with libwrp_cte_posix.so, and run_wfbench.py
 #   rewrites every task I/O path to a "clio::"-prefixed form so the
 #   POSIX adapter intercepts it.
@@ -40,11 +40,11 @@ name: wfcommons_srasearch_clio_30gb
 install_manager: default
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: cte_runtime
     ipc_mode: shm
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte
     devices:
       - ["ram::cte_ram", "32G", 1.0]
@@ -64,6 +64,6 @@ pkgs:
     interceptors: [cte_posix]
 
 interceptors:
-  - pkg_type: jarvis_iowarp.wrp_adapters
+  - pkg_type: jarvis_iowarp.clio_adapters
     pkg_name: cte_posix
     posix: true

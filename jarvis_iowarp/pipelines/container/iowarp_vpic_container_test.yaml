@@ -1,4 +1,4 @@
-# Pipeline: IOWarp runtime + CTE + wrp_adapters (POSIX) + VPIC
+# Pipeline: IOWarp runtime + CTE + clio_adapters (POSIX) + VPIC
 # Purpose: Run the VPIC Harris-sheet plasma deck with IOWarp's POSIX
 # adapter intercepting its file I/O through the CTE.
 #
@@ -32,14 +32,14 @@ pkgs:
   - pkg_type: builtin.compress_libs
     deploy_mode: container
 
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     deploy_mode: container
     git_branch: transparent-compress
     cmake_preset: release-adapter
     port: 9413
     sleep: 2
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     deploy_mode: container
 
   - pkg_type: builtin.vpic
@@ -50,7 +50,7 @@ pkgs:
     base_image: ubuntu:24.04
 
 interceptors:
-  - pkg_type: jarvis_iowarp.wrp_adapters
+  - pkg_type: jarvis_iowarp.clio_adapters
     posix: true
     include:
       - ".*vpic_run.*"

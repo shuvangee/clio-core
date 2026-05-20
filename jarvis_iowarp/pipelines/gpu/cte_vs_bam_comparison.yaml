@@ -20,7 +20,7 @@
 # Fixed: client_blocks=64, rt_blocks=16
 #
 # Requirements:
-#   - wrp_cte_gpu_bench in PATH (built with -DWRP_CORE_ENABLE_BAM=ON)
+#   - clio_cte_gpu_bench in PATH (built with -DWRP_CORE_ENABLE_BAM=ON)
 #   - CUDA-capable GPU
 #
 # Usage:
@@ -29,7 +29,7 @@
 config:
   name: cte_vs_bam
   pkgs:
-    - pkg_type: jarvis_iowarp.wrp_cte_gpu_bench
+    - pkg_type: jarvis_iowarp.clio_cte_gpu_bench
       pkg_name: bench
       test_case: "synthetic"
       workload_mode: "cte"

@@ -1,8 +1,8 @@
 # WfCommons (bare-metal) + CTE via POSIX adapter.
 #
 # Layout:
-#   wrp_runtime    - starts the chimaera/CTE runtime locally
-#   wrp_adapters   - LD_PRELOADs libwrp_cte_posix.so into the next pkg
+#   clio_runtime    - starts the chimaera/CTE runtime locally
+#   clio_adapters   - LD_PRELOADs libwrp_cte_posix.so into the next pkg
 #   wfcommons      - bare-metal install (creates a venv, pip installs
 #                    wfcommons, then runs the recipe + wfbench driver)
 #
@@ -16,7 +16,7 @@ name: wfcommons_posix_baremetal
 install_manager: default
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: cte_runtime
     # Use shared-memory IPC instead of TCP. wfbench spawns stress-ng
     # subprocesses for its memory benchmarks which signal the parent
@@ -47,6 +47,6 @@ pkgs:
     interceptors: [cte_posix]
 
 interceptors:
-  - pkg_type: jarvis_iowarp.wrp_adapters
+  - pkg_type: jarvis_iowarp.clio_adapters
     pkg_name: cte_posix
     posix: true

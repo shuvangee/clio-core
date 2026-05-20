@@ -7,7 +7,7 @@ config:
   env:
     OMPI_MCA_btl_tcp_if_include: enp47s0np0
   pkgs:
-    - pkg_type: jarvis_iowarp.wrp_runtime
+    - pkg_type: jarvis_iowarp.clio_runtime
       pkg_name: runtime
       do_dbg: false
       dbg_port: 4000
@@ -16,7 +16,7 @@ config:
       stdout: $HOME/iowarp/core/build/cte.txt
       stderr: $HOME/iowarp/core/build/cte.txt
 
-    - pkg_type: jarvis_iowarp.wrp_cte
+    - pkg_type: jarvis_iowarp.clio_cte
       pkg_name: cte_core
       devices:
         - ["${HOME}/cte_benchmark/storage1.bin", "500MB", 0.8]

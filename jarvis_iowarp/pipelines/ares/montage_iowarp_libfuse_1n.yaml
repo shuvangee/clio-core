@@ -1,6 +1,6 @@
 # Pipeline: Montage workload reusing the prebuilt montage_apptainer_test
 # SIF, with IOWarp's FUSE adapter providing the CTE-backed mount under
-# /mnt/wrp_cte.
+# /mnt/clio_cte.
 #
 # See biobb_iowarp_libfuse_1n.yaml for the full layered explanation.
 
@@ -11,11 +11,11 @@ container_engine: apptainer
 container_image: montage_apptainer_test
 
 container_binds:
-  - /home/llogan/wrp_cte:/mnt/wrp_cte
-  - /home/llogan/wrp_cte:/home/llogan/wrp_cte
+  - /home/llogan/clio_cte:/mnt/clio_cte
+  - /home/llogan/clio_cte:/home/llogan/clio_cte
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: runtime
     deploy_mode: default
     num_threads: 4
@@ -25,7 +25,7 @@ pkgs:
     log_level: info
     sleep: 4
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte_core
     deploy_mode: default
     devices:
@@ -36,10 +36,10 @@ pkgs:
     poll_period_ms: 5000
     iowarp_compress: none
 
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     pkg_name: cte_fuse
     deploy_mode: default
-    mountpoint: /home/llogan/wrp_cte
+    mountpoint: /home/llogan/clio_cte
     sleep: 2
 
   - pkg_type: builtin.montage
@@ -48,4 +48,4 @@ pkgs:
     ppn: 1
     region: M17
     band: j
-    out: /home/llogan/wrp_cte/montage_iowarp_libfuse_1n
+    out: /home/llogan/clio_cte/montage_iowarp_libfuse_1n

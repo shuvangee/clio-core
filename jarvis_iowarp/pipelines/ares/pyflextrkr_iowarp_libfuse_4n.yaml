@@ -4,7 +4,7 @@
 #
 # Multi-host via the mcs_imerg demo. The 4-node SLURM allocation is
 # fanned across via PsshExecInfo; per-rank NetCDF feature/mask writes
-# land in the FUSE mountpoint and route through wrp_cte → wrp_runtime.
+# land in the FUSE mountpoint and route through clio_cte → clio_runtime.
 
 name: pyflextrkr_iowarp_libfuse_4n
 
@@ -18,7 +18,7 @@ container_binds:
   # runs the genuine PyFLEXTRKR demo (mcs_imerg). Re-add the io_only bind
   # to switch back to the I/O proxy.
   - ${HOME}/jarvis-runs:${HOME}/jarvis-runs
-  - ${HOME}/wrp_cte_pyflextrkr_4n:/mnt/wrp_cte
+  - ${HOME}/wrp_cte_pyflextrkr_4n:/mnt/clio_cte
   - ${HOME}/wrp_cte_pyflextrkr_4n:${HOME}/wrp_cte_pyflextrkr_4n
 
 ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
@@ -54,7 +54,7 @@ scheduler:
     - 'mkdir -p /home/llogan/wrp_cte_pyflextrkr_4n'
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: runtime
     deploy_mode: default
     num_threads: 4
@@ -65,7 +65,7 @@ pkgs:
     sleep: 4
     swim_enabled: false
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte_core
     deploy_mode: default
     devices:
@@ -77,7 +77,7 @@ pkgs:
     iowarp_compress: none
     pool_query: "local"
 
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     pkg_name: cte_fuse
     deploy_mode: default
     mountpoint: ${HOME}/wrp_cte_pyflextrkr_4n

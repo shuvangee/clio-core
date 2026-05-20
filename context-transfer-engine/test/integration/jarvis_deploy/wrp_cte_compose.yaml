@@ -1,6 +1,6 @@
 ---
 # WRP CTE Compose Configuration for Jarvis Deployment Test
-# Separate CTE compose config (matches Jarvis WrpCte output)
+# Separate CTE compose config (matches Jarvis ClioCte output)
 # Applied via `chimaera compose` after runtime is started
 
 compose:

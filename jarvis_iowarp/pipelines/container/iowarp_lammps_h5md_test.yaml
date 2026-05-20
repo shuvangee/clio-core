@@ -1,4 +1,4 @@
-# Pipeline: IOWarp runtime + CTE + wrp_adapters (HDF5 VOL) + LAMMPS (H5MD)
+# Pipeline: IOWarp runtime + CTE + clio_adapters (HDF5 VOL) + LAMMPS (H5MD)
 # Purpose: Exercise the IOWarp HDF5 VOL connector with LAMMPS writing an
 # H5MD trajectory.
 #
@@ -38,14 +38,14 @@ pkgs:
   - pkg_type: builtin.compress_libs
     deploy_mode: container
 
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     deploy_mode: container
     git_branch: transparent-compress
     cmake_preset: release-adapter
     port: 9413
     sleep: 2
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     deploy_mode: container
 
   - pkg_type: builtin.lammps
@@ -58,7 +58,7 @@ pkgs:
     base_image: ubuntu:24.04
 
 interceptors:
-  - pkg_type: jarvis_iowarp.wrp_adapters
+  - pkg_type: jarvis_iowarp.clio_adapters
     vol: true
     include:
       - ".*lammps_h5md.*"

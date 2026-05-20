@@ -3,13 +3,13 @@
 # providing the CTE-backed mount that the workload writes to.
 #
 # Stack (single host):
-#   wrp_runtime     — chimaera daemon on the host
-#   wrp_cte         — CTE storage tier (8GB RAM)
-#   wrp_cte_libfuse — clio_cte_fuse binary (host PATH) mounts $HOME/wrp_cte
+#   clio_runtime     — chimaera daemon on the host
+#   clio_cte         — CTE storage tier (8GB RAM)
+#   clio_cte_libfuse — clio_cte_fuse binary (host PATH) mounts $HOME/clio_cte
 #   biobb_wf_md_setup — runs INSIDE the existing apptainer SIF; its
-#                       /mnt/wrp_cte path is bound from $HOME/wrp_cte on
+#                       /mnt/clio_cte path is bound from $HOME/clio_cte on
 #                       the host, so workload writes land on the FUSE
-#                       adapter and flow through wrp_cte → wrp_runtime.
+#                       adapter and flow through clio_cte → clio_runtime.
 #
 # `container_image` reuses the SIF built by
 # builtin/pipelines/examples/biobb_wf_md_setup_apptainer_test.yaml — this
@@ -23,11 +23,11 @@ container_engine: apptainer
 container_image: biobb_wf_md_setup_apptainer_test
 
 container_binds:
-  - /home/llogan/wrp_cte:/mnt/wrp_cte
-  - /home/llogan/wrp_cte:/home/llogan/wrp_cte
+  - /home/llogan/clio_cte:/mnt/clio_cte
+  - /home/llogan/clio_cte:/home/llogan/clio_cte
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: runtime
     deploy_mode: default
     num_threads: 4
@@ -37,7 +37,7 @@ pkgs:
     log_level: info
     sleep: 4
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte_core
     deploy_mode: default
     devices:
@@ -48,14 +48,14 @@ pkgs:
     poll_period_ms: 5000
     iowarp_compress: none
 
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     pkg_name: cte_fuse
     deploy_mode: default
-    mountpoint: /home/llogan/wrp_cte
+    mountpoint: /home/llogan/clio_cte
     sleep: 2
 
   - pkg_type: builtin.biobb_wf_md_setup
     pkg_name: biobb
     nprocs: 1
     ppn: 1
-    out: /home/llogan/wrp_cte/biobb_iowarp_libfuse_1n
+    out: /home/llogan/clio_cte/biobb_iowarp_libfuse_1n

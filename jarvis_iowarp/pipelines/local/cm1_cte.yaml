@@ -21,21 +21,21 @@ pkgs:
   - pkg_type: builtin.adios2
     deploy_mode: container
 
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     deploy_mode: container
     git_branch: transparent-compress
     cmake_preset: release-adapter
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     deploy_mode: container
 
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     deploy_mode: container
-    mountpoint: /mnt/wrp_cte
+    mountpoint: /mnt/clio_cte
     sleep: 2
 
   - pkg_type: builtin.cm1
     deploy_mode: container
     nprocs: 4
     ppn: 4
-    output: /mnt/wrp_cte/cm1_out
+    output: /mnt/clio_cte/cm1_out

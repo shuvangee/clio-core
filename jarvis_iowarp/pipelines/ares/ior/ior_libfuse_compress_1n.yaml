@@ -1,24 +1,24 @@
 # Pipeline: IOWarp FUSE + IOR with transparent compressor — 1 node x 1 ppn.
-# Mirrors aurora/ior_libfuse_1n.yaml but inserts wrp_compress in front of
-# wrp_cte so writes through the FUSE mount hit the compressor pool first.
+# Mirrors aurora/ior_libfuse_1n.yaml but inserts clio_compress in front of
+# clio_cte so writes through the FUSE mount hit the compressor pool first.
 #
 # Pool layout:
-#   wrp_compress (wrp_cte_compressor) at 512.0 — entrypoint targeted by
+#   clio_compress (wrp_cte_compressor) at 512.0 — entrypoint targeted by
 #                                                 WRP_CTE_CLIENT_INIT
-#   wrp_cte      (wrp_cte_core)       at 513.0 — downstream storage
+#   clio_cte      (wrp_cte_core)       at 513.0 — downstream storage
 #
 # Stack:
-#   wrp_runtime     -> chimaera daemon
-#   wrp_cte         -> CTE storage tiers at pool 513.0
-#   wrp_compress    -> wrp_cte_compressor at 512.0, next_pool_id=513.0,
+#   clio_runtime     -> chimaera daemon
+#   clio_cte         -> CTE storage tiers at pool 513.0
+#   clio_compress    -> wrp_cte_compressor at 512.0, next_pool_id=513.0,
 #                       snappy as the default static library
-#   wrp_cte_libfuse -> mounts ${HOME}/libfuse_compress via clio_cte_fuse
+#   clio_cte_libfuse -> mounts ${HOME}/libfuse_compress via clio_cte_fuse
 #   builtin.ior     -> POSIX writes through the mountpoint
 
 name: iowarp_ior_libfuse_compress_ares_1n
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: runtime
     num_threads: 4
     client_data_segment_size: "2G"
@@ -27,7 +27,7 @@ pkgs:
     log_level: "info"
     sleep: 4
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte_core
     pool_name: wrp_cte_core_storage
     pool_id: 513.0
@@ -39,7 +39,7 @@ pkgs:
     poll_period_ms: 5000
     iowarp_compress: "none"
 
-  - pkg_type: jarvis_iowarp.wrp_compress
+  - pkg_type: jarvis_iowarp.clio_compress
     pkg_name: cte_compress
     pool_name: wrp_cte_compressor
     pool_id: 512.0
@@ -48,7 +48,7 @@ pkgs:
     compress_lib: snappy
     compress_preset: default
 
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     pkg_name: cte_fuse
     mountpoint: /tmp/libfuse_compress
     sleep: 2

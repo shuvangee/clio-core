@@ -2,11 +2,11 @@
 #
 # wfbench tasks issue plain POSIX read/write on their data/* files; we
 # intercept those calls with libwrp_cte_posix.so injected via LD_PRELOAD
-# by the wrp_adapters Interceptor. The CTE adapter sees every read/write
+# by the clio_adapters Interceptor. The CTE adapter sees every read/write
 # the workflow performs.
 #
 # (wfcommons/wfbench has no native ADIOS2 path — adios2:true on
-# wrp_adapters would set ADIOS2_PLUGIN_PATH but intercept nothing
+# clio_adapters would set ADIOS2_PLUGIN_PATH but intercept nothing
 # because the runner emits no ADIOS2 calls.)
 
 name: wfcommons_cte
@@ -26,15 +26,15 @@ pkgs:
   - pkg_type: builtin.adios2
     deploy_mode: container
 
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     deploy_mode: container
     git_branch: transparent-compress
     cmake_preset: release-adapter
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     deploy_mode: container
 
-  - pkg_type: jarvis_iowarp.wrp_adapters
+  - pkg_type: jarvis_iowarp.clio_adapters
     deploy_mode: container
     posix: true
     # Path selection is now per-call: any open() with a path beginning

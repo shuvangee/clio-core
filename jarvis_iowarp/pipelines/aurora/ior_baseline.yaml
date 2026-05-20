@@ -7,10 +7,10 @@
 #    sleep infinity`. Every `apptainer exec <sif> <cmd>` spawns a fresh
 #    namespace. For the FUSE mount to persist across pkg starts (FUSE
 #    daemon in one process, IOR in the next), we rely on
-#    `apptainer instance start` — wrp_cte_libfuse/pkg.py's
+#    `apptainer instance start` — clio_cte_libfuse/pkg.py's
 #    _exec_in_container() dispatches via `apptainer exec instance://<name>`
 #    when the engine is apptainer. The pipeline must start the instance
-#    before wrp_cte_libfuse runs; today that requires either the
+#    before clio_cte_libfuse runs; today that requires either the
 #    upstream jarvis_cd _start_containerized_pipeline to `apptainer
 #    instance start` (it does `docker compose up` for docker/podman but
 #    no-ops for apptainer), or a manual pre-step:

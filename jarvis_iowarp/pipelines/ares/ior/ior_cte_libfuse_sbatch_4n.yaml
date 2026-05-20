@@ -1,12 +1,12 @@
 # IOR + CTE (libfuse adapter) — SLURM sbatch deployment.
 #
 # Layout (single-node by default; bump `nodes:` for multi-node):
-#   wrp_runtime      -> chimaera daemon (shm IPC; works in both 1-node
+#   clio_runtime      -> chimaera daemon (shm IPC; works in both 1-node
 #                       and multi-node because chimaera uses shm for
 #                       client<->daemon within a node and another
 #                       transport for daemon<->daemon across nodes)
-#   wrp_cte          -> CTE pool with a RAM tier
-#   wrp_cte_libfuse  -> mounts the pool at $HOME/cte_libfuse_sbatch
+#   clio_cte          -> CTE pool with a RAM tier
+#   clio_cte_libfuse  -> mounts the pool at $HOME/cte_libfuse_sbatch
 #                       (NEVER /tmp on this host — small / partition)
 #   builtin.ior      -> POSIX writes through the mount
 #
@@ -121,7 +121,7 @@ scheduler:
     - 'mkdir -p /home/llogan/iowarp_prte_tmp'
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: runtime
     num_threads: 4
     client_data_segment_size: "2G"
@@ -136,7 +136,7 @@ pkgs:
     # transient TCP/ZMQ errors instead of giving up via SetDead.
     swim_enabled: false
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte_core
     devices:
       # 24 ranks/node x 256 MiB block = 6 GiB written per node. With
@@ -154,7 +154,7 @@ pkgs:
     # No broadcast routing or cross-node admin propagation required.
     pool_query: "local"
 
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     pkg_name: cte_fuse
     mountpoint: ${HOME}/cte_libfuse_sbatch_4n
     sleep: 2

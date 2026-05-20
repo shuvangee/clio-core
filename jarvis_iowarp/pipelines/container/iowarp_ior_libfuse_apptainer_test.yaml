@@ -7,10 +7,10 @@
 #    sleep infinity`. Every `apptainer exec <sif> <cmd>` spawns a fresh
 #    namespace. For the FUSE mount to persist across pkg starts (FUSE
 #    daemon in one process, IOR in the next), we rely on
-#    `apptainer instance start` — wrp_cte_libfuse/pkg.py's
+#    `apptainer instance start` — clio_cte_libfuse/pkg.py's
 #    _exec_in_container() dispatches via `apptainer exec instance://<name>`
 #    when the engine is apptainer. The pipeline must start the instance
-#    before wrp_cte_libfuse runs; today that requires either the
+#    before clio_cte_libfuse runs; today that requires either the
 #    upstream jarvis_cd _start_containerized_pipeline to `apptainer
 #    instance start` (it does `docker compose up` for docker/podman but
 #    no-ops for apptainer), or a manual pre-step:
@@ -53,19 +53,19 @@ pkgs:
   - pkg_type: builtin.compress_libs
     deploy_mode: container
 
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     deploy_mode: container
     git_branch: transparent-compress
     cmake_preset: release-adapter
     port: 9413
     sleep: 2
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     deploy_mode: container
 
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     deploy_mode: container
-    mountpoint: /mnt/wrp_cte
+    mountpoint: /mnt/clio_cte
     sleep: 2
 
   - pkg_type: builtin.ior
@@ -77,4 +77,4 @@ pkgs:
     ppn: 1
     xfer: 1m
     block: 8m
-    out: /mnt/wrp_cte/ior.bin
+    out: /mnt/clio_cte/ior.bin

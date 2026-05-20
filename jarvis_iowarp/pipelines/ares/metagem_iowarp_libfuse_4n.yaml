@@ -1,15 +1,15 @@
 # Pipeline: MetaGEM workload, Apptainer + sbatch on Ares, 4 nodes,
 # writing through IOWarp's FUSE adapter mounted at ${HOME}/wrp_cte_metagem_4n
 # on each host (NFS-shared path, per-host FUSE namespace). Same pattern as
-# deepdrivemd_iowarp_libfuse_4n.yaml: wrp_runtime / wrp_cte / wrp_cte_libfuse
+# deepdrivemd_iowarp_libfuse_4n.yaml: clio_runtime / clio_cte / clio_cte_libfuse
 # run with deploy_mode: default (host bare-metal); only metagem itself runs
-# inside the SIF, where it sees the FUSE mount via --bind into /mnt/wrp_cte.
+# inside the SIF, where it sees the FUSE mount via --bind into /mnt/clio_cte.
 #
-# Apptainer's --bind uses MS_SLAVE on the container side, so wrp_cte_libfuse
+# Apptainer's --bind uses MS_SLAVE on the container side, so clio_cte_libfuse
 # mounting FUSE on the host AFTER apptainer instance start still propagates
-# into the container's /mnt/wrp_cte. Only requirement: the bind source must
+# into the container's /mnt/clio_cte. Only requirement: the bind source must
 # exist as a directory at instance-start time; pre_cmds mkdir handles that.
-# (Metagem itself doesn't link libfuse3 — it just opens /mnt/wrp_cte/* like
+# (Metagem itself doesn't link libfuse3 — it just opens /mnt/clio_cte/* like
 # any other directory; the kernel routes through FUSE to the host's
 # clio_cte_fuse daemon. No FUSE awareness needed inside the container.)
 #
@@ -25,11 +25,11 @@ container_image: metagem_apptainer_test
 container_binds:
   - ${HOME}/jarvis-bench-cache/metagem-stage:/tmp/metagem-cache:ro
   - ${HOME}/jarvis-runs:${HOME}/jarvis-runs
-  # Host-side clio_cte_fuse mount bound into the container at /mnt/wrp_cte.
+  # Host-side clio_cte_fuse mount bound into the container at /mnt/clio_cte.
   # The dir must exist at instance-start (created by the pre_cmd below);
-  # apptainer's --bind uses MS_SLAVE so the FUSE mount that wrp_cte_libfuse
+  # apptainer's --bind uses MS_SLAVE so the FUSE mount that clio_cte_libfuse
   # establishes on the host later still propagates into the container.
-  - ${HOME}/wrp_cte_metagem_4n:/mnt/wrp_cte
+  - ${HOME}/wrp_cte_metagem_4n:/mnt/clio_cte
 
 ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
 
@@ -56,12 +56,12 @@ scheduler:
     - 'mkdir -p /home/llogan/iowarp_prte_tmp'
     # FUSE bind source. NFS-shared so a head-node mkdir is visible to every
     # node; each node will mask it with its own clio_cte_fuse mount during
-    # wrp_cte_libfuse start.
+    # clio_cte_libfuse start.
     - 'fusermount3 -u /home/llogan/wrp_cte_metagem_4n 2>/dev/null || umount -l /home/llogan/wrp_cte_metagem_4n 2>/dev/null || true'
     - 'mkdir -p /home/llogan/wrp_cte_metagem_4n'
 
 pkgs:
-  - pkg_type: jarvis_iowarp.wrp_runtime
+  - pkg_type: jarvis_iowarp.clio_runtime
     pkg_name: runtime
     deploy_mode: default
     num_threads: 4
@@ -72,7 +72,7 @@ pkgs:
     sleep: 4
     swim_enabled: false
 
-  - pkg_type: jarvis_iowarp.wrp_cte
+  - pkg_type: jarvis_iowarp.clio_cte
     pkg_name: cte_core
     deploy_mode: default
     devices:
@@ -84,7 +84,7 @@ pkgs:
     iowarp_compress: none
     pool_query: "local"
 
-  - pkg_type: jarvis_iowarp.wrp_cte_libfuse
+  - pkg_type: jarvis_iowarp.clio_cte_libfuse
     pkg_name: cte_fuse
     deploy_mode: default
     mountpoint: ${HOME}/wrp_cte_metagem_4n
@@ -102,4 +102,4 @@ pkgs:
     # concurrency is fine.
     parallel_reps: 4
     omp_threads: 4
-    out: /mnt/wrp_cte/metagem
+    out: /mnt/clio_cte/metagem
