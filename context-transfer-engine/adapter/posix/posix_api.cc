@@ -42,7 +42,7 @@ bool posix_intercepted = true;
 
 #include <filesystem>
 
-#include "chimaera/chimaera.h"
+#include "clio_runtime/clio_runtime.h"
 #include "adapter/filesystem/filesystem.h"
 #include "clio_ctp/util/logging.h"
 #include "clio_ctp/util/singleton.h"

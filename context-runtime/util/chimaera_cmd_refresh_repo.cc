@@ -199,7 +199,7 @@ class ChiModGenerator {
     oss << "#ifndef " << namespace_upper << "_" << chimod_upper << "_AUTOGEN_METHODS_H_\n";
     oss << "#define " << namespace_upper << "_" << chimod_upper << "_AUTOGEN_METHODS_H_\n";
     oss << "\n";
-    oss << "#include <chimaera/chimaera.h>\n";
+    oss << "#include <clio_runtime/clio_runtime.h>\n";
     oss << "#include <string>\n";
     oss << "#include <vector>\n";
     oss << "\n";
@@ -305,8 +305,8 @@ class ChiModGenerator {
     oss << "\n";
     oss << "#include \"" << namespace_name << "/" << module_name << "/" << chimod_name << "_runtime.h\"\n";
     oss << "#include \"" << namespace_name << "/" << module_name << "/autogen/" << chimod_name << "_methods.h\"\n";
-    oss << "#include <chimaera/chimaera.h>\n";
-    oss << "#include <chimaera/task.h>  // For TaskResume coroutine return type\n";
+    oss << "#include <clio_runtime/clio_runtime.h>\n";
+    oss << "#include <clio_runtime/task.h>  // For TaskResume coroutine return type\n";
     oss << "\n";
     oss << "namespace " << namespace_name << "::" << chimod_name << " {\n";
     oss << "\n";

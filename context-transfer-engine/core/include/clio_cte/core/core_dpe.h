@@ -34,7 +34,7 @@
 #ifndef WRPCTE_CORE_DPE_H_
 #define WRPCTE_CORE_DPE_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_cte/core/core_tasks.h>
 #include <vector>
 #include <string>

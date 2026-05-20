@@ -38,7 +38,7 @@
  * Contains global variables and singletons for client-side code.
  */
 
-#include "chimaera/simple_mod/simple_mod_client.h"
+#include "clio_runtime/simple_mod/simple_mod_client.h"
 
 namespace external_test::simple_mod {
 

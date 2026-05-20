@@ -35,10 +35,10 @@
  * Unit tests for Compose feature
  */
 
-#include <chimaera/chimaera.h>
-#include <chimaera/config_manager.h>
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/bdev/bdev_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/config_manager.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/bdev/bdev_client.h>
 #include <fstream>
 #include <clio_ctp/util/logging.h>
 

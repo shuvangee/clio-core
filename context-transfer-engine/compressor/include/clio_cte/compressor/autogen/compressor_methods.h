@@ -1,7 +1,7 @@
 #ifndef CLIO_CTE_COMPRESSOR_AUTOGEN_METHODS_H_
 #define CLIO_CTE_COMPRESSOR_AUTOGEN_METHODS_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <string>
 #include <vector>
 

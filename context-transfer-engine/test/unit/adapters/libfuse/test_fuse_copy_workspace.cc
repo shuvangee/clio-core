@@ -47,8 +47,8 @@
  *   CteDelTag          -> cleanup
  */
 
-#include <chimaera/chimaera.h>
-#include <chimaera/bdev/bdev_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/bdev/bdev_client.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>
 

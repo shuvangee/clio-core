@@ -38,12 +38,12 @@
  * batch task submission.
  */
 
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/ipc_manager.h>
-#include <chimaera/pool_manager.h>
-#include <chimaera/work_orchestrator.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/ipc_manager.h>
+#include <clio_runtime/pool_manager.h>
+#include <clio_runtime/work_orchestrator.h>
 #include <simple_test.h>
 
 #include <chrono>

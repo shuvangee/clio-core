@@ -34,8 +34,8 @@
 #ifndef SIMPLE_MOD_TASKS_H_
 #define SIMPLE_MOD_TASKS_H_
 
-#include <chimaera/chimaera.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 #include "autogen/simple_mod_methods.h"
 

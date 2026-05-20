@@ -38,12 +38,12 @@
  * Contains the server-side task processing logic with basic functionality.
  */
 
-#include "chimaera/simple_mod/simple_mod_runtime.h"
+#include "clio_runtime/simple_mod/simple_mod_runtime.h"
 
-#include <chimaera/chimaera_manager.h>
-#include <chimaera/module_manager.h>
-#include <chimaera/pool_manager.h>
-#include <chimaera/task_archives.h>
+#include <clio_runtime/chimaera_manager.h>
+#include <clio_runtime/module_manager.h>
+#include <clio_runtime/pool_manager.h>
+#include <clio_runtime/task_archives.h>
 #include <clio_ctp/memory/allocator/malloc_allocator.h>
 
 #include <iostream>

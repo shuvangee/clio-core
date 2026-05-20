@@ -35,7 +35,7 @@
  * Module manager implementation with dynamic ChiMod loading
  */
 
-#include "chimaera/module_manager.h"
+#include "clio_runtime/module_manager.h"
 
 #ifndef _WIN32
 #include <dlfcn.h>
@@ -46,7 +46,7 @@
 #include <cstring>
 #include <filesystem>
 
-#include "chimaera/container.h"
+#include "clio_runtime/container.h"
 
 // Global pointer variable definition for Module manager singleton
 CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::ModuleManager, g_module_manager);
@@ -216,7 +216,7 @@ std::vector<std::string> ModuleManager::GetScanDirectories() const {
   }
 
   // Get CHI_REPO_PATH
-  const char *chi_repo_path = std::getenv("CHI_REPO_PATH");
+  const char *chi_repo_path = chi::env::GetCompat("REPO_PATH");
   if (chi_repo_path) {
     std::string path_str(chi_repo_path);
     // Split by colon (Unix) or semicolon (Windows)

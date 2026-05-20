@@ -48,8 +48,8 @@
 #include <tuple>
 #include <vector>
 
-#include "chimaera/work_orchestrator.h"
-#include "chimaera/worker.h"
+#include "clio_runtime/work_orchestrator.h"
+#include "clio_runtime/worker.h"
 #include "clio_ctp/compress/compress_factory.h"
 #include "clio_ctp/compress/data_stats.h"
 #include "clio_ctp/util/logging.h"

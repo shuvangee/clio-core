@@ -5,11 +5,11 @@
 #include <string>
 #include <thread>
 
-#include "chimaera/chimaera.h"
-#include "chimaera/config_manager.h"
-#include "chimaera/admin/admin_client.h"
-#include "chimaera/singletons.h"
-#include "chimaera/types.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/config_manager.h"
+#include "clio_runtime/admin/admin_client.h"
+#include "clio_runtime/singletons.h"
+#include "clio_runtime/types.h"
 #include "chimaera_commands.h"
 
 namespace {

@@ -34,15 +34,15 @@
 #ifndef WRPCTE_CORE_TASKS_H_
 #define WRPCTE_CORE_TASKS_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_cte/core/autogen/core_methods.h>
 #include <clio_cte/core/core_config.h>
 // Include admin tasks for GetOrCreatePoolTask
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_tasks.h>
 // Include bdev tasks for BdevType enum
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 // Include bdev client for TargetInfo
-#include <chimaera/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_client.h>
 // Include mutex for BlobInfo prealloc_lock_
 #include <clio_ctp/thread/lock/mutex.h>
 #if CTP_IS_HOST

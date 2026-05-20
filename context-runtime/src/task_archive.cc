@@ -36,8 +36,8 @@
  * Contains SaveTaskArchive and LoadTaskArchive bulk() method implementations
  */
 
-#include "chimaera/task_archives.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/task_archives.h"
+#include "clio_runtime/ipc_manager.h"
 #include "clio_ctp/util/logging.h"
 
 namespace chi {

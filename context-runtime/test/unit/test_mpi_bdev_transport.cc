@@ -61,11 +61,11 @@
 #include <vector>
 #include <clio_ctp/util/logging.h>
 
-#include "chimaera/chimaera.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/ipc_manager.h"
 
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 
 using namespace chi;
 

@@ -39,7 +39,7 @@
 #include <cstring>
 
 #include <adios2.h>
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_cte/core/core_client.h>
 
 namespace fs = std::filesystem;

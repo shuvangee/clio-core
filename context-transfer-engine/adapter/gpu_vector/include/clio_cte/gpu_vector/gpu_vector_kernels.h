@@ -9,8 +9,8 @@
 #ifndef CLIO_CTE_GPU_VECTOR_KERNELS_H_
 #define CLIO_CTE_GPU_VECTOR_KERNELS_H_
 
-#include <chimaera/gpu/gpu_ipc_manager.h>
-#include <chimaera/types.h>
+#include <clio_runtime/gpu/gpu_ipc_manager.h>
+#include <clio_runtime/types.h>
 #include <clio_cte/gpu_vector/gpu_vector_page.h>
 #include <clio_cte/gpu_vector/gpu_vector_view.h>
 

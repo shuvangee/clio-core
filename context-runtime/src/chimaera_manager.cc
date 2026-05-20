@@ -39,8 +39,8 @@
 #include <iomanip>
 #include <iostream>
 
-#include "chimaera/admin/admin_client.h"
-#include "chimaera/singletons.h"
+#include "clio_runtime/admin/admin_client.h"
+#include "clio_runtime/singletons.h"
 
 // Global pointer variable definition for Chimaera manager singleton
 CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::Chimaera, g_chimaera_manager);

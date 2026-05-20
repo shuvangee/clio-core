@@ -38,7 +38,7 @@
  * Coroutines are managed via std::coroutine_handle stored in RunContext.
  */
 
-#include "chimaera/worker.h"
+#include "clio_runtime/worker.h"
 
 #ifndef _WIN32
 #include <sys/syscall.h>
@@ -54,16 +54,16 @@
 
 // Include task_queue.h before other chimaera headers to ensure proper
 // resolution
-#include "chimaera/admin/admin_client.h"
-#include "chimaera/container.h"
-#include "chimaera/device_memcpy.h"
-#include "chimaera/ipc_manager.h"
-#include "chimaera/pool_manager.h"
-#include "chimaera/singletons.h"
-#include "chimaera/task.h"
-#include "chimaera/task_archives.h"
-#include "chimaera/local_task_archives.h"
-#include "chimaera/work_orchestrator.h"
+#include "clio_runtime/admin/admin_client.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/device_memcpy.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/pool_manager.h"
+#include "clio_runtime/singletons.h"
+#include "clio_runtime/task.h"
+#include "clio_runtime/task_archives.h"
+#include "clio_runtime/local_task_archives.h"
+#include "clio_runtime/work_orchestrator.h"
 
 namespace chi {
 

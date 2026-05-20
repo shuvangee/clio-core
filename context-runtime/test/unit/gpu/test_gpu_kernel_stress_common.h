@@ -36,15 +36,15 @@
 #ifndef CHIMAERA_TEST_UNIT_GPU_TEST_GPU_KERNEL_STRESS_COMMON_H_
 #define CHIMAERA_TEST_UNIT_GPU_TEST_GPU_KERNEL_STRESS_COMMON_H_
 
-#include <chimaera/chimaera.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/gpu/future.h>
-#include <chimaera/gpu/gpu_info.h>
-#include <chimaera/gpu/gpu_ipc_manager.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
-#include <chimaera/MOD_NAME/MOD_NAME_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/gpu/future.h>
+#include <clio_runtime/gpu/gpu_info.h>
+#include <clio_runtime/gpu/gpu_ipc_manager.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_client.h>
 
 #include <chrono>
 #include <cstdio>

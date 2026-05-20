@@ -253,7 +253,7 @@ Here is an example of the context transfer engine's C++ API.
 
 ```cpp
 #include <clio_cte/core/core_client.h>
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 int main() {
   // 1. Initialize Chimaera runtime

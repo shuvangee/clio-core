@@ -5,14 +5,14 @@
  * BSD 3-Clause License. See LICENSE file.
  */
 
-#include "chimaera/ipc/ipc_gpu2cpu.h"
+#include "clio_runtime/ipc/ipc_gpu2cpu.h"
 
 #if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 
-#include "chimaera/device_memcpy.h"
-#include "chimaera/gpu/future.h"
-#include "chimaera/gpu/gpu_ipc_manager.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/device_memcpy.h"
+#include "clio_runtime/gpu/future.h"
+#include "clio_runtime/gpu/gpu_ipc_manager.h"
+#include "clio_runtime/ipc_manager.h"
 
 namespace chi {
 

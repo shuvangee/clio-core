@@ -34,7 +34,7 @@
 #ifndef WRPCTE_CORE_CONFIG_H_
 #define WRPCTE_CORE_CONFIG_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_ctp/util/config_parse.h>
 #include <yaml-cpp/yaml.h>
 

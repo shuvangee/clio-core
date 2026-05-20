@@ -34,9 +34,9 @@
 #ifndef PY_WRAPPER_H_
 #define PY_WRAPPER_H_
 
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
-#include <chimaera/chimaera.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include <string>
 #include <thread>

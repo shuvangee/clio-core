@@ -34,8 +34,8 @@
 #ifndef SIMPLE_MOD_RUNTIME_H_
 #define SIMPLE_MOD_RUNTIME_H_
 
-#include <chimaera/chimaera.h>
-#include <chimaera/container.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/container.h>
 #include "simple_mod_tasks.h"
 #include "simple_mod_client.h"
 

@@ -9,8 +9,8 @@
 #ifndef CLIO_CTE_GPU_VECTOR_PAGE_H_
 #define CLIO_CTE_GPU_VECTOR_PAGE_H_
 
-#include <chimaera/types.h>
-#include <chimaera/gpu/future.h>
+#include <clio_runtime/types.h>
+#include <clio_runtime/gpu/future.h>
 #include <clio_cte/core/core_tasks.h>
 
 namespace clio_cte::gpu_vector {

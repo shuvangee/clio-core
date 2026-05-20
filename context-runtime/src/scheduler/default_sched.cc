@@ -32,14 +32,14 @@
  */
 
 // Copyright 2024 IOWarp contributors
-#include "chimaera/scheduler/default_sched.h"
+#include "clio_runtime/scheduler/default_sched.h"
 
-#include "chimaera/config_manager.h"
-#include "chimaera/container.h"
-#include "chimaera/ipc_manager.h"
-#include "chimaera/pool_manager.h"
-#include "chimaera/work_orchestrator.h"
-#include "chimaera/worker.h"
+#include "clio_runtime/config_manager.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/pool_manager.h"
+#include "clio_runtime/work_orchestrator.h"
+#include "clio_runtime/worker.h"
 
 namespace chi {
 

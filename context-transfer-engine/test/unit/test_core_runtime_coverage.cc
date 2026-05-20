@@ -41,16 +41,16 @@
 #include "simple_test.h"
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 #include <clio_ctp/util/logging.h>
 
 using namespace clio_cte::core;
 
 static std::string chi_test_data_dir() {
-  const char *d = std::getenv("CHI_TEST_DATA_DIR");
+  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
   return (d && *d) ? d : ".";
 }
 

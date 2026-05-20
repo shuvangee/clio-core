@@ -20,7 +20,7 @@
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>
 #include <clio_cte/core/content_transfer_engine.h>
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 // CTP includes
 #include <clio_ctp/util/singleton.h>

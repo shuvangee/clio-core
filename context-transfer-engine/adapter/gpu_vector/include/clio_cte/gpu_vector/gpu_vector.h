@@ -9,11 +9,11 @@
 #ifndef CLIO_CTE_GPU_VECTOR_H_
 #define CLIO_CTE_GPU_VECTOR_H_
 
-#include <chimaera/chimaera.h>
-#include <chimaera/gpu/gpu_ipc_manager.h>
-#include <chimaera/ipc_manager.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/gpu/gpu_ipc_manager.h>
+#include <clio_runtime/ipc_manager.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 #include <clio_ctp/util/gpu_api.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>

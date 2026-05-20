@@ -36,8 +36,8 @@
 #define CLIO_CTE_COMPRESSOR_COMPRESSOR_RUNTIME_H_
 
 #include <atomic>
-#include <chimaera/chimaera.h>
-#include <chimaera/corwlock.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/corwlock.h>
 #include <clio_ctp/data_structures/ipc/ring_buffer.h>
 #include <clio_ctp/introspect/system_info.h>
 #include <memory>

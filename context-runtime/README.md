@@ -112,9 +112,9 @@ cmake --install build --prefix /usr/local
 Create a simple application using the bdev ChiMod:
 
 ```cpp
-#include <chimaera/chimaera.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/admin/admin_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/admin/admin_client.h>
 
 int main() {
   // Initialize Chimaera (client mode with embedded runtime)

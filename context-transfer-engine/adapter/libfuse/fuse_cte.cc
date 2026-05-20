@@ -49,7 +49,7 @@
 #include <cerrno>                 // errno
 #include <cstdio>                 // snprintf, fprintf
 
-#include "chimaera/chimaera.h"
+#include "clio_runtime/clio_runtime.h"
 #include "clio_cte/core/content_transfer_engine.h"
 
 using namespace clio::cae::fuse;

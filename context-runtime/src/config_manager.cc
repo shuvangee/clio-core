@@ -35,9 +35,9 @@
  * Configuration manager implementation
  */
 
-#include "chimaera/config_manager.h"
-#include "chimaera/task.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/config_manager.h"
+#include "clio_runtime/task.h"
+#include "clio_runtime/ipc_manager.h"
 #include <cstdlib>
 #include <filesystem>
 
@@ -99,7 +99,7 @@ bool ConfigManager::LoadYaml(const std::string &config_path) {
 
 std::string ConfigManager::GetServerConfigPath() const {
   // Check CHI_SERVER_CONF first (primary)
-  const char *chi_env_path = std::getenv("CHI_SERVER_CONF");
+  const char *chi_env_path = chi::env::GetCompat("SERVER_CONF");
   if (chi_env_path) {
     return std::string(chi_env_path);
   }
@@ -252,10 +252,10 @@ void ConfigManager::ParseYAML(YAML::Node &yaml_conf) {
   // Environment variable overrides for GPU config (higher priority than YAML).
   // Allows benchmarks to set the partition count dynamically from their
   // thread parameters before CHIMAERA_INIT().
-  if (const char *env = std::getenv("CHI_GPU_BLOCKS")) {
+  if (const char *env = chi::env::GetCompat("GPU_BLOCKS")) {
     gpu_blocks_ = static_cast<u32>(std::stoul(env));
   }
-  if (const char *env = std::getenv("CHI_GPU_THREADS")) {
+  if (const char *env = chi::env::GetCompat("GPU_THREADS")) {
     gpu_threads_per_block_ = static_cast<u32>(std::stoul(env));
   }
 

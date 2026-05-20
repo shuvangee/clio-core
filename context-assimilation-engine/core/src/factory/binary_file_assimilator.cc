@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #ifndef _WIN32
 #include <sys/stat.h>
 #endif

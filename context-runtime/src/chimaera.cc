@@ -35,9 +35,9 @@
  * Main Chimaera initialization and global functions
  */
 
-#include "chimaera/chimaera.h"
-#include "chimaera/container.h"
-#include "chimaera/work_orchestrator.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/work_orchestrator.h"
 #include <cstdlib>
 #include <cstring>
 
@@ -55,7 +55,7 @@ bool CHIMAERA_INIT(ChimaeraMode mode, bool default_with_runtime, bool is_restart
 
   // Check environment variable CHI_WITH_RUNTIME
   bool with_runtime = default_with_runtime;
-  const char* env_val = std::getenv("CHI_WITH_RUNTIME");
+  const char* env_val = chi::env::GetCompat("WITH_RUNTIME");
   if (env_val != nullptr) {
     with_runtime = (std::strcmp(env_val, "1") == 0 ||
                    std::strcmp(env_val, "true") == 0 ||

@@ -31,11 +31,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/bdev/bdev_runtime.h>
-#include <chimaera/comutex.h>
-#include <chimaera/device_memcpy.h>
-#include <chimaera/work_orchestrator.h>
-#include <chimaera/worker.h>
+#include <clio_runtime/bdev/bdev_runtime.h>
+#include <clio_runtime/comutex.h>
+#include <clio_runtime/device_memcpy.h>
+#include <clio_runtime/work_orchestrator.h>
+#include <clio_runtime/worker.h>
 
 #include <clio_ctp/introspect/system_info.h>
 #include <clio_ctp/serialize/msgpack_wrapper.h>

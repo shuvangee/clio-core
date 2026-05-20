@@ -34,7 +34,7 @@
 #ifndef SIMPLE_MOD_CLIENT_H_
 #define SIMPLE_MOD_CLIENT_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include "simple_mod_tasks.h"
 

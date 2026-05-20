@@ -35,7 +35,7 @@
 #define CLIO_CAE_CORE_BASE_ASSIMILATOR_H_
 
 #include <clio_cae/core/factory/assimilation_ctx.h>
-#include <chimaera/task.h>
+#include <clio_runtime/task.h>
 
 namespace clio_cae::core {
 

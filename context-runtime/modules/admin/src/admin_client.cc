@@ -38,7 +38,7 @@
  * Contains global variables and singletons for client-side code.
  */
 
-#include "chimaera/admin/admin_client.h"
+#include "clio_runtime/admin/admin_client.h"
 
 namespace chimaera::admin {
 

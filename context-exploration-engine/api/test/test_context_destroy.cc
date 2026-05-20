@@ -44,7 +44,7 @@
  */
 
 #include <clio_cee/api/context_interface.h>
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <iostream>
 #include <cassert>
 #include <cstring>

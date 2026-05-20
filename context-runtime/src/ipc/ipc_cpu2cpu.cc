@@ -5,8 +5,8 @@
  * BSD 3-Clause License. See LICENSE file.
  */
 
-#include "chimaera/ipc/ipc_cpu2cpu.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/ipc/ipc_cpu2cpu.h"
+#include "clio_runtime/ipc_manager.h"
 
 namespace chi {
 

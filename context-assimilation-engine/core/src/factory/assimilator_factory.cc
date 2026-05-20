@@ -39,7 +39,7 @@
 #ifdef CAE_ENABLE_GLOBUS
 #include <clio_cae/core/factory/globus_file_assimilator.h>
 #endif
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include <memory>
 

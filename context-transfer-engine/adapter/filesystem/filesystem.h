@@ -52,7 +52,7 @@
 
 #include "adapter/adapter_types.h"
 #include "adapter/mapper/mapper_factory.h"
-#include "chimaera/chimaera.h"
+#include "clio_runtime/clio_runtime.h"
 #include "filesystem_io_client.h"
 #include "filesystem_mdm.h"
 #include "clio_cte/core/content_transfer_engine.h"

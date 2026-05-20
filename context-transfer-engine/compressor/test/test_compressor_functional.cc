@@ -52,7 +52,7 @@
 #include <vector>
 #include <random>
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_cte/compressor/compressor_client.h>
 #include <clio_cte/compressor/compressor_tasks.h>
 #include <clio_cte/compressor/compressor_runtime.h>

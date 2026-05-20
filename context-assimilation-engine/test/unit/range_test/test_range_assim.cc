@@ -53,7 +53,7 @@
 #include <cstring>
 
 // Chimaera and CAE headers
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_cae/core/core_client.h>
 #include <clio_cae/core/constants.h>
 #include <clio_cae/core/factory/assimilation_ctx.h>

@@ -55,7 +55,7 @@
 #include <clio_cae/core/core_client.h>
 #include <clio_cae/core/constants.h>
 #include <clio_cte/core/core_client.h>
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <iostream>
 #include <fstream>
 #include <cassert>

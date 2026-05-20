@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_cte/core/content_transfer_engine.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_config.h>

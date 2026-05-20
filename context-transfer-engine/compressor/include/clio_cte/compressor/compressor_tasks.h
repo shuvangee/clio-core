@@ -35,9 +35,9 @@
 #ifndef CLIO_CTE_COMPRESSOR_COMPRESSOR_TASKS_H_
 #define CLIO_CTE_COMPRESSOR_COMPRESSOR_TASKS_H_
 
-#include <chimaera/chimaera.h>
-#include <chimaera/task.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/task.h>
+#include <clio_runtime/admin/admin_tasks.h>
 #include <clio_cte/core/core_tasks.h>
 #include <clio_cte/compressor/autogen/compressor_methods.h>
 

@@ -32,10 +32,10 @@
  */
 
 // Copyright 2024 IOWarp contributors
-#include "chimaera/scheduler/scheduler_factory.h"
+#include "clio_runtime/scheduler/scheduler_factory.h"
 
-#include "chimaera/scheduler/default_sched.h"
-#include "chimaera/scheduler/local_sched.h"
+#include "clio_runtime/scheduler/default_sched.h"
+#include "clio_runtime/scheduler/local_sched.h"
 
 namespace chi {
 

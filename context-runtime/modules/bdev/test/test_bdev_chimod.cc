@@ -58,18 +58,18 @@
 using namespace std::chrono_literals;
 
 // Include Chimaera headers
-#include <chimaera/chimaera.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 
 // Include bdev client and tasks
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 
 // Include admin client for pool management
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 namespace {
 // Test configuration constants
@@ -211,7 +211,7 @@ class BdevChimodFixture {
    */
   chi::u32 getNumContainers() const {
     // First check CHI_NUM_CONTAINERS environment variable
-    const char* num_containers_env = std::getenv("CHI_NUM_CONTAINERS");
+    const char* num_containers_env = chi::env::GetCompat("NUM_CONTAINERS");
     if (num_containers_env) {
       chi::u32 num_containers = std::atoi(num_containers_env);
       if (num_containers > 0) {
@@ -1359,7 +1359,7 @@ void run_bdev_file_explicit_backend_test(const char *mode_name) {
 }
 
 TEST_CASE("bdev_file_explicit_backend_shm", "[bdev][file][explicit][shm]") {
-  const char* ipc_mode = std::getenv("CHI_IPC_MODE");
+  const char* ipc_mode = chi::env::GetCompat("IPC_MODE");
   if (ipc_mode && std::string(ipc_mode) != "SHM" && std::string(ipc_mode) != "shm") {
     INFO("Skipping: CHI_IPC_MODE=" + std::string(ipc_mode) + " (need SHM)");
     return;
@@ -1369,7 +1369,7 @@ TEST_CASE("bdev_file_explicit_backend_shm", "[bdev][file][explicit][shm]") {
 }
 
 TEST_CASE("bdev_file_explicit_backend_tcp", "[bdev][file][explicit][tcp]") {
-  const char* ipc_mode = std::getenv("CHI_IPC_MODE");
+  const char* ipc_mode = chi::env::GetCompat("IPC_MODE");
   if (ipc_mode && std::string(ipc_mode) != "TCP" && std::string(ipc_mode) != "tcp") {
     INFO("Skipping: CHI_IPC_MODE=" + std::string(ipc_mode) + " (need TCP)");
     return;
@@ -1379,7 +1379,7 @@ TEST_CASE("bdev_file_explicit_backend_tcp", "[bdev][file][explicit][tcp]") {
 }
 
 TEST_CASE("bdev_file_explicit_backend_ipc", "[bdev][file][explicit][ipc]") {
-  const char* ipc_mode = std::getenv("CHI_IPC_MODE");
+  const char* ipc_mode = chi::env::GetCompat("IPC_MODE");
   if (ipc_mode && std::string(ipc_mode) != "IPC" && std::string(ipc_mode) != "ipc") {
     INFO("Skipping: CHI_IPC_MODE=" + std::string(ipc_mode) + " (need IPC)");
     return;

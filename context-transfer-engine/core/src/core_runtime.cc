@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/admin/admin_client.h>
+#include <clio_runtime/admin/admin_client.h>
 #include <clio_cte/core/core_config.h>
 #include <clio_cte/core/core_dpe.h>
 #include <clio_cte/core/core_runtime.h>
@@ -55,7 +55,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "chimaera/worker.h"
+#include "clio_runtime/worker.h"
 #include "clio_ctp/util/gpu_api.h"
 #include "clio_ctp/util/logging.h"
 #include "clio_ctp/util/timer.h"

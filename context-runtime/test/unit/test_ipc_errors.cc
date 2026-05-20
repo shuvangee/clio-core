@@ -45,8 +45,8 @@
 #include <unistd.h>
 #endif
 
-#include "chimaera/chimaera.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/ipc_manager.h"
 
 using namespace chi;
 

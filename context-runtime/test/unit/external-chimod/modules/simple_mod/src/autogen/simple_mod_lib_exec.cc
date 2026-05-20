@@ -9,8 +9,8 @@
 
 #include "external_test/simple_mod/simple_mod_runtime.h"
 #include "external_test/simple_mod/autogen/simple_mod_methods.h"
-#include <chimaera/chimaera.h>
-#include <chimaera/task.h>  // For TaskResume coroutine return type
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/task.h>  // For TaskResume coroutine return type
 
 namespace external_test::simple_mod {
 

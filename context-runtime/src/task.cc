@@ -35,8 +35,8 @@
  * Task implementation
  */
 
-#include "chimaera/task.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/task.h"
+#include "clio_runtime/ipc_manager.h"
 
 namespace chi {
 

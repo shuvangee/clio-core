@@ -48,9 +48,9 @@
 #include <iostream>
 #include <memory>
 #include <clio_ctp/util/logging.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/simple_mod/simple_mod_client.h>
-#include <chimaera/admin/admin_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/simple_mod/simple_mod_client.h>
+#include <clio_runtime/admin/admin_client.h>
 
 namespace {
 constexpr chi::PoolId kExternalTestPoolId = chi::PoolId(7001, 0);

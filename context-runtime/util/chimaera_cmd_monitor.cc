@@ -7,10 +7,10 @@
 
 #include <clio_ctp/serialize/msgpack_wrapper.h>
 
-#include "chimaera/chimaera.h"
-#include "chimaera/singletons.h"
-#include "chimaera/types.h"
-#include "chimaera/admin/admin_client.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/singletons.h"
+#include "clio_runtime/types.h"
+#include "clio_runtime/admin/admin_client.h"
 #include "chimaera_commands.h"
 
 namespace {

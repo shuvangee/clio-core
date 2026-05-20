@@ -23,9 +23,9 @@
 
 #include "simple_test.h"
 
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/singletons.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/singletons.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>
 #include <clio_cte/gpu_vector/gpu_vector.h>

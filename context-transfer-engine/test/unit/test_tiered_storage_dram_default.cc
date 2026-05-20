@@ -61,8 +61,8 @@
  * placement decisions and inter-tier migration.
  */
 
-#include <chimaera/chimaera.h>
-#include <chimaera/bdev/bdev_tasks.h>  // chimaera::bdev::DefaultRamCapacityBytes
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/bdev/bdev_tasks.h>  // chimaera::bdev::DefaultRamCapacityBytes
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>
 
@@ -80,7 +80,7 @@
 namespace fs = std::filesystem;
 
 static std::string chi_test_data_dir() {
-  const char *d = std::getenv("CHI_TEST_DATA_DIR");
+  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
   return (d && *d) ? d : ".";
 }
 

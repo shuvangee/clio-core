@@ -58,7 +58,7 @@
 #include <memory>
 
 // Chimaera and CAE headers
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_cae/core/core_client.h>
 #include <clio_cae/core/constants.h>
 #include <clio_cae/core/factory/assimilation_ctx.h>
@@ -70,8 +70,8 @@
 #include <clio_ctp/util/logging.h>
 
 // Bdev headers for storage target registration
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 #include <filesystem>
 #include <thread>
 #include <chrono>

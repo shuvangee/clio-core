@@ -50,8 +50,8 @@
 #include <string>
 
 #include <clio_ctp/util/logging.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/admin/admin_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/admin/admin_client.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>
 

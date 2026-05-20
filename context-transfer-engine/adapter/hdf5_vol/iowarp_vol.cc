@@ -21,7 +21,7 @@
 #include <vector>
 #include <memory>
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 /* transport_factory_impl.h provides the inline definitions of
    ctp::lbm::Transport::ClearRecvHandles / Send<...>. They are required
    when AsyncPutBlob template-instantiates here (it doesn't fire from

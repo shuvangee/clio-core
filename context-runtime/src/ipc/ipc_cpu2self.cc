@@ -31,10 +31,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "chimaera/ipc/ipc_cpu2self.h"
-#include "chimaera/ipc_manager.h"
-#include "chimaera/worker.h"
-#include "chimaera/singletons.h"
+#include "clio_runtime/ipc/ipc_cpu2self.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/worker.h"
+#include "clio_runtime/singletons.h"
 
 namespace chi {
 

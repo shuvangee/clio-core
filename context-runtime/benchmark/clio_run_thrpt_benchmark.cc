@@ -50,10 +50,10 @@
 #include <vector>
 #include <clio_ctp/util/logging.h>
 
-#include "chimaera/MOD_NAME/MOD_NAME_client.h"
-#include "chimaera/admin/admin_client.h"
-#include "chimaera/bdev/bdev_client.h"
-#include "chimaera/chimaera.h"
+#include "clio_runtime/MOD_NAME/MOD_NAME_client.h"
+#include "clio_runtime/admin/admin_client.h"
+#include "clio_runtime/bdev/bdev_client.h"
+#include "clio_runtime/clio_runtime.h"
 
 /**
  * Benchmark test cases

@@ -34,6 +34,7 @@
 #define CTP_COMPILING_DLL
 #define __HSHM_IS_COMPILING__
 
+#include <clio_ctp/util/env_compat.h>
 #include "clio_ctp/introspect/system_info.h"
 
 #include <climits>
@@ -404,7 +405,7 @@ std::string SystemInfo::GetMemfdDir() {
   // subsequent memfd symlink + shm_open returns ENOENT here. Allow
   // env override so deployments can point chimaera's per-user
   // bookkeeping at an NFS-backed location (e.g. $HOME).
-  const char *override_dir = getenv("CHI_MEMFD_DIR");
+  const char *override_dir = ctp::env::GetCompat("MEMFD_DIR");
   if (override_dir && *override_dir) {
     return std::string(override_dir);
   }

@@ -34,7 +34,7 @@
 #ifndef CLIO_CTE_ABSTRACT_MAPPER_H
 #define CLIO_CTE_ABSTRACT_MAPPER_H
 
-#include "chimaera/chimaera.h"
+#include "clio_runtime/clio_runtime.h"
 
 namespace clio::cae {
 

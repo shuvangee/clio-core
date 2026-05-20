@@ -50,17 +50,17 @@
 #include <clio_ctp/util/logging.h>
 
 // Include Chimaera headers
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_ctp/memory/allocator/malloc_allocator.h>
-#include <chimaera/container.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/task.h>
-#include <chimaera/task_archives.h>
-#include <chimaera/types.h>
+#include <clio_runtime/container.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/task.h>
+#include <clio_runtime/task_archives.h>
+#include <clio_runtime/types.h>
 
 // Include admin tasks for testing concrete task types
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 // Include GlobalSerialize for serialization
 #include "clio_ctp/data_structures/serialization/global_serialize.h"

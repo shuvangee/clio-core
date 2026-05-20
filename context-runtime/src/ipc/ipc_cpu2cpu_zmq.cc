@@ -5,8 +5,8 @@
  * BSD 3-Clause License. See LICENSE file.
  */
 
-#include "chimaera/ipc_manager.h"
-#include "chimaera/singletons.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/singletons.h"
 
 namespace chi {
 

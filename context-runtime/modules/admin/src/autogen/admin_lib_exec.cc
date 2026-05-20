@@ -7,10 +7,10 @@
  * Changes should be made to the autogen tool or the YAML configuration.
  */
 
-#include "chimaera/admin/admin_runtime.h"
-#include "chimaera/admin/autogen/admin_methods.h"
-#include <chimaera/chimaera.h>
-#include <chimaera/task.h>  // For TaskResume coroutine return type
+#include "clio_runtime/admin/admin_runtime.h"
+#include "clio_runtime/admin/autogen/admin_methods.h"
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/task.h>  // For TaskResume coroutine return type
 
 namespace chimaera::admin {
 

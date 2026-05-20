@@ -58,7 +58,7 @@
  * (score 0.0)
  */
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <mpi.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_ctp/util/logging.h>

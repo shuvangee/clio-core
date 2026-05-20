@@ -35,8 +35,8 @@
  * Type implementations
  */
 
-#include "chimaera/types.h"
-#include "chimaera/worker.h"
+#include "clio_runtime/types.h"
+#include "clio_runtime/worker.h"
 #include <sstream>
 #include <stdexcept>
 

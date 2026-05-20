@@ -750,25 +750,32 @@ function(_chimaera_link_runtime_to_client RUNTIME_TARGET CLIENT_TARGET)
   endif()
 endfunction()
 
-# Function to read repository namespace from chimaera_repo.yaml
-# Searches up the directory tree from the given path to find chimaera_repo.yaml
+# Function to read repository namespace from clio_repo.yaml (preferred) or
+# chimaera_repo.yaml (legacy). Both formats are accepted; the new clio_repo.yaml
+# takes precedence so projects can migrate gradually. Searches up the directory
+# tree from the given path.
 function(read_repo_namespace output_var start_path)
   set(current_path "${start_path}")
   set(namespace "chimaera")  # Default fallback
 
-  # Search up the directory tree for chimaera_repo.yaml
+  # Search up the directory tree; at each level look for the new name first,
+  # then the legacy name. Either is sufficient.
   while(NOT "${current_path}" STREQUAL "/" AND NOT "${current_path}" STREQUAL "")
-    set(repo_file "${current_path}/chimaera_repo.yaml")
-    if(EXISTS "${repo_file}")
-      # Read and parse the YAML file
-      file(READ "${repo_file}" REPO_YAML_CONTENT)
-      string(REGEX MATCH "namespace: *([^\n\r]+)" NAMESPACE_MATCH "${REPO_YAML_CONTENT}")
-      if(NAMESPACE_MATCH)
-        string(REGEX REPLACE "namespace: *" "" namespace "${NAMESPACE_MATCH}")
-        string(STRIP "${namespace}" namespace)
-        break()
+    set(_repo_candidates
+        "${current_path}/clio_repo.yaml"      # preferred (new)
+        "${current_path}/chimaera_repo.yaml") # legacy, still supported
+    foreach(repo_file ${_repo_candidates})
+      if(EXISTS "${repo_file}")
+        file(READ "${repo_file}" REPO_YAML_CONTENT)
+        string(REGEX MATCH "namespace: *([^\n\r]+)" NAMESPACE_MATCH "${REPO_YAML_CONTENT}")
+        if(NAMESPACE_MATCH)
+          string(REGEX REPLACE "namespace: *" "" namespace "${NAMESPACE_MATCH}")
+          string(STRIP "${namespace}" namespace)
+          set(${output_var} "${namespace}" PARENT_SCOPE)
+          return()
+        endif()
       endif()
-    endif()
+    endforeach()
 
     # Move up one directory
     get_filename_component(current_path "${current_path}" DIRECTORY)
@@ -777,12 +784,24 @@ function(read_repo_namespace output_var start_path)
   set(${output_var} "${namespace}" PARENT_SCOPE)
 endfunction()
 
-# Function to read module configuration from chimaera_mod.yaml
+# Function to read module configuration from clio_mod.yaml (preferred) or
+# chimaera_mod.yaml (legacy). Both formats are accepted; the new name takes
+# precedence to enable gradual migration.
 function(chimaera_read_module_config MODULE_DIR)
-  set(CONFIG_FILE "${MODULE_DIR}/chimaera_mod.yaml")
+  set(_mod_candidates
+      "${MODULE_DIR}/clio_mod.yaml"
+      "${MODULE_DIR}/chimaera_mod.yaml")
+  set(CONFIG_FILE "")
+  foreach(_cand ${_mod_candidates})
+    if(EXISTS "${_cand}")
+      set(CONFIG_FILE "${_cand}")
+      break()
+    endif()
+  endforeach()
 
-  if(NOT EXISTS ${CONFIG_FILE})
-    message(FATAL_ERROR "Missing chimaera_mod.yaml in ${MODULE_DIR}")
+  if(NOT CONFIG_FILE)
+    message(FATAL_ERROR
+            "Missing clio_mod.yaml (or legacy chimaera_mod.yaml) in ${MODULE_DIR}")
   endif()
 
   # Parse YAML file (simple regex parsing for key: value pairs)

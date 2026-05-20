@@ -35,7 +35,7 @@
  * Pool query implementation
  */
 
-#include "chimaera/pool_query.h"
+#include "clio_runtime/pool_query.h"
 #include <algorithm>
 #include <stdexcept>
 

@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/chimaera.h>
-#include <chimaera/ipc_manager.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/ipc_manager.h>
 #ifndef _WIN32
 #include <fnmatch.h>
 #include <sys/stat.h>

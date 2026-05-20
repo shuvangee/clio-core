@@ -35,13 +35,13 @@
  * Pool manager implementation
  */
 
-#include "chimaera/pool_manager.h"
+#include "clio_runtime/pool_manager.h"
 
-#include "chimaera/admin/admin_tasks.h"
-#include "chimaera/config_manager.h"
-#include "chimaera/container.h"
-#include "chimaera/module_manager.h"
-#include "chimaera/task.h"
+#include "clio_runtime/admin/admin_tasks.h"
+#include "clio_runtime/config_manager.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/module_manager.h"
+#include "clio_runtime/task.h"
 
 #include <chrono>
 #include <filesystem>

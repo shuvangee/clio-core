@@ -36,10 +36,10 @@
  */
 
 #include "simple_test.h"
-#include "chimaera/chimaera.h"
-#include "chimaera/local_task_archives.h"
-#include "chimaera/admin/admin_client.h"
-#include "chimaera/bdev/bdev_client.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/local_task_archives.h"
+#include "clio_runtime/admin/admin_client.h"
+#include "clio_runtime/bdev/bdev_client.h"
 
 using namespace chi;
 

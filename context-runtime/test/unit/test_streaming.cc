@@ -37,11 +37,11 @@
  */
 
 #include "../simple_test.h"
-#include "chimaera/chimaera.h"
-#include "chimaera/task.h"
-#include "chimaera/ipc_manager.h"
-#include "chimaera/MOD_NAME/MOD_NAME_client.h"
-#include "chimaera/MOD_NAME/MOD_NAME_tasks.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/task.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/MOD_NAME/MOD_NAME_client.h"
+#include "clio_runtime/MOD_NAME/MOD_NAME_tasks.h"
 
 #include <vector>
 #include <chrono>

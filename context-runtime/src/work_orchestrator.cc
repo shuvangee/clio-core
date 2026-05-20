@@ -35,7 +35,7 @@
  * Work orchestrator implementation
  */
 
-#include "chimaera/work_orchestrator.h"
+#include "clio_runtime/work_orchestrator.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -43,10 +43,10 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "chimaera/container.h"
-#include "chimaera/pool_manager.h"
-#include "chimaera/singletons.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/pool_manager.h"
+#include "clio_runtime/singletons.h"
+#include "clio_runtime/ipc_manager.h"
 
 // Global pointer variable definition for Work Orchestrator singleton
 CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::WorkOrchestrator, g_work_orchestrator);

@@ -20,36 +20,36 @@
 #include "clio_ctp/data_structures/serialization/global_serialize.h"
 
 // Include Chimaera headers
-#include <chimaera/chimaera.h>
-#include <chimaera/container.h>
-#include <chimaera/ipc_manager.h>
-#include <chimaera/module_manager.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/task.h>
-#include <chimaera/task_archives.h>
-#include <chimaera/local_task_archives.h>
-#include <chimaera/types.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/container.h>
+#include <clio_runtime/ipc_manager.h>
+#include <clio_runtime/module_manager.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/task.h>
+#include <clio_runtime/task_archives.h>
+#include <clio_runtime/local_task_archives.h>
+#include <clio_runtime/types.h>
 
 // Include admin tasks
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_runtime.h>
-#include <chimaera/admin/admin_tasks.h>
-#include <chimaera/admin/autogen/admin_methods.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_runtime.h>
+#include <clio_runtime/admin/admin_tasks.h>
+#include <clio_runtime/admin/autogen/admin_methods.h>
 
 // Include bdev tasks
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_runtime.h>
-#include <chimaera/bdev/bdev_tasks.h>
-#include <chimaera/bdev/autogen/bdev_methods.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_runtime.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
+#include <clio_runtime/bdev/autogen/bdev_methods.h>
 
 // Include work orchestrator and pool manager
-#include <chimaera/work_orchestrator.h>
-#include <chimaera/pool_manager.h>
-#include <chimaera/config_manager.h>
+#include <clio_runtime/work_orchestrator.h>
+#include <clio_runtime/pool_manager.h>
+#include <clio_runtime/config_manager.h>
 
 // Include scheduler
-#include <chimaera/scheduler/default_sched.h>
+#include <clio_runtime/scheduler/default_sched.h>
 
 // Include CTE core config
 #include <clio_cte/core/core_config.h>
@@ -7095,9 +7095,9 @@ TEST_CASE("Autogen - CAE Task Serialization Methods", "[autogen][cae][serialize]
 //==============================================================================
 
 // Include MOD_NAME headers for container method tests
-#include <chimaera/MOD_NAME/MOD_NAME_runtime.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
-#include <chimaera/MOD_NAME/autogen/MOD_NAME_methods.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_runtime.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/autogen/MOD_NAME_methods.h>
 
 TEST_CASE("Autogen - MOD_NAME Runtime Container Methods", "[autogen][mod_name][runtime]") {
   EnsureInitialized();
@@ -12196,7 +12196,7 @@ TEST_CASE("Autogen - IpcManager memory operations", "[autogen][ipcmanager][memor
 // Additional data structure coverage - ConfigManager
 // ============================================================================
 
-#include <chimaera/config_manager.h>
+#include <clio_runtime/config_manager.h>
 
 TEST_CASE("Autogen - PoolConfig operations", "[autogen][poolconfig]") {
   SECTION("Default construction") {

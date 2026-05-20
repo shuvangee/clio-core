@@ -34,7 +34,7 @@
 #ifndef WRPCTE_CORE_TRANSACTION_LOG_H_
 #define WRPCTE_CORE_TRANSACTION_LOG_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include <cstring>
 #include <filesystem>

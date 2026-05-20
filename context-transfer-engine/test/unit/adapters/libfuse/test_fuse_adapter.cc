@@ -41,8 +41,8 @@
  * 4. End-to-end integration (create file, write, read, list, delete)
  */
 
-#include <chimaera/chimaera.h>
-#include <chimaera/bdev/bdev_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/bdev/bdev_client.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>
 

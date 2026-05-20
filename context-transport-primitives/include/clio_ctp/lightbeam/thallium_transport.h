@@ -33,6 +33,7 @@
 
 #pragma once
 #if CTP_ENABLE_THALLIUM
+#include <clio_ctp/util/env_compat.h>
 #include <arpa/inet.h>
 
 #include <atomic>
@@ -76,10 +77,10 @@ class ThalliumEngine {
     static std::once_flag once;
     static std::unique_ptr<tl::engine> engine;
     std::call_once(once, []() {
-      const char *proto_env = std::getenv("CHI_LBM_THALLIUM_PROTOCOL");
+      const char *proto_env = ctp::env::GetCompat("LBM_THALLIUM_PROTOCOL");
       std::string proto = (proto_env && *proto_env) ? proto_env
                                                     : "ofi+tcp;ofi_rxm";
-      const char *rpc_env = std::getenv("CHI_LBM_THALLIUM_RPC_THREADS");
+      const char *rpc_env = ctp::env::GetCompat("LBM_THALLIUM_RPC_THREADS");
       int rpc_threads = (rpc_env && *rpc_env) ? std::atoi(rpc_env) : 4;
       if (rpc_threads < 1) rpc_threads = 1;
       engine = std::make_unique<tl::engine>(

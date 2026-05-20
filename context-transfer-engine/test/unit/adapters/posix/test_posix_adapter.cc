@@ -50,7 +50,7 @@
 #include <unistd.h>
 #include <vector>
 
-#include "chimaera/chimaera.h"
+#include "clio_runtime/clio_runtime.h"
 #include "clio_cte/core/core_client.h"
 
 using namespace std::chrono_literals;

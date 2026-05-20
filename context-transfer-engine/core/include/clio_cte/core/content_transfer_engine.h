@@ -35,7 +35,7 @@
 #define CLIO_CTE_CORE_CONTENT_TRANSFER_ENGINE_H_
 
 #include "clio_ctp/util/singleton.h"
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 namespace clio_cte::core {
 

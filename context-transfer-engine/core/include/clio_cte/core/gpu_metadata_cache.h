@@ -61,7 +61,7 @@
  *   carve a single GpuApi::MallocManaged region.
  */
 
-#include <chimaera/types.h>
+#include <clio_runtime/types.h>
 
 #include <cstddef>
 #include <cstdint>

@@ -38,13 +38,13 @@
  * Contains the server-side task processing logic with PoolManager integration.
  */
 
-#include "chimaera/admin/admin_runtime.h"
+#include "clio_runtime/admin/admin_runtime.h"
 
-#include <chimaera/chimaera_manager.h>
-#include <chimaera/module_manager.h>
-#include <chimaera/pool_manager.h>
-#include <chimaera/task_archives.h>
-#include <chimaera/worker.h>
+#include <clio_runtime/chimaera_manager.h>
+#include <clio_runtime/module_manager.h>
+#include <clio_runtime/pool_manager.h>
+#include <clio_runtime/task_archives.h>
+#include <clio_runtime/worker.h>
 #include <clio_ctp/lightbeam/transport_factory_impl.h>
 #include <clio_ctp/serialize/msgpack_wrapper.h>
 

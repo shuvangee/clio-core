@@ -39,7 +39,7 @@
  * - Multiple segment creation and allocation fallback strategies
  */
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include <cstring>
 #include <memory>

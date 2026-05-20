@@ -35,7 +35,7 @@
  * IPC manager implementation
  */
 
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/ipc_manager.h"
 
 #ifndef _WIN32
 #include <arpa/inet.h>
@@ -64,15 +64,15 @@
 #include <random>
 #include <set>
 
-#include "chimaera/admin.h"
-#include "chimaera/admin/admin_client.h"
-#include "chimaera/chimaera_manager.h"
-#include "chimaera/config_manager.h"
-#include "chimaera/container.h"
-#include "chimaera/local_task_archives.h"
-#include "chimaera/pool_manager.h"
-#include "chimaera/scheduler/scheduler_factory.h"
-#include "chimaera/task_archives.h"
+#include "clio_runtime/admin.h"
+#include "clio_runtime/admin/admin_client.h"
+#include "clio_runtime/chimaera_manager.h"
+#include "clio_runtime/config_manager.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/local_task_archives.h"
+#include "clio_runtime/pool_manager.h"
+#include "clio_runtime/scheduler/scheduler_factory.h"
+#include "clio_runtime/task_archives.h"
 
 #if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
 #include <clio_ctp/util/gpu_api.h>
@@ -81,7 +81,7 @@
 // Global pointer variable definition for IPC manager singleton
 CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::IpcManager, g_ipc_manager);
 
-#include <chimaera/device_memcpy.h>
+#include <clio_runtime/device_memcpy.h>
 
 namespace chi {
 
@@ -112,7 +112,7 @@ bool IpcManager::ClientInit() {
   }
 
   // Parse CHI_IPC_MODE environment variable (default: TCP)
-  const char *ipc_mode_env = std::getenv("CHI_IPC_MODE");
+  const char *ipc_mode_env = chi::env::GetCompat("IPC_MODE");
   if (ipc_mode_env != nullptr) {
     std::string mode_str(ipc_mode_env);
     if (mode_str == "SHM" || mode_str == "shm") {
@@ -130,7 +130,7 @@ bool IpcManager::ClientInit() {
 
   // Parse retry timeout environment variable
   // Semantics: 0 = fail immediately, -1 = wait forever, >0 = timeout in seconds
-  const char *retry_env = std::getenv("CHI_CLIENT_RETRY_TIMEOUT");
+  const char *retry_env = chi::env::GetCompat("CLIENT_RETRY_TIMEOUT");
   if (retry_env) {
     client_retry_timeout_ = static_cast<float>(std::atof(retry_env));
   }
@@ -138,7 +138,7 @@ bool IpcManager::ClientInit() {
        client_retry_timeout_);
 
   // Parse CHI_CLIENT_TRY_NEW_SERVERS environment variable
-  const char *try_new_env = std::getenv("CHI_CLIENT_TRY_NEW_SERVERS");
+  const char *try_new_env = chi::env::GetCompat("CLIENT_TRY_NEW_SERVERS");
   if (try_new_env) {
     client_try_new_servers_ = std::atoi(try_new_env);
   }
@@ -745,7 +745,7 @@ bool IpcManager::StartLocalServer() {
 bool IpcManager::WaitForLocalServer() {
   // Read environment variables for wait configuration
   // Semantics: 0 = fail immediately, -1 = wait forever, >0 = timeout in seconds
-  const char *wait_env = std::getenv("CHI_WAIT_SERVER");
+  const char *wait_env = chi::env::GetCompat("WAIT_SERVER");
   if (wait_env != nullptr) {
     wait_server_timeout_ = static_cast<float>(std::atof(wait_env));
   }

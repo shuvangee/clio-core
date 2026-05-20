@@ -34,6 +34,7 @@
 #pragma once
 #if CTP_ENABLE_ZMQ
 #ifndef _WIN32
+#include <clio_ctp/util/env_compat.h>
 #include <unistd.h>
 #endif
 #include <zmq.h>
@@ -90,7 +91,7 @@ class ZmqStats {
  public:
   static bool Enabled() {
     static const bool e = []() {
-      const char *v = std::getenv("CHI_LBM_ZMQ_STATS");
+      const char *v = ctp::env::GetCompat("LBM_ZMQ_STATS");
       return v && *v && std::atoi(v) != 0;
     }();
     return e;
@@ -272,7 +273,7 @@ class ZeroMqTransport : public Transport {
       // talks to N-1 peers; N²=4096 connections at N=64 is enough to
       // bottleneck 2 I/O threads). 8 scales comfortably to ~512.
       // Override at runtime via CHI_ZMQ_IO_THREADS env if needed.
-      const char *iot_env = std::getenv("CHI_ZMQ_IO_THREADS");
+      const char *iot_env = ctp::env::GetCompat("ZMQ_IO_THREADS");
       int iot = (iot_env && *iot_env) ? std::atoi(iot_env) : 8;
       if (iot < 1) iot = 1;
       zmq_ctx_set(owner.ctx, ZMQ_IO_THREADS, iot);
@@ -448,7 +449,7 @@ class ZeroMqTransport : public Transport {
       // identity-related setopts differ.
       ctx_ = zmq_ctx_new();
       owns_ctx_ = true;
-      const char *iot_env = std::getenv("CHI_ZMQ_IO_THREADS");
+      const char *iot_env = ctp::env::GetCompat("ZMQ_IO_THREADS");
       int iot = (iot_env && *iot_env) ? std::atoi(iot_env) : 8;
       if (iot < 1) iot = 1;
       zmq_ctx_set(ctx_, ZMQ_IO_THREADS, iot);

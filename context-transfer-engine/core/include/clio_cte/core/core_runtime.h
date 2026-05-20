@@ -35,9 +35,9 @@
 #define WRPCTE_CORE_RUNTIME_H_
 
 #include <atomic>
-#include <chimaera/chimaera.h>
-#include <chimaera/comutex.h>
-#include <chimaera/corwlock.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/comutex.h>
+#include <clio_runtime/corwlock.h>
 #include <clio_ctp/data_structures/priv/unordered_map_ll.h>
 #include <clio_ctp/data_structures/ipc/ring_buffer.h>
 #include <clio_ctp/memory/allocator/malloc_allocator.h>

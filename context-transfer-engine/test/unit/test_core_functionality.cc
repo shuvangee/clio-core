@@ -66,17 +66,17 @@
 #include "simple_test.h"
 
 static std::string chi_test_data_dir() {
-  const char *d = std::getenv("CHI_TEST_DATA_DIR");
+  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
   return (d && *d) ? d : ".";
 }
 
 using namespace std::chrono_literals;
 
 // Chimaera core includes
-#include <chimaera/admin/admin_tasks.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
-#include <chimaera/chimaera.h>
+#include <clio_runtime/admin/admin_tasks.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_runtime.h>
 #include <clio_cte/core/core_tasks.h>
@@ -89,7 +89,7 @@ namespace fs = std::filesystem;
  * Returns true if unset or set to any value except "0", "false", "no", "off"
  */
 bool ShouldInitializeRuntime() {
-  const char *env_val = std::getenv("CHI_WITH_RUNTIME");
+  const char *env_val = chi::env::GetCompat("WITH_RUNTIME");
   if (env_val == nullptr) {
     return true;  // Default: initialize runtime
   }
@@ -161,7 +161,7 @@ class CTECoreFunctionalTestFixture {
       REQUIRE(success);
     } else {
       INFO("Runtime already initialized externally (CHI_WITH_RUNTIME="
-           << std::getenv("CHI_WITH_RUNTIME") << ")");
+           << chi::env::GetCompat("WITH_RUNTIME") << ")");
       bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
       REQUIRE(success);
     }

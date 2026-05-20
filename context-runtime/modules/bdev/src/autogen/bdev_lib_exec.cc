@@ -7,10 +7,10 @@
  * Changes should be made to the autogen tool or the YAML configuration.
  */
 
-#include "chimaera/bdev/bdev_runtime.h"
-#include "chimaera/bdev/autogen/bdev_methods.h"
-#include <chimaera/chimaera.h>
-#include <chimaera/task.h>  // For TaskResume coroutine return type
+#include "clio_runtime/bdev/bdev_runtime.h"
+#include "clio_runtime/bdev/autogen/bdev_methods.h"
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/task.h>  // For TaskResume coroutine return type
 
 namespace chimaera::bdev {
 

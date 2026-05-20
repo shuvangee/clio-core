@@ -76,7 +76,7 @@
 #include <thread>
 #include <vector>
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>
 #include <clio_ctp/util/logging.h>

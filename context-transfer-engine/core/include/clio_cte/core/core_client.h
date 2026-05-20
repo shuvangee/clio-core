@@ -34,7 +34,7 @@
 #ifndef WRPCTE_CORE_CLIENT_H_
 #define WRPCTE_CORE_CLIENT_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_ctp/util/singleton.h>
 #include <clio_cte/core/core_tasks.h>
 

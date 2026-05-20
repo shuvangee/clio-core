@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_ctp/util/logging.h>
 #include <clio_cae/core/factory/globus_file_assimilator.h>
 

@@ -36,7 +36,7 @@
  * Tests the IPC manager's buffer allocation for shared memory operations
  */
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include <cstring>
 #include <memory>

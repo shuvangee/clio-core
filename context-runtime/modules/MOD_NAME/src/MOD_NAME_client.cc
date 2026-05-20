@@ -37,8 +37,8 @@
  * Contains global variables and singletons for client-side code.
  */
 
-#include "chimaera/MOD_NAME/MOD_NAME_client.h"
-#include "chimaera/MOD_NAME/MOD_NAME_tasks.h"
+#include "clio_runtime/MOD_NAME/MOD_NAME_client.h"
+#include "clio_runtime/MOD_NAME/MOD_NAME_tasks.h"
 
 namespace chimaera::MOD_NAME {
 

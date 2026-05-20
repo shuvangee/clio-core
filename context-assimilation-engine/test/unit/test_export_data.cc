@@ -57,10 +57,10 @@
 #include <clio_cae/core/constants.h>
 #include <clio_cae/core/factory/assimilation_ctx.h>
 #include <clio_cte/core/core_client.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 
 #include "clio_ctp/data_structures/serialization/global_serialize.h"
 #include <fstream>

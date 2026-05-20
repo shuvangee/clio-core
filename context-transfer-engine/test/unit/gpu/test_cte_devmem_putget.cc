@@ -41,13 +41,13 @@
 
 #include "simple_test.h"
 
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/gpu/future.h>
-#include <chimaera/gpu/gpu_info.h>
-#include <chimaera/gpu/gpu_ipc_manager.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/gpu/future.h>
+#include <clio_runtime/gpu/gpu_info.h>
+#include <clio_runtime/gpu/gpu_ipc_manager.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 #include <clio_ctp/util/gpu_api.h>
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>

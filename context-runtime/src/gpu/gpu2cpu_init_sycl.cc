@@ -16,11 +16,11 @@
 
 #if CTP_ENABLE_SYCL && !(CTP_ENABLE_CUDA || CTP_ENABLE_ROCM)
 
-#include "chimaera/ipc_manager.h"
-#include "chimaera/gpu/gpu_ipc_manager.h"
-#include "chimaera/config_manager.h"
-#include "chimaera/device_memcpy.h"
-#include "chimaera/singletons.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/gpu/gpu_ipc_manager.h"
+#include "clio_runtime/config_manager.h"
+#include "clio_runtime/device_memcpy.h"
+#include "clio_runtime/singletons.h"
 #include "clio_ctp/util/gpu_api.h"
 #include "clio_ctp/util/logging.h"
 

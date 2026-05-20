@@ -56,16 +56,16 @@
 #include <thread>
 #include <vector>
 
-#include <chimaera/chimaera.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 
-#include <chimaera/MOD_NAME/MOD_NAME_client.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_client.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
 
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 using namespace std::chrono_literals;
 

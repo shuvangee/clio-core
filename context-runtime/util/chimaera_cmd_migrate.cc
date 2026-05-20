@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "chimaera/chimaera.h"
-#include "chimaera/admin/admin_client.h"
-#include "chimaera/types.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/admin/admin_client.h"
+#include "clio_runtime/types.h"
 #include "chimaera_commands.h"
 
 namespace {

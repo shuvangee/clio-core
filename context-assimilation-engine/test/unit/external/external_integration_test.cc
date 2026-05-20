@@ -14,7 +14,7 @@
 #include <clio_cae/core/core_client.h>
 #include <clio_cae/core/core_tasks.h>
 #include <clio_cae/core/constants.h>
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 // CTP includes
 #include <clio_ctp/util/singleton.h>

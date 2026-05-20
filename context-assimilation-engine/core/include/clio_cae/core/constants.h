@@ -34,7 +34,7 @@
 #ifndef CLIO_CAE_CORE_CONSTANTS_H_
 #define CLIO_CAE_CORE_CONSTANTS_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 namespace clio_cae::core {
 

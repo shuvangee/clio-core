@@ -51,25 +51,25 @@
 #include <vector>
 
 // Include Chimaera headers
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #include <clio_ctp/memory/allocator/malloc_allocator.h>
-#include <chimaera/container.h>
-#include <chimaera/ipc_manager.h>
-#include <chimaera/module_manager.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/task.h>
-#include <chimaera/task_archives.h>
-#include <chimaera/types.h>
+#include <clio_runtime/container.h>
+#include <clio_runtime/ipc_manager.h>
+#include <clio_runtime/module_manager.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/task.h>
+#include <clio_runtime/task_archives.h>
+#include <clio_runtime/types.h>
 
 // Include admin tasks for testing
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_runtime.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_runtime.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 // Include bdev tasks for testing
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 
 using namespace chi;
 
