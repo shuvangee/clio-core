@@ -4,7 +4,7 @@
  *
  * STDIO ADAPTER UNIT TESTS
  *
- * Exercise the WRP CTE STDIO adapter (libwrp_cte_stdio.so) under the
+ * Exercise the WRP CTE STDIO adapter (libclio_cte_stdio.so) under the
  * new clio:: prefix gating. Each test opens a file with fopen() on a
  * clio::-prefixed path so the adapter intercepts; bare paths fall
  * through to libc and act as a negative control.

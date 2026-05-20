@@ -1,7 +1,7 @@
 # IOR + CTE via the clio POSIX LD_PRELOAD adapter — SLURM sbatch, 16 nodes.
 #
 # "clio" path (NOT FUSE): the clio_adapters interceptor LD_PRELOADs
-# libwrp_cte_posix.so into the IOR ranks; any path prefixed "clio::"
+# libclio_cte_posix.so into the IOR ranks; any path prefixed "clio::"
 # is rerouted through the CTE client (shm IPC to the node-local
 # chimaera daemon). The adapter strips the prefix before touching the
 # backend, so there is no FUSE mount and no clio_cte_libfuse pkg.
@@ -11,12 +11,12 @@
 #                   over the 40 GbE -40g fabric)
 #   clio_cte      -> CTE pool with a RAM tier per node (pool 512.0,
 #                   adapter entrypoint; NO compressor in this pipeline)
-#   clio_adapters -> cte_posix interceptor, LD_PRELOAD libwrp_cte_posix.so
+#   clio_adapters -> cte_posix interceptor, LD_PRELOAD libclio_cte_posix.so
 #   builtin.ior  -> POSIX fpp writes/reads through clio::<path>
 #
 # Build prereq (already satisfied on this host): the POSIX adapter only
 # builds with WRP_CORE_ENABLE_ELF=ON + WRP_CTE_ENABLE_POSIX_ADAPTER=ON
-# (the release-fuse preset has ELF OFF, so libwrp_cte_posix.so had to
+# (the release-fuse preset has ELF OFF, so libclio_cte_posix.so had to
 # be built explicitly). libelf needs PKG_CONFIG_PATH to include
 # /usr/lib/x86_64-linux-gnu/pkgconfig at configure time.
 

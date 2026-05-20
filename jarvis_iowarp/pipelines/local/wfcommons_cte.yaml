@@ -1,7 +1,7 @@
 # WfCommons + CTE via POSIX adapter (containerized).
 #
 # wfbench tasks issue plain POSIX read/write on their data/* files; we
-# intercept those calls with libwrp_cte_posix.so injected via LD_PRELOAD
+# intercept those calls with libclio_cte_posix.so injected via LD_PRELOAD
 # by the clio_adapters Interceptor. The CTE adapter sees every read/write
 # the workflow performs.
 #

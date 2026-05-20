@@ -9,30 +9,30 @@ The WRP Adapters interceptor works by injecting shared libraries via `LD_PRELOAD
 ## Supported Adapters
 
 ### POSIX Adapter (`posix`)
-- **Library**: `libwrp_cte_posix.so`
+- **Library**: `libclio_cte_posix.so`
 - **Intercepts**: `read`, `write`, `open`, `close`, `lseek`, `pread`, `pwrite`, `stat`, and other POSIX I/O operations
 - **Use Case**: Traditional file I/O operations, works with most applications
 
 ### MPI-IO Adapter (`mpiio`)
-- **Library**: `libwrp_cte_mpiio.so`
+- **Library**: `libclio_cte_mpiio.so`
 - **Intercepts**: `MPI_File_*` operations (open, read, write, seek, etc.)
 - **Use Case**: Parallel I/O in MPI applications
 - **Note**: Requires MPI to be enabled during CTE build
 
 ### STDIO Adapter (`stdio`)
-- **Library**: `libwrp_cte_stdio.so`
+- **Library**: `libclio_cte_stdio.so`
 - **Intercepts**: `fread`, `fwrite`, `fopen`, `fclose`, `fseek`, `fprintf`, and other buffered I/O operations
 - **Use Case**: Applications using C standard library I/O functions
 
 ### HDF5 VFD Adapter (`vfd`)
-- **Library**: `libwrp_cte_vfd.so`
+- **Library**: `libclio_cte_vfd.so`
 - **Mechanism**: HDF5 Virtual File Driver (not LD_PRELOAD)
 - **Intercepts**: HDF5 file I/O operations
 - **Use Case**: Scientific applications using HDF5 format
 - **Configuration**: Sets `HDF5_PLUGIN_PATH` and `HDF5_DRIVER` environment variables
 
 ### NVIDIA GDS Adapter (`nvidia_gds`)
-- **Library**: `libwrp_cte_nvidia_gds.so`
+- **Library**: `libclio_cte_nvidia_gds.so`
 - **Intercepts**: NVIDIA GPUDirect Storage operations
 - **Use Case**: GPU-accelerated I/O with direct GPU-storage communication
 - **Requirements**: NVIDIA GPUs with GDS support, CUDA runtime
@@ -195,7 +195,7 @@ The interceptor modifies the execution environment in the following ways:
 
 1. **LD_PRELOAD**: Adds adapter libraries to intercept I/O calls
    ```
-   LD_PRELOAD=/path/to/libwrp_cte_posix.so:/path/to/libwrp_cte_mpiio.so
+   LD_PRELOAD=/path/to/libclio_cte_posix.so:/path/to/libclio_cte_mpiio.so
    ```
 
 2. **HDF5 VFD** (when enabled): Configures HDF5 plugin path
@@ -230,7 +230,7 @@ If you get an error like "Could not find clio_cte_posix library":
 
 2. Check installation:
    ```bash
-   find /usr/local -name "libwrp_cte_*.so"
+   find /usr/local -name "libclio_cte_*.so"
    ```
 
 3. Add to `LD_LIBRARY_PATH`:

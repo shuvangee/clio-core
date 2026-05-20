@@ -2,7 +2,7 @@
 #
 # Stack mirrors ior_posix_baremetal.yaml:
 #   clio_runtime (shm IPC) -> clio_cte (25 GiB RAM bdev) -> wfbench tasks
-#   are LD_PRELOAD'd with libwrp_cte_posix.so, and run_wfbench.py
+#   are LD_PRELOAD'd with libclio_cte_posix.so, and run_wfbench.py
 #   rewrites every task I/O path to a "clio::"-prefixed form so the
 #   POSIX adapter intercepts it.
 #

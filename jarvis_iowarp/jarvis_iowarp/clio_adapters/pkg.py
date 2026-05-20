@@ -98,7 +98,7 @@ class ClioAdapters(Interceptor):
                 raise Exception('Could not find clio_cte_posix library')
             self.env['WRP_CTE_POSIX'] = lib
             self.env['WRP_CTE_ROOT'] = str(pathlib.Path(lib).parent.parent)
-            self.log(f'Found libwrp_cte_posix.so at {lib}')
+            self.log(f'Found libclio_cte_posix.so at {lib}')
             has_one = True
 
         if self.config['mpiio']:
@@ -107,7 +107,7 @@ class ClioAdapters(Interceptor):
                 raise Exception('Could not find clio_cte_mpiio library')
             self.env['WRP_CTE_MPIIO'] = lib
             self.env['WRP_CTE_ROOT'] = str(pathlib.Path(lib).parent.parent)
-            self.log(f'Found libwrp_cte_mpiio.so at {lib}')
+            self.log(f'Found libclio_cte_mpiio.so at {lib}')
             has_one = True
 
         if self.config['stdio']:
@@ -116,7 +116,7 @@ class ClioAdapters(Interceptor):
                 raise Exception('Could not find clio_cte_stdio library')
             self.env['WRP_CTE_STDIO'] = lib
             self.env['WRP_CTE_ROOT'] = str(pathlib.Path(lib).parent.parent)
-            self.log(f'Found libwrp_cte_stdio.so at {lib}')
+            self.log(f'Found libclio_cte_stdio.so at {lib}')
             has_one = True
 
         if self.config['vfd']:
@@ -125,7 +125,7 @@ class ClioAdapters(Interceptor):
                 raise Exception('Could not find clio_cte_vfd library')
             self.env['WRP_CTE_VFD'] = lib
             self.env['WRP_CTE_ROOT'] = str(pathlib.Path(lib).parent.parent)
-            self.log(f'Found libwrp_cte_vfd.so at {lib}')
+            self.log(f'Found libclio_cte_vfd.so at {lib}')
             has_one = True
 
         if self.config['vol']:
@@ -143,7 +143,7 @@ class ClioAdapters(Interceptor):
                 raise Exception('Could not find clio_cte_nvidia_gds library')
             self.env['WRP_CTE_NVIDIA_GDS'] = lib
             self.env['WRP_CTE_ROOT'] = str(pathlib.Path(lib).parent.parent)
-            self.log(f'Found libwrp_cte_nvidia_gds.so at {lib}')
+            self.log(f'Found libclio_cte_nvidia_gds.so at {lib}')
             has_one = True
 
         if self.config['adios2']:

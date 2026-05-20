@@ -56,12 +56,12 @@ def _setup():
             "libchimaera_admin_runtime.so",
             "libchimaera_bdev_client.so",
             "libchimaera_bdev_runtime.so",
-            "libwrp_cte_core_client.so",
-            "libwrp_cte_core_runtime.so",
-            "libwrp_cte_cae_config.so",
-            "libwrp_cae_core_client.so",
-            "libwrp_cae_core_runtime.so",
-            "libwrp_cee_api.so",
+            "libclio_cte_core_client.so",
+            "libclio_cte_core_runtime.so",
+            "libclio_cte_cae_config.so",
+            "libclio_cae_core_client.so",
+            "libclio_cae_core_runtime.so",
+            "libclio_cee_api.so",
         ]:
             _lib_path = os.path.join(_LIB_DIR, _lib_name)
             if os.path.exists(_lib_path):

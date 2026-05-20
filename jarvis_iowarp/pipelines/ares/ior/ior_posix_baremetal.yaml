@@ -2,7 +2,7 @@
 #
 # Layout:
 #   clio_runtime    - starts the chimaera/CTE runtime locally (shm IPC).
-#   clio_adapters   - LD_PRELOADs libwrp_cte_posix.so into ior; binds via
+#   clio_adapters   - LD_PRELOADs libclio_cte_posix.so into ior; binds via
 #                    the `interceptors: [cte_posix]` reference below.
 #   builtin.ior    - runs ior with the output path prefixed by "clio::"
 #                    so every read/write goes through the adapter.
@@ -50,7 +50,7 @@ pkgs:
     write: true
     read: true
     # Route IOR's output file through the WRP CTE POSIX adapter: the
-    # interceptor binding below LD_PRELOADs libwrp_cte_posix.so, and the
+    # interceptor binding below LD_PRELOADs libclio_cte_posix.so, and the
     # clio:: prefix opts every open()/read()/write() on this path into
     # CTE-routed I/O. The adapter strips the prefix before reaching the
     # backend filesystem, so the actual on-disk file lives at the bare

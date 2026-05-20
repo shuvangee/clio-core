@@ -33,7 +33,7 @@ target_link_libraries(clio_cte_uvm
         CUDA::cuda_driver   # cuda.h + libcuda.so (driver API)
         CUDA::cudart        # cuda_runtime.h + libcudart.so (runtime API)
 )
-target_link_options(clio_cte_uvm PRIVATE "-Wl,-soname,libwrp_cte_uvm.so")
+target_link_options(clio_cte_uvm PRIVATE "-Wl,-soname,libclio_cte_uvm.so")
 
 install(TARGETS clio_cte_uvm
     LIBRARY DESTINATION lib

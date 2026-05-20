@@ -35,7 +35,7 @@ OMNI_FILE="${OMNI_FILE:-${SCRIPT_DIR}/matsci_globus_omni.yaml}"
 OUTPUT_DIR="${OUTPUT_DIR:-/tmp/globus_matsci}"
 
 # Ensure build/bin is on PATH and LD_LIBRARY_PATH so the runtime can
-# discover libwrp_cae_core_runtime.so / libwrp_cte_core_runtime.so.
+# discover libclio_cae_core_runtime.so / libclio_cte_core_runtime.so.
 # Conda iowarp lib must come before base miniconda3/lib so that libcurl's
 # OPENSSL_3.2.0 dependency is satisfied by the conda-provided libssl.so.3.
 CONDA_IOWARP_LIB="${HOME}/miniconda3/envs/iowarp/lib"

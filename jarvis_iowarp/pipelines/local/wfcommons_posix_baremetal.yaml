@@ -2,7 +2,7 @@
 #
 # Layout:
 #   clio_runtime    - starts the chimaera/CTE runtime locally
-#   clio_adapters   - LD_PRELOADs libwrp_cte_posix.so into the next pkg
+#   clio_adapters   - LD_PRELOADs libclio_cte_posix.so into the next pkg
 #   wfcommons      - bare-metal install (creates a venv, pip installs
 #                    wfcommons, then runs the recipe + wfbench driver)
 #
@@ -40,7 +40,7 @@ pkgs:
     clio_prefix: true
     # Bind the cte_posix interceptor (declared below) to this package.
     # jarvis-cd only invokes Interceptor.modify_env() — i.e. only
-    # prepends libwrp_cte_posix.so onto LD_PRELOAD — for packages that
+    # prepends libclio_cte_posix.so onto LD_PRELOAD — for packages that
     # explicitly reference the interceptor by name here. Without this
     # binding the LD_PRELOAD never gets set and the adapter is loaded
     # but never gets called.

@@ -203,7 +203,7 @@ cmake --preset=debug
 # Build the library
 cmake --build build --target clio_cee_api
 
-# Library output: build/bin/libwrp_cee_api.so.1.0.0
+# Library output: build/bin/libclio_cee_api.so.1.0.0
 ```
 
 ### Python Bindings

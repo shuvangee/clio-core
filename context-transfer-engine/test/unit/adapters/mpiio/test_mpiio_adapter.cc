@@ -4,7 +4,7 @@
  *
  * MPI-IO ADAPTER UNIT TESTS
  *
- * Exercise the WRP CTE MPI-IO adapter (libwrp_cte_mpiio.so) under the
+ * Exercise the WRP CTE MPI-IO adapter (libclio_cte_mpiio.so) under the
  * new clio:: prefix gating. Runs as a single-rank MPI program: enough
  * to validate the open/read/write/close paths and the prefix check
  * without needing a multi-node launcher in CI.
