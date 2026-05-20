@@ -31,12 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_MEMORY_ALLOCATOR_SLAB_ALLOCATOR_H_
-#define HSHM_MEMORY_ALLOCATOR_SLAB_ALLOCATOR_H_
+#ifndef CTP_MEMORY_ALLOCATOR_SLAB_ALLOCATOR_H_
+#define CTP_MEMORY_ALLOCATOR_SLAB_ALLOCATOR_H_
 
 #include "hermes_shm/memory/allocator/allocator.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * High-performance slab allocator with O(1) alloc/free.
@@ -65,11 +65,11 @@ class PrivateSlabAllocator : public Allocator {
 
     static constexpr size_t kFreeMask = (size_t)1 << (sizeof(size_t) * 8 - 1);
 
-    HSHM_INLINE_CROSS_FUN void Init(size_t data_size) { size_ = data_size; }
-    HSHM_INLINE_CROSS_FUN size_t GetSize() const { return size_ & ~kFreeMask; }
-    HSHM_INLINE_CROSS_FUN void MarkFree() { size_ |= kFreeMask; }
-    HSHM_INLINE_CROSS_FUN void MarkAllocated() { size_ &= ~kFreeMask; }
-    HSHM_INLINE_CROSS_FUN bool IsFree() const { return (size_ & kFreeMask) != 0; }
+    CTP_INLINE_CROSS_FUN void Init(size_t data_size) { size_ = data_size; }
+    CTP_INLINE_CROSS_FUN size_t GetSize() const { return size_ & ~kFreeMask; }
+    CTP_INLINE_CROSS_FUN void MarkFree() { size_ |= kFreeMask; }
+    CTP_INLINE_CROSS_FUN void MarkAllocated() { size_ &= ~kFreeMask; }
+    CTP_INLINE_CROSS_FUN bool IsFree() const { return (size_ & kFreeMask) != 0; }
   };
 
   static constexpr size_t kHeaderSize = 16;  // Padded to 16 for alignment
@@ -98,19 +98,19 @@ class PrivateSlabAllocator : public Allocator {
     size_t head_;  /**< pop index */
     size_t tail_;  /**< push index */
 
-    HSHM_INLINE_CROSS_FUN void Init(size_t *buf) {
+    CTP_INLINE_CROSS_FUN void Init(size_t *buf) {
       buf_ = buf;
       head_ = 0;
       tail_ = 0;
     }
 
-    HSHM_INLINE_CROSS_FUN bool Empty() const { return head_ == tail_; }
+    CTP_INLINE_CROSS_FUN bool Empty() const { return head_ == tail_; }
 
-    HSHM_INLINE_CROSS_FUN bool Full() const {
+    CTP_INLINE_CROSS_FUN bool Full() const {
       return ((tail_ + 1) % kRingCap) == head_;
     }
 
-    HSHM_INLINE_CROSS_FUN bool Push(size_t off) {
+    CTP_INLINE_CROSS_FUN bool Push(size_t off) {
       if (Full()) {
         return false;
       }
@@ -119,7 +119,7 @@ class PrivateSlabAllocator : public Allocator {
       return true;
     }
 
-    HSHM_INLINE_CROSS_FUN bool Pop(size_t &off) {
+    CTP_INLINE_CROSS_FUN bool Pop(size_t &off) {
       if (Empty()) {
         return false;
       }
@@ -137,7 +137,7 @@ class PrivateSlabAllocator : public Allocator {
   char * __restrict__ base_;       /**< Cached base pointer */
 
  public:
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   PrivateSlabAllocator() : bump_(0), bump_end_(0), base_(nullptr) {
     for (int i = 0; i < kNumClasses; ++i) {
       free_lists_[i] = nullptr;
@@ -151,7 +151,7 @@ class PrivateSlabAllocator : public Allocator {
    * @param backend Memory backend
    * @param region_size Size of region (0 = entire backend minus header)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool shm_init(const MemoryBackend &backend, size_t region_size = 0) {
     SetBackend(backend);
     alloc_header_size_ = sizeof(PrivateSlabAllocator);
@@ -195,7 +195,7 @@ class PrivateSlabAllocator : public Allocator {
    * Fast path: pop from free list for the size class.
    * Slow path: bump allocate from the remaining region.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> AllocateOffset(size_t requested_size) {
     // Round up to minimum and align to 16 bytes
     if (requested_size < 32) {
@@ -243,7 +243,7 @@ class PrivateSlabAllocator : public Allocator {
    *
    * Reads the size from the header, computes size class, pushes to free stack.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FreeOffsetNoNullCheck(OffsetPtr<> offset) {
     size_t off = offset.load();
     SlabHeader *hdr = reinterpret_cast<SlabHeader *>(
@@ -271,7 +271,7 @@ class PrivateSlabAllocator : public Allocator {
   /**
    * Free memory (null-safe).
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FreeOffset(OffsetPtr<> offset) {
     if (offset.IsNull()) {
       return;
@@ -282,14 +282,14 @@ class PrivateSlabAllocator : public Allocator {
   /**
    * Reallocate (not supported — allocate new + copy manually).
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> ReallocateOffsetNoNullCheck(OffsetPtr<> p, size_t new_size) {
     (void)p; (void)new_size;
     return OffsetPtr<>::GetNull();
   }
 
   /** Push arena state — bump allocator subset */
-  HSHM_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block,
+  CTP_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block,
                                       size_t size) {
     prior.arena_off_ = bump_;
     prior.arena_cur_ = bump_;
@@ -305,15 +305,15 @@ class PrivateSlabAllocator : public Allocator {
   }
 
   /** Pop arena state */
-  HSHM_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
+  CTP_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
     if (!block.IsNull()) {
       FreeOffset(block);
     }
   }
 
   /** No-op TLS management */
-  HSHM_CROSS_FUN void CreateTls() {}
-  HSHM_CROSS_FUN void FreeTls() {}
+  CTP_CROSS_FUN void CreateTls() {}
+  CTP_CROSS_FUN void FreeTls() {}
 
  private:
   /**
@@ -321,7 +321,7 @@ class PrivateSlabAllocator : public Allocator {
    * Returns -1 if size exceeds kMaxClassSize.
    * Uses bit tricks: cls = max(0, ceil_log2(size) - 5)
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   static int GetSizeClass(size_t size) {
     if (size > kMaxClassSize) {
       return -1;
@@ -332,7 +332,7 @@ class PrivateSlabAllocator : public Allocator {
     // ceil_log2: find position of highest set bit, +1 if not power of 2
     unsigned int v = static_cast<unsigned int>(size - 1);
     // __clz counts leading zeros from bit 31
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
     int log2_val = 31 - __clz(v);
 #else
     int log2_val = 31 - __builtin_clz(v);
@@ -350,12 +350,12 @@ class PrivateSlabAllocator : public Allocator {
   /**
    * Convert size class index to actual slot size.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   static size_t ClassToSize(int cls) {
     return (size_t)32 << cls;
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_MEMORY_ALLOCATOR_SLAB_ALLOCATOR_H_
+#endif  // CTP_MEMORY_ALLOCATOR_SLAB_ALLOCATOR_H_

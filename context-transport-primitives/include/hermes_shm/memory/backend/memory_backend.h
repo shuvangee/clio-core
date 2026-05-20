@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_MEMORY_H
-#define HSHM_MEMORY_H
+#ifndef CTP_MEMORY_H
+#define CTP_MEMORY_H
 
 #include <cstdint>
 #include <iostream>
@@ -45,7 +45,7 @@
 // #include "hermes_shm/data_structures/ipc/chararr.h"  // Deleted during hard refactoring
 #include "hermes_shm/memory/allocator/allocator.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /** Forward declaration for FullPtr (defined in allocator.h after this header) */
 template <typename T, bool ATOMIC>
@@ -57,77 +57,77 @@ class MemoryBackendId {
   u32 major_;  // Major ID (e.g., PID)
   u32 minor_;  // Minor ID (relative to major)
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MemoryBackendId() : major_(0), minor_(0) {}
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MemoryBackendId(u32 major, u32 minor) : major_(major), minor_(minor) {}
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MemoryBackendId(const MemoryBackendId &other) : major_(other.major_), minor_(other.minor_) {}
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MemoryBackendId(MemoryBackendId &&other) noexcept : major_(other.major_), minor_(other.minor_) {}
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MemoryBackendId &operator=(const MemoryBackendId &other) {
     major_ = other.major_;
     minor_ = other.minor_;
     return *this;
   }
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MemoryBackendId &operator=(MemoryBackendId &&other) noexcept {
     major_ = other.major_;
     minor_ = other.minor_;
     return *this;
   }
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static MemoryBackendId GetRoot() { return {0, 0}; }
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static MemoryBackendId Get(u32 major, u32 minor) { return {major, minor}; }
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool operator==(const MemoryBackendId &other) const {
     return major_ == other.major_ && minor_ == other.minor_;
   }
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool operator!=(const MemoryBackendId &other) const {
     return major_ != other.major_ || minor_ != other.minor_;
   }
 
   /** Get the null backend ID */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static MemoryBackendId GetNull() {
     return MemoryBackendId(UINT32_MAX, UINT32_MAX);
   }
 
   /** Set this backend ID to null */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void SetNull() { *this = GetNull(); }
 
   /** Check if this is the null backend ID */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool IsNull() const { return *this == GetNull(); }
 
   /** To index */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   uint32_t ToIndex() const {
     return major_ * 2 + minor_;
   }
 
   /** Serialize */
   template <typename Ar>
-  HSHM_CROSS_FUN void serialize(Ar &ar) {
+  CTP_CROSS_FUN void serialize(Ar &ar) {
     ar & major_;
     ar & minor_;
   }
 
   /** Print */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Print() const {
     printf("(%s) Memory Backend ID: (%u,%u)\n", kCurrentDevice, major_, minor_);
   }
@@ -146,7 +146,7 @@ struct MemoryBackendHeader {
   size_t data_capacity_;     // Capacity available for data allocation
   int data_id_;              // Device ID for the data buffer (GPU ID, etc.)
 
-  HSHM_CROSS_FUN void Print() const {
+  CTP_CROSS_FUN void Print() const {
     printf("(%s) MemoryBackendHeader: id: (%u, %u), backend_size: %lu, data_capacity: %lu\n",
            kCurrentDevice, id_.major_, id_.minor_, (long unsigned)backend_size_, (long unsigned)data_capacity_);
   }
@@ -167,7 +167,7 @@ class MemoryBackend : public MemoryBackendHeader {
   char *data_;      // Data buffer (region_ + kBackendHeaderSize)
 
  public:
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MemoryBackend() : header_(nullptr), region_(nullptr), data_(nullptr) {
     // Initialize inherited MemoryBackendHeader fields
     id_ = MemoryBackendId();
@@ -180,18 +180,18 @@ class MemoryBackend : public MemoryBackendHeader {
   ~MemoryBackend() = default;
 
   /** Get the ID of this backend */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MemoryBackendId &GetId() { return id_; }
 
   /** Get the ID of this backend */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   const MemoryBackendId &GetId() const { return id_; }
 
   /**
    * Set the MEMORY_BACKEND_OWNED flag
    * Called during shm_init to indicate this process owns the backend
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void SetOwner() {
     flags_.SetBits(MEMORY_BACKEND_OWNED);
   }
@@ -200,7 +200,7 @@ class MemoryBackend : public MemoryBackendHeader {
    * Check if this process owns the backend
    * @return true if MEMORY_BACKEND_OWNED flag is set
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool IsOwner() const {
     return flags_.Any(MEMORY_BACKEND_OWNED) != 0;
   }
@@ -210,7 +210,7 @@ class MemoryBackend : public MemoryBackendHeader {
    * Called during shm_attach to indicate this process is attaching to
    * a backend created by another process
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void UnsetOwner() {
     flags_.UnsetBits(MEMORY_BACKEND_OWNED);
   }
@@ -225,7 +225,7 @@ class MemoryBackend : public MemoryBackendHeader {
    * @param size   Size of the clipped region in bytes
    * @return A new MemoryBackend describing the sub-region
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MemoryBackend Clip(size_t offset, size_t size) const {
     MemoryBackend sub;
     sub.id_ = id_;
@@ -245,7 +245,7 @@ class MemoryBackend : public MemoryBackendHeader {
    * @return Pointer to allocator at the start of data_
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   AllocT* Cast() {
     return reinterpret_cast<AllocT*>(data_);
   }
@@ -254,7 +254,7 @@ class MemoryBackend : public MemoryBackendHeader {
    * Cast data_ pointer to an Allocator type (const version)
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   AllocT* Cast() const {
     return reinterpret_cast<AllocT*>(data_);
   }
@@ -275,7 +275,7 @@ class MemoryBackend : public MemoryBackendHeader {
    * @return Pointer to the constructed and initialized allocator
    */
   template<typename AllocT, typename... Args>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   AllocT* MakeAlloc(Args&&... args) {
     AllocT* alloc = Cast<AllocT>();
     new (alloc) AllocT();
@@ -296,14 +296,14 @@ class MemoryBackend : public MemoryBackendHeader {
    * @return Pointer to the attached allocator
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   AllocT* AttachAlloc() {
     AllocT* alloc = Cast<AllocT>();
     alloc->shm_attach(*this);
     return alloc;
   }
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Print() const {
     printf("(%s) MemoryBackend: region: %p, data: %p, data_capacity: %lu\n",
            kCurrentDevice, region_, data_, (long unsigned)data_capacity_);
@@ -311,11 +311,11 @@ class MemoryBackend : public MemoryBackendHeader {
 
   /// Each allocator must define its own shm_init.
   // virtual bool shm_init(size_t size, ...) = 0;
-  // virtual bool shm_attach(const hshm::chararr &url) = 0;
+  // virtual bool shm_attach(const ctp::chararr &url) = 0;
   // virtual void shm_detach() = 0;
   // virtual void shm_destroy() = 0;
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_MEMORY_H
+#endif  // CTP_MEMORY_H

@@ -111,10 +111,10 @@ bool Worker::Init() {
   // runtime data). Stores Future<Task> objects to avoid stale RunContext*
   // pointers.
   event_queue_ =
-      HSHM_MALLOC
-          ->template NewObj<hshm::ipc::mpsc_ring_buffer<
-              Future<Task, CHI_QUEUE_ALLOC_T>, hshm::ipc::MallocAllocator>>(
-              HSHM_MALLOC, EVENT_QUEUE_DEPTH)
+      CTP_MALLOC
+          ->template NewObj<ctp::ipc::mpsc_ring_buffer<
+              Future<Task, CHI_QUEUE_ALLOC_T>, ctp::ipc::MallocAllocator>>(
+              CTP_MALLOC, EVENT_QUEUE_DEPTH)
           .ptr_;
 
   // Get scheduler from IpcManager (IpcManager is the single owner)
@@ -122,10 +122,10 @@ bool Worker::Init() {
   HLOG(kDebug, "Worker {}: Using scheduler from IpcManager", worker_id_);
 
   // Create SHM lightbeam transports for worker-side transport
-  shm_send_transport_ = hshm::lbm::TransportFactory::Get(
-      "", hshm::lbm::TransportType::kShm, hshm::lbm::TransportMode::kClient);
-  shm_recv_transport_ = hshm::lbm::TransportFactory::Get(
-      "", hshm::lbm::TransportType::kShm, hshm::lbm::TransportMode::kServer);
+  shm_send_transport_ = ctp::lbm::TransportFactory::Get(
+      "", ctp::lbm::TransportType::kShm, ctp::lbm::TransportMode::kClient);
+  shm_recv_transport_ = ctp::lbm::TransportFactory::Get(
+      "", ctp::lbm::TransportType::kShm, ctp::lbm::TransportMode::kServer);
 
   is_initialized_ = true;
   return true;
@@ -177,7 +177,7 @@ WorkerStats Worker::GetWorkerStats() const {
   return stats;
 }
 
-hshm::lbm::EventManager &Worker::GetEventManager() { return event_manager_; }
+ctp::lbm::EventManager &Worker::GetEventManager() { return event_manager_; }
 
 void Worker::Finalize() {
   if (!is_initialized_) {
@@ -564,7 +564,7 @@ bool Worker::ProcessNewTask(TaskLane *lane) {
   // RouteTask handles Retry/Dne internally via AddToRetryQueue
   RouteResult route_result = CHI_IPC->RouteTask(future);
   if (route_result == RouteResult::ExecHere) {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     // Re-fetch task pointer from future in case RouteTask changed it
     RunContext *run_ctx = task_full_ptr->GetRunCtx();
     bool is_started = task_full_ptr->task_flags_.Any(TASK_STARTED);
@@ -629,7 +629,7 @@ void Worker::SuspendMe() {
   u32 max_sleep = config->GetMaxSleep();
 
   // Calculate actual elapsed idle time
-  hshm::Timepoint current_time;
+  ctp::Timepoint current_time;
   current_time.Now();
   double elapsed_idle_us = idle_start_.GetUsecFromStart(current_time);
 
@@ -720,12 +720,12 @@ TaskLane *Worker::GetCurrentLane() const {
 }
 
 void Worker::SetAsCurrentWorker() {
-  HSHM_THREAD_MODEL->SetTls(chi_cur_worker_key_,
+  CTP_THREAD_MODEL->SetTls(chi_cur_worker_key_,
                             static_cast<class Worker *>(this));
 }
 
 void Worker::ClearCurrentWorker() {
-  HSHM_THREAD_MODEL->SetTls(chi_cur_worker_key_,
+  CTP_THREAD_MODEL->SetTls(chi_cur_worker_key_,
                             static_cast<class Worker *>(nullptr));
 }
 
@@ -1095,7 +1095,7 @@ void Worker::ProcessPeriodicQueue(std::queue<RunContext *> &queue,
   // Capture SINGLE timestamp for ALL tasks processed in this batch
   // This prevents timestamp desynchronization between tasks with same
   // yield_time
-  hshm::Timepoint batch_timestamp;
+  ctp::Timepoint batch_timestamp;
   batch_timestamp.Now();
 
   // Get current time for all checks

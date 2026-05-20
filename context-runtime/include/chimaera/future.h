@@ -93,7 +93,7 @@ struct FutureShm {
    * whose offset is a raw pinned-host address (not an SHM offset).
    * @return AllocatorId sentinel {UINT32_MAX-1, 0}
    */
-  HSHM_CROSS_FUN static hipc::AllocatorId GetCpu2GpuAllocId() {
+  CTP_CROSS_FUN static hipc::AllocatorId GetCpu2GpuAllocId() {
     hipc::AllocatorId id;
     id.major_ = UINT32_MAX - 1;
     id.minor_ = 0;
@@ -116,13 +116,13 @@ struct FutureShm {
   u32 client_pid_;
 
   /** SHM transfer info for input direction (client -> worker) */
-  hshm::lbm::ShmTransferInfo input_;
+  ctp::lbm::ShmTransferInfo input_;
 
   /** SHM transfer info for output direction (worker -> client) */
-  hshm::lbm::ShmTransferInfo output_;
+  ctp::lbm::ShmTransferInfo output_;
 
   /** Transport to use for sending response back to client */
-  hshm::lbm::Transport* response_transport_;
+  ctp::lbm::Transport* response_transport_;
 
   /** Socket fd for routing response (IPC mode) */
   int response_fd_;
@@ -132,7 +132,7 @@ struct FutureShm {
   u32 response_identity_len_;
 
   /** Atomic bitfield for completion and data availability flags */
-  hshm::abitfield32_t flags_;
+  ctp::abitfield32_t flags_;
 
   /**
    * Opaque pointer to the parent's GPU RunContext (chi::gpu::RunContext*).
@@ -180,7 +180,7 @@ struct FutureShm {
    * Default constructor - initializes fields
    * Note: copy_space is allocated as part of the buffer, not separately
    */
-  HSHM_CROSS_FUN FutureShm() {
+  CTP_CROSS_FUN FutureShm() {
     pool_id_ = PoolId::GetNull();
     method_id_ = 0;
     origin_ = FUTURE_CLIENT_SHM;
@@ -206,7 +206,7 @@ struct FutureShm {
    *
    * Call this instead of placement-new when reusing a cached FutureShm.
    */
-  HSHM_CROSS_FUN void Reset(PoolId pool_id, u32 method_id) {
+  CTP_CROSS_FUN void Reset(PoolId pool_id, u32 method_id) {
     pool_id_ = pool_id;
     method_id_ = method_id;
     client_task_vaddr_ = 0;
@@ -265,8 +265,8 @@ class Future {
   struct Range {
     u32 off;
     u32 width;
-    HSHM_CROSS_FUN Range() : off(0), width(0) {}
-    HSHM_CROSS_FUN Range(u32 o, u32 w) : off(o), width(w) {}
+    CTP_CROSS_FUN Range() : off(0), width(0) {}
+    CTP_CROSS_FUN Range(u32 o, u32 w) : off(o), width(w) {}
   } range_;
 
   /**
@@ -282,7 +282,7 @@ class Future {
    * @param task_ptr FullPtr to the task (wraps private memory with null
    * allocator)
    */
-  HSHM_CROSS_FUN Future(hipc::ShmPtr<FutureT> future_shm,
+  CTP_CROSS_FUN Future(hipc::ShmPtr<FutureT> future_shm,
                         const hipc::FullPtr<TaskT>& task_ptr)
       : future_shm_(future_shm), parent_task_(nullptr), consumed_(false) {
     // Manually initialize task_ptr_ to avoid FullPtr copy constructor bug on
@@ -294,14 +294,14 @@ class Future {
   /**
    * Default constructor - creates null future
    */
-  HSHM_CROSS_FUN Future() : parent_task_(nullptr), consumed_(false) {}
+  CTP_CROSS_FUN Future() : parent_task_(nullptr), consumed_(false) {}
 
   /**
    * Constructor from ShmPtr<FutureShm> - used by ring buffer deserialization
    * Task pointer will be null and must be set later
    * @param future_shm_ptr ShmPtr to FutureShm object
    */
-  HSHM_CROSS_FUN explicit Future(const hipc::ShmPtr<FutureT>& future_shm_ptr)
+  CTP_CROSS_FUN explicit Future(const hipc::ShmPtr<FutureT>& future_shm_ptr)
       : future_shm_(future_shm_ptr), parent_task_(nullptr), consumed_(false) {
     // Task pointer starts null - will be set in ProcessNewTasks
     task_ptr_.SetNull();
@@ -312,24 +312,24 @@ class Future {
    * Wait/await_resume). Defined out-of-line in ipc_manager.h where
    * CHI_IPC is available.
    */
-  HSHM_CROSS_FUN ~Future();
+  CTP_CROSS_FUN ~Future();
 
   /**
    * Destroy the task using CHI_IPC->DelTask if not null
    * Sets the task pointer to null afterwards
    */
-  HSHM_CROSS_FUN void Destroy(bool post_wait = false);
+  CTP_CROSS_FUN void Destroy(bool post_wait = false);
 
   /**
    * Explicitly delete the underlying task via CHI_IPC->DelTask
    */
-  HSHM_CROSS_FUN void DelTask();
+  CTP_CROSS_FUN void DelTask();
 
   /**
    * Copy constructor - does not transfer ownership
    * @param other Future to copy from
    */
-  HSHM_CROSS_FUN Future(const Future& other)
+  CTP_CROSS_FUN Future(const Future& other)
       : future_shm_(other.future_shm_),
         parent_task_(other.parent_task_),
         consumed_(false) {  // Copy is not consumed
@@ -343,7 +343,7 @@ class Future {
    * @param other Future to copy from
    * @return Reference to this future
    */
-  HSHM_CROSS_FUN Future& operator=(const Future& other) {
+  CTP_CROSS_FUN Future& operator=(const Future& other) {
     if (this != &other) {
       // Manually copy task_ptr_ to avoid FullPtr copy assignment bug on GPU
       task_ptr_.shm_ = other.task_ptr_.shm_;
@@ -359,7 +359,7 @@ class Future {
    * Move constructor - transfers ownership
    * @param other Future to move from
    */
-  HSHM_CROSS_FUN Future(Future&& other) noexcept
+  CTP_CROSS_FUN Future(Future&& other) noexcept
       : future_shm_(std::move(other.future_shm_)),
         parent_task_(other.parent_task_),
         consumed_(other.consumed_) {
@@ -376,7 +376,7 @@ class Future {
    * @param other Future to move from
    * @return Reference to this future
    */
-  HSHM_CROSS_FUN Future& operator=(Future&& other) noexcept {
+  CTP_CROSS_FUN Future& operator=(Future&& other) noexcept {
     if (this != &other) {
       // Manually move task_ptr_ to avoid FullPtr move assignment bug on GPU
       task_ptr_.shm_ = other.task_ptr_.shm_;
@@ -396,7 +396,7 @@ class Future {
    * Get raw pointer to the task
    * @return Pointer to the task object
    */
-  HSHM_CROSS_FUN TaskT* get() const { return task_ptr_.ptr_; }
+  CTP_CROSS_FUN TaskT* get() const { return task_ptr_.ptr_; }
 
   /**
    * Get the FullPtr to the task (non-const version)
@@ -414,63 +414,63 @@ class Future {
    * Dereference operator - access task members
    * @return Reference to the task object
    */
-  HSHM_CROSS_FUN TaskT& operator*() const { return *task_ptr_.ptr_; }
+  CTP_CROSS_FUN TaskT& operator*() const { return *task_ptr_.ptr_; }
 
   /**
    * Arrow operator - access task members
    * @return Pointer to the task object
    */
-  HSHM_CROSS_FUN TaskT* operator->() const { return task_ptr_.ptr_; }
+  CTP_CROSS_FUN TaskT* operator->() const { return task_ptr_.ptr_; }
 
   /** Get the cross-warp range offset */
-  HSHM_CROSS_FUN u32 RangeOffset() const { return range_.off; }
+  CTP_CROSS_FUN u32 RangeOffset() const { return range_.off; }
 
   /** Get the cross-warp range width */
-  HSHM_CROSS_FUN u32 RangeWidth() const { return range_.width; }
+  CTP_CROSS_FUN u32 RangeWidth() const { return range_.width; }
 
   /** Set the cross-warp sub-range */
-  HSHM_CROSS_FUN void SetRange(u32 off, u32 width) {
+  CTP_CROSS_FUN void SetRange(u32 off, u32 width) {
     range_.off = off;
     range_.width = width;
   }
 
   /** Get the warp offset index for this future's range */
-  HSHM_CROSS_FUN u32 GetTaskWarpOffset() const { return range_.off / 32; }
+  CTP_CROSS_FUN u32 GetTaskWarpOffset() const { return range_.off / 32; }
 
   /**
    * Check if the task is complete.
    * Dispatches to the correct variant based on origin.
    * @return True if task has completed, false otherwise
    */
-  HSHM_CROSS_FUN bool IsComplete() const;
+  CTP_CROSS_FUN bool IsComplete() const;
 
   /**
    * CPU-to-CPU completion check.
    * Reads FUTURE_COMPLETE via normal atomic load.
    * @return True if task has completed
    */
-  HSHM_HOST_FUN bool IsCompleteCpu2Cpu() const;
+  CTP_HOST_FUN bool IsCompleteCpu2Cpu() const;
 
   /**
    * GPU-to-CPU completion check.
    * Reads FUTURE_COMPLETE via system-scope atomic (visible across GPU/CPU).
    * @return True if task has completed
    */
-  HSHM_HOST_FUN bool IsCompleteGpu2Cpu() const;
+  CTP_HOST_FUN bool IsCompleteGpu2Cpu() const;
 
   /**
    * CPU-to-GPU completion check.
    * Polls device-resident FutureShm flags via D-to-H memcpy.
    * @return True if task has completed
    */
-  HSHM_HOST_FUN bool IsCompleteCpu2Gpu() const;
+  CTP_HOST_FUN bool IsCompleteCpu2Gpu() const;
 
   /**
    * GPU-to-GPU completion check.
    * Reads FUTURE_COMPLETE via device-scope atomic on GPU.
    * @return True if task has completed
    */
-  HSHM_GPU_FUN bool IsCompleteGpu2Gpu() const;
+  CTP_GPU_FUN bool IsCompleteGpu2Gpu() const;
 
   /**
    * Wait for task completion (blocking with optional timeout).
@@ -487,7 +487,7 @@ class Future {
    * @return true if task completed, false if not (timeout or non-blocking
    *         poll that found the future incomplete)
    */
-  HSHM_CROSS_FUN bool Wait(float max_sec = -1, bool reuse_task = false);
+  CTP_CROSS_FUN bool Wait(float max_sec = -1, bool reuse_task = false);
 
   /**
    * CPU-to-CPU wait path (SHM / ZMQ / IPC).
@@ -497,7 +497,7 @@ class Future {
    * @param reuse_task If true, skip task deletion on destroy
    * @return true if task completed, false if timed out
    */
-  HSHM_HOST_FUN bool WaitCpu2Cpu(float max_sec = 0, bool reuse_task = false);
+  CTP_HOST_FUN bool WaitCpu2Cpu(float max_sec = 0, bool reuse_task = false);
 
   /**
    * GPU-to-CPU wait path (GPU future polled from client on host).
@@ -507,7 +507,7 @@ class Future {
    * @param reuse_task If true, skip task deletion on destroy
    * @return true if task completed, false if timed out
    */
-  HSHM_HOST_FUN bool WaitGpu2Cpu(float max_sec = 0, bool reuse_task = false);
+  CTP_HOST_FUN bool WaitGpu2Cpu(float max_sec = 0, bool reuse_task = false);
 
   /**
    * CPU-to-GPU wait path (POD transfer via cudaMemcpy).
@@ -517,7 +517,7 @@ class Future {
    * @param reuse_task If true, skip task deletion on destroy
    * @return true if task completed, false if timed out
    */
-  HSHM_HOST_FUN bool WaitCpu2Gpu(float max_sec = 0, bool reuse_task = false);
+  CTP_HOST_FUN bool WaitCpu2Gpu(float max_sec = 0, bool reuse_task = false);
 
   /**
    * GPU-to-GPU wait path (task submitted and completed entirely on GPU).
@@ -526,13 +526,13 @@ class Future {
    * @param reuse_task If true, skip task deletion on destroy
    * @return true if task completed, false if timed out
    */
-  HSHM_GPU_FUN bool WaitGpu2Gpu(float max_sec = 0, bool reuse_task = false);
+  CTP_GPU_FUN bool WaitGpu2Gpu(float max_sec = 0, bool reuse_task = false);
 
   /** Wait phase 1: spin until FUTURE_COMPLETE (no deserialization) */
-  HSHM_CROSS_FUN void WaitPoll(float max_sec = 0, bool reuse_task = false);
+  CTP_CROSS_FUN void WaitPoll(float max_sec = 0, bool reuse_task = false);
 
   /** Wait phase 2: deserialize output + cleanup (call after WaitPoll) */
-  HSHM_CROSS_FUN void WaitRecv(float max_sec = 0, bool reuse_task = false);
+  CTP_CROSS_FUN void WaitRecv(float max_sec = 0, bool reuse_task = false);
 
   /**
    * Mark the task as complete
@@ -555,13 +555,13 @@ class Future {
    * Check if this future is null
    * @return True if future is null, false otherwise
    */
-  HSHM_CROSS_FUN bool IsNull() const { return task_ptr_.IsNull(); }
+  CTP_CROSS_FUN bool IsNull() const { return task_ptr_.IsNull(); }
 
   /**
    * Get the internal ShmPtr to FutureShm (for internal use)
    * @return ShmPtr to the FutureShm object
    */
-  HSHM_CROSS_FUN hipc::ShmPtr<FutureT> GetFutureShmPtr() const {
+  CTP_CROSS_FUN hipc::ShmPtr<FutureT> GetFutureShmPtr() const {
     return future_shm_;
   }
 
@@ -571,7 +571,7 @@ class Future {
    * @return FullPtr to the FutureShm object
    * Note: Implementation provided in ipc_manager.h where CHI_IPC is defined
    */
-  HSHM_CROSS_FUN hipc::FullPtr<FutureT> GetFutureShm() const;
+  CTP_CROSS_FUN hipc::FullPtr<FutureT> GetFutureShm() const;
 
   /**
    * Get the pool ID from the FutureShm
@@ -650,7 +650,7 @@ class Future {
    * If the task is already complete, the coroutine won't suspend.
    * @return True if task is complete, false if coroutine should suspend
    */
-  HSHM_CROSS_FUN bool await_ready() const noexcept {
+  CTP_CROSS_FUN bool await_ready() const noexcept {
     // A null future (e.g. SendGpu allocation failure) is immediately ready
     // to prevent suspending with awaited_fshm_=nullptr, which would resume
     // the coroutine into a null task_ptr_ dereference.
@@ -675,9 +675,9 @@ class Future {
    * @return True to suspend, false to continue without suspending
    */
   template <typename PromiseT>
-  HSHM_CROSS_FUN bool await_suspend(
+  CTP_CROSS_FUN bool await_suspend(
       std::coroutine_handle<PromiseT> handle) noexcept {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     // Get RunContext via helper function (defined in worker.cc)
     // This avoids needing RunContext to be complete at this point
     return await_suspend_impl(handle);
@@ -688,7 +688,7 @@ class Future {
     if constexpr (requires { handle.promise().get_run_context(); }) {
       auto *ctx = handle.promise().get_run_context();
       if (ctx) {
-#if HSHM_IS_GPU_COMPILER
+#if CTP_IS_GPU_COMPILER
         u32 lane = threadIdx.x % 32;
 #else
         u32 lane = 0;
@@ -715,7 +715,7 @@ class Future {
    * GPU: Worker already confirmed FUTURE_COMPLETE; deserialize output
    * and cleanup.
    */
-  HSHM_CROSS_FUN void await_resume() noexcept {
+  CTP_CROSS_FUN void await_resume() noexcept {
     if (!task_ptr_.IsNull() &&
         task_ptr_->task_flags_.Any(TASK_FIRE_AND_FORGET)) {
       // Fire-and-forget: detach without destroying. The task is still
@@ -724,7 +724,7 @@ class Future {
       future_shm_.SetNull();
       return;
     }
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     Destroy(true);
 #else
     // GPU: Worker already deserialized output before resuming this coroutine.

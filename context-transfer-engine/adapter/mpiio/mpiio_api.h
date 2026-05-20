@@ -116,7 +116,7 @@ typedef int (*MPI_File_sync_t)(MPI_File fh);
 
 namespace clio::cae {
 
-using hshm::RealApi;
+using ctp::RealApi;
 
 /** Pointers to the real mpiio API */
 class MpiioApi : public RealApi {
@@ -258,7 +258,7 @@ class MpiioApi : public RealApi {
 
 /** Simplify access to the stateless MpiioFs Singleton */
 #define WRP_CTE_MPIIO_API \
-  hshm::Singleton<::clio::cae::MpiioApi>::GetInstance()
+  ctp::Singleton<::clio::cae::MpiioApi>::GetInstance()
 #define WRP_CTE_MPIIO_API_T clio::cae::MpiioApi*
 
 #endif  // WRP_CTE_ADAPTER_MPIIO_H

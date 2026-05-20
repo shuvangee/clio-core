@@ -18,7 +18,7 @@
  * concurrently from gpu2cpu_queue (multi-MPSC ring buffer).
  */
 
-#if HSHM_ENABLE_SYCL && !(HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM)
+#if CTP_ENABLE_SYCL && !(CTP_ENABLE_CUDA || CTP_ENABLE_ROCM)
 
 #include "simple_test.h"
 #include "test_gpu_kernel_stress_common.h"
@@ -55,7 +55,7 @@ TEST_CASE("GPU producer-only stress: kernel submits N tasks (SYCL)",
   // Stage gpu_info, kernel-scope IpcManager, and the FullPtr array in
   // shared USM so each kernel functor can capture pointers by value.
   //
-  // Use a fresh GPU queue rather than hshm::GpuApi::SyclQueue() (the
+  // Use a fresh GPU queue rather than ctp::GpuApi::SyclQueue() (the
   // singleton). The singleton was used for ServerInitGpuQueues during
   // CHIMAERA_INIT; on the DPC++ CUDA backend, subsequent submissions
   // on the same singleton can silently no-op (observed: kernel runs
@@ -114,7 +114,7 @@ TEST_CASE("GPU producer-only stress: kernel submits N tasks (SYCL)",
           (void)info_storage; (void)ipc_storage;
           (void)handle_storage; (void)slot_storage;
           *marker_storage = 1;
-#if HSHM_IS_DEVICE_PASS
+#if CTP_IS_DEVICE_PASS
           CHIMAERA_GPU_INIT(*info_storage, ipc_storage);
           *marker_storage = 2;
           chi::u32 slot = *slot_storage;

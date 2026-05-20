@@ -9,7 +9,7 @@ add_executable(test_local_serialize_exec
 add_dependencies(test_local_serialize_exec hermes_shm_host)
 target_link_libraries(test_local_serialize_exec
         hermes_shm_host
-        hshm::serialize)
+        ctp::serialize)
 
 #------------------------------------------------------------------------------
 # Test Cases

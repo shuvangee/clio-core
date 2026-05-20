@@ -31,15 +31,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_H_
 
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <sys/types.h>
 
-namespace hshm {
+namespace ctp {
 
 /** Opaque token returned by Submit, used to check completion */
 using IoToken = uint64_t;
@@ -89,6 +89,6 @@ class AsyncIO {
   virtual int GetEventFd() const = 0;
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_H_

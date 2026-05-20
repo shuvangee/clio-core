@@ -35,7 +35,7 @@ target_link_libraries(test_adios2_adapter
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     adios2::adios2               # ADIOS2 library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )

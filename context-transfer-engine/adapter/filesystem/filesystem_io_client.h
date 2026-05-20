@@ -102,7 +102,7 @@ struct IoStatus {
  * For now, nothing additional than the typical FsIoOptions.
  * */
 struct FsIoOptions {
-  hshm::bitfield32_t flags_;    /**< various I/O flags */
+  ctp::bitfield32_t flags_;    /**< various I/O flags */
   MPI_Datatype mpi_type_; /**< MPI data type */
   int mpi_count_;         /**< The number of types */
   int type_size_;         /**< The size of type */
@@ -219,7 +219,7 @@ struct File {
 struct AdapterStat {
   std::string path_;         /**< The URL of this file */
   int flags_;                /**< open() flags for POSIX */
-  hshm::bitfield32_t hflags_;      /**< Flags used by FS adapter */
+  ctp::bitfield32_t hflags_;      /**< Flags used by FS adapter */
   mode_t st_mode_;           /**< protection */
   uid_t st_uid_;             /**< user ID of owner */
   gid_t st_gid_;             /**< group ID of owner */

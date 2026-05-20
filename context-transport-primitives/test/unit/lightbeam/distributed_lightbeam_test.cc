@@ -32,7 +32,7 @@
  */
 
 #include <arpa/inet.h>
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
 #include <hermes_shm/lightbeam/thallium_transport.h>
 #endif
 #include <hermes_shm/lightbeam/transport_factory_impl.h>
@@ -53,7 +53,7 @@
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 std::vector<std::string> ReadHosts(const std::string& hostfile) {
   std::vector<std::string> hosts;
@@ -67,7 +67,7 @@ std::vector<std::string> ReadHosts(const std::string& hostfile) {
 
 TransportType ParseTransport(const std::string& s) {
   if (s == "zeromq") return TransportType::kZeroMq;
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
   if (s == "thallium") return TransportType::kThallium;
 #endif
   throw std::runtime_error("Unknown transport type: " + s);
@@ -255,7 +255,7 @@ int main(int argc, char** argv) {
   if (transport == TransportType::kZeroMq) {
     server_owned = std::unique_ptr<Transport>(new ZeroMqTransport(
         TransportMode::kServer, bind_addr, protocol, my_port, topology));
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
   } else if (transport == TransportType::kThallium) {
     server_owned = std::unique_ptr<Transport>(new ThalliumTransport(
         TransportMode::kServer, bind_addr, protocol, my_port));
@@ -362,7 +362,7 @@ int main(int argc, char** argv) {
       return std::unique_ptr<Transport>(new ZeroMqTransport(
           TransportMode::kClient, peer_addr, protocol, target_port, topology));
     }
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     if (transport == TransportType::kThallium) {
       return std::unique_ptr<Transport>(new ThalliumTransport(
           TransportMode::kClient, peer_addr, protocol, target_port));

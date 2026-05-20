@@ -31,15 +31,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_SINGLETON_H
-#define HSHM_SHM_SINGLETON_H
+#ifndef CTP_SHM_SINGLETON_H
+#define CTP_SHM_SINGLETON_H
 
 #include <memory>
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/thread/lock/spin_lock.h"
 
-namespace hshm {
+namespace ctp {
 
 /**
  * A class to represent singleton pattern
@@ -56,7 +56,7 @@ class SingletonBase {
   static T *GetInstance() {
     if (GetObject() == nullptr) {
       if constexpr (WithLock) {
-        hshm::ScopedSpinLock lock(GetSpinLock(), 0);
+        ctp::ScopedSpinLock lock(GetSpinLock(), 0);
         new ((T *)GetData()) T();
         GetObject() = (T *)GetData();
       } else {
@@ -67,9 +67,9 @@ class SingletonBase {
     return GetObject();
   }
 
-  static hshm::SpinLock &GetSpinLock() {
-    static char spinlock_data_[sizeof(hshm::SpinLock)] = {0};
-    return *(hshm::SpinLock *)spinlock_data_;
+  static ctp::SpinLock &GetSpinLock() {
+    static char spinlock_data_[sizeof(ctp::SpinLock)] = {0};
+    return *(ctp::SpinLock *)spinlock_data_;
   }
 
   static T *GetData() {
@@ -98,11 +98,11 @@ using LockfreeSingleton = SingletonBase<T, false>;
 template <typename T, bool WithLock>
 class CrossSingletonBase {
  public:
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   static T *GetInstance() {
     if (GetObject() == nullptr) {
       if constexpr (WithLock) {
-        hshm::ScopedSpinLock lock(GetSpinLock(), 0);
+        ctp::ScopedSpinLock lock(GetSpinLock(), 0);
         new ((T *)GetData()) T();
         GetObject() = (T *)GetData();
       } else {
@@ -113,19 +113,19 @@ class CrossSingletonBase {
     return GetObject();
   }
 
-  HSHM_INLINE_CROSS_FUN
-  static hshm::SpinLock &GetSpinLock() {
-    static char spinlock_data_[sizeof(hshm::SpinLock)] = {0};
-    return *(hshm::SpinLock *)spinlock_data_;
+  CTP_INLINE_CROSS_FUN
+  static ctp::SpinLock &GetSpinLock() {
+    static char spinlock_data_[sizeof(ctp::SpinLock)] = {0};
+    return *(ctp::SpinLock *)spinlock_data_;
   }
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   static T *GetData() {
     static char data_[sizeof(T)] = {0};
     return (T *)data_;
   }
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   static T *&GetObject() {
     static T *obj_ = nullptr;
     return obj_;
@@ -161,7 +161,7 @@ T GlobalSingleton<T>::obj_;
  * Makes a singleton. Constructs during initialization of program.
  * Does not require specific initialization of the static variable.
  * */
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
 template <typename T>
 using GlobalCrossSingleton = GlobalSingleton<T>;
 #else
@@ -172,9 +172,9 @@ using GlobalCrossSingleton = LockfreeCrossSingleton<T>;
 /**
  * C-style singleton with global variables
  */
-#define HSHM_DEFINE_GLOBAL_VAR_H(T, NAME) extern __TU(T) NAME;
-#define HSHM_DEFINE_GLOBAL_VAR_CC(T, NAME) __TU(T) NAME = T{};
-#define HSHM_GET_GLOBAL_VAR(T, NAME) hshm::GetGlobalVar<__TU(T)>(NAME)
+#define CTP_DEFINE_GLOBAL_VAR_H(T, NAME) extern __TU(T) NAME;
+#define CTP_DEFINE_GLOBAL_VAR_CC(T, NAME) __TU(T) NAME = T{};
+#define CTP_GET_GLOBAL_VAR(T, NAME) ctp::GetGlobalVar<__TU(T)>(NAME)
 template <typename T>
 static inline T *GetGlobalVar(T &instance) {
   return &instance;
@@ -183,28 +183,28 @@ static inline T *GetGlobalVar(T &instance) {
 /**
  * Cross-device C-style singleton with global variables
  */
-#if HSHM_IS_HOST
-#define HSHM_DEFINE_GLOBAL_CROSS_VAR_H(T, NAME) extern __TU(T) NAME;
-#define HSHM_DEFINE_GLOBAL_CROSS_VAR_CC(T, NAME) __TU(T) NAME = T{};
-#define HSHM_GET_GLOBAL_CROSS_VAR(T, NAME) \
-  hshm::GetGlobalCrossVar<__TU(T)>(NAME)
+#if CTP_IS_HOST
+#define CTP_DEFINE_GLOBAL_CROSS_VAR_H(T, NAME) extern __TU(T) NAME;
+#define CTP_DEFINE_GLOBAL_CROSS_VAR_CC(T, NAME) __TU(T) NAME = T{};
+#define CTP_GET_GLOBAL_CROSS_VAR(T, NAME) \
+  ctp::GetGlobalCrossVar<__TU(T)>(NAME)
 template <typename T>
-HSHM_CROSS_FUN static inline T *GetGlobalCrossVar(T &instance) {
+CTP_CROSS_FUN static inline T *GetGlobalCrossVar(T &instance) {
   return &instance;
 }
 #else
-#define HSHM_DEFINE_GLOBAL_CROSS_VAR_H(T, NAME)
-#define HSHM_DEFINE_GLOBAL_CROSS_VAR_CC(T, NAME)
-#define HSHM_GET_GLOBAL_CROSS_VAR(T, NAME) \
-  hshm::CrossSingleton<__TU(T)>::GetInstance()
+#define CTP_DEFINE_GLOBAL_CROSS_VAR_H(T, NAME)
+#define CTP_DEFINE_GLOBAL_CROSS_VAR_CC(T, NAME)
+#define CTP_GET_GLOBAL_CROSS_VAR(T, NAME) \
+  ctp::CrossSingleton<__TU(T)>::GetInstance()
 #endif
 
 /**
  * C-style pointer singleton with global variables
  */
-#define HSHM_DEFINE_GLOBAL_PTR_VAR_H(T, NAME) extern __TU(T) * NAME;
-#define HSHM_DEFINE_GLOBAL_PTR_VAR_CC(T, NAME) __TU(T) *NAME = nullptr;
-#define HSHM_GET_GLOBAL_PTR_VAR(T, NAME) hshm::GetGlobalPtrVar<__TU(T)>(NAME)
+#define CTP_DEFINE_GLOBAL_PTR_VAR_H(T, NAME) extern __TU(T) * NAME;
+#define CTP_DEFINE_GLOBAL_PTR_VAR_CC(T, NAME) __TU(T) *NAME = nullptr;
+#define CTP_GET_GLOBAL_PTR_VAR(T, NAME) ctp::GetGlobalPtrVar<__TU(T)>(NAME)
 template <typename T>
 static inline T *GetGlobalPtrVar(T *&instance) {
   if (instance == nullptr) {
@@ -216,25 +216,25 @@ static inline T *GetGlobalPtrVar(T *&instance) {
 /**
  * Cross-device C-style pointer singleton with global variables
  */
-#if HSHM_IS_HOST
-#define HSHM_DEFINE_GLOBAL_CROSS_PTR_VAR_H(T, NAME) extern __TU(T) * NAME;
-#define HSHM_DEFINE_GLOBAL_CROSS_PTR_VAR_CC(T, NAME) __TU(T) *NAME = nullptr;
-#define HSHM_GET_GLOBAL_CROSS_PTR_VAR(T, NAME) \
-  hshm::GetGlobalCrossPtrVar<__TU(T)>(NAME)
+#if CTP_IS_HOST
+#define CTP_DEFINE_GLOBAL_CROSS_PTR_VAR_H(T, NAME) extern __TU(T) * NAME;
+#define CTP_DEFINE_GLOBAL_CROSS_PTR_VAR_CC(T, NAME) __TU(T) *NAME = nullptr;
+#define CTP_GET_GLOBAL_CROSS_PTR_VAR(T, NAME) \
+  ctp::GetGlobalCrossPtrVar<__TU(T)>(NAME)
 template <typename T>
-HSHM_CROSS_FUN static inline T *GetGlobalCrossPtrVar(T *&instance) {
+CTP_CROSS_FUN static inline T *GetGlobalCrossPtrVar(T *&instance) {
   if (instance == nullptr) {
     instance = new T();
   }
   return instance;
 }
 #else
-#define HSHM_DEFINE_GLOBAL_CROSS_PTR_VAR_H(T, NAME)
-#define HSHM_DEFINE_GLOBAL_CROSS_PTR_VAR_CC(T, NAME)
-#define HSHM_GET_GLOBAL_CROSS_PTR_VAR(T, NAME) \
-  hshm::CrossSingleton<__TU(T)>::GetInstance()
+#define CTP_DEFINE_GLOBAL_CROSS_PTR_VAR_H(T, NAME)
+#define CTP_DEFINE_GLOBAL_CROSS_PTR_VAR_CC(T, NAME)
+#define CTP_GET_GLOBAL_CROSS_PTR_VAR(T, NAME) \
+  ctp::CrossSingleton<__TU(T)>::GetInstance()
 #endif
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_SHM_SINGLETON_H
+#endif  // CTP_SHM_SINGLETON_H

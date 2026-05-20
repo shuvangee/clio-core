@@ -107,7 +107,7 @@ private:
   static inline constexpr size_t kSystemStatsRingSize = 1024;
   std::unique_ptr<hipc::circular_mpsc_ring_buffer<SystemStats, hipc::MallocAllocator>>
       system_stats_ring_;
-  hshm::CpuTimes prev_cpu_times_;
+  ctp::CpuTimes prev_cpu_times_;
 
   // Network task tracking maps (keyed by net_key for efficient lookup)
   // Using unordered_map_ll with 1024 buckets.
@@ -126,8 +126,8 @@ private:
   static constexpr size_t kNumMapBuckets = 1024;
   mutable std::mutex send_map_mutex_;
   mutable std::mutex recv_map_mutex_;
-  hshm::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> send_map_{kNumMapBuckets};  // Tasks sent to remote nodes
-  hshm::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> recv_map_{kNumMapBuckets};  // Tasks received from remote nodes
+  ctp::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> send_map_{kNumMapBuckets};  // Tasks sent to remote nodes
+  ctp::priv::unordered_map_ll<size_t, hipc::FullPtr<chi::Task>> recv_map_{kNumMapBuckets};  // Tasks received from remote nodes
 
   // Dedicated recv threads — bypass the Worker scheduler for the hot
   // inbound network path. Single thread per channel:
@@ -378,12 +378,12 @@ public:
   /**
    * Helper: Receive task inputs from remote node
    */
-  void RecvIn(hipc::FullPtr<RecvTask> task, chi::LoadTaskArchive& archive, hshm::lbm::Transport* lbm_transport);
+  void RecvIn(hipc::FullPtr<RecvTask> task, chi::LoadTaskArchive& archive, ctp::lbm::Transport* lbm_transport);
 
   /**
    * Helper: Receive task outputs from remote node
    */
-  void RecvOut(hipc::FullPtr<RecvTask> task, chi::LoadTaskArchive& archive, hshm::lbm::Transport* lbm_transport);
+  void RecvOut(hipc::FullPtr<RecvTask> task, chi::LoadTaskArchive& archive, ctp::lbm::Transport* lbm_transport);
 
   /**
    * Get live task statistics for this task instance.

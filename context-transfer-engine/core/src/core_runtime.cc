@@ -147,14 +147,14 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   // on every PutBlob.
   static const size_t kTargetMapSize = 64;
   registered_targets_ =
-      hshm::priv::unordered_map_ll<chi::PoolId, TargetInfo>(kTargetMapSize);
+      ctp::priv::unordered_map_ll<chi::PoolId, TargetInfo>(kTargetMapSize);
   target_name_to_id_ =
-      hshm::priv::unordered_map_ll<std::string, chi::PoolId>(kTargetMapSize);
+      ctp::priv::unordered_map_ll<std::string, chi::PoolId>(kTargetMapSize);
   tag_name_to_id_ =
-      hshm::priv::unordered_map_ll<std::string, TagId>(kTagMapSize);
-  tag_id_to_info_ = hshm::priv::unordered_map_ll<TagId, TagInfo>(kTagMapSize);
+      ctp::priv::unordered_map_ll<std::string, TagId>(kTagMapSize);
+  tag_id_to_info_ = ctp::priv::unordered_map_ll<TagId, TagInfo>(kTagMapSize);
   tag_blob_name_to_info_ =
-      hshm::priv::unordered_map_ll<std::string, BlobInfo>(kBlobMapSize);
+      ctp::priv::unordered_map_ll<std::string, BlobInfo>(kBlobMapSize);
 
   // Initialize lock vectors for concurrent access
   target_locks_.reserve(kMaxLocks);
@@ -167,10 +167,10 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   // Get IPC manager for later use
   auto *ipc_manager = CHI_IPC;
 
-  // Initialize telemetry ring buffer using unique_ptr with HSHM_MALLOC
+  // Initialize telemetry ring buffer using unique_ptr with CTP_MALLOC
   telemetry_log_ = std::make_unique<
       hipc::circular_mpsc_ring_buffer<CteTelemetry, hipc::MallocAllocator>>(
-      HSHM_MALLOC, kTelemetryRingSize);
+      CTP_MALLOC, kTelemetryRingSize);
 
   // Initialize atomic counters
   next_tag_id_minor_ = 1;
@@ -1091,7 +1091,7 @@ chi::TaskResume Runtime::PutBlob(hipc::FullPtr<PutBlobTask> task,
       CHI_CO_RETURN;
     }
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
     // Update compression metadata
     Context &context = task->context_;
     blob_info_ptr->compress_lib_ = context.compress_lib_;
@@ -2401,14 +2401,14 @@ size_t Runtime::GetTargetLockIndex(const chi::PoolId &target_id) const {
 }
 
 size_t Runtime::GetTagLockIndex(const std::string &tag_name) const {
-  // Use same hash function as hshm::priv::unordered_map_ll to ensure lock maps
+  // Use same hash function as ctp::priv::unordered_map_ll to ensure lock maps
   // to same bucket
   std::hash<std::string> hasher;
   return hasher(tag_name) % tag_locks_.size();
 }
 
 size_t Runtime::GetTagLockIndex(const TagId &tag_id) const {
-  // Use same hash function as hshm::priv::unordered_map_ll for TagId keys
+  // Use same hash function as ctp::priv::unordered_map_ll for TagId keys
   // std::hash<chi::UniqueId> is defined in types.h
   std::hash<TagId> hasher;
   return hasher(tag_id) % tag_locks_.size();
@@ -2649,7 +2649,7 @@ chi::TaskResume Runtime::ModifyExistingData(
   static thread_local size_t mod_count = 0;
   static thread_local double t_setup_ms = 0, t_vec_alloc_ms = 0;
   static thread_local double t_async_send_ms = 0, t_co_await_ms = 0;
-  hshm::Timer timer;
+  ctp::Timer timer;
 
   // Step 1: Initially store the remaining_size equal to data_size
   size_t remaining_size = data_size;
@@ -2701,7 +2701,7 @@ chi::TaskResume Runtime::ModifyExistingData(
 
       // Wrap single block in chi::priv::vector for AsyncWrite
       timer.Resume();
-      chi::priv::vector<chimaera::bdev::Block> blocks(HSHM_MALLOC);
+      chi::priv::vector<chimaera::bdev::Block> blocks(CTP_MALLOC);
       blocks.push_back(bdev_block);
       timer.Pause();
       t_vec_alloc_ms += timer.GetMsec();
@@ -2820,7 +2820,7 @@ chi::TaskResume Runtime::ReadData(const chi::priv::vector<BlobBlock> &blocks,
       hipc::ShmPtr<> data_ptr = data + data_buffer_offset;
 
       // Wrap single block in chi::priv::vector for AsyncRead
-      chi::priv::vector<chimaera::bdev::Block> blocks(HSHM_MALLOC);
+      chi::priv::vector<chimaera::bdev::Block> blocks(CTP_MALLOC);
       blocks.push_back(bdev_block);
 
       chimaera::bdev::Client cte_clientcopy = block.bdev_client_;
@@ -3534,7 +3534,7 @@ bool Runtime::GpuCacheCreate() {
     return true;
   }
 
-#if !(HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL)
+#if !(CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL)
   HLOG(kWarning,
        "GpuMetadataCache: enabled in config, but no GPU backend was built "
        "in. Cache will not be allocated.");
@@ -3570,7 +3570,7 @@ bool Runtime::GpuCacheCreate() {
   // virtual address. CUDA -> cudaMallocManaged, ROCm -> hipMallocManaged,
   // SYCL -> sycl::malloc_shared. All three give us a pointer the CPU can
   // call GpuCacheUpsert*/Remove* through directly.
-  void *region = hshm::GpuApi::MallocManaged<char>(needed);
+  void *region = ctp::GpuApi::MallocManaged<char>(needed);
   if (!region) {
     HLOG(kError,
          "GpuMetadataCache: MallocManaged({} bytes) failed", needed);
@@ -3591,9 +3591,9 @@ bool Runtime::GpuCacheCreate() {
 }
 
 void Runtime::GpuCacheDestroy() {
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
   if (gpu_cache_ != nullptr) {
-    hshm::GpuApi::Free(reinterpret_cast<char *>(gpu_cache_));
+    ctp::GpuApi::Free(reinterpret_cast<char *>(gpu_cache_));
     gpu_cache_ = nullptr;
     gpu_cache_bytes_ = 0;
   }

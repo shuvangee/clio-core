@@ -131,7 +131,7 @@ int main() {
   
   // Allocate and use a block
   auto block = bdev_client.Allocate(4096);  // 4KB block
-  std::vector<hshm::u8> data(4096, 0xAB);
+  std::vector<ctp::u8> data(4096, 0xAB);
   bdev_client.Write(block, data);
   auto read_data = bdev_client.Read(block);
   bdev_client.Free(block);

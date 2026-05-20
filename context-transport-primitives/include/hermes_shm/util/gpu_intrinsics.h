@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_UTIL_GPU_INTRINSICS_H
-#define HSHM_UTIL_GPU_INTRINSICS_H
+#ifndef CTP_UTIL_GPU_INTRINSICS_H
+#define CTP_UTIL_GPU_INTRINSICS_H
 
 #include "hermes_shm/constants/macros.h"
 
@@ -42,11 +42,11 @@
 /**
  * Backend-conditional GPU device intrinsic wrappers.
  *
- * Use HSHM_DEVICE_* from device-side runtime/orchestrator code (e.g.
+ * Use CTP_DEVICE_* from device-side runtime/orchestrator code (e.g.
  * chi::gpu::Worker) so the same source compiles under CUDA, ROCm, or SYCL
  * device compilers. Each wrapper expands to:
- *   - the raw nvcc/hipcc intrinsic when HSHM_IS_GPU_COMPILER is set
- *   - a sycl::* equivalent when HSHM_IS_SYCL_COMPILER is set
+ *   - the raw nvcc/hipcc intrinsic when CTP_IS_GPU_COMPILER is set
+ *   - a sycl::* equivalent when CTP_IS_SYCL_COMPILER is set
  *   - a no-op stub on host-only compilation
  *
  * Scope conventions match CUDA's:
@@ -58,34 +58,34 @@
 // Memory fences
 // =====================================================================
 
-#if HSHM_IS_GPU_COMPILER
-#define HSHM_DEVICE_FENCE_DEVICE() __threadfence()
-#define HSHM_DEVICE_FENCE_SYSTEM() __threadfence_system()
-#elif HSHM_IS_SYCL_COMPILER
-#define HSHM_DEVICE_FENCE_DEVICE()                                            \
+#if CTP_IS_GPU_COMPILER
+#define CTP_DEVICE_FENCE_DEVICE() __threadfence()
+#define CTP_DEVICE_FENCE_SYSTEM() __threadfence_system()
+#elif CTP_IS_SYCL_COMPILER
+#define CTP_DEVICE_FENCE_DEVICE()                                            \
   ::sycl::atomic_fence(::sycl::memory_order::seq_cst,                          \
                        ::sycl::memory_scope::device)
-#define HSHM_DEVICE_FENCE_SYSTEM()                                            \
+#define CTP_DEVICE_FENCE_SYSTEM()                                            \
   ::sycl::atomic_fence(::sycl::memory_order::seq_cst,                          \
                        ::sycl::memory_scope::system)
 #else
-#define HSHM_DEVICE_FENCE_DEVICE() ((void)0)
-#define HSHM_DEVICE_FENCE_SYSTEM() ((void)0)
+#define CTP_DEVICE_FENCE_DEVICE() ((void)0)
+#define CTP_DEVICE_FENCE_SYSTEM() ((void)0)
 #endif
 
 // =====================================================================
 // Atomic OR (uint32_t) — used by chi::gpu::Worker for FUTURE_COMPLETE flags
 // =====================================================================
 
-#if HSHM_IS_GPU_COMPILER
-#define HSHM_DEVICE_ATOMIC_OR_U32_DEVICE(ptr, val)                            \
+#if CTP_IS_GPU_COMPILER
+#define CTP_DEVICE_ATOMIC_OR_U32_DEVICE(ptr, val)                            \
   ::atomicOr(reinterpret_cast<unsigned int *>(ptr),                            \
              static_cast<unsigned int>(val))
-#define HSHM_DEVICE_ATOMIC_OR_U32_SYSTEM(ptr, val)                            \
+#define CTP_DEVICE_ATOMIC_OR_U32_SYSTEM(ptr, val)                            \
   ::atomicOr_system(reinterpret_cast<unsigned int *>(ptr),                     \
                     static_cast<unsigned int>(val))
-#elif HSHM_IS_SYCL_COMPILER
-namespace hshm::gpu_intr {
+#elif CTP_IS_SYCL_COMPILER
+namespace ctp::gpu_intr {
 inline uint32_t atomic_or_u32_device(uint32_t *ptr, uint32_t val) {
   ::sycl::atomic_ref<uint32_t, ::sycl::memory_order::acq_rel,
                      ::sycl::memory_scope::device>
@@ -98,16 +98,16 @@ inline uint32_t atomic_or_u32_system(uint32_t *ptr, uint32_t val) {
       ref(*ptr);
   return ref.fetch_or(val);
 }
-}  // namespace hshm::gpu_intr
-#define HSHM_DEVICE_ATOMIC_OR_U32_DEVICE(ptr, val)                            \
-  ::hshm::gpu_intr::atomic_or_u32_device(                                      \
+}  // namespace ctp::gpu_intr
+#define CTP_DEVICE_ATOMIC_OR_U32_DEVICE(ptr, val)                            \
+  ::ctp::gpu_intr::atomic_or_u32_device(                                      \
       reinterpret_cast<uint32_t *>(ptr), static_cast<uint32_t>(val))
-#define HSHM_DEVICE_ATOMIC_OR_U32_SYSTEM(ptr, val)                            \
-  ::hshm::gpu_intr::atomic_or_u32_system(                                      \
+#define CTP_DEVICE_ATOMIC_OR_U32_SYSTEM(ptr, val)                            \
+  ::ctp::gpu_intr::atomic_or_u32_system(                                      \
       reinterpret_cast<uint32_t *>(ptr), static_cast<uint32_t>(val))
 #else
-#define HSHM_DEVICE_ATOMIC_OR_U32_DEVICE(ptr, val) ((void)0)
-#define HSHM_DEVICE_ATOMIC_OR_U32_SYSTEM(ptr, val) ((void)0)
+#define CTP_DEVICE_ATOMIC_OR_U32_DEVICE(ptr, val) ((void)0)
+#define CTP_DEVICE_ATOMIC_OR_U32_SYSTEM(ptr, val) ((void)0)
 #endif
 
 // =====================================================================
@@ -118,15 +118,15 @@ inline uint32_t atomic_or_u32_system(uint32_t *ptr, uint32_t val) {
 // CUDA's atomicAdd overload (which only accepts unsigned long long, not
 // uint64_t directly).
 
-#if HSHM_IS_GPU_COMPILER
-#define HSHM_DEVICE_ATOMIC_ADD_U32_DEVICE(ptr, val)                           \
+#if CTP_IS_GPU_COMPILER
+#define CTP_DEVICE_ATOMIC_ADD_U32_DEVICE(ptr, val)                           \
   ::atomicAdd(reinterpret_cast<unsigned int *>(ptr),                           \
               static_cast<unsigned int>(val))
-#define HSHM_DEVICE_ATOMIC_ADD_U64_DEVICE(ptr, val)                           \
+#define CTP_DEVICE_ATOMIC_ADD_U64_DEVICE(ptr, val)                           \
   ::atomicAdd(reinterpret_cast<unsigned long long *>(ptr),                     \
               static_cast<unsigned long long>(val))
-#elif HSHM_IS_SYCL_COMPILER
-namespace hshm::gpu_intr {
+#elif CTP_IS_SYCL_COMPILER
+namespace ctp::gpu_intr {
 inline uint32_t atomic_add_u32_device(uint32_t *ptr, uint32_t val) {
   ::sycl::atomic_ref<uint32_t, ::sycl::memory_order::acq_rel,
                      ::sycl::memory_scope::device>
@@ -139,30 +139,30 @@ inline uint64_t atomic_add_u64_device(uint64_t *ptr, uint64_t val) {
       ref(*ptr);
   return ref.fetch_add(val);
 }
-}  // namespace hshm::gpu_intr
-#define HSHM_DEVICE_ATOMIC_ADD_U32_DEVICE(ptr, val)                           \
-  ::hshm::gpu_intr::atomic_add_u32_device(                                     \
+}  // namespace ctp::gpu_intr
+#define CTP_DEVICE_ATOMIC_ADD_U32_DEVICE(ptr, val)                           \
+  ::ctp::gpu_intr::atomic_add_u32_device(                                     \
       reinterpret_cast<uint32_t *>(ptr), static_cast<uint32_t>(val))
-#define HSHM_DEVICE_ATOMIC_ADD_U64_DEVICE(ptr, val)                           \
-  ::hshm::gpu_intr::atomic_add_u64_device(                                     \
+#define CTP_DEVICE_ATOMIC_ADD_U64_DEVICE(ptr, val)                           \
+  ::ctp::gpu_intr::atomic_add_u64_device(                                     \
       reinterpret_cast<uint64_t *>(ptr), static_cast<uint64_t>(val))
 #else
-#define HSHM_DEVICE_ATOMIC_ADD_U32_DEVICE(ptr, val) ((void)0)
-#define HSHM_DEVICE_ATOMIC_ADD_U64_DEVICE(ptr, val) ((void)0)
+#define CTP_DEVICE_ATOMIC_ADD_U32_DEVICE(ptr, val) ((void)0)
+#define CTP_DEVICE_ATOMIC_ADD_U64_DEVICE(ptr, val) ((void)0)
 #endif
 
 // =====================================================================
 // Cycle counter — for in-kernel profiling timers
 // =====================================================================
 
-#if HSHM_IS_GPU_COMPILER
-#define HSHM_DEVICE_CLOCK64() ::clock64()
+#if CTP_IS_GPU_COMPILER
+#define CTP_DEVICE_CLOCK64() ::clock64()
 #else
 // SYCL has no portable cycle counter (DPC++ has experimental
 // sycl::ext::oneapi::experimental::this_kernel::get_cycle_count() but it is
 // not available on every backend). Profiling is disabled for now under
 // SYCL; use SYCL queue events for end-to-end timing instead.
-#define HSHM_DEVICE_CLOCK64() (static_cast<long long>(0))
+#define CTP_DEVICE_CLOCK64() (static_cast<long long>(0))
 #endif
 
 // =====================================================================
@@ -176,10 +176,10 @@ inline uint64_t atomic_add_u64_device(uint64_t *ptr, uint64_t val) {
 //                   peer lanes to wait for. Phase 3b's nd_range fan-out
 //                   replaces this with sycl::group_barrier(sub_group).
 
-#if HSHM_IS_GPU_COMPILER
-#define HSHM_DEVICE_SYNCWARP() __syncwarp()
+#if CTP_IS_GPU_COMPILER
+#define CTP_DEVICE_SYNCWARP() __syncwarp()
 #else
-#define HSHM_DEVICE_SYNCWARP() ((void)0)
+#define CTP_DEVICE_SYNCWARP() ((void)0)
 #endif
 
 // =====================================================================
@@ -191,10 +191,10 @@ inline uint64_t atomic_add_u64_device(uint64_t *ptr, uint64_t val) {
 // extension exists but its constant-address-space format-string requirement
 // is awkward to satisfy from generic code. Device prints are debug-only;
 // suppress them under SYCL and rely on host-side queue events for diagnostics.
-#if HSHM_IS_SYCL_COMPILER
-#define HSHM_DEVICE_PRINTF(...) ((void)0)
+#if CTP_IS_SYCL_COMPILER
+#define CTP_DEVICE_PRINTF(...) ((void)0)
 #else
-#define HSHM_DEVICE_PRINTF(...) ::printf(__VA_ARGS__)
+#define CTP_DEVICE_PRINTF(...) ::printf(__VA_ARGS__)
 #endif
 
-#endif  // HSHM_UTIL_GPU_INTRINSICS_H
+#endif  // CTP_UTIL_GPU_INTRINSICS_H

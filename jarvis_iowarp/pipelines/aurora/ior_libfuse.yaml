@@ -53,7 +53,7 @@ container_extensions:
   security_opt:
     # Docker/Podman's default seccomp profile blocks io_uring_setup
     # (syscall 425). IOWarp's bdev backend prefers io_uring via
-    # hshm::AsyncIoFactory; without this, bdev_runtime.cc:417 Open()
+    # ctp::AsyncIoFactory; without this, bdev_runtime.cc:417 Open()
     # returns false and target registration fails.
     - seccomp=unconfined
     - apparmor:unconfined

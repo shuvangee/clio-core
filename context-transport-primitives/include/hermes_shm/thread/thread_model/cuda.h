@@ -31,10 +31,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_THREAD_CUDA_H_
-#define HSHM_THREAD_CUDA_H_
+#ifndef CTP_THREAD_CUDA_H_
+#define CTP_THREAD_CUDA_H_
 
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
 
 #include <errno.h>
 
@@ -43,53 +43,53 @@
 #include "hermes_shm/util/errors.h"
 #include "thread_model.h"
 
-namespace hshm::thread {
+namespace ctp::thread {
 
 class Cuda : public ThreadModel {
  public:
   /** Default constructor */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   Cuda() : ThreadModel(ThreadType::kCuda) {}
 
   /** Destructor */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ~Cuda() = default;
 
   /** Yield the current thread for a period of time */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void SleepForUs(size_t us) {}
 
   /** Yield thread time slice */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Yield() {
-    hshm::ipc::threadfence();
+    ctp::ipc::threadfence();
   }
 
   /** Create thread-local storage */
   template <typename TLS>
-  HSHM_CROSS_FUN bool CreateTls(ThreadLocalKey &key, TLS *data) {
+  CTP_CROSS_FUN bool CreateTls(ThreadLocalKey &key, TLS *data) {
     return false;
   }
 
   /** Get thread-local storage */
   template <typename TLS>
-  HSHM_CROSS_FUN TLS *GetTls(const ThreadLocalKey &key) {
+  CTP_CROSS_FUN TLS *GetTls(const ThreadLocalKey &key) {
     return nullptr;
   }
 
   /** Create thread-local storage */
   template <typename TLS>
-  HSHM_CROSS_FUN bool SetTls(ThreadLocalKey &key, TLS *data) {
+  CTP_CROSS_FUN bool SetTls(ThreadLocalKey &key, TLS *data) {
     return false;
   }
 
   /** Get the TID of the current thread */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ThreadId GetTid() { return ThreadId::GetNull(); }
 };
 
-}  // namespace hshm::thread
+}  // namespace ctp::thread
 
-#endif  // HSHM_ENABLE_CUDA
+#endif  // CTP_ENABLE_CUDA
 
-#endif  // HSHM_THREAD_CUDA_H_
+#endif  // CTP_THREAD_CUDA_H_

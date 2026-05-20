@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_TYPES_HASH_H_
-#define HSHM_TYPES_HASH_H_
+#ifndef CTP_TYPES_HASH_H_
+#define CTP_TYPES_HASH_H_
 
 #include "hermes_shm/constants/macros.h"
 #include <cstddef>
 #include <cstdint>
 
-namespace hshm {
+namespace ctp {
 
 /**
  * GPU-compatible hash template
@@ -46,8 +46,8 @@ namespace hshm {
  */
 template <typename T>
 struct hash {
-  HSHM_INLINE_CROSS_FUN std::size_t operator()(const T &key) const {
-#if HSHM_IS_GPU
+  CTP_INLINE_CROSS_FUN std::size_t operator()(const T &key) const {
+#if CTP_IS_GPU
     // GPU-compatible FNV-1a hash for basic types
     return fnv1a_hash(reinterpret_cast<const unsigned char*>(&key), sizeof(T));
 #else
@@ -61,7 +61,7 @@ struct hash {
   static constexpr std::size_t FNV_OFFSET_BASIS = 14695981039346656037ULL;
   static constexpr std::size_t FNV_PRIME = 1099511628211ULL;
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   static std::size_t fnv1a_hash(const unsigned char* data, std::size_t size) {
     std::size_t hash = FNV_OFFSET_BASIS;
     for (std::size_t i = 0; i < size; ++i) {
@@ -75,8 +75,8 @@ struct hash {
 // Specializations for common types to ensure std::hash compatibility on CPU
 template <>
 struct hash<uint8_t> {
-  HSHM_INLINE_CROSS_FUN std::size_t operator()(uint8_t key) const {
-#if HSHM_IS_GPU
+  CTP_INLINE_CROSS_FUN std::size_t operator()(uint8_t key) const {
+#if CTP_IS_GPU
     return static_cast<std::size_t>(key);
 #else
     return std::hash<uint8_t>{}(key);
@@ -86,8 +86,8 @@ struct hash<uint8_t> {
 
 template <>
 struct hash<uint16_t> {
-  HSHM_INLINE_CROSS_FUN std::size_t operator()(uint16_t key) const {
-#if HSHM_IS_GPU
+  CTP_INLINE_CROSS_FUN std::size_t operator()(uint16_t key) const {
+#if CTP_IS_GPU
     return static_cast<std::size_t>(key);
 #else
     return std::hash<uint16_t>{}(key);
@@ -97,8 +97,8 @@ struct hash<uint16_t> {
 
 template <>
 struct hash<uint32_t> {
-  HSHM_INLINE_CROSS_FUN std::size_t operator()(uint32_t key) const {
-#if HSHM_IS_GPU
+  CTP_INLINE_CROSS_FUN std::size_t operator()(uint32_t key) const {
+#if CTP_IS_GPU
     return static_cast<std::size_t>(key);
 #else
     return std::hash<uint32_t>{}(key);
@@ -108,8 +108,8 @@ struct hash<uint32_t> {
 
 template <>
 struct hash<uint64_t> {
-  HSHM_INLINE_CROSS_FUN std::size_t operator()(uint64_t key) const {
-#if HSHM_IS_GPU
+  CTP_INLINE_CROSS_FUN std::size_t operator()(uint64_t key) const {
+#if CTP_IS_GPU
     return static_cast<std::size_t>(key);
 #else
     return std::hash<uint64_t>{}(key);
@@ -119,8 +119,8 @@ struct hash<uint64_t> {
 
 template <>
 struct hash<int8_t> {
-  HSHM_INLINE_CROSS_FUN std::size_t operator()(int8_t key) const {
-#if HSHM_IS_GPU
+  CTP_INLINE_CROSS_FUN std::size_t operator()(int8_t key) const {
+#if CTP_IS_GPU
     return static_cast<std::size_t>(key);
 #else
     return std::hash<int8_t>{}(key);
@@ -130,8 +130,8 @@ struct hash<int8_t> {
 
 template <>
 struct hash<int16_t> {
-  HSHM_INLINE_CROSS_FUN std::size_t operator()(int16_t key) const {
-#if HSHM_IS_GPU
+  CTP_INLINE_CROSS_FUN std::size_t operator()(int16_t key) const {
+#if CTP_IS_GPU
     return static_cast<std::size_t>(key);
 #else
     return std::hash<int16_t>{}(key);
@@ -141,8 +141,8 @@ struct hash<int16_t> {
 
 template <>
 struct hash<int32_t> {
-  HSHM_INLINE_CROSS_FUN std::size_t operator()(int32_t key) const {
-#if HSHM_IS_GPU
+  CTP_INLINE_CROSS_FUN std::size_t operator()(int32_t key) const {
+#if CTP_IS_GPU
     return static_cast<std::size_t>(key);
 #else
     return std::hash<int32_t>{}(key);
@@ -152,8 +152,8 @@ struct hash<int32_t> {
 
 template <>
 struct hash<int64_t> {
-  HSHM_INLINE_CROSS_FUN std::size_t operator()(int64_t key) const {
-#if HSHM_IS_GPU
+  CTP_INLINE_CROSS_FUN std::size_t operator()(int64_t key) const {
+#if CTP_IS_GPU
     return static_cast<std::size_t>(key);
 #else
     return std::hash<int64_t>{}(key);
@@ -166,11 +166,11 @@ struct hash<int64_t> {
  */
 template <typename T>
 struct equal_to {
-  HSHM_INLINE_CROSS_FUN bool operator()(const T &a, const T &b) const {
+  CTP_INLINE_CROSS_FUN bool operator()(const T &a, const T &b) const {
     return a == b;
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_TYPES_HASH_H_
+#endif  // CTP_TYPES_HASH_H_

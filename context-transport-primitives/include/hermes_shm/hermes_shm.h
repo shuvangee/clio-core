@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_HSHM_SHM_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_HSHM_SHM_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_HSHM_SHM_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_HSHM_SHM_H_
 
 // Comprehensive include for all hermes_shm headers
 // Since all headers now have proper compile-time guards, this is safe to
@@ -65,7 +65,7 @@
 #include "util/timer_thread.h"
 #include "util/type_switch.h"
 
-// Compression utilities (guarded by HSHM_ENABLE_COMPRESS)
+// Compression utilities (guarded by CTP_ENABLE_COMPRESS)
 #include "compress/blosc.h"
 #include "compress/brotli.h"
 #include "compress/bzip2.h"
@@ -78,11 +78,11 @@
 #include "compress/zlib.h"
 #include "compress/zstd.h"
 
-// Encryption utilities (guarded by HSHM_ENABLE_ENCRYPT)
+// Encryption utilities (guarded by CTP_ENABLE_ENCRYPT)
 #include "encrypt/aes.h"
 #include "encrypt/encrypt.h"
 
-// Thread models and synchronization (guarded by respective HSHM_ENABLE_*
+// Thread models and synchronization (guarded by respective CTP_ENABLE_*
 // macros)
 #include "thread/lock.h"
 #include "thread/lock/mutex.h"
@@ -140,7 +140,7 @@
 
 // Lightbeam transport layer (base types always available)
 #include "lightbeam/lightbeam.h"
-// Concrete transports + factory (only when hshm::lightbeam is linked)
+// Concrete transports + factory (only when ctp::lightbeam is linked)
 #include "lightbeam/transport_factory_impl.h"
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_HSHM_SHM_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_HSHM_SHM_H_

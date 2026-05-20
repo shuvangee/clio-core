@@ -37,11 +37,11 @@ extern "C" {
 
 typedef int (*testfun_t)();
 
-class TestFunApi : public hshm::RealApi {
+class TestFunApi : public ctp::RealApi {
  public:
   testfun_t testfun_;
 
-  TestFunApi() : hshm::RealApi("testfun", "mylib_intercepted") {
+  TestFunApi() : ctp::RealApi("testfun", "mylib_intercepted") {
     testfun_ = (testfun_t)dlsym(real_lib_, "testfun");
     REQUIRE_API(testfun_);
   }

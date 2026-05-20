@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LL_H_
-#define HSHM_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LL_H_
+#ifndef CTP_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LL_H_
+#define CTP_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LL_H_
 
 // `unordered_map_ll` -- linked-list (chaining) unordered map.
 //
@@ -72,10 +72,10 @@
 #include "hermes_shm/memory/allocator/malloc_allocator.h"
 #include "hermes_shm/thread/lock/rwlock.h"
 
-namespace hshm::priv {
+namespace ctp::priv {
 
-#ifndef HSHM_PRIV_INSERT_RESULT_DEFINED_
-#define HSHM_PRIV_INSERT_RESULT_DEFINED_
+#ifndef CTP_PRIV_INSERT_RESULT_DEFINED_
+#define CTP_PRIV_INSERT_RESULT_DEFINED_
 /** Result of insert / insert_or_assign operations. Guard-shared with
  *  `unordered_map_lhash.h` so callers can include either header (or
  *  both, in any order) without a redefinition. */
@@ -84,7 +84,7 @@ struct InsertResult {
   bool inserted;
   T *value;
 };
-#endif  // HSHM_PRIV_INSERT_RESULT_DEFINED_
+#endif  // CTP_PRIV_INSERT_RESULT_DEFINED_
 
 /**
  * Chaining unordered map with optional per-bucket fine-grained RwLock.
@@ -92,8 +92,8 @@ struct InsertResult {
  * @tparam Key            Key type (copy/move + operator==)
  * @tparam T              Mapped value type
  * @tparam AllocT         Allocator (defaults to MallocAllocator)
- * @tparam Hash           Hash functor (defaults to hshm::hash<Key>)
- * @tparam KeyEqual       Equality functor (defaults to hshm::equal_to<Key>)
+ * @tparam Hash           Hash functor (defaults to ctp::hash<Key>)
+ * @tparam KeyEqual       Equality functor (defaults to ctp::equal_to<Key>)
  * @tparam EnableLocking  Compile-time toggle for per-bucket RwLock
  *                        (defaults to true). When false the lock array is
  *                        elided and every operation is unsynchronized --
@@ -102,9 +102,9 @@ struct InsertResult {
  *                        synchronization.
  */
 template <typename Key, typename T,
-          typename AllocT = hshm::ipc::MallocAllocator,
-          typename Hash = hshm::hash<Key>,
-          typename KeyEqual = hshm::equal_to<Key>,
+          typename AllocT = ctp::ipc::MallocAllocator,
+          typename Hash = ctp::hash<Key>,
+          typename KeyEqual = ctp::equal_to<Key>,
           bool EnableLocking = true>
 class unordered_map_ll {
  public:
@@ -120,51 +120,51 @@ class unordered_map_ll {
     Key key_;
     T value_;
     Node *next_;
-    HSHM_CROSS_FUN Node() : key_(), value_(), next_(nullptr) {}
-    HSHM_CROSS_FUN Node(const Key &k, const T &v, Node *n)
+    CTP_CROSS_FUN Node() : key_(), value_(), next_(nullptr) {}
+    CTP_CROSS_FUN Node(const Key &k, const T &v, Node *n)
         : key_(k), value_(v), next_(n) {}
   };
 
   vector<Node *, AllocT> buckets_;  // bucket heads (nullptr = empty)
-  vector<hshm::RwLock, AllocT> locks_;  // per-bucket; size 0 when !EnableLocking
-  hshm::ipc::atomic<size_type> size_;
+  vector<ctp::RwLock, AllocT> locks_;  // per-bucket; size 0 when !EnableLocking
+  ctp::ipc::atomic<size_type> size_;
   AllocT *alloc_;
   Hash hash_fn_;
   KeyEqual key_eq_;
 
   /** Map a key to a bucket index. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type bucket_of(const Key &key) const {
     return hash_fn_(key) % buckets_.size();
   }
 
   /** Read-lock a bucket (no-op when locking is disabled). */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void read_lock_bucket(size_type b) {
     if constexpr (EnableLocking) locks_[b].ReadLock(0);
   }
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void read_unlock_bucket(size_type b) {
     if constexpr (EnableLocking) locks_[b].ReadUnlock();
   }
   /** Write-lock a bucket (no-op when locking is disabled). */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void write_lock_bucket(size_type b) {
     if constexpr (EnableLocking) locks_[b].WriteLock(0);
   }
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void write_unlock_bucket(size_type b) {
     if constexpr (EnableLocking) locks_[b].WriteUnlock();
   }
 
   /** Acquire every bucket's write lock. Used for rehash / clear / for_each. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void write_lock_all() {
     if constexpr (EnableLocking) {
       for (size_type i = 0; i < buckets_.size(); ++i) locks_[i].WriteLock(0);
     }
   }
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void write_unlock_all() {
     if constexpr (EnableLocking) {
       for (size_type i = 0; i < buckets_.size(); ++i) locks_[i].WriteUnlock();
@@ -172,7 +172,7 @@ class unordered_map_ll {
   }
 
   /** Walk a bucket chain. Caller holds whatever lock is appropriate. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   Node *find_in_bucket(size_type b, const Key &key) const {
     Node *cur = buckets_[b];
     while (cur != nullptr) {
@@ -183,21 +183,21 @@ class unordered_map_ll {
   }
 
   /** Allocate a node via the allocator. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   Node *new_node(const Key &k, const T &v, Node *next) {
     auto fp = alloc_->template NewObj<Node>(k, v, next);
     return fp.ptr_;
   }
 
   /** Free a node via the allocator. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void del_node(Node *n) {
     hipc::FullPtr<Node> fp(alloc_, n);
     alloc_->template DelObj<Node>(fp);
   }
 
   /** Set up an empty bucket array. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void init_buckets(size_type num_buckets) {
     if (num_buckets == 0) num_buckets = 1;
     buckets_.resize(num_buckets);
@@ -209,7 +209,7 @@ class unordered_map_ll {
   }
 
   /** Rehash without taking locks (caller holds every bucket lock). */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void rehash_no_lock(size_type new_bucket_count) {
     if (new_bucket_count == 0) new_bucket_count = 1;
     // Snapshot the current chains and the old bucket head array. We
@@ -247,7 +247,7 @@ class unordered_map_ll {
    *  Concurrent users must size the map so this always early-returns
    *  (bucket_count() > max distinct keys) or otherwise quiesce all
    *  threads around growth. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void maybe_rehash() {
     size_type cur_size = size_.load();
     size_type cap = buckets_.size();
@@ -268,26 +268,26 @@ class unordered_map_ll {
   }
 
  public:
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   /** Host-side constructor using the global MallocAllocator. */
   explicit unordered_map_ll(size_type num_buckets = 16)
-      : buckets_(HSHM_MALLOC), locks_(HSHM_MALLOC), size_(0),
-        alloc_(HSHM_MALLOC), hash_fn_(), key_eq_() {
+      : buckets_(CTP_MALLOC), locks_(CTP_MALLOC), size_(0),
+        alloc_(CTP_MALLOC), hash_fn_(), key_eq_() {
     init_buckets(num_buckets);
   }
   /** Three-arg constructor kept for source compatibility with the
    *  prior open-addressing map -- num_locks is ignored (locking is now
    *  one-per-bucket and toggled by the EnableLocking template arg). */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   unordered_map_ll(size_type num_buckets, size_type /*num_locks_ignored*/)
-      : buckets_(HSHM_MALLOC), locks_(HSHM_MALLOC), size_(0),
-        alloc_(HSHM_MALLOC), hash_fn_(), key_eq_() {
+      : buckets_(CTP_MALLOC), locks_(CTP_MALLOC), size_(0),
+        alloc_(CTP_MALLOC), hash_fn_(), key_eq_() {
     init_buckets(num_buckets);
   }
 #endif
 
   /** Constructor with an explicit allocator. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   explicit unordered_map_ll(AllocT *alloc, size_type num_buckets = 16)
       : buckets_(alloc), locks_(alloc), size_(0),
         alloc_(alloc), hash_fn_(), key_eq_() {
@@ -295,7 +295,7 @@ class unordered_map_ll {
   }
 
   /** Source-compatible four-arg constructor; second size_type is ignored. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   unordered_map_ll(AllocT *alloc, size_type num_buckets,
                    size_type /*num_locks_ignored*/)
       : buckets_(alloc), locks_(alloc), size_(0),
@@ -303,7 +303,7 @@ class unordered_map_ll {
     init_buckets(num_buckets);
   }
 
-  HSHM_CROSS_FUN ~unordered_map_ll() {
+  CTP_CROSS_FUN ~unordered_map_ll() {
     // Free every node. We don't bother locking -- destruction is
     // expected to be single-threaded.
     for (size_type i = 0; i < buckets_.size(); ++i) {
@@ -319,9 +319,9 @@ class unordered_map_ll {
 
   // -- size / capacity -------------------------------------------------
 
-  HSHM_INLINE_CROSS_FUN size_type size() const { return size_.load(); }
-  HSHM_INLINE_CROSS_FUN bool empty() const { return size() == 0; }
-  HSHM_INLINE_CROSS_FUN size_type bucket_count() const {
+  CTP_INLINE_CROSS_FUN size_type size() const { return size_.load(); }
+  CTP_INLINE_CROSS_FUN bool empty() const { return size() == 0; }
+  CTP_INLINE_CROSS_FUN size_type bucket_count() const {
     return buckets_.size();
   }
 
@@ -332,7 +332,7 @@ class unordered_map_ll {
    *  touching the map for the duration of this call -- the bucket and
    *  lock arrays are both reallocated, so concurrent inserts/finds/
    *  erases would race and use freed memory. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool rehash(size_type new_bucket_count) {
     write_lock_all();
     // rehash_no_lock() resizes locks_ and re-Init()s every bucket lock,
@@ -348,17 +348,17 @@ class unordered_map_ll {
   // -- locked variants (caller holds the bucket write lock) -----------
 
   /** Write-lock the bucket that owns this key. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void lock_key(const Key &key) {
     write_lock_bucket(bucket_of(key));
   }
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void unlock_key(const Key &key) {
     write_unlock_bucket(bucket_of(key));
   }
 
   /** Find while holding the bucket's write lock. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   T *find_locked(const Key &key) {
     Node *n = find_in_bucket(bucket_of(key), key);
     return n != nullptr ? &n->value_ : nullptr;
@@ -366,7 +366,7 @@ class unordered_map_ll {
 
   /** Insert while holding the bucket's write lock; returns existing
    *  entry untouched if the key is already present. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   InsertResult<T> insert_locked(const Key &key, const T &value) {
     size_type b = bucket_of(key);
     Node *n = find_in_bucket(b, key);
@@ -379,7 +379,7 @@ class unordered_map_ll {
   }
 
   /** Erase while holding the bucket's write lock. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_type erase_locked(const Key &key) {
     size_type b = bucket_of(key);
     Node **prev = &buckets_[b];
@@ -400,7 +400,7 @@ class unordered_map_ll {
   // -- self-locking primary API ---------------------------------------
 
   /** Insert if absent; thread-safe. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   InsertResult<T> insert(const Key &key, const T &value) {
     size_type b = bucket_of(key);
     write_lock_bucket(b);
@@ -411,7 +411,7 @@ class unordered_map_ll {
   }
 
   /** Insert if absent, else overwrite. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   InsertResult<T> insert_or_assign(const Key &key, const T &value) {
     size_type b = bucket_of(key);
     write_lock_bucket(b);
@@ -436,7 +436,7 @@ class unordered_map_ll {
   }
 
   /** operator[] -- creates a default-valued entry if absent. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   T &operator[](const Key &key) {
     size_type b = bucket_of(key);
     write_lock_bucket(b);
@@ -453,7 +453,7 @@ class unordered_map_ll {
   }
 
   /** Lookup (mutable) returning a pointer or nullptr. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   T *find(const Key &key) {
     size_type b = bucket_of(key);
     read_lock_bucket(b);
@@ -464,7 +464,7 @@ class unordered_map_ll {
   }
 
   /** Lookup (const). */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   const T *find(const Key &key) const {
     size_type b = bucket_of(key);
     const_cast<unordered_map_ll *>(this)->read_lock_bucket(b);
@@ -474,11 +474,11 @@ class unordered_map_ll {
     return res;
   }
 
-  HSHM_CROSS_FUN bool contains(const Key &key) { return find(key) != nullptr; }
-  HSHM_CROSS_FUN size_type count(const Key &key) { return contains(key) ? 1 : 0; }
+  CTP_CROSS_FUN bool contains(const Key &key) { return find(key) != nullptr; }
+  CTP_CROSS_FUN size_type count(const Key &key) { return contains(key) ? 1 : 0; }
 
   /** Erase by key. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_type erase(const Key &key) {
     size_type b = bucket_of(key);
     write_lock_bucket(b);
@@ -488,7 +488,7 @@ class unordered_map_ll {
   }
 
   /** Drop all entries. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void clear() {
     write_lock_all();
     for (size_type i = 0; i < buckets_.size(); ++i) {
@@ -507,7 +507,7 @@ class unordered_map_ll {
   /** Apply `fn(key, value)` to every entry. Takes every write lock so
    *  the callback sees a consistent snapshot. */
   template <typename Func>
-  HSHM_CROSS_FUN void for_each(Func fn) {
+  CTP_CROSS_FUN void for_each(Func fn) {
     write_lock_all();
     for (size_type i = 0; i < buckets_.size(); ++i) {
       Node *cur = buckets_[i];
@@ -520,7 +520,7 @@ class unordered_map_ll {
   }
 
   template <typename Func>
-  HSHM_CROSS_FUN void for_each(Func fn) const {
+  CTP_CROSS_FUN void for_each(Func fn) const {
     auto *self = const_cast<unordered_map_ll *>(this);
     self->write_lock_all();
     for (size_type i = 0; i < buckets_.size(); ++i) {
@@ -534,6 +534,6 @@ class unordered_map_ll {
   }
 };
 
-}  // namespace hshm::priv
+}  // namespace ctp::priv
 
-#endif  // HSHM_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LL_H_
+#endif  // CTP_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LL_H_

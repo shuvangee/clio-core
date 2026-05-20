@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_UTIL_GPU_LINKER_H
-#define HSHM_UTIL_GPU_LINKER_H
+#ifndef CTP_UTIL_GPU_LINKER_H
+#define CTP_UTIL_GPU_LINKER_H
 
 #include <string>
 #include <vector>
 #include "hermes_shm/constants/macros.h"
 
-namespace hshm {
+namespace ctp {
 
 struct GpuDeviceCode {
   std::string name;
@@ -48,22 +48,22 @@ struct GpuDeviceCode {
 
 class GpuLinker {
  public:
-  HSHM_DLL GpuLinker();
-  HSHM_DLL ~GpuLinker();
+  CTP_DLL GpuLinker();
+  CTP_DLL ~GpuLinker();
 
   GpuLinker(const GpuLinker &) = delete;
   GpuLinker &operator=(const GpuLinker &) = delete;
 
-  HSHM_DLL void AddModule(const std::string &name, const void *fatbin,
+  CTP_DLL void AddModule(const std::string &name, const void *fatbin,
                            size_t size);
-  HSHM_DLL bool Link();
-  HSHM_DLL void *GetFunction(const char *kernel_name);
-  HSHM_DLL bool LaunchKernel(void *func, unsigned gridX, unsigned gridY,
+  CTP_DLL bool Link();
+  CTP_DLL void *GetFunction(const char *kernel_name);
+  CTP_DLL bool LaunchKernel(void *func, unsigned gridX, unsigned gridY,
                               unsigned gridZ, unsigned blockX, unsigned blockY,
                               unsigned blockZ, unsigned sharedMem,
                               void *stream, void **params);
-  HSHM_DLL void Unload();
-  HSHM_DLL bool IsLinked() const;
+  CTP_DLL void Unload();
+  CTP_DLL bool IsLinked() const;
 
  private:
   std::vector<GpuDeviceCode> modules_;
@@ -71,6 +71,6 @@ class GpuLinker {
   bool linked_ = false;
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_UTIL_GPU_LINKER_H
+#endif  // CTP_UTIL_GPU_LINKER_H

@@ -99,7 +99,7 @@ struct IpcCpu2Self {
   static void RuntimeSend(const FullPtr<Task> &task_ptr,
                            RunContext *run_ctx,
                            Container *container,
-                           hshm::lbm::Transport *send_transport);
+                           ctp::lbm::Transport *send_transport);
 
   /**
    * Client waits for task completion (runtime-internal poll).
@@ -114,10 +114,10 @@ struct IpcCpu2Self {
   static bool ClientRecv(Future<TaskT, AllocT> &future, float max_sec,
                          hipc::FullPtr<FutureShm> future_full) {
     // Poll FUTURE_COMPLETE in shared memory
-    hshm::abitfield32_t &flags = future_full->flags_;
+    ctp::abitfield32_t &flags = future_full->flags_;
     auto start = std::chrono::steady_clock::now();
     while (!flags.Any(FutureShm::FUTURE_COMPLETE)) {
-      HSHM_THREAD_MODEL->Yield();
+      CTP_THREAD_MODEL->Yield();
       if (max_sec > 0) {
         float elapsed = std::chrono::duration<float>(
                             std::chrono::steady_clock::now() - start)

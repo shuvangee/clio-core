@@ -43,7 +43,7 @@
 #include "basic_test.h"
 
 TEST_CASE("RandomCountDistribution") {
-  hshm::CountDistribution x;
+  ctp::CountDistribution x;
   x.Shape(0);
   for (size_t i = 0; i < 10; ++i) {
     REQUIRE(x.GetInt() == i);
@@ -51,7 +51,7 @@ TEST_CASE("RandomCountDistribution") {
 }
 
 TEST_CASE("RandomNormalDistribution") {
-  hshm::NormalDistribution x;
+  ctp::NormalDistribution x;
   x.Shape(10, 10);
   for (size_t i = 0; i < 10; ++i) {
     x.GetInt();
@@ -61,7 +61,7 @@ TEST_CASE("RandomNormalDistribution") {
 }
 
 TEST_CASE("RandomGammaDistribution") {
-  hshm::GammaDistribution x;
+  ctp::GammaDistribution x;
   x.Shape(1, 10);
   for (size_t i = 0; i < 10; ++i) {
     x.GetInt();
@@ -71,7 +71,7 @@ TEST_CASE("RandomGammaDistribution") {
 }
 
 TEST_CASE("RandomExponentialDistribution") {
-  hshm::ExponentialDistribution x;
+  ctp::ExponentialDistribution x;
   x.Shape(2.23);
   for (size_t i = 0; i < 10; ++i) {
     x.GetInt();
@@ -81,7 +81,7 @@ TEST_CASE("RandomExponentialDistribution") {
 }
 
 TEST_CASE("RandomUniformDistribution") {
-  hshm::UniformDistribution x;
+  ctp::UniformDistribution x;
   x.Shape(2.23);
   for (size_t i = 0; i < 10; ++i) {
     x.GetInt();

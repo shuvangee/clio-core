@@ -32,7 +32,7 @@
  */
 
 #pragma once
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
 #include <arpa/inet.h>
 
 #include <atomic>
@@ -55,7 +55,7 @@
 #include "hermes_shm/util/logging.h"
 #include "lightbeam.h"
 
-namespace hshm::lbm {
+namespace ctp::lbm {
 
 namespace tl = thallium;
 
@@ -94,7 +94,7 @@ class ThalliumEngine {
   }
 };
 
-inline const char *ThalliumLbmRpcName() { return "hshm_lbm_send"; }
+inline const char *ThalliumLbmRpcName() { return "ctp_lbm_send"; }
 
 // A single received message after the RPC handler has pulled all BULK_XFER
 // payloads via RDMA. The meta_blob still needs deserialization in Recv.
@@ -207,7 +207,7 @@ class ThalliumTransport : public Transport {
     Bulk bulk;
     bulk.data = ptr;
     bulk.size = data_size;
-    bulk.flags = hshm::bitfield32_t(flags);
+    bulk.flags = ctp::bitfield32_t(flags);
     if (bulk.flags.Any(BULK_XFER) && ptr.ptr_ != nullptr && data_size > 0) {
       auto &eng = ThalliumEngine::Get();
       std::vector<std::pair<void *, size_t>> segs{
@@ -262,7 +262,7 @@ class ThalliumTransport : public Transport {
     // bulk payload bytes are not in this blob — they travel via RDMA.
     std::vector<char> meta_buf;
     {
-      hshm::ipc::GlobalSerialize<std::vector<char>> ar(meta_buf);
+      ctp::ipc::GlobalSerialize<std::vector<char>> ar(meta_buf);
       ar(meta);
       ar.Finalize();
     }
@@ -328,7 +328,7 @@ class ThalliumTransport : public Transport {
     try {
       std::vector<char> meta_buf(entry.meta_blob.begin(),
                                  entry.meta_blob.end());
-      hshm::ipc::GlobalDeserialize<std::vector<char>> ar(meta_buf);
+      ctp::ipc::GlobalDeserialize<std::vector<char>> ar(meta_buf);
       ar(meta);
     } catch (const std::exception &e) {
       HLOG(kError, "ThalliumTransport::Recv deserialize failed: {}",
@@ -382,5 +382,5 @@ class ThalliumTransport : public Transport {
   std::shared_ptr<ThalliumRecvQueue> recv_q_;
 };
 
-}  // namespace hshm::lbm
-#endif  // HSHM_ENABLE_THALLIUM
+}  // namespace ctp::lbm
+#endif  // CTP_ENABLE_THALLIUM

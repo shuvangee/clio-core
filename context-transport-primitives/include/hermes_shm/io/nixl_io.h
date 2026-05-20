@@ -32,7 +32,7 @@
  */
 
 #pragma once
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
 
 #include "async_io.h"
 #include <nixl.h>
@@ -45,7 +45,7 @@
 #include <memory>
 #include <cerrno>
 
-namespace hshm {
+namespace ctp {
 
 /**
  * Pending NIXL transfer operation state.
@@ -417,6 +417,6 @@ class NixlAsyncIO : public AsyncIO {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_NIXL
+#endif  // CTP_ENABLE_NIXL

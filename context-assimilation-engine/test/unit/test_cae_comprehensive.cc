@@ -407,7 +407,7 @@ TEST_CASE("CAE - AssimilationCtx Serialization", "[cae][ctx][serialization]") {
   // Serialize using GlobalSerialize
   std::vector<char> buf;
   {
-    hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+    ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
     oarchive(ctx);
     oarchive.Finalize();
   }
@@ -415,7 +415,7 @@ TEST_CASE("CAE - AssimilationCtx Serialization", "[cae][ctx][serialization]") {
   // Deserialize
   AssimilationCtx ctx_restored;
   {
-    hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(buf);
     iarchive(ctx_restored);
   }
 

@@ -31,10 +31,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_COMPRESS_COMPRESS_FACTORY_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_COMPRESS_COMPRESS_FACTORY_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_UTIL_COMPRESS_COMPRESS_FACTORY_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_UTIL_COMPRESS_COMPRESS_FACTORY_H_
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
 
 #include <memory>
 #include <string>
@@ -43,11 +43,11 @@
 #include "snappy.h"
 #include "blosc.h"
 
-#if HSHM_ENABLE_LIBPRESSIO
+#if CTP_ENABLE_LIBPRESSIO
 #include "libpressio_modes.h"
 #endif
 
-namespace hshm {
+namespace ctp {
 
 /**
  * Compression preset levels for configurable compressors.
@@ -120,7 +120,7 @@ class CompressionFactory {
       return std::make_unique<Blosc>();
     }
 
-#if HSHM_ENABLE_LIBPRESSIO
+#if CTP_ENABLE_LIBPRESSIO
     // Lossy compressors with LibPressio
     if (lib_lower == "zfp") {
       return CreateLossy("zfp", preset);
@@ -258,7 +258,7 @@ class CompressionFactory {
     return std::make_unique<CompressorClass>(mode);
   }
 
-#if HSHM_ENABLE_LIBPRESSIO
+#if CTP_ENABLE_LIBPRESSIO
   static std::unique_ptr<Compressor> CreateLossy(
       const std::string& compressor_id, CompressionPreset preset) {
     CompressionMode mode;
@@ -279,8 +279,8 @@ class CompressionFactory {
 #endif
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_COMPRESS
+#endif  // CTP_ENABLE_COMPRESS
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_COMPRESS_COMPRESS_FACTORY_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_UTIL_COMPRESS_COMPRESS_FACTORY_H_

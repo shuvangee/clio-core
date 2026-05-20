@@ -31,15 +31,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_INCLUDE_HSHM_TYPES_BITFIELD_H_
-#define HSHM_INCLUDE_HSHM_TYPES_BITFIELD_H_
+#ifndef CTP_INCLUDE_HSHM_TYPES_BITFIELD_H_
+#define CTP_INCLUDE_HSHM_TYPES_BITFIELD_H_
 
 #include <cstdint>
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/types/atomic.h"
 
-namespace hshm {
+namespace ctp {
 
 #define BIT_OPT(T, n) (((T)1) << n)
 #define ALL_BITS(T) (~((T)0))
@@ -52,87 +52,87 @@ struct bitfield {
   hipc::opt_atomic<T, ATOMIC> bits_;
 
   /** Default constructor */
-  HSHM_INLINE_CROSS_FUN bitfield() : bits_(0) {}
+  CTP_INLINE_CROSS_FUN bitfield() : bits_(0) {}
 
   /** Emplace constructor */
-  HSHM_INLINE_CROSS_FUN explicit bitfield(T mask) : bits_(mask) {}
+  CTP_INLINE_CROSS_FUN explicit bitfield(T mask) : bits_(mask) {}
 
   /** Copy constructor */
-  HSHM_INLINE_CROSS_FUN bitfield(const bitfield &other) : bits_(other.bits_) {}
+  CTP_INLINE_CROSS_FUN bitfield(const bitfield &other) : bits_(other.bits_) {}
 
   /** Copy assignment */
-  HSHM_INLINE_CROSS_FUN bitfield &operator=(const bitfield &other) {
+  CTP_INLINE_CROSS_FUN bitfield &operator=(const bitfield &other) {
     bits_ = other.bits_;
     return *this;
   }
 
   /** Move constructor */
-  HSHM_INLINE_CROSS_FUN bitfield(bitfield &&other) noexcept
+  CTP_INLINE_CROSS_FUN bitfield(bitfield &&other) noexcept
       : bits_(other.bits_) {}
 
   /** Move assignment */
-  HSHM_INLINE_CROSS_FUN bitfield &operator=(bitfield &&other) noexcept {
+  CTP_INLINE_CROSS_FUN bitfield &operator=(bitfield &&other) noexcept {
     bits_ = other.bits_;
     return *this;
   }
 
   /** Copy from any bitfield */
   template <bool ATOMIC2>
-  HSHM_INLINE_CROSS_FUN bitfield(const bitfield<T, ATOMIC2> &other)
+  CTP_INLINE_CROSS_FUN bitfield(const bitfield<T, ATOMIC2> &other)
       : bits_(other.bits_) {}
 
   /** Copy assignment from any bitfield */
   template <bool ATOMIC2>
-  HSHM_INLINE_CROSS_FUN bitfield &operator=(const bitfield<T, ATOMIC2> &other) {
+  CTP_INLINE_CROSS_FUN bitfield &operator=(const bitfield<T, ATOMIC2> &other) {
     bits_ = other.bits_;
     return *this;
   }
 
   /** Set bits using mask */
-  HSHM_INLINE_CROSS_FUN void SetBits(T mask) { bits_ |= mask; }
+  CTP_INLINE_CROSS_FUN void SetBits(T mask) { bits_ |= mask; }
 
   /** Set bits using system-scope atomic OR (fence + atomicOr_system on GPU).
    *  Use this when GPU must signal CPU: all prior GPU writes will be visible
    *  to CPU before this flag update is observed. */
-  HSHM_INLINE_CROSS_FUN void SetBitsSystem(T mask) { bits_.or_system(mask); }
+  CTP_INLINE_CROSS_FUN void SetBitsSystem(T mask) { bits_.or_system(mask); }
 
   /** Unset bits in mask */
-  HSHM_INLINE_CROSS_FUN void UnsetBits(T mask) { bits_ &= ~mask; }
+  CTP_INLINE_CROSS_FUN void UnsetBits(T mask) { bits_ &= ~mask; }
 
   /** Check if any bits are set (non-destructive: load then AND) */
-  HSHM_INLINE_CROSS_FUN T Any(T mask) const { return bits_.load() & mask; }
+  CTP_INLINE_CROSS_FUN T Any(T mask) const { return bits_.load() & mask; }
 
   /** Device-scope check: bypasses per-SM L1 cache via ld.global.cg so GPU
    *  can observe writes from a different SM or concurrent kernel. */
-  HSHM_INLINE_CROSS_FUN T AnyDevice(T mask) const {
+  CTP_INLINE_CROSS_FUN T AnyDevice(T mask) const {
     return bits_.load_device() & mask;
   }
 
   /** System-scope check if any bits are set: bypasses GPU L2 so GPU can
    *  observe CPU-written flags in pinned host memory. */
-  HSHM_INLINE_CROSS_FUN T AnySystem(T mask) const {
+  CTP_INLINE_CROSS_FUN T AnySystem(T mask) const {
     return bits_.load_system() & mask;
   }
 
   /** Check if all bits are set */
-  HSHM_INLINE_CROSS_FUN T All(T mask) const { return Any(mask) == mask; }
+  CTP_INLINE_CROSS_FUN T All(T mask) const { return Any(mask) == mask; }
 
   /** Copy bits from another bitfield */
-  HSHM_INLINE_CROSS_FUN void CopyBits(bitfield field, T mask) {
+  CTP_INLINE_CROSS_FUN void CopyBits(bitfield field, T mask) {
     bits_ &= (field.bits_ & mask);
   }
 
   /** Clear all bits */
-  HSHM_INLINE_CROSS_FUN void Clear() { bits_ = 0; }
+  CTP_INLINE_CROSS_FUN void Clear() { bits_ = 0; }
 
   /** Make a mask */
-  HSHM_INLINE_CROSS_FUN static T MakeMask(int start, int length) {
+  CTP_INLINE_CROSS_FUN static T MakeMask(int start, int length) {
     return ((((T)1) << length) - 1) << start;
   }
 
   /** Serialization */
   template <typename Ar>
-  HSHM_CROSS_FUN void serialize(Ar &ar) {
+  CTP_CROSS_FUN void serialize(Ar &ar) {
     ar & bits_;
   }
 };
@@ -167,11 +167,11 @@ template <size_t NUM_BITS,
 struct big_bitfield {
   bitfield32_t bits_[LEN::value];
 
-  HSHM_INLINE_CROSS_FUN big_bitfield() : bits_() {}
+  CTP_INLINE_CROSS_FUN big_bitfield() : bits_() {}
 
-  HSHM_INLINE_CROSS_FUN size_t size() const { return LEN::value; }
+  CTP_INLINE_CROSS_FUN size_t size() const { return LEN::value; }
 
-  HSHM_INLINE_CROSS_FUN void SetBits(int start, int length) {
+  CTP_INLINE_CROSS_FUN void SetBits(int start, int length) {
     int bf_idx = start / 32;
     int bf_idx_count = 32 - bf_idx;
     int rem = length;
@@ -187,7 +187,7 @@ struct big_bitfield {
     }
   }
 
-  HSHM_INLINE_CROSS_FUN void UnsetBits(int start, int length) {
+  CTP_INLINE_CROSS_FUN void UnsetBits(int start, int length) {
     int bf_idx = start / 32;
     int bf_idx_count = 32 - bf_idx;
     int rem = length;
@@ -203,7 +203,7 @@ struct big_bitfield {
     }
   }
 
-  HSHM_INLINE_CROSS_FUN bool Any(int start, int length) const {
+  CTP_INLINE_CROSS_FUN bool Any(int start, int length) const {
     int bf_idx = start / 32;
     int bf_idx_count = 32 - bf_idx;
     int rem = length;
@@ -222,7 +222,7 @@ struct big_bitfield {
     return false;
   }
 
-  HSHM_INLINE_CROSS_FUN bool All(int start, int length) const {
+  CTP_INLINE_CROSS_FUN bool All(int start, int length) const {
     int bf_idx = start / 32;
     int bf_idx_count = 32 - bf_idx;
     int rem = length;
@@ -241,11 +241,11 @@ struct big_bitfield {
     return true;
   }
 
-  HSHM_INLINE_CROSS_FUN void Clear() {
+  CTP_INLINE_CROSS_FUN void Clear() {
     memset((void *)bits_, 0, sizeof(bitfield32_t) * LEN::value);
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_INCLUDE_HSHM_TYPES_BITFIELD_H_
+#endif  // CTP_INCLUDE_HSHM_TYPES_BITFIELD_H_

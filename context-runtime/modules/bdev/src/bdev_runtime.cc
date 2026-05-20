@@ -62,10 +62,10 @@ bool WorkerIOContext::Init(const std::string &file_path, chi::u32 io_depth,
   }
 
   // Create async I/O backend via factory (io_depth passed at construction)
-#if HSHM_ENABLE_NIXL
-  async_io_ = hshm::AsyncIoFactory::Get(io_depth, hshm::AsyncIoBackend::kNixl);
+#if CTP_ENABLE_NIXL
+  async_io_ = ctp::AsyncIoFactory::Get(io_depth, ctp::AsyncIoBackend::kNixl);
 #else
-  async_io_ = hshm::AsyncIoFactory::Get(io_depth);
+  async_io_ = ctp::AsyncIoFactory::Get(io_depth);
 #endif
   if (!async_io_) {
     HLOG(kError, "Worker {} failed to create async I/O backend", worker_id);
@@ -401,10 +401,10 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
     file_path_ = pool_name;
 
     // Use a temporary AsyncIO to set up the file (create/truncate)
-#if HSHM_ENABLE_NIXL
-    auto setup_io = hshm::AsyncIoFactory::Get(io_depth_, hshm::AsyncIoBackend::kNixl);
+#if CTP_ENABLE_NIXL
+    auto setup_io = ctp::AsyncIoFactory::Get(io_depth_, ctp::AsyncIoBackend::kNixl);
 #else
-    auto setup_io = hshm::AsyncIoFactory::Get(io_depth_);
+    auto setup_io = ctp::AsyncIoFactory::Get(io_depth_);
 #endif
     if (!setup_io) {
       HLOG(kError, "Failed to create setup async I/O backend");
@@ -500,7 +500,7 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
          "({}% of {} total DRAM when configured as 0/0g)",
          pool_name, params.total_size_, ram_capacity_,
          static_cast<int>(kDefaultRamCapacityFraction * 100),
-         hshm::SystemInfo::GetRamCapacity());
+         ctp::SystemInfo::GetRamCapacity());
     file_size_ = ram_capacity_;  // Heap allocator's soft cap
 
   // BdevType::kHbm and BdevType::kPinned removed — supported tiers
@@ -805,10 +805,10 @@ chi::TaskResume Runtime::WriteToFile(hipc::FullPtr<WriteTask> task,
       CHI_CO_RETURN;
     }
 
-    hshm::IoToken token = io_ctx->async_io_->Write(
+    ctp::IoToken token = io_ctx->async_io_->Write(
         block_data, static_cast<size_t>(block_write_size),
         static_cast<off_t>(block.offset_));
-    if (token == hshm::kInvalidIoToken) {
+    if (token == ctp::kInvalidIoToken) {
       HLOG(kError, "Failed to submit async write: offset={}, size={}",
            block.offset_, block_write_size);
       task->return_code_ = 2;
@@ -816,7 +816,7 @@ chi::TaskResume Runtime::WriteToFile(hipc::FullPtr<WriteTask> task,
       CHI_CO_RETURN;
     }
 
-    hshm::IoResult result;
+    ctp::IoResult result;
     while (!io_ctx->async_io_->IsComplete(token, result)) {
       CHI_CO_AWAIT(chi::yield(10.0));
     }
@@ -882,10 +882,10 @@ chi::TaskResume Runtime::ReadFromFile(hipc::FullPtr<ReadTask> task,
       CHI_CO_RETURN;
     }
 
-    hshm::IoToken token = io_ctx->async_io_->Read(
+    ctp::IoToken token = io_ctx->async_io_->Read(
         block_data, static_cast<size_t>(block_read_size),
         static_cast<off_t>(block.offset_));
-    if (token == hshm::kInvalidIoToken) {
+    if (token == ctp::kInvalidIoToken) {
       HLOG(kError, "Failed to submit async read: offset={}, size={}",
            block.offset_, block_read_size);
       task->return_code_ = 2;
@@ -893,7 +893,7 @@ chi::TaskResume Runtime::ReadFromFile(hipc::FullPtr<ReadTask> task,
       CHI_CO_RETURN;
     }
 
-    hshm::IoResult result;
+    ctp::IoResult result;
     while (!io_ctx->async_io_->IsComplete(token, result)) {
       CHI_CO_AWAIT(chi::yield(10.0));
     }
@@ -1073,7 +1073,7 @@ char* Runtime::GetRamPage(size_t page_idx) const {
 void Runtime::WriteToRam(hipc::FullPtr<WriteTask> task) {
   static thread_local size_t ram_write_count = 0;
   static thread_local double t_resolve_ms = 0, t_memcpy_ms = 0;
-  hshm::Timer timer;
+  ctp::Timer timer;
 
   timer.Resume();
   auto *ipc_mgr = CHI_IPC;
@@ -1161,7 +1161,7 @@ void Runtime::WriteToRam(hipc::FullPtr<WriteTask> task) {
 void Runtime::ReadFromRam(hipc::FullPtr<ReadTask> task) {
   static thread_local size_t ram_read_count = 0;
   static thread_local double tr_resolve_ms = 0, tr_memcpy_ms = 0;
-  hshm::Timer rtimer;
+  ctp::Timer rtimer;
 
   rtimer.Resume();
   auto *ipc_mgr = CHI_IPC;

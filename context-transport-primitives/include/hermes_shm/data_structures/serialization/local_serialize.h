@@ -35,8 +35,8 @@
 // Created by llogan on 11/27/24.
 //
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_LOCAL_SERIALIZE_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_LOCAL_SERIALIZE_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_LOCAL_SERIALIZE_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_LOCAL_SERIALIZE_H_
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/types/argpack.h"
@@ -51,54 +51,54 @@
 
 #include "serialize_common.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 
 /** Save string */
 template <typename Ar>
-HSHM_INLINE_CROSS_FUN void save(Ar &ar, const std::string &str) {
+CTP_INLINE_CROSS_FUN void save(Ar &ar, const std::string &str) {
   save_string(ar, str);
 }
 
 /** Load string */
 template <typename Ar>
-HSHM_INLINE_CROSS_FUN void load(Ar &ar, std::string &str) {
+CTP_INLINE_CROSS_FUN void load(Ar &ar, std::string &str) {
   load_string(ar, str);
 }
 
 /** Save vector */
 template <typename Ar, typename T>
-HSHM_INLINE_CROSS_FUN void save(Ar &ar, const std::vector<T> &data) {
+CTP_INLINE_CROSS_FUN void save(Ar &ar, const std::vector<T> &data) {
   save_vec<Ar, std::vector<T>, T>(ar, data);
 }
 
 /** Load vector */
 template <typename Ar, typename T>
-HSHM_INLINE_CROSS_FUN void load(Ar &ar, std::vector<T> &data) {
+CTP_INLINE_CROSS_FUN void load(Ar &ar, std::vector<T> &data) {
   load_vec<Ar, std::vector<T>, T>(ar, data);
 }
 
 /** Save list */
 template <typename Ar, typename T>
-HSHM_INLINE_CROSS_FUN void save(Ar &ar, const std::list<T> &data) {
+CTP_INLINE_CROSS_FUN void save(Ar &ar, const std::list<T> &data) {
   save_list<Ar, std::list<T>, T>(ar, data);
 }
 
 /** Load list */
 template <typename Ar, typename T>
-HSHM_INLINE_CROSS_FUN void load(Ar &ar, std::list<T> &data) {
+CTP_INLINE_CROSS_FUN void load(Ar &ar, std::list<T> &data) {
   load_list<Ar, std::list<T>, T>(ar, data);
 }
 
 /** Save unordered_map */
 template <typename Ar, typename KeyT, typename T>
-HSHM_INLINE_CROSS_FUN void save(Ar &ar, const std::unordered_map<KeyT, T> &data) {
+CTP_INLINE_CROSS_FUN void save(Ar &ar, const std::unordered_map<KeyT, T> &data) {
   save_map<Ar, std::unordered_map<KeyT, T>, KeyT, T>(ar, data);
 }
 
 /** Load unordered_map */
 template <typename Ar, typename KeyT, typename T>
-HSHM_INLINE_CROSS_FUN void load(Ar &ar, std::unordered_map<KeyT, T> &data) {
+CTP_INLINE_CROSS_FUN void load(Ar &ar, std::unordered_map<KeyT, T> &data) {
   load_map<Ar, std::unordered_map<KeyT, T>, KeyT, T>(ar, data);
 }
 
@@ -116,35 +116,35 @@ class CalculateSizeArchive {
   size_t cur_off_ = 0;
 
  public:
-  HSHM_CROSS_FUN CalculateSizeArchive() = default;
+  CTP_CROSS_FUN CalculateSizeArchive() = default;
 
   /** Get the total computed size */
-  HSHM_INLINE_CROSS_FUN size_t size() const { return cur_off_; }
+  CTP_INLINE_CROSS_FUN size_t size() const { return cur_off_; }
 
   /** left shift operator */
   template <typename T>
-  HSHM_INLINE_CROSS_FUN CalculateSizeArchive &operator<<(const T &obj) {
+  CTP_INLINE_CROSS_FUN CalculateSizeArchive &operator<<(const T &obj) {
     return base(obj);
   }
 
   /** & operator */
   template <typename T>
-  HSHM_INLINE_CROSS_FUN CalculateSizeArchive &operator&(const T &obj) {
+  CTP_INLINE_CROSS_FUN CalculateSizeArchive &operator&(const T &obj) {
     return base(obj);
   }
 
   /** Call operator */
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN CalculateSizeArchive &operator()(Args &&...args) {
-    hshm::ForwardIterateArgpack::Apply(
-        hshm::make_argpack(std::forward<Args>(args)...),
+  CTP_INLINE_CROSS_FUN CalculateSizeArchive &operator()(Args &&...args) {
+    ctp::ForwardIterateArgpack::Apply(
+        ctp::make_argpack(std::forward<Args>(args)...),
         [this](auto i, auto &arg) { this->base(arg); });
     return *this;
   }
 
   /** range() — compute span size from first to last arg (contiguous POD) */
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN CalculateSizeArchive &range(Args &...args) {
+  CTP_INLINE_CROSS_FUN CalculateSizeArchive &range(Args &...args) {
     const char *begin = reinterpret_cast<const char *>(
         &std::get<0>(std::forward_as_tuple(args...)));
     auto &last = std::get<sizeof...(Args) - 1>(std::forward_as_tuple(args...));
@@ -156,7 +156,7 @@ class CalculateSizeArchive {
 
   /** Size-compute function */
   template <typename T>
-  HSHM_INLINE_CROSS_FUN CalculateSizeArchive &base(const T &obj) {
+  CTP_INLINE_CROSS_FUN CalculateSizeArchive &base(const T &obj) {
     if constexpr (std::is_arithmetic<T>::value) {
       cur_off_ += sizeof(T);
     } else if constexpr (std::is_enum<T>::value) {
@@ -175,7 +175,7 @@ class CalculateSizeArchive {
 
   /** write_range — compute span size */
   template <typename FirstT, typename LastT>
-  HSHM_INLINE_CROSS_FUN void write_range(const FirstT *first,
+  CTP_INLINE_CROSS_FUN void write_range(const FirstT *first,
                                           const LastT *last) {
     const char *begin = reinterpret_cast<const char *>(first);
     const char *end = reinterpret_cast<const char *>(last) + sizeof(LastT);
@@ -183,7 +183,7 @@ class CalculateSizeArchive {
   }
 
   /** write_binary — just accumulate size */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   CalculateSizeArchive &write_binary(const char *data, size_t size) {
     (void)data;
     cur_off_ += size;
@@ -191,7 +191,7 @@ class CalculateSizeArchive {
   }
 
   /** Fused string save — just accumulate sizeof(size_t) + len */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void save_string_fused(const char *str_data, size_t len) {
     (void)str_data;
     cur_off_ += sizeof(size_t) + len;
@@ -199,28 +199,28 @@ class CalculateSizeArchive {
 };
 
 /** Save string (CalculateSizeArchive overload) */
-HSHM_INLINE_CROSS_FUN void save(CalculateSizeArchive &ar,
+CTP_INLINE_CROSS_FUN void save(CalculateSizeArchive &ar,
                                  const std::string &str) {
   save_string(ar, str);
 }
 
 /** Save vector (CalculateSizeArchive overload) */
 template <typename T>
-HSHM_INLINE_CROSS_FUN void save(CalculateSizeArchive &ar,
+CTP_INLINE_CROSS_FUN void save(CalculateSizeArchive &ar,
                                  const std::vector<T> &data) {
   save_vec<CalculateSizeArchive, std::vector<T>, T>(ar, data);
 }
 
 /** Save list (CalculateSizeArchive overload) */
 template <typename T>
-HSHM_INLINE_CROSS_FUN void save(CalculateSizeArchive &ar,
+CTP_INLINE_CROSS_FUN void save(CalculateSizeArchive &ar,
                                  const std::list<T> &data) {
   save_list<CalculateSizeArchive, std::list<T>, T>(ar, data);
 }
 
 /** Save unordered_map (CalculateSizeArchive overload) */
 template <typename KeyT, typename T>
-HSHM_INLINE_CROSS_FUN void save(CalculateSizeArchive &ar,
+CTP_INLINE_CROSS_FUN void save(CalculateSizeArchive &ar,
                                  const std::unordered_map<KeyT, T> &data) {
   save_map<CalculateSizeArchive, std::unordered_map<KeyT, T>, KeyT, T>(ar,
                                                                         data);
@@ -239,32 +239,32 @@ class LocalSerialize {
   bool warp_converged_ = false;
 
  public:
-  HSHM_CROSS_FUN LocalSerialize(DataT &data) : data_(data), cur_off_(0), warp_converged_(false) {}
-  HSHM_CROSS_FUN LocalSerialize(DataT &data, bool) : data_(data), cur_off_(data.size()), warp_converged_(false) {}
+  CTP_CROSS_FUN LocalSerialize(DataT &data) : data_(data), cur_off_(0), warp_converged_(false) {}
+  CTP_CROSS_FUN LocalSerialize(DataT &data, bool) : data_(data), cur_off_(data.size()), warp_converged_(false) {}
 
   /** Commit the local offset to the vector's size. Must be called when
    *  serialization is complete so that data_.size() reflects what was written. */
-  HSHM_INLINE_CROSS_FUN void Finalize() {
+  CTP_INLINE_CROSS_FUN void Finalize() {
     data_.resize(cur_off_);
   }
 
   /** left shift operator */
   template <typename T>
-  HSHM_INLINE_CROSS_FUN LocalSerialize &operator<<(const T &obj) {
+  CTP_INLINE_CROSS_FUN LocalSerialize &operator<<(const T &obj) {
     return base(obj);
   }
 
   /** & operator */
   template <typename T>
-  HSHM_INLINE_CROSS_FUN LocalSerialize &operator&(const T &obj) {
+  CTP_INLINE_CROSS_FUN LocalSerialize &operator&(const T &obj) {
     return base(obj);
   }
 
   /** Call operator */
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN LocalSerialize &operator()(Args &&...args) {
-    hshm::ForwardIterateArgpack::Apply(
-        hshm::make_argpack(std::forward<Args>(args)...),
+  CTP_INLINE_CROSS_FUN LocalSerialize &operator()(Args &&...args) {
+    ctp::ForwardIterateArgpack::Apply(
+        ctp::make_argpack(std::forward<Args>(args)...),
         [this](auto i, auto &arg) { this->base(arg); });
     return *this;
   }
@@ -273,7 +273,7 @@ class LocalSerialize {
    *  All args must be contiguous POD fields in memory.
    *  The first parameter is the beginning and the last is the end. */
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN LocalSerialize &range(Args &...args) {
+  CTP_INLINE_CROSS_FUN LocalSerialize &range(Args &...args) {
     const char *begin = reinterpret_cast<const char *>(
         &std::get<0>(std::forward_as_tuple(args...)));
     auto &last = std::get<sizeof...(Args) - 1>(std::forward_as_tuple(args...));
@@ -285,7 +285,7 @@ class LocalSerialize {
 
   /** Save function */
   template <typename T>
-  HSHM_INLINE_CROSS_FUN LocalSerialize &base(const T &obj) {
+  CTP_INLINE_CROSS_FUN LocalSerialize &base(const T &obj) {
     STATIC_ASSERT((is_serializeable_v<LocalSerialize, T>),
                   "Cannot serialize object", void);
     if constexpr (std::is_arithmetic<T>::value) {
@@ -314,7 +314,7 @@ class LocalSerialize {
    *  Example: ar.write_range(&obj.field_a_, &obj.field_z_);
    */
   template <typename FirstT, typename LastT>
-  HSHM_INLINE_CROSS_FUN LocalSerialize &write_range(const FirstT *first,
+  CTP_INLINE_CROSS_FUN LocalSerialize &write_range(const FirstT *first,
                                                      const LastT *last) {
     const char *begin = reinterpret_cast<const char *>(first);
     const char *end = reinterpret_cast<const char *>(last) + sizeof(LastT);
@@ -324,7 +324,7 @@ class LocalSerialize {
 
   /** Fused string save: size prefix + character data in one capacity check.
    *  Uses direct store for size prefix to avoid memcpy overhead on GPU. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void save_string_fused(const char *str_data, size_t len) {
     size_t total = sizeof(size_t) + len;
     size_t new_off = cur_off_ + total;
@@ -344,9 +344,9 @@ class LocalSerialize {
 
   /** Save function (binary data).
    *  GPU: warp-parallel when warp_converged_, sequential otherwise. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   LocalSerialize &write_binary(const char *data, size_t size) {
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
     if (warp_converged_) {
       uint32_t lane_id = threadIdx.x & 31;
       if (lane_id == 0) {
@@ -401,25 +401,25 @@ class LocalDeserialize {
   bool warp_converged_ = false;
 
  public:
-  HSHM_CROSS_FUN LocalDeserialize(const DataT &data) : data_(data), cur_off_(0), warp_converged_(false) {}
+  CTP_CROSS_FUN LocalDeserialize(const DataT &data) : data_(data), cur_off_(0), warp_converged_(false) {}
 
   /** right shift operator */
   template <typename T>
-  HSHM_INLINE_CROSS_FUN LocalDeserialize &operator>>(T &obj) {
+  CTP_INLINE_CROSS_FUN LocalDeserialize &operator>>(T &obj) {
     return base(obj);
   }
 
   /** & operator */
   template <typename T>
-  HSHM_INLINE_CROSS_FUN LocalDeserialize &operator&(T &obj) {
+  CTP_INLINE_CROSS_FUN LocalDeserialize &operator&(T &obj) {
     return base(obj);
   }
 
   /** Call operator */
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN LocalDeserialize &operator()(Args &&...args) {
-    hshm::ForwardIterateArgpack::Apply(
-        hshm::make_argpack(std::forward<Args>(args)...),
+  CTP_INLINE_CROSS_FUN LocalDeserialize &operator()(Args &&...args) {
+    ctp::ForwardIterateArgpack::Apply(
+        ctp::make_argpack(std::forward<Args>(args)...),
         [this](auto i, auto &arg) { this->base(arg); });
     return *this;
   }
@@ -428,7 +428,7 @@ class LocalDeserialize {
    *  All args must be contiguous POD fields in memory.
    *  The first parameter is the beginning and the last is the end. */
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN LocalDeserialize &range(Args &...args) {
+  CTP_INLINE_CROSS_FUN LocalDeserialize &range(Args &...args) {
     char *begin = reinterpret_cast<char *>(
         &std::get<0>(std::forward_as_tuple(args...)));
     auto &last = std::get<sizeof...(Args) - 1>(std::forward_as_tuple(args...));
@@ -440,7 +440,7 @@ class LocalDeserialize {
 
   /** Load function */
   template <typename T>
-  HSHM_INLINE_CROSS_FUN LocalDeserialize &base(T &obj) {
+  CTP_INLINE_CROSS_FUN LocalDeserialize &base(T &obj) {
     STATIC_ASSERT((is_serializeable_v<LocalDeserialize, T>),
                   "Cannot serialize object", void);
     if constexpr (std::is_arithmetic<T>::value) {
@@ -469,7 +469,7 @@ class LocalDeserialize {
    *  Example: ar.read_range(&obj.field_a_, &obj.field_z_);
    */
   template <typename FirstT, typename LastT>
-  HSHM_INLINE_CROSS_FUN LocalDeserialize &read_range(FirstT *first,
+  CTP_INLINE_CROSS_FUN LocalDeserialize &read_range(FirstT *first,
                                                       LastT *last) {
     char *begin = reinterpret_cast<char *>(first);
     char *end = reinterpret_cast<char *>(last) + sizeof(LastT);
@@ -479,9 +479,9 @@ class LocalDeserialize {
 
   /** Load function (binary data).
    *  GPU: warp-parallel when warp_converged_, sequential otherwise. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   LocalDeserialize &read_binary(char *data, size_t size) {
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
     if (warp_converged_) {
       uint32_t lane_id = threadIdx.x & 31;
       if (lane_id == 0) {
@@ -504,7 +504,7 @@ class LocalDeserialize {
 #endif
     {
       if (cur_off_ + size > data_.size()) {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
         HLOG(kError,
              "LocalDeserialize::read_binary: Attempted to read beyond end of "
              "data");
@@ -520,6 +520,6 @@ class LocalDeserialize {
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_LOCAL_SERIALIZE_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_LOCAL_SERIALIZE_H_

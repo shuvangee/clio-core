@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_CONFIG_PARSE_PARSER_H
-#define HSHM_CONFIG_PARSE_PARSER_H
+#ifndef CTP_CONFIG_PARSE_PARSER_H
+#define CTP_CONFIG_PARSE_PARSER_H
 
 #include <float.h>
 #include <limits.h>
@@ -60,7 +60,7 @@
 #include "logging.h"
 #include "yaml-cpp/yaml.h"
 
-namespace hshm {
+namespace ctp {
 
 class ConfigParse {
  public:
@@ -199,24 +199,24 @@ class ConfigParse {
   }
 
   /** Converts \a size_text SIZE text into a size_t */
-  static hshm::u64 ParseSize(const std::string &size_text) {
+  static ctp::u64 ParseSize(const std::string &size_text) {
     auto size = ParseNumber<double>(size_text);
     if (size_text == "inf") {
-      return std::numeric_limits<hshm::u64>::max();
+      return std::numeric_limits<ctp::u64>::max();
     }
     std::string suffix = ParseNumberSuffix(size_text);
     if (suffix.empty()) {
-      return Unit<hshm::u64>::Bytes(size);
+      return Unit<ctp::u64>::Bytes(size);
     } else if (suffix[0] == 'k' || suffix[0] == 'K') {
-      return hshm::Unit<hshm::u64>::Kilobytes(size);
+      return ctp::Unit<ctp::u64>::Kilobytes(size);
     } else if (suffix[0] == 'm' || suffix[0] == 'M') {
-      return hshm::Unit<hshm::u64>::Megabytes(size);
+      return ctp::Unit<ctp::u64>::Megabytes(size);
     } else if (suffix[0] == 'g' || suffix[0] == 'G') {
-      return hshm::Unit<hshm::u64>::Gigabytes(size);
+      return ctp::Unit<ctp::u64>::Gigabytes(size);
     } else if (suffix[0] == 't' || suffix[0] == 'T') {
-      return hshm::Unit<hshm::u64>::Terabytes(size);
+      return ctp::Unit<ctp::u64>::Terabytes(size);
     } else if (suffix[0] == 'p' || suffix[0] == 'P') {
-      return hshm::Unit<hshm::u64>::Petabytes(size);
+      return ctp::Unit<ctp::u64>::Petabytes(size);
     } else {
       HLOG(kFatal, "Could not parse the size: {}", size_text);
       exit(1);
@@ -224,24 +224,24 @@ class ConfigParse {
   }
 
   /** Returns bandwidth (bytes / second) */
-  static hshm::u64 ParseBandwidth(const std::string &size_text) {
+  static ctp::u64 ParseBandwidth(const std::string &size_text) {
     return ParseSize(size_text);
   }
 
   /** Returns latency (nanoseconds) */
-  static hshm::u64 ParseLatency(const std::string &latency_text) {
+  static ctp::u64 ParseLatency(const std::string &latency_text) {
     auto size = ParseNumber<double>(latency_text);
     std::string suffix = ParseNumberSuffix(latency_text);
     if (suffix.empty()) {
-      return Unit<hshm::u64>::Bytes(size);
+      return Unit<ctp::u64>::Bytes(size);
     } else if (suffix[0] == 'n' || suffix[0] == 'N') {
-      return Unit<hshm::u64>::Bytes(size);
+      return Unit<ctp::u64>::Bytes(size);
     } else if (suffix[0] == 'u' || suffix[0] == 'U') {
-      return hshm::Unit<hshm::u64>::Kilobytes(size);
+      return ctp::Unit<ctp::u64>::Kilobytes(size);
     } else if (suffix[0] == 'm' || suffix[0] == 'M') {
-      return hshm::Unit<hshm::u64>::Megabytes(size);
+      return ctp::Unit<ctp::u64>::Megabytes(size);
     } else if (suffix[0] == 's' || suffix[0] == 'S') {
-      return hshm::Unit<hshm::u64>::Terabytes(size);
+      return ctp::Unit<ctp::u64>::Terabytes(size);
     }
     HLOG(kFatal, "Could not parse the latency: {}", latency_text);
     return 0;
@@ -254,8 +254,8 @@ class ConfigParse {
       size_t end = path.find("}", pos + 2);
       if (end == std::string::npos) break;
       std::string env_name = path.substr(pos + 2, end - pos - 2);
-      std::string env_val = hshm::SystemInfo::Getenv(
-          env_name.c_str(), hshm::Unit<size_t>::Megabytes(1));
+      std::string env_val = ctp::SystemInfo::Getenv(
+          env_name.c_str(), ctp::Unit<size_t>::Megabytes(1));
       path.replace(pos, end - pos + 1, env_val);
       pos += env_val.size();
     }
@@ -269,7 +269,7 @@ class ConfigParse {
     if (file.is_open()) {
       std::string line;
       while (std::getline(file, line)) {
-        hshm::ConfigParse::ParseHostNameString(line, hosts);
+        ctp::ConfigParse::ParseHostNameString(line, hosts);
       }
       file.close();
     } else {
@@ -329,7 +329,7 @@ class BaseConfig {
     YAML::Node yaml_conf = YAML::Load(config_string);
 #if defined(__has_feature)
 #if __has_feature(memory_sanitizer)
-    hshm::ConfigParse::MsanUnpoisonYamlNode(yaml_conf);
+    ctp::ConfigParse::MsanUnpoisonYamlNode(yaml_conf);
 #endif
 #endif
     ParseYAML(yaml_conf);
@@ -343,12 +343,12 @@ class BaseConfig {
     if (path.size() == 0) {
       return;
     }
-    auto real_path = hshm::ConfigParse::ExpandPath(path);
+    auto real_path = ctp::ConfigParse::ExpandPath(path);
     try {
       YAML::Node yaml_conf = YAML::LoadFile(real_path);
 #if defined(__has_feature)
 #if __has_feature(memory_sanitizer)
-      hshm::ConfigParse::MsanUnpoisonYamlNode(yaml_conf);
+      ctp::ConfigParse::MsanUnpoisonYamlNode(yaml_conf);
 #endif
 #endif
       ParseYAML(yaml_conf);
@@ -382,6 +382,6 @@ class BaseConfig {
   virtual void ParseYAML(YAML::Node &yaml_conf) = 0;
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_CONFIG_PARSE_PARSER_H
+#endif  // CTP_CONFIG_PARSE_PARSER_H

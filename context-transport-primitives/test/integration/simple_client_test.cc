@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
     
     // Create client using the selected backend
     if (protocol == "thallium") {
-        hshm::lbm::thallium::Client client;
+        ctp::lbm::thallium::Client client;
         std::cout << "Connecting to Thallium server..." << std::endl;
         client.Connect(url);
         std::string message = "Hello Thallium!";
@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
             std::cout << "❌ FAIL: Thallium round-trip failed" << std::endl;
         }
     } else {
-        hshm::lbm::Client client;
+        ctp::lbm::Client client;
         std::cout << "Connecting to ZMQ server..." << std::endl;
         client.Connect(url);
         // Add your ZMQ test logic here (existing logic)
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
         // Start timing the complete round-trip
         std::cout << "Starting round-trip test..." << std::endl;
         
-        hshm::Timer timer;
+        ctp::Timer timer;
         timer.Resume();
         
         // Send message (async)

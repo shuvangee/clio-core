@@ -125,7 +125,7 @@ git clone --depth 1 --branch ##GIT_BRANCH## \
     https://github.com/iowarp/clio-core.git /opt/iowarp
 
 cd /opt/iowarp
-# HSHM_LOG_LEVEL=0 (kDebug) compiles in all kDebug HLOG markers — needed
+# CTP_LOG_LEVEL=0 (kDebug) compiles in all kDebug HLOG markers — needed
 # to trace the SWIM probe RPC path. Default release preset uses 1 (kInfo)
 # which strips them entirely.
 cmake --preset ##CMAKE_PRESET## -DCMAKE_INSTALL_PREFIX=/usr/local \

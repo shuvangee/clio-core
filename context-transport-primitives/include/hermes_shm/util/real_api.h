@@ -33,7 +33,7 @@
 
 #ifndef HERMES_ADAPTER_API_H
 #define HERMES_ADAPTER_API_H
-#if HSHM_ENABLE_ELF
+#if CTP_ENABLE_ELF
 
 #include <fcntl.h>
 #undef DEPRECATED
@@ -54,7 +54,7 @@
     HLOG(kFatal, "HERMES Adapter failed to map symbol: {}", #api_name); \
   }
 
-namespace hshm {
+namespace ctp {
 
 struct RealApi {
   const char *symbol_name_ = nullptr;
@@ -234,7 +234,7 @@ struct PreloadProgress {
     //   exe_path[0] = '\0';
     // }
 
-    posix_ = hshm::Singleton<PosixT>::GetInstance();
+    posix_ = ctp::Singleton<PosixT>::GetInstance();
     if (!LoadElf(api.intercepted_lib_path_)) {
       // if (!LoadElf(exe_path)) {
       return;
@@ -244,8 +244,8 @@ struct PreloadProgress {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
 #undef DEPRECATED
-#endif  // HSHM_ENABLE_ELF
+#endif  // CTP_ENABLE_ELF
 #endif  // HERMES_ADAPTER_API_H

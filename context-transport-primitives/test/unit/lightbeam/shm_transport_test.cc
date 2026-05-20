@@ -40,7 +40,7 @@
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 // Shared copy-space buffer and synchronization primitives
 static constexpr size_t kCopySpaceSize = 256;
@@ -275,7 +275,7 @@ void TestShmPtrPassthrough() {
   Bulk bulk;
   bulk.data = shm_ptr;
   bulk.size = 4096;
-  bulk.flags = hshm::bitfield32_t(BULK_XFER);
+  bulk.flags = ctp::bitfield32_t(BULK_XFER);
   send_meta.send.push_back(bulk);
   send_meta.send_bulks = 1;
 
@@ -333,7 +333,7 @@ void TestMixedBulks() {
   Bulk bulk1;
   bulk1.data = shm_ptr;
   bulk1.size = 8192;
-  bulk1.flags = hshm::bitfield32_t(BULK_XFER);
+  bulk1.flags = ctp::bitfield32_t(BULK_XFER);
   send_meta.send.push_back(bulk1);
   send_meta.send_bulks = 2;
 
@@ -487,7 +487,7 @@ void TestShmBulkExposeFlag() {
   Bulk bulk;
   bulk.data = shm_ptr;
   bulk.size = 2048;
-  bulk.flags = hshm::bitfield32_t(BULK_EXPOSE);
+  bulk.flags = ctp::bitfield32_t(BULK_EXPOSE);
   send_meta.send.push_back(bulk);
   send_meta.send_bulks = 0;  // No BULK_XFER entries
 

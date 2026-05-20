@@ -317,9 +317,9 @@ class PoolManager {
 }  // namespace chi
 
 // Global pointer variable declaration for Pool manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(chi::PoolManager, g_pool_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(chi::PoolManager, g_pool_manager);
 
 // Macro for accessing the Pool manager singleton using global pointer variable
-#define CHI_POOL_MANAGER HSHM_GET_GLOBAL_PTR_VAR(::chi::PoolManager, g_pool_manager)
+#define CHI_POOL_MANAGER CTP_GET_GLOBAL_PTR_VAR(::chi::PoolManager, g_pool_manager)
 
 #endif  // CHIMAERA_INCLUDE_CHIMAERA_MANAGERS_POOL_MANAGER_H_

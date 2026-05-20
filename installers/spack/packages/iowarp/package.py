@@ -117,21 +117,21 @@ class Iowarp(CMakePackage):
 
         # Context-transport-primitives (HSHM) options
         if '+hdf5' in self.spec:
-            args.append(self.define('HSHM_ENABLE_VFD', 'ON'))
+            args.append(self.define('CTP_ENABLE_VFD', 'ON'))
         if '+compress' in self.spec:
-            args.append(self.define('HSHM_ENABLE_COMPRESS', 'ON'))
+            args.append(self.define('CTP_ENABLE_COMPRESS', 'ON'))
         if '+encrypt' in self.spec:
-            args.append(self.define('HSHM_ENABLE_ENCRYPT', 'ON'))
+            args.append(self.define('CTP_ENABLE_ENCRYPT', 'ON'))
         if '+mochi' in self.spec:
             args.append(self.define('WRP_CORE_ENABLE_THALLIUM', 'ON'))
         if '+zmq' in self.spec:
-            args.append(self.define('HSHM_ENABLE_ZMQ_TESTS', 'ON'))
+            args.append(self.define('CTP_ENABLE_ZMQ_TESTS', 'ON'))
         if '+elf' in self.spec:
-            args.append(self.define('HSHM_ENABLE_ELF', 'ON'))
+            args.append(self.define('CTP_ENABLE_ELF', 'ON'))
         if '+cuda' in self.spec:
-            args.append(self.define('HSHM_ENABLE_CUDA', 'ON'))
+            args.append(self.define('CTP_ENABLE_CUDA', 'ON'))
         if '+rocm' in self.spec:
-            args.append(self.define('HSHM_ENABLE_ROCM', 'ON'))
+            args.append(self.define('CTP_ENABLE_ROCM', 'ON'))
         if '+adios2' in self.spec:
             args.append(self.define('WRP_CTE_ENABLE_ADIOS2_ADAPTER', 'ON'))
             args.append(self.define('WRP_CORE_ENABLE_GRAY_SCOTT', 'ON'))
@@ -139,14 +139,14 @@ class Iowarp(CMakePackage):
         # Tests and benchmarks
         if '+test' in self.spec:
             args.append(self.define('WRP_CORE_ENABLE_TESTS', 'ON'))
-            args.append(self.define('HSHM_ENABLE_TESTS', 'ON'))
+            args.append(self.define('CTP_ENABLE_TESTS', 'ON'))
             args.append(self.define('CHIMAERA_ENABLE_TESTS', 'ON'))
             args.append(self.define('WRP_CTE_ENABLE_TESTS', 'ON'))
             args.append(self.define('WRP_CAE_ENABLE_TESTS', 'ON'))
             args.append(self.define('WRP_CEE_ENABLE_TESTS', 'ON'))
         else:
             args.append(self.define('WRP_CORE_ENABLE_TESTS', 'OFF'))
-            args.append(self.define('HSHM_ENABLE_TESTS', 'OFF'))
+            args.append(self.define('CTP_ENABLE_TESTS', 'OFF'))
             args.append(self.define('CHIMAERA_ENABLE_TESTS', 'OFF'))
             args.append(self.define('WRP_CTE_ENABLE_TESTS', 'OFF'))
             args.append(self.define('WRP_CAE_ENABLE_TESTS', 'OFF'))
@@ -154,14 +154,14 @@ class Iowarp(CMakePackage):
 
         if '+benchmark' in self.spec:
             args.append(self.define('WRP_CORE_ENABLE_BENCHMARKS', 'ON'))
-            args.append(self.define('HSHM_ENABLE_BENCHMARKS', 'ON'))
+            args.append(self.define('CTP_ENABLE_BENCHMARKS', 'ON'))
             args.append(self.define('CHIMAERA_ENABLE_BENCHMARKS', 'ON'))
             args.append(self.define('WRP_CTE_ENABLE_BENCHMARKS', 'ON'))
             args.append(self.define('WRP_CAE_ENABLE_BENCHMARKS', 'ON'))
             args.append(self.define('WRP_CEE_ENABLE_BENCHMARKS', 'ON'))
         else:
             args.append(self.define('WRP_CORE_ENABLE_BENCHMARKS', 'OFF'))
-            args.append(self.define('HSHM_ENABLE_BENCHMARKS', 'OFF'))
+            args.append(self.define('CTP_ENABLE_BENCHMARKS', 'OFF'))
             args.append(self.define('CHIMAERA_ENABLE_BENCHMARKS', 'OFF'))
             args.append(self.define('WRP_CTE_ENABLE_BENCHMARKS', 'OFF'))
             args.append(self.define('WRP_CAE_ENABLE_BENCHMARKS', 'OFF'))

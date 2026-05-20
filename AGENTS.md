@@ -117,20 +117,20 @@ Keeep code simple. Do not allow functions to be more than 100 lines of code. Mak
 
 Use the Google C++ style guide for C++.
 
-You should store the pointer returned by the singleton GetInstance method. Avoid dereferencing GetInstance method directly using either -> or *. E.g., do not do ``hshm::Singleton<T>::GetInstance()->var_``. You should do ``auto *x = hshm::Singleton<T>::GetInstance(); x->var_;``.
+You should store the pointer returned by the singleton GetInstance method. Avoid dereferencing GetInstance method directly using either -> or *. E.g., do not do ``ctp::Singleton<T>::GetInstance()->var_``. You should do ``auto *x = ctp::Singleton<T>::GetInstance(); x->var_;``.
 
 Whenever you build a new function, always create a docstring for it. It should document what the parameters mean and the point of the function. It should be something easily parsed by doxygen.
 
 ### GPU Compiler Macro Rule
 
-**NEVER** use raw GPU compiler-detection macros (`__CUDACC__`, `__HIPCC__`, `__HIP__`, `__CUDA_ARCH__`, `__HIP_DEVICE_COMPILE__`) anywhere except `context-transport-primitives/include/hermes_shm/constants/macros.h`. We do not want code paths to compile just because a GPU compiler is being used — we need the explicit CMake build flags (`HSHM_ENABLE_CUDA`, `HSHM_ENABLE_ROCM`) to be set as well.
+**NEVER** use raw GPU compiler-detection macros (`__CUDACC__`, `__HIPCC__`, `__HIP__`, `__CUDA_ARCH__`, `__HIP_DEVICE_COMPILE__`) anywhere except `context-transport-primitives/include/hermes_shm/constants/macros.h`. We do not want code paths to compile just because a GPU compiler is being used — we need the explicit CMake build flags (`CTP_ENABLE_CUDA`, `CTP_ENABLE_ROCM`) to be set as well.
 
 **Use these macros instead:**
-- `HSHM_IS_GPU` — true when compiling device code (replaces `__CUDA_ARCH__` / `__HIP_DEVICE_COMPILE__`)
-- `HSHM_IS_HOST` — true when compiling host code
-- `HSHM_IS_GPU_COMPILER` — true when compiled by nvcc or hipcc AND the build flag is set (replaces `__CUDACC__` / `__HIPCC__`)
-- `HSHM_IS_CUDA_COMPILER` — CUDA-specific compiler check (replaces `HSHM_ENABLE_CUDA && __CUDACC__`)
-- `HSHM_IS_ROCM_COMPILER` — ROCm-specific compiler check (replaces `HSHM_ENABLE_ROCM && __HIPCC__`)
+- `CTP_IS_GPU` — true when compiling device code (replaces `__CUDA_ARCH__` / `__HIP_DEVICE_COMPILE__`)
+- `CTP_IS_HOST` — true when compiling host code
+- `CTP_IS_GPU_COMPILER` — true when compiled by nvcc or hipcc AND the build flag is set (replaces `__CUDACC__` / `__HIPCC__`)
+- `CTP_IS_CUDA_COMPILER` — CUDA-specific compiler check (replaces `CTP_ENABLE_CUDA && __CUDACC__`)
+- `CTP_IS_ROCM_COMPILER` — ROCm-specific compiler check (replaces `CTP_ENABLE_ROCM && __HIPCC__`)
 
 ## File Headers
 
@@ -216,11 +216,11 @@ This ensures a clean state for each runtime initialization without requiring man
 ### IPC Path Convention
 
 **CRITICAL**: Never hardcode `/tmp/chimaera_*` paths in IpcManager or elsewhere. Always use the `SystemInfo` helpers:
-- `hshm::SystemInfo::GetMemfdDir()` — returns `/tmp/chimaera_$USER`
-- `hshm::SystemInfo::GetMemfdPath(name)` — returns `/tmp/chimaera_$USER/<name>` (strips leading `/`)
-- `hshm::SystemInfo::EnsureMemfdDir()` — creates the directory if it doesn't exist
+- `ctp::SystemInfo::GetMemfdDir()` — returns `/tmp/chimaera_$USER`
+- `ctp::SystemInfo::GetMemfdPath(name)` — returns `/tmp/chimaera_$USER/<name>` (strips leading `/`)
+- `ctp::SystemInfo::EnsureMemfdDir()` — creates the directory if it doesn't exist
 
-For IPC Unix domain socket paths, use: `hshm::SystemInfo::GetMemfdPath("chimaera_" + std::to_string(port) + ".ipc")`
+For IPC Unix domain socket paths, use: `ctp::SystemInfo::GetMemfdPath("chimaera_" + std::to_string(port) + ".ipc")`
 
 ## Workflow
 
@@ -288,7 +288,7 @@ The build system uses **relative RPATHs** (`$ORIGIN`) for portable, relocatable 
 
 ### HSHM Usage
 
-Always use HSHM_MCTX macro unless we are writing GPU code, which necessitates a specific mctx to be created.
+Always use CTP_MCTX macro unless we are writing GPU code, which necessitates a specific mctx to be created.
 
 ### ChiMod Build Patterns
 
@@ -514,7 +514,7 @@ Use the unified `find_package(iowarp-core)` which automatically includes all com
 find_package(iowarp-core REQUIRED)
 # This automatically provides:
 #   Core Components:
-#     - All hshm::* modular targets (hshm::cxx, hshm::configure, hshm::serialize, etc.)
+#     - All ctp::* modular targets (ctp::cxx, ctp::configure, ctp::serialize, etc.)
 #     - chimaera::cxx (core runtime library)
 #     - ChiMod build utilities (add_chimod_client, add_chimod_runtime, etc.)
 #
@@ -534,13 +534,13 @@ target_link_libraries(your_target
   wrp_cae::core_client       # CAE ChiMod (if enabled)
 )
 # Dependencies are automatically included by ChiMod libraries
-# No need to manually link hshm::cxx or chimaera::cxx
+# No need to manually link ctp::cxx or chimaera::cxx
 ```
 
 **Alternative (Manual):**
 If you need finer control, you can still find packages individually:
 ```cmake
-find_package(HermesShm REQUIRED)        # Provides hshm::* targets
+find_package(HermesShm REQUIRED)        # Provides ctp::* targets
 find_package(chimaera REQUIRED)         # Provides chimaera::cxx
 find_package(chimaera_admin REQUIRED)   # Provides admin ChiMod
 find_package(chimaera_bdev REQUIRED)    # Provides bdev ChiMod
@@ -554,108 +554,108 @@ HSHM (HermesShm/context-transport-primitives) provides modular INTERFACE library
 
 **Available Modular Targets:**
 
-- **`hshm::cxx`** - Core HSHM library
+- **`ctp::cxx`** - Core HSHM library
   - Provides: Basic shared memory and data structures
   - Links to: `configure`, `thread_all`
   - Always required by all HSHM users
 
-- **`hshm::configure`** - Configuration parsing (yaml-cpp)
+- **`ctp::configure`** - Configuration parsing (yaml-cpp)
   - Provides: YAML configuration file parsing
   - Use instead of linking to yaml-cpp directly
   - Compile definitions: None (yaml-cpp is always enabled)
 
-- **`hshm::serialize`** - Serialization (cereal)
+- **`ctp::serialize`** - Serialization (cereal)
   - Provides: Object serialization/deserialization
   - Use instead of linking to cereal directly
-  - Compile definitions: `HSHM_ENABLE_CEREAL`
+  - Compile definitions: `CTP_ENABLE_CEREAL`
 
-- **`hshm::interceptor`** - ELF interception
+- **`ctp::interceptor`** - ELF interception
   - Provides: Dynamic library interception support
   - Required for: Adapter real API functionality
-  - Compile definitions: `HSHM_ENABLE_ELF`
+  - Compile definitions: `CTP_ENABLE_ELF`
 
-- **`hshm::lightbeam`** - Network transport (ZeroMQ, libfabric, Thallium)
+- **`ctp::lightbeam`** - Network transport (ZeroMQ, libfabric, Thallium)
   - Provides: High-performance network communication
   - Used by: Chimaera runtime for distributed operations
-  - Compile definitions: `HSHM_ENABLE_ZMQ`, `HSHM_ENABLE_LIBFABRIC`, `HSHM_ENABLE_THALLIUM`
+  - Compile definitions: `CTP_ENABLE_ZMQ`, `CTP_ENABLE_LIBFABRIC`, `CTP_ENABLE_THALLIUM`
 
-- **`hshm::thread_all`** - Threading support
+- **`ctp::thread_all`** - Threading support
   - Provides: pthread, OpenMP support
   - Includes: Thread model definitions
-  - Compile definitions: `HSHM_ENABLE_OPENMP`, `HSHM_ENABLE_PTHREADS`, `HSHM_ENABLE_WINDOWS_THREADS`, `HSHM_DEFAULT_THREAD_MODEL`, `HSHM_DEFAULT_THREAD_MODEL_GPU`
+  - Compile definitions: `CTP_ENABLE_OPENMP`, `CTP_ENABLE_PTHREADS`, `CTP_ENABLE_WINDOWS_THREADS`, `CTP_DEFAULT_THREAD_MODEL`, `CTP_DEFAULT_THREAD_MODEL_GPU`
 
-- **`hshm::mpi`** - MPI support
+- **`ctp::mpi`** - MPI support
   - Provides: Message Passing Interface
   - Use only where MPI is actually needed
-  - Compile definitions: `HSHM_ENABLE_MPI`
+  - Compile definitions: `CTP_ENABLE_MPI`
 
-- **`hshm::compress`** - Compression libraries
+- **`ctp::compress`** - Compression libraries
   - Provides: Data compression support
-  - Compile definitions: `HSHM_ENABLE_COMPRESS`
+  - Compile definitions: `CTP_ENABLE_COMPRESS`
 
-- **`hshm::encrypt`** - Encryption libraries
+- **`ctp::encrypt`** - Encryption libraries
   - Provides: Data encryption support
-  - Compile definitions: `HSHM_ENABLE_ENCRYPT`
+  - Compile definitions: `CTP_ENABLE_ENCRYPT`
 
-- **`hshm::cuda_cxx`** - CUDA GPU support
+- **`ctp::cuda_cxx`** - CUDA GPU support
   - Provides: CUDA-enabled HSHM library for GPU code
   - Use for: CUDA kernel code and GPU device functions
-  - Compile definitions: `HSHM_ENABLE_CUDA=1`, `HSHM_ENABLE_ROCM=0`
-  - Note: Only available when `HSHM_ENABLE_CUDA=ON` at build time
+  - Compile definitions: `CTP_ENABLE_CUDA=1`, `CTP_ENABLE_ROCM=0`
+  - Note: Only available when `CTP_ENABLE_CUDA=ON` at build time
 
-- **`hshm::rocm_cxx`** - ROCm GPU support
+- **`ctp::rocm_cxx`** - ROCm GPU support
   - Provides: ROCm-enabled HSHM library for GPU code
   - Use for: HIP kernel code and GPU device functions
-  - Compile definitions: `HSHM_ENABLE_ROCM=1`, `HSHM_ENABLE_CUDA=0`
-  - Note: Only available when `HSHM_ENABLE_ROCM=ON` at build time
+  - Compile definitions: `CTP_ENABLE_ROCM=1`, `CTP_ENABLE_CUDA=0`
+  - Note: Only available when `CTP_ENABLE_ROCM=ON` at build time
 
-- **`hshm::nixl`** - NIXL (NVIDIA Inference Xfer Library) transport
+- **`ctp::nixl`** - NIXL (NVIDIA Inference Xfer Library) transport
   - Provides: NIXL-backed data movement (DRAM→FILE via POSIX, DRAM→DRAM via memcpy)
   - Use for: High-performance CPU→storage transfers and future GPU→storage (GDS)
-  - Compile definitions: `HSHM_ENABLE_NIXL=1`
+  - Compile definitions: `CTP_ENABLE_NIXL=1`
   - Build option: `WRP_CORE_ENABLE_NIXL=ON`
   - Note: Requires NIXL installed at `/usr/local` (built with POSIX backend)
 
-- **`hshm::nvshmem`** - NVSHMEM GPU-to-GPU communication
+- **`ctp::nvshmem`** - NVSHMEM GPU-to-GPU communication
   - Provides: NVSHMEM compile definitions for GPU peer-to-peer communication
-  - Compile definitions: `HSHM_ENABLE_NVSHMEM=1`
+  - Compile definitions: `CTP_ENABLE_NVSHMEM=1`
   - Build option: `WRP_CORE_ENABLE_NVSHMEM=ON`
   - Note: Requires NVSHMEM from NVIDIA developer portal
 
 **Linking Guidelines:**
 
-1. **Never link to yaml-cpp directly** - Use `hshm::configure` instead (except within hshm::configure itself)
-2. **Never link to cereal directly** - Use `hshm::serialize` instead
+1. **Never link to yaml-cpp directly** - Use `ctp::configure` instead (except within ctp::configure itself)
+2. **Never link to cereal directly** - Use `ctp::serialize` instead
 3. **Be selective** - Only link to the modular targets you actually need
-4. **ChiMod clients** - Should only link to `hshm::cxx` (automatically included)
+4. **ChiMod clients** - Should only link to `ctp::cxx` (automatically included)
 5. **ChiMod runtimes** - May link to additional modular targets as needed
 6. **Tests** - Link only to the specific modular targets they test
-7. **GPU code** - Use `hshm::cuda_cxx` or `hshm::rocm_cxx` for GPU kernel code; use `hshm::cxx` for host code
+7. **GPU code** - Use `ctp::cuda_cxx` or `ctp::rocm_cxx` for GPU kernel code; use `ctp::cxx` for host code
 
 **Example Usage:**
 ```cmake
 # External application needing configuration and serialization
 target_link_libraries(my_app
-  wrp_cte::core_client      # Provides hshm::cxx automatically
-  hshm::configure           # For YAML config parsing
-  hshm::serialize           # For object serialization
+  wrp_cte::core_client      # Provides ctp::cxx automatically
+  ctp::configure           # For YAML config parsing
+  ctp::serialize           # For object serialization
 )
 
 # Adapter needing ELF interception
 target_link_libraries(my_adapter
-  hshm::cxx
-  hshm::interceptor         # For real API functionality
+  ctp::cxx
+  ctp::interceptor         # For real API functionality
 )
 
 # Test needing MPI
 target_link_libraries(my_test
-  hshm::cxx
-  hshm::mpi                 # Only link MPI where needed
+  ctp::cxx
+  ctp::mpi                 # Only link MPI where needed
 )
 
 # GPU application using CUDA
 target_link_libraries(my_cuda_kernel
-  hshm::cuda_cxx            # For GPU kernel code
+  ctp::cuda_cxx            # For GPU kernel code
 )
 ```
 

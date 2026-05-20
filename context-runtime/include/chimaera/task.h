@@ -60,7 +60,7 @@ using pid_t = int;
 #include <hermes_shm/data_structures/serialization/global_serialize.h>
 
 // Forward declare chi::priv::string for cereal support
-namespace hshm::priv {
+namespace ctp::priv {
 template <typename T, typename AllocT, size_t SmallSize>
 class basic_string;
 }
@@ -157,19 +157,19 @@ struct TaskGroup {
   int64_t id_{-1}; /**< Group identifier; -1 = null (no group) */
 
   /** Default constructor - null group */
-  HSHM_CROSS_FUN TaskGroup() : id_(-1) {}
+  CTP_CROSS_FUN TaskGroup() : id_(-1) {}
 
   /** Construct with explicit group ID */
-  HSHM_CROSS_FUN explicit TaskGroup(int64_t id) : id_(id) {}
+  CTP_CROSS_FUN explicit TaskGroup(int64_t id) : id_(id) {}
 
   /** Check if this group is null (unassigned) */
-  HSHM_CROSS_FUN bool IsNull() const { return id_ == -1; }
+  CTP_CROSS_FUN bool IsNull() const { return id_ == -1; }
 
   /** Equality operators */
-  HSHM_CROSS_FUN bool operator==(const TaskGroup& o) const {
+  CTP_CROSS_FUN bool operator==(const TaskGroup& o) const {
     return id_ == o.id_;
   }
-  HSHM_CROSS_FUN bool operator!=(const TaskGroup& o) const {
+  CTP_CROSS_FUN bool operator!=(const TaskGroup& o) const {
     return id_ != o.id_;
   }
 };
@@ -217,7 +217,7 @@ class Task {
    *  Unconditional so sizeof(Task) is identical on CPU and GPU. */
   TEMP uintptr_t host_run_ctx_ = 0;
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   RunContext* GetRunCtx() { return reinterpret_cast<RunContext*>(host_run_ctx_); }
   const RunContext* GetRunCtx() const { return reinterpret_cast<const RunContext*>(host_run_ctx_); }
   void SetRunCtx(RunContext* ctx) { host_run_ctx_ = reinterpret_cast<uintptr_t>(ctx); }
@@ -228,11 +228,11 @@ class Task {
   /**
    * Destructor — must explicitly free RunContext since we no longer use unique_ptr.
    * Host pass uses the out-of-line definition in task.cc; any device pass
-   * (CUDA/ROCm/SYCL) uses `= default`. Switching from HSHM_IS_HOST to
-   * !HSHM_IS_DEVICE_PASS lets DPC++'s SYCL device pass — where HSHM_IS_HOST=1 —
+   * (CUDA/ROCm/SYCL) uses `= default`. Switching from CTP_IS_HOST to
+   * !CTP_IS_DEVICE_PASS lets DPC++'s SYCL device pass — where CTP_IS_HOST=1 —
    * pick the inline default destructor instead of an unresolved declaration.
    */
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
   ~Task();
 #else
   ~Task() = default;
@@ -241,12 +241,12 @@ class Task {
   /**
    * Default constructor
    */
-  HSHM_CROSS_FUN Task() { pod_size_ = 0; host_run_ctx_ = 0; SetNull(); }
+  CTP_CROSS_FUN Task() { pod_size_ = 0; host_run_ctx_ = 0; SetNull(); }
 
   /**
    * Emplace constructor with task initialization
    */
-  HSHM_CROSS_FUN explicit Task(const TaskId& task_id, const PoolId& pool_id,
+  CTP_CROSS_FUN explicit Task(const TaskId& task_id, const PoolId& pool_id,
                                const PoolQuery& pool_query,
                                const MethodId& method) {
     // Initialize task
@@ -270,7 +270,7 @@ class Task {
    *
    * @param other Pointer to the source task to copy from
    */
-  HSHM_CROSS_FUN void Copy(const hipc::FullPtr<Task>& other) {
+  CTP_CROSS_FUN void Copy(const hipc::FullPtr<Task>& other) {
     pool_id_ = other->pool_id_;
     task_id_ = other->task_id_;
     pool_query_ = other->pool_query_;
@@ -286,14 +286,14 @@ class Task {
   /**
    * SetNull implementation
    */
-  HSHM_INLINE_CROSS_FUN void SetNull() {
+  CTP_INLINE_CROSS_FUN void SetNull() {
     pool_id_ = PoolId::GetNull();
     task_id_ = TaskId();
     pool_query_ = PoolQuery();
     method_ = 0;
     task_flags_.Clear();
     period_ns_ = 0.0;
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     DestroyRunCtx();
 #endif
     return_code_.store(0);  // Initialize as success
@@ -305,7 +305,7 @@ class Task {
    * Check if task is periodic
    * @return true if task has periodic flag set
    */
-  HSHM_CROSS_FUN bool IsPeriodic() const {
+  CTP_CROSS_FUN bool IsPeriodic() const {
     return task_flags_.Any(TASK_PERIODIC);
   }
 
@@ -313,13 +313,13 @@ class Task {
    * Check if task has been routed
    * @return true if task has routed flag set
    */
-  HSHM_CROSS_FUN bool IsRouted() const { return task_flags_.Any(TASK_ROUTED); }
+  CTP_CROSS_FUN bool IsRouted() const { return task_flags_.Any(TASK_ROUTED); }
 
   /**
    * Check if task is the data owner
    * @return true if task has data owner flag set
    */
-  HSHM_CROSS_FUN bool IsDataOwner() const {
+  CTP_CROSS_FUN bool IsDataOwner() const {
     return task_flags_.Any(TASK_DATA_OWNER);
   }
 
@@ -327,14 +327,14 @@ class Task {
    * Check if task is a remote task (received from another node)
    * @return true if task has remote flag set
    */
-  HSHM_CROSS_FUN bool IsRemote() const { return task_flags_.Any(TASK_REMOTE); }
+  CTP_CROSS_FUN bool IsRemote() const { return task_flags_.Any(TASK_REMOTE); }
 
   /**
    * Get task execution period in specified time unit
    * @param unit Time unit constant (kNano, kMicro, kMilli, kSec, kMin, kHour)
    * @return Period in specified unit, 0 if not periodic
    */
-  HSHM_CROSS_FUN double GetPeriod(double unit) const {
+  CTP_CROSS_FUN double GetPeriod(double unit) const {
     return period_ns_ / unit;
   }
 
@@ -343,7 +343,7 @@ class Task {
    * @param period Period value in the specified unit
    * @param unit Time unit constant (kNano, kMicro, kMilli, kSec, kMin, kHour)
    */
-  HSHM_CROSS_FUN void SetPeriod(double period, double unit) {
+  CTP_CROSS_FUN void SetPeriod(double period, double unit) {
     period_ns_ = period * unit;
   }
 
@@ -351,13 +351,13 @@ class Task {
    * Set task flags
    * @param flags Bitfield of task flags to set
    */
-  HSHM_CROSS_FUN void SetFlags(u32 flags) { task_flags_.SetBits(flags); }
+  CTP_CROSS_FUN void SetFlags(u32 flags) { task_flags_.SetBits(flags); }
 
   /**
    * Clear task flags
    * @param flags Bitfield of task flags to clear
    */
-  HSHM_CROSS_FUN void ClearFlags(u32 flags) { task_flags_.UnsetBits(flags); }
+  CTP_CROSS_FUN void ClearFlags(u32 flags) { task_flags_.UnsetBits(flags); }
 
   /**
    * Serialize data structures to chi::priv::string using GlobalSerialize
@@ -369,7 +369,7 @@ class Task {
   static void Serialize(CHI_PRIV_ALLOC_T* alloc,
                         chi::priv::string& output_str, const Args&... args) {
     std::vector<char> buffer;
-    hshm::ipc::GlobalSerialize<std::vector<char>> ar(buffer);
+    ctp::ipc::GlobalSerialize<std::vector<char>> ar(buffer);
     ar(args...);
     ar.Finalize();
     std::string serialized(buffer.begin(), buffer.end());
@@ -385,7 +385,7 @@ class Task {
   static OutT Deserialize(const chi::priv::string& input_str) {
     std::vector<char> data(input_str.data(),
                            input_str.data() + input_str.size());
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ar(data);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ar(data);
     OutT result;
     ar(result);
     return result;
@@ -402,7 +402,7 @@ class Task {
    * @param ar Archive to serialize to
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive& ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive& ar) {
     ar.range(pool_id_, task_id_, pool_query_, method_, task_flags_,
              period_ns_, task_group_, return_code_, completer_);
   }
@@ -418,7 +418,7 @@ class Task {
    * @param ar Archive to serialize to
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive& ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive& ar) {
     ar.range(return_code_, completer_);
   }
 
@@ -426,13 +426,13 @@ class Task {
    * Get the task return code
    * @return Return code (0=success, non-zero=error)
    */
-  HSHM_CROSS_FUN u32 GetReturnCode() const { return return_code_.load(); }
+  CTP_CROSS_FUN u32 GetReturnCode() const { return return_code_.load(); }
 
   /**
    * Set the task return code
    * @param return_code Return code to set (0=success, non-zero=error)
    */
-  HSHM_CROSS_FUN void SetReturnCode(u32 return_code) {
+  CTP_CROSS_FUN void SetReturnCode(u32 return_code) {
     return_code_.store(return_code);
   }
 
@@ -440,7 +440,7 @@ class Task {
    * Get the completer container ID (which container completed this task)
    * @return Container ID that completed this task
    */
-  HSHM_CROSS_FUN ContainerId GetCompleter() const { return completer_.load(); }
+  CTP_CROSS_FUN ContainerId GetCompleter() const { return completer_.load(); }
 
   /**
    * Post-wait callback called after task completion
@@ -456,7 +456,7 @@ class Task {
    * Set the completer container ID (which container completed this task)
    * @param completer Container ID to set
    */
-  HSHM_CROSS_FUN void SetCompleter(ContainerId completer) {
+  CTP_CROSS_FUN void SetCompleter(ContainerId completer) {
     completer_.store(completer);
   }
 
@@ -489,7 +489,7 @@ class Task {
    * Default is 4KB (4096 bytes) for most tasks
    * @return Size in bytes for the serialized_task_ capacity
    */
-  HSHM_CROSS_FUN size_t GetCopySpaceSize() const {
+  CTP_CROSS_FUN size_t GetCopySpaceSize() const {
     return 4096;  // Default 4KB for most tasks
   }
 
@@ -499,7 +499,7 @@ class Task {
    * fields to re-seat inline (SVO) pointers to the new host address.
    * Default is a no-op for pure POD tasks.
    */
-  HSHM_CROSS_FUN void FixupAfterCopy() {}
+  CTP_CROSS_FUN void FixupAfterCopy() {}
 };
 
 }  // namespace chi
@@ -594,7 +594,7 @@ struct RunContext {
   FullPtr<Task> task_;          /**< Task being executed by this context */
   bool is_yielded_;             /**< Task is waiting for completion */
   double yield_time_us_;        /**< Time in microseconds for task to yield */
-  hshm::Timepoint block_start_; /**< Time when task was blocked (real time) */
+  ctp::Timepoint block_start_; /**< Time when task was blocked (real time) */
   Container* container_;        /**< Current container being executed */
   TaskLane* lane_;              /**< Current lane being processed */
   void* event_queue_;           /**< Pointer to worker's event queue */
@@ -614,9 +614,9 @@ struct RunContext {
                                      queue additions */
   double true_period_ns_;         /**< Original period from task->period_ns_ */
   bool did_work_;            /**< Whether task did work in last execution */
-  hshm::CpuTimer cpu_timer_; /**< Accumulates thread CPU time across yields */
+  ctp::CpuTimer cpu_timer_; /**< Accumulates thread CPU time across yields */
   float predicted_load_ = 0; /**< Predicted CPU time from InferModel (us) */
-  hshm::HighResMonotonicTimer wall_timer_; /**< Wall clock time across yields */
+  ctp::HighResMonotonicTimer wall_timer_; /**< Wall clock time across yields */
   float predicted_wall_us_ =
       0; /**< Predicted wall time from InferWallClockTime */
   TaskStat
@@ -721,7 +721,7 @@ struct RunContext {
     subtasks_.clear();
     completed_replicas_.store(0);
     yield_time_us_ = 0.0;
-    block_start_ = hshm::Timepoint();
+    block_start_ = ctp::Timepoint();
     yield_count_ = 0;
     is_notified_.store(false);
     true_period_ns_ = 0.0;

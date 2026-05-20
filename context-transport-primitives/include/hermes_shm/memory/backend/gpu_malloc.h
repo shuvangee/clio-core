@@ -34,7 +34,7 @@
 #ifndef GPU_MALLOC_H
 #define GPU_MALLOC_H
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
 
 #include <string>
 
@@ -45,7 +45,7 @@
 #include "hermes_shm/util/logging.h"
 #include "memory_backend.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * GPU-only memory backend using cudaMalloc/hipMalloc
@@ -62,7 +62,7 @@ class GpuMalloc : public MemoryBackend, public UrlMemoryBackend {
 
  public:
   /** Constructor */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   GpuMalloc() = default;
 
   /** Destructor */
@@ -214,8 +214,8 @@ class GpuMalloc : public MemoryBackend, public UrlMemoryBackend {
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#endif  // CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
 
 #endif  // GPU_MALLOC_H

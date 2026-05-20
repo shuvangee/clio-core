@@ -19,7 +19,7 @@
  *    verify on the host.
  */
 
-#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#if (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL
 
 #include "simple_test.h"
 
@@ -45,9 +45,9 @@ bool g_initialized = false;
 
 /** Bring up Chimaera + CTE core pool exactly once. Body gated to host
  *  pass: the device pass parses the function but never runs it, and
- *  cte_client->AsyncCreate is HSHM_IS_HOST-only. */
+ *  cte_client->AsyncCreate is CTP_IS_HOST-only. */
 void EnsureInit() {
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
   if (g_initialized) return;
   std::fprintf(stderr, "[INIT] Starting Chimaera server (gpu_vector test)\n");
   REQUIRE(chi::CHIMAERA_INIT(chi::ChimaeraMode::kServer));
@@ -122,7 +122,7 @@ __global__ void GpuVectorReadKernel(chi::IpcManagerGpuInfo info,
   (void)g_ipc_manager;
 }
 
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 
 TEST_CASE("gpu_vector: write then read round-trip",
           "[gpu_vector][cte][stress]") {
@@ -152,22 +152,22 @@ TEST_CASE("gpu_vector: write then read round-trip",
   auto view = vec.Device();
   chi::IpcManagerGpuInfo gpu_info = ipc->GetGpuIpcManager()->GetGpuInfo(0);
 
-  // hshm::GpuApi::MallocHost takes BYTES (not elements).
-  auto *result = hshm::GpuApi::MallocHost<chi::u32>(
+  // ctp::GpuApi::MallocHost takes BYTES (not elements).
+  auto *result = ctp::GpuApi::MallocHost<chi::u32>(
       total * sizeof(chi::u32));
   REQUIRE(result != nullptr);
   std::memset(result, 0, total * sizeof(chi::u32));
 
   // 1. Write v[i] = i*2 across all blocks.
   GpuVectorWriteKernel<<<nblocks, 32>>>(gpu_info, view, total);
-  hshm::GpuApi::Synchronize();
+  ctp::GpuApi::Synchronize();
 
   // 2. Drain in-flight puts before tearing down the cache.
   vec.FlushAllSync();
 
   // 3. Read back. Reads will fault any pages that the cache evicted.
   GpuVectorReadKernel<<<nblocks, 32>>>(gpu_info, view, result, total);
-  hshm::GpuApi::Synchronize();
+  ctp::GpuApi::Synchronize();
 
   // 4. Verify.
   for (chi::u64 i = 0; i < total; ++i) {
@@ -182,15 +182,15 @@ TEST_CASE("gpu_vector: write then read round-trip",
   std::fprintf(stderr, "[GPUVEC] OK %llu / %llu\n",
                (unsigned long long)total, (unsigned long long)total);
 
-  hshm::GpuApi::FreeHost(result);
+  ctp::GpuApi::FreeHost(result);
 }
 
 SIMPLE_TEST_MAIN()
 
-#endif  // !HSHM_IS_DEVICE_PASS
+#endif  // !CTP_IS_DEVICE_PASS
 
 #else
 
 int main() { return 0; }
 
-#endif  // (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#endif  // (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL

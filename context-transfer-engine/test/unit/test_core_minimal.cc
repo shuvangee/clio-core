@@ -77,7 +77,7 @@ public:
   
   CTECoreTestFixture() {
     // Setup test storage path in home directory
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
     REQUIRE(!home_dir.empty());
     test_storage_path_ = home_dir + "/cte_unit_test.dat";
     
@@ -134,7 +134,7 @@ public:
  */
 TEST_CASE("Create CTE Core Pool", "[cte][core][pool]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Basic pool creation test") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Basic pool creation test") {
     // Verify client is properly initialized
     REQUIRE(fixture->core_client_ != nullptr);
     
@@ -174,7 +174,7 @@ TEST_CASE("Create CTE Core Pool", "[cte][core][pool]") {
  */
 TEST_CASE("Register Target", "[cte][core][target]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("File-based target configuration") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("File-based target configuration") {
     const std::string target_name = "cte_test_target";
     const chimaera::bdev::BdevType bdev_type = chimaera::bdev::BdevType::kFile;
     
@@ -231,7 +231,7 @@ TEST_CASE("Register Target", "[cte][core][target]") {
  */
 TEST_CASE("PutBlob Operations", "[cte][core][putblob]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("PutBlob parameter validation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("PutBlob parameter validation") {
     // Test valid blob parameters - Updated for new pattern
     const std::string valid_blob_name = "test_blob_001";
     const chi::u32 valid_blob_id = 0;  // Use null ID for PutBlob
@@ -328,7 +328,7 @@ TEST_CASE("PutBlob Operations", "[cte][core][putblob]") {
  */
 TEST_CASE("GetBlob Operations", "[cte][core][getblob]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("GetBlob parameter validation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("GetBlob parameter validation") {
     // Test valid retrieval parameters - Updated for new pattern
     const chi::u32 valid_tag_id = 100;
     const std::string valid_blob_name = "";  // Empty name for GetBlob
@@ -442,7 +442,7 @@ TEST_CASE("GetBlob Operations", "[cte][core][getblob]") {
  */
 TEST_CASE("CTE Core Integration Workflow", "[cte][core][integration]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Complete workflow simulation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Complete workflow simulation") {
     INFO("=== CTE Core Integration Workflow Test ===");
     
     // Step 1: Pool initialization (already done in fixture)

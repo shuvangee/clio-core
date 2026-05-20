@@ -44,7 +44,7 @@ Before any commit, verify:
 Flag these immediately:
 - Hardcoded paths in CMakeLists.txt
 - Missing file headers
-- Raw GPU macros instead of HSHM_IS_* wrappers
+- Raw GPU macros instead of CTP_IS_* wrappers
 - Catch2 used with Chimaera runtime
 - Mock/stub implementations
 - Functions over 100 lines

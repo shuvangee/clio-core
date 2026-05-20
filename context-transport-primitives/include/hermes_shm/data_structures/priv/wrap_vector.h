@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_PRIV_WRAP_VECTOR_H_
-#define HSHM_DATA_STRUCTURES_PRIV_WRAP_VECTOR_H_
+#ifndef CTP_DATA_STRUCTURES_PRIV_WRAP_VECTOR_H_
+#define CTP_DATA_STRUCTURES_PRIV_WRAP_VECTOR_H_
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/memory/allocator/allocator.h"
 
-namespace hshm::priv {
+namespace ctp::priv {
 
 /**
  * Non-owning char vector that wraps an existing FullPtr<char> buffer.
@@ -53,43 +53,43 @@ class wrap_vector {
   size_t size_ = 0;
   size_t capacity_ = 0;
 
-  HSHM_CROSS_FUN wrap_vector() = default;
+  CTP_CROSS_FUN wrap_vector() = default;
 
-  HSHM_CROSS_FUN wrap_vector(hipc::FullPtr<char> data, size_t capacity)
+  CTP_CROSS_FUN wrap_vector(hipc::FullPtr<char> data, size_t capacity)
       : data_(data), size_(0), capacity_(capacity) {}
 
-  HSHM_CROSS_FUN void set(hipc::FullPtr<char> data, size_t capacity) {
+  CTP_CROSS_FUN void set(hipc::FullPtr<char> data, size_t capacity) {
     data_ = data;
     size_ = 0;
     capacity_ = capacity;
   }
 
-  HSHM_CROSS_FUN char *data() { return data_.ptr_; }
-  HSHM_CROSS_FUN const char *data() const { return data_.ptr_; }
-  HSHM_CROSS_FUN size_t size() const { return size_; }
-  HSHM_CROSS_FUN size_t capacity() const { return capacity_; }
-  HSHM_CROSS_FUN bool empty() const { return size_ == 0; }
+  CTP_CROSS_FUN char *data() { return data_.ptr_; }
+  CTP_CROSS_FUN const char *data() const { return data_.ptr_; }
+  CTP_CROSS_FUN size_t size() const { return size_; }
+  CTP_CROSS_FUN size_t capacity() const { return capacity_; }
+  CTP_CROSS_FUN bool empty() const { return size_ == 0; }
 
-  HSHM_CROSS_FUN bool reserve(size_t n) { return n <= capacity_; }
-  HSHM_CROSS_FUN bool resize(size_t n) { size_ = n; return n <= capacity_; }
-  HSHM_CROSS_FUN bool resize_no_init(size_t n) { size_ = n; return n <= capacity_; }
-  HSHM_CROSS_FUN void clear() { size_ = 0; }
+  CTP_CROSS_FUN bool reserve(size_t n) { return n <= capacity_; }
+  CTP_CROSS_FUN bool resize(size_t n) { size_ = n; return n <= capacity_; }
+  CTP_CROSS_FUN bool resize_no_init(size_t n) { size_ = n; return n <= capacity_; }
+  CTP_CROSS_FUN void clear() { size_ = 0; }
 
-  HSHM_CROSS_FUN void push_back(char c) { data_.ptr_[size_++] = c; }
-  HSHM_CROSS_FUN char &operator[](size_t i) { return data_.ptr_[i]; }
-  HSHM_CROSS_FUN const char &operator[](size_t i) const { return data_.ptr_[i]; }
+  CTP_CROSS_FUN void push_back(char c) { data_.ptr_[size_++] = c; }
+  CTP_CROSS_FUN char &operator[](size_t i) { return data_.ptr_[i]; }
+  CTP_CROSS_FUN const char &operator[](size_t i) const { return data_.ptr_[i]; }
 
-  HSHM_CROSS_FUN char *begin() { return data_.ptr_; }
-  HSHM_CROSS_FUN char *end() { return data_.ptr_ + size_; }
-  HSHM_CROSS_FUN const char *begin() const { return data_.ptr_; }
-  HSHM_CROSS_FUN const char *end() const { return data_.ptr_ + size_; }
+  CTP_CROSS_FUN char *begin() { return data_.ptr_; }
+  CTP_CROSS_FUN char *end() { return data_.ptr_ + size_; }
+  CTP_CROSS_FUN const char *begin() const { return data_.ptr_; }
+  CTP_CROSS_FUN const char *end() const { return data_.ptr_ + size_; }
 
-  HSHM_CROSS_FUN hipc::FullPtr<char> &GetFullPtr() { return data_; }
-  HSHM_CROSS_FUN const hipc::FullPtr<char> &GetFullPtr() const { return data_; }
+  CTP_CROSS_FUN hipc::FullPtr<char> &GetFullPtr() { return data_; }
+  CTP_CROSS_FUN const hipc::FullPtr<char> &GetFullPtr() const { return data_; }
 
   /** Serialize (save) — write size + data bytes */
   template <class Archive>
-  HSHM_CROSS_FUN void save(Archive &ar) const {
+  CTP_CROSS_FUN void save(Archive &ar) const {
     ar << size_;
     if (size_ > 0) {
       ar.write_binary(data_.ptr_, size_);
@@ -98,7 +98,7 @@ class wrap_vector {
 
   /** Deserialize (load) — read size + data bytes into wrapped buffer */
   template <class Archive>
-  HSHM_CROSS_FUN void load(Archive &ar) {
+  CTP_CROSS_FUN void load(Archive &ar) {
     size_t sz = 0;
     ar >> sz;
     resize(sz);
@@ -108,6 +108,6 @@ class wrap_vector {
   }
 };
 
-}  // namespace hshm::priv
+}  // namespace ctp::priv
 
-#endif  // HSHM_DATA_STRUCTURES_PRIV_WRAP_VECTOR_H_
+#endif  // CTP_DATA_STRUCTURES_PRIV_WRAP_VECTOR_H_

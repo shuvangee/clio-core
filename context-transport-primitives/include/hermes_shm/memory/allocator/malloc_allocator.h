@@ -37,7 +37,7 @@
 #include "hermes_shm/memory/allocator/allocator.h"
 #include <memory>
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Page header for malloc allocations
@@ -48,8 +48,8 @@ struct MallocPage {
   uint64_t magic_;        // Magic number to change alignment
   size_t page_size_;      // Size of this allocation including header
 
-  HSHM_CROSS_FUN MallocPage() : magic_(MAGIC), page_size_(0) {}
-  HSHM_CROSS_FUN explicit MallocPage(size_t size) : magic_(MAGIC), page_size_(size) {}
+  CTP_CROSS_FUN MallocPage() : magic_(MAGIC), page_size_(0) {}
+  CTP_CROSS_FUN explicit MallocPage(size_t size) : magic_(MAGIC), page_size_(size) {}
 };
 
 /**
@@ -62,7 +62,7 @@ class _MallocAllocator : public Allocator {
   /**
    * Default constructor - initializes with null backend
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   _MallocAllocator() {
     // Create a null backend with max capacity so ContainsPtr always returns true
     MemoryBackend null_backend;
@@ -85,7 +85,7 @@ class _MallocAllocator : public Allocator {
     // Then: 0 + raw_pointer_as_offset = raw_pointer
     this_ = reinterpret_cast<size_t>(this);
 
-#ifdef HSHM_ALLOC_TRACK_SIZE
+#ifdef CTP_ALLOC_TRACK_SIZE
     total_alloc_ = 0;
 #endif
   }
@@ -93,7 +93,7 @@ class _MallocAllocator : public Allocator {
   /**
    * Initialize allocator (for compatibility with backend pattern)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void shm_init(const MemoryBackend &backend, size_t region_size = 0) {
     // Ignore backend - we use malloc directly
     (void)backend;
@@ -104,10 +104,10 @@ class _MallocAllocator : public Allocator {
    * Attach to existing allocator
    * Not supported for malloc allocator (no-op on GPU where exceptions are unavailable)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void shm_attach(const MemoryBackend &backend) {
     (void)backend;
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     throw SHMEM_NOT_SUPPORTED.format();
 #endif
   }
@@ -115,7 +115,7 @@ class _MallocAllocator : public Allocator {
   /**
    * Allocate memory via malloc
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> AllocateOffset(size_t size) {
     // Allocate space for header + user data
     size_t total_size = sizeof(MallocPage) + size;
@@ -132,7 +132,7 @@ class _MallocAllocator : public Allocator {
     // User data starts after header
     void *user_ptr = reinterpret_cast<char*>(ptr) + sizeof(MallocPage);
 
-#ifdef HSHM_ALLOC_TRACK_SIZE
+#ifdef CTP_ALLOC_TRACK_SIZE
     total_alloc_ += size;
 #endif
 
@@ -145,7 +145,7 @@ class _MallocAllocator : public Allocator {
    * On host: uses realloc for efficiency.
    * On GPU: realloc is unavailable; falls back to malloc+memcpy+free.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> ReallocateOffsetNoNullCheck(OffsetPtr<> p, size_t new_size) {
     void *user_ptr = reinterpret_cast<void*>(p.load());
     MallocPage *old_page = reinterpret_cast<MallocPage*>(
@@ -153,7 +153,7 @@ class _MallocAllocator : public Allocator {
     size_t old_size = old_page->page_size_ - sizeof(MallocPage);
     size_t new_total_size = sizeof(MallocPage) + new_size;
 
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
     // CUDA device code: no realloc, use malloc+memcpy+free
     void *new_raw = malloc(new_total_size);
     if (!new_raw) return OffsetPtr<>();
@@ -172,7 +172,7 @@ class _MallocAllocator : public Allocator {
     void *new_user = reinterpret_cast<char*>(new_ptr) + sizeof(MallocPage);
 #endif
 
-#ifdef HSHM_ALLOC_TRACK_SIZE
+#ifdef CTP_ALLOC_TRACK_SIZE
     total_alloc_ += (new_size - old_size);
 #endif
     return OffsetPtr<>(reinterpret_cast<size_t>(new_user));
@@ -181,14 +181,14 @@ class _MallocAllocator : public Allocator {
   /**
    * Free memory via free
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FreeOffsetNoNullCheck(OffsetPtr<> p) {
     // Get page header (before user data)
     void *user_ptr = reinterpret_cast<void*>(p.load());
     MallocPage *page = reinterpret_cast<MallocPage*>(
         reinterpret_cast<char*>(user_ptr) - sizeof(MallocPage));
 
-#ifdef HSHM_ALLOC_TRACK_SIZE
+#ifdef CTP_ALLOC_TRACK_SIZE
     size_t size = page->page_size_ - sizeof(MallocPage);
     total_alloc_ -= size;
 #endif
@@ -200,9 +200,9 @@ class _MallocAllocator : public Allocator {
   /**
    * Get currently allocated size
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t GetCurrentlyAllocatedSize() {
-#ifdef HSHM_ALLOC_TRACK_SIZE
+#ifdef CTP_ALLOC_TRACK_SIZE
     return total_alloc_;
 #else
     return 0;
@@ -212,22 +212,22 @@ class _MallocAllocator : public Allocator {
   /**
    * Thread-local storage (no-op for malloc)
    */
-  HSHM_CROSS_FUN void CreateTls() {}
-  HSHM_CROSS_FUN void FreeTls() {}
+  CTP_CROSS_FUN void CreateTls() {}
+  CTP_CROSS_FUN void FreeTls() {}
 
   /** Not supported for malloc allocator */
-  HSHM_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block, size_t size) {
+  CTP_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block, size_t size) {
     (void)prior; (void)block; (void)size;
     return false;
   }
-  HSHM_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
+  CTP_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
     (void)prior; (void)block;
   }
 
   /**
    * Reset: no-op for malloc allocator (individual frees handle reclamation)
    */
-  HSHM_CROSS_FUN void Reset() {}
+  CTP_CROSS_FUN void Reset() {}
 };
 
 // Type alias
@@ -259,9 +259,9 @@ class MallocAllocatorSingleton {
   MallocAllocator allocator_;
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
 // Global accessor macro
-#define HSHM_MALLOC ::hshm::ipc::MallocAllocatorSingleton::Get()
+#define CTP_MALLOC ::ctp::ipc::MallocAllocatorSingleton::Get()
 
 #endif  // HERMES_SHM_MEMORY_ALLOCATOR_MALLOC_ALLOCATOR_H_

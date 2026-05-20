@@ -39,7 +39,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-namespace hshm::lbm {
+namespace ctp::lbm {
 
 class EventManager {
  public:
@@ -208,4 +208,4 @@ class EventManager {
   std::unordered_map<int, EventRegistration> fd_to_reg_;
 };
 
-}  // namespace hshm::lbm
+}  // namespace ctp::lbm

@@ -221,7 +221,7 @@ private:
   chi::CoRwLock tag_consumers_lock_;
 
   // Previous CPU times sample, used by PollNodeLoad to compute CPU%.
-  hshm::CpuTimes prev_cpu_times_;
+  ctp::CpuTimes prev_cpu_times_;
   std::mutex cpu_times_mutex_;
 
   /**

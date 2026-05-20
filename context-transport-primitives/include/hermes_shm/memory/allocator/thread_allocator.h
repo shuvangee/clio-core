@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_MEMORY_ALLOCATOR_THREAD_ALLOCATOR_H_
-#define HSHM_MEMORY_ALLOCATOR_THREAD_ALLOCATOR_H_
+#ifndef CTP_MEMORY_ALLOCATOR_THREAD_ALLOCATOR_H_
+#define CTP_MEMORY_ALLOCATOR_THREAD_ALLOCATOR_H_
 
 #include "hermes_shm/memory/allocator/allocator.h"
 #include "hermes_shm/memory/allocator/buddy_allocator.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 class _PartitionedAllocator;
 typedef BaseAllocator<_PartitionedAllocator> PartitionedAllocator;
@@ -56,15 +56,15 @@ struct TaThreadBlock {
   hipc::atomic<int> initialized_;  /**< 0=uninitialized, 1=ready */
   PrivateBuddyAllocator alloc_;   /**< Private buddy allocator (MUST BE LAST) */
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   TaThreadBlock() : initialized_(0) {}
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool shm_init(const MemoryBackend &backend, size_t region_size) {
     size_t alloc_region_size = region_size - sizeof(TaThreadBlock);
     alloc_.shm_init(backend, alloc_region_size);
     initialized_.store(1);
-#if !HSHM_IS_HOST
+#if !CTP_IS_HOST
     __threadfence_system();
 #endif
     return true;
@@ -101,7 +101,7 @@ class _PartitionedAllocator : public Allocator {
   char * volatile base_;         /**< Cached base pointer (volatile: same) */
 
  public:
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   _PartitionedAllocator()
       : heap_ready_(0), max_threads_(0), thread_unit_(0), base_(nullptr) {}
 
@@ -119,7 +119,7 @@ class _PartitionedAllocator : public Allocator {
    * @param thread_unit Bytes per thread partition
    * @return true on success
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool shm_init(const MemoryBackend &backend,
                 size_t region_size = 0,
                 int max_threads = 32,
@@ -156,7 +156,7 @@ class _PartitionedAllocator : public Allocator {
    * Get a TaThreadBlock by tid.
    * O(1) — computed directly from the fixed partition layout.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   TaThreadBlock* GetThreadBlock(int tid) {
     char *b = base_;  // volatile read (bypasses L1)
     size_t tu = thread_unit_;  // volatile read
@@ -169,7 +169,7 @@ class _PartitionedAllocator : public Allocator {
    * Lazily initialize the thread partition for the given tid.
    * No mutex needed — each tid is only initialized by its owning thread.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool LazyInitThread(int tid) {
     if (tid < 0 || tid >= max_threads_) {
       return false;
@@ -195,9 +195,9 @@ class _PartitionedAllocator : public Allocator {
    * GPU: global warp ID, or -1 if beyond max_threads_
    * CPU: 0 (caller should provide explicit tid for multi-threaded use)
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   int GetAutoTid() {
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
     int tid = static_cast<int>((blockIdx.x * blockDim.x + threadIdx.x) / 32);
     if (tid >= max_threads_) return -1;
     return tid;
@@ -209,7 +209,7 @@ class _PartitionedAllocator : public Allocator {
   /**
    * Allocate memory with auto-detected tid.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> AllocateOffset(size_t size) {
     return AllocateOffset(size, GetAutoTid());
   }
@@ -217,7 +217,7 @@ class _PartitionedAllocator : public Allocator {
   /**
    * Allocate memory with explicit tid.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> AllocateOffset(size_t size, int tid) {
     if (!LazyInitThread(tid)) {
       return OffsetPtr<>::GetNull();
@@ -228,7 +228,7 @@ class _PartitionedAllocator : public Allocator {
   /**
    * Reallocate memory (not supported — allocate new + copy manually).
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> ReallocateOffsetNoNullCheck(OffsetPtr<> p, size_t new_size) {
     (void)p;
     (void)new_size;
@@ -241,7 +241,7 @@ class _PartitionedAllocator : public Allocator {
    * Computes the owning thread partition in O(1) by address arithmetic,
    * then frees to that partition's SlabAllocator.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FreeOffsetNoNullCheck(OffsetPtr<> p) {
     char *ptr_addr = base_ + p.load();
     char *partitions_base = base_ + sizeof(_PartitionedAllocator);
@@ -256,15 +256,15 @@ class _PartitionedAllocator : public Allocator {
   /**
    * Free memory (null-safe wrapper).
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FreeOffset(OffsetPtr<> p) {
     if (p.IsNull()) return;
     FreeOffsetNoNullCheck(p);
   }
 
-#ifdef HSHM_BUDDY_ALLOC_DEBUG
+#ifdef CTP_BUDDY_ALLOC_DEBUG
   /** Get the BuddyAllocator for a given thread/partition (debug only) */
-  HSHM_CROSS_FUN PrivateBuddyAllocator *DbgGetPartition(int tid) {
+  CTP_CROSS_FUN PrivateBuddyAllocator *DbgGetPartition(int tid) {
     if (tid >= 0 && tid < max_threads_) {
       auto *block = GetThreadBlock(tid);
       if (block->initialized_.load_device() == 1) {
@@ -273,18 +273,18 @@ class _PartitionedAllocator : public Allocator {
     }
     return nullptr;
   }
-  HSHM_CROSS_FUN int DbgMaxThreads() const { return max_threads_; }
+  CTP_CROSS_FUN int DbgMaxThreads() const { return max_threads_; }
 #endif
 
   /** Push arena on the current thread's BuddyAllocator */
-  HSHM_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block, size_t size) {
+  CTP_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block, size_t size) {
     int tid = GetAutoTid();
     if (!LazyInitThread(tid)) return false;
     return GetThreadBlock(tid)->alloc_.PushArenaState(prior, block, size);
   }
 
   /** Pop arena on the owning thread's BuddyAllocator */
-  HSHM_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
+  CTP_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
     if (block.IsNull()) return;
     char *ptr_addr = base_ + block.load();
     char *partitions_base = base_ + sizeof(_PartitionedAllocator);
@@ -301,7 +301,7 @@ class _PartitionedAllocator : public Allocator {
    * Calls GetAutoTid + LazyInitThread, then returns the partition's allocator.
    * @return Pointer to the warp's BuddyAllocator, or nullptr on failure
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   PrivateBuddyAllocator* GetWarpAllocator() {
     int tid = GetAutoTid();
     if (!LazyInitThread(tid)) return nullptr;
@@ -309,23 +309,23 @@ class _PartitionedAllocator : public Allocator {
   }
 
   /** Get the PrivateBuddyAllocator pointer for a specific tid (no init). */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   PrivateBuddyAllocator* GetWarpAllocatorByTid(int tid) {
     if (tid < 0 || tid >= max_threads_) return nullptr;
     return &GetThreadBlock(tid)->alloc_;
   }
 
   /** No-op TLS management (thread IDs are caller-provided) */
-  HSHM_CROSS_FUN void CreateTls() {}
-  HSHM_CROSS_FUN void FreeTls() {}
+  CTP_CROSS_FUN void CreateTls() {}
+  CTP_CROSS_FUN void FreeTls() {}
 
   /**
    * Mark the allocator as ready (grid-level sync).
    * Call after shm_init completes on the initializing thread.
    */
-  HSHM_CROSS_FUN void MarkReady() {
+  CTP_CROSS_FUN void MarkReady() {
     heap_ready_.store(1);
-#if !HSHM_IS_HOST
+#if !CTP_IS_HOST
     __threadfence_system();
 #endif
   }
@@ -334,17 +334,17 @@ class _PartitionedAllocator : public Allocator {
    * Spin-wait until the allocator is marked ready.
    * Used by non-initializing GPU blocks to wait for block 0.
    */
-  HSHM_CROSS_FUN void WaitReady() {
-#if !HSHM_IS_HOST
+  CTP_CROSS_FUN void WaitReady() {
+#if !CTP_IS_HOST
     // Use load_device() (atomicAdd-based) to bypass per-SM L1 cache.
     while (heap_ready_.load_device() != 1) {
-      hshm::ipc::threadfence();
+      ctp::ipc::threadfence();
     }
-    hshm::ipc::threadfence_system();
+    ctp::ipc::threadfence_system();
 #endif
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_MEMORY_ALLOCATOR_THREAD_ALLOCATOR_H_
+#endif  // CTP_MEMORY_ALLOCATOR_THREAD_ALLOCATOR_H_

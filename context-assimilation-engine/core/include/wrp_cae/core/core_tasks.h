@@ -93,22 +93,22 @@ struct ParseOmniTask : public chi::Task {
   // SHM constructor
   ParseOmniTask()
       : chi::Task(),
-        serialized_ctx_(HSHM_MALLOC),
+        serialized_ctx_(CTP_MALLOC),
         num_tasks_scheduled_(0),
         result_code_(0),
-        error_message_(HSHM_MALLOC) {}
+        error_message_(CTP_MALLOC) {}
 
   // Emplace constructor - accepts vector of AssimilationCtx and serializes
   // internally
-  HSHM_CROSS_FUN explicit ParseOmniTask(
+  CTP_CROSS_FUN explicit ParseOmniTask(
       const chi::TaskId &task_node, const chi::PoolId &pool_id,
       const chi::PoolQuery &pool_query,
       const std::vector<wrp_cae::core::AssimilationCtx> &contexts)
       : chi::Task(task_node, pool_id, pool_query, Method::kParseOmni),
-        serialized_ctx_(HSHM_MALLOC),
+        serialized_ctx_(CTP_MALLOC),
         num_tasks_scheduled_(0),
         result_code_(0),
-        error_message_(HSHM_MALLOC) {
+        error_message_(CTP_MALLOC) {
     task_id_ = task_node;
     method_ = Method::kParseOmni;
     task_flags_.Clear();
@@ -117,18 +117,18 @@ struct ParseOmniTask : public chi::Task {
     // Serialize the vector of contexts using GlobalSerialize
     std::vector<char> buf;
     {
-      hshm::ipc::GlobalSerialize<std::vector<char>> ar(buf);
+      ctp::ipc::GlobalSerialize<std::vector<char>> ar(buf);
       ar(contexts);
       ar.Finalize();
     }
-    serialized_ctx_ = chi::priv::string(HSHM_MALLOC, std::string(buf.begin(), buf.end()));
+    serialized_ctx_ = chi::priv::string(CTP_MALLOC, std::string(buf.begin(), buf.end()));
   }
 
   /**
    * Serialize IN and INOUT parameters
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(serialized_ctx_);
   }
@@ -137,7 +137,7 @@ struct ParseOmniTask : public chi::Task {
    * Serialize OUT and INOUT parameters
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(num_tasks_scheduled_, result_code_, error_message_);
   }
@@ -178,25 +178,25 @@ struct ProcessHdf5DatasetTask : public chi::Task {
   // SHM constructor
   ProcessHdf5DatasetTask()
       : chi::Task(),
-        file_path_(HSHM_MALLOC),
-        dataset_path_(HSHM_MALLOC),
-        tag_prefix_(HSHM_MALLOC),
+        file_path_(CTP_MALLOC),
+        dataset_path_(CTP_MALLOC),
+        tag_prefix_(CTP_MALLOC),
         result_code_(0),
-        error_message_(HSHM_MALLOC) {}
+        error_message_(CTP_MALLOC) {}
 
   // Emplace constructor
-  HSHM_CROSS_FUN explicit ProcessHdf5DatasetTask(const chi::TaskId &task_node,
+  CTP_CROSS_FUN explicit ProcessHdf5DatasetTask(const chi::TaskId &task_node,
                                   const chi::PoolId &pool_id,
                                   const chi::PoolQuery &pool_query,
                                   const std::string &file_path,
                                   const std::string &dataset_path,
                                   const std::string &tag_prefix)
       : chi::Task(task_node, pool_id, pool_query, Method::kProcessHdf5Dataset),
-        file_path_(HSHM_MALLOC, file_path),
-        dataset_path_(HSHM_MALLOC, dataset_path),
-        tag_prefix_(HSHM_MALLOC, tag_prefix),
+        file_path_(CTP_MALLOC, file_path),
+        dataset_path_(CTP_MALLOC, dataset_path),
+        tag_prefix_(CTP_MALLOC, tag_prefix),
         result_code_(0),
-        error_message_(HSHM_MALLOC) {
+        error_message_(CTP_MALLOC) {
     task_id_ = task_node;
     method_ = Method::kProcessHdf5Dataset;
     task_flags_.Clear();
@@ -207,7 +207,7 @@ struct ProcessHdf5DatasetTask : public chi::Task {
    * Serialize IN and INOUT parameters
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(file_path_, dataset_path_, tag_prefix_);
   }
@@ -216,7 +216,7 @@ struct ProcessHdf5DatasetTask : public chi::Task {
    * Serialize OUT and INOUT parameters
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(result_code_, error_message_);
   }
@@ -260,11 +260,11 @@ struct ExportDataTask : public chi::Task {
   // SHM constructor
   ExportDataTask()
       : chi::Task(),
-        tag_name_(HSHM_MALLOC),
-        output_path_(HSHM_MALLOC),
-        format_(HSHM_MALLOC),
+        tag_name_(CTP_MALLOC),
+        output_path_(CTP_MALLOC),
+        format_(CTP_MALLOC),
         result_code_(0),
-        error_message_(HSHM_MALLOC),
+        error_message_(CTP_MALLOC),
         bytes_exported_(0) {}
 
   // Emplace constructor
@@ -275,11 +275,11 @@ struct ExportDataTask : public chi::Task {
                           const std::string &output_path,
                           const std::string &format)
       : chi::Task(task_node, pool_id, pool_query, Method::kExportData),
-        tag_name_(HSHM_MALLOC, tag_name),
-        output_path_(HSHM_MALLOC, output_path),
-        format_(HSHM_MALLOC, format),
+        tag_name_(CTP_MALLOC, tag_name),
+        output_path_(CTP_MALLOC, output_path),
+        format_(CTP_MALLOC, format),
         result_code_(0),
-        error_message_(HSHM_MALLOC),
+        error_message_(CTP_MALLOC),
         bytes_exported_(0) {
     task_id_ = task_node;
     method_ = Method::kExportData;

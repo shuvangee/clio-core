@@ -17,7 +17,7 @@ add_subdirectory(thread)
 # add_subdirectory(singleton)
 # add_subdirectory(solvers)
 
-if(NOT HSHM_COMPILER_MSVC)
+if(NOT CLIO_CTP_COMPILER_MSVC)
     add_subdirectory(interceptor)
 endif()
 

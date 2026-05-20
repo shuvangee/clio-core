@@ -31,12 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_COMPRESS_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_COMPRESS_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_COMPRESS_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_COMPRESS_H_
 
 // #include "hermes_shm/data_structures/all.h"  // Deleted during hard refactoring
 
-namespace hshm {
+namespace ctp {
 
 class Compressor {
  public:
@@ -56,6 +56,6 @@ class Compressor {
                           size_t input_size) = 0;
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_COMPRESS_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_COMPRESS_H_

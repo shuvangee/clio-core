@@ -6,7 +6,7 @@
 # Include patterns - regex patterns for paths to intercept
 # Patterns are checked in order of specificity (longest first)
 # If a path matches an include pattern, it will be intercepted
-# Environment variables are expanded using hshm::ConfigParse::ExpandPath
+# Environment variables are expanded using ctp::ConfigParse::ExpandPath
 include:
   - ".*test_hermes.*"     # Default: test directories
   - "$HOME/data.*"        # Home directory data (env var expanded)

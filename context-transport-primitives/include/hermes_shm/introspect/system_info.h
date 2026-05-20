@@ -31,11 +31,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SYSINFO_INFO_H_
-#define HSHM_SYSINFO_INFO_H_
+#ifndef CTP_SYSINFO_INFO_H_
+#define CTP_SYSINFO_INFO_H_
 
 #include "hermes_shm/constants/macros.h"
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #ifdef __linux__
 #include <sys/sysinfo.h>
 #endif
@@ -49,31 +49,31 @@
 #include "hermes_shm/util/formatter.h"
 #include "hermes_shm/util/singleton.h"
 
-#define HSHM_SYSTEM_INFO \
-  hshm::LockfreeCrossSingleton<hshm::SystemInfo>::GetInstance()
-#define HSHM_SYSTEM_INFO_T hshm::SystemInfo *
+#define CTP_SYSTEM_INFO \
+  ctp::LockfreeCrossSingleton<ctp::SystemInfo>::GetInstance()
+#define CTP_SYSTEM_INFO_T ctp::SystemInfo *
 
-namespace hshm {
+namespace ctp {
 
 /** Dynamically load shared libraries */
 struct SharedLibrary {
   void *handle_ = nullptr;
 
   SharedLibrary() = default;
-  HSHM_DLL SharedLibrary(const std::string &name);
-  HSHM_DLL ~SharedLibrary();
+  CTP_DLL SharedLibrary(const std::string &name);
+  CTP_DLL ~SharedLibrary();
 
   // Delete copy operations
   SharedLibrary(const SharedLibrary &) = delete;
   SharedLibrary &operator=(const SharedLibrary &) = delete;
 
   // Move operations
-  HSHM_DLL SharedLibrary(SharedLibrary &&other) noexcept;
-  HSHM_DLL SharedLibrary &operator=(SharedLibrary &&other) noexcept;
+  CTP_DLL SharedLibrary(SharedLibrary &&other) noexcept;
+  CTP_DLL SharedLibrary &operator=(SharedLibrary &&other) noexcept;
 
-  HSHM_DLL void Load(const std::string &name);
-  HSHM_DLL void *GetSymbol(const std::string &name);
-  HSHM_DLL std::string GetError() const;
+  CTP_DLL void Load(const std::string &name);
+  CTP_DLL void *GetSymbol(const std::string &name);
+  CTP_DLL std::string GetError() const;
 
   bool IsNull() { return handle_ == nullptr; }
 };
@@ -110,17 +110,17 @@ class SystemInfo {
   int uid_;
   int gid_;
   size_t ram_size_;
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   std::vector<size_t> cur_cpu_freq_;
 #endif
 
  public:
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   SystemInfo() { RefreshInfo(); }
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void RefreshInfo() {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     pid_ = GetPid();
     ncpu_ = GetCpuCount();
     page_size_ = GetPageSize();
@@ -132,43 +132,43 @@ class SystemInfo {
 #endif
   }
 
-  HSHM_DLL void RefreshCpuFreqKhz();
+  CTP_DLL void RefreshCpuFreqKhz();
 
-  HSHM_DLL size_t GetCpuFreqKhz(int cpu);
+  CTP_DLL size_t GetCpuFreqKhz(int cpu);
 
-  HSHM_DLL size_t GetCpuMaxFreqKhz(int cpu);
+  CTP_DLL size_t GetCpuMaxFreqKhz(int cpu);
 
-  HSHM_DLL size_t GetCpuMinFreqKhz(int cpu);
+  CTP_DLL size_t GetCpuMinFreqKhz(int cpu);
 
-  HSHM_DLL size_t GetCpuMinFreqMhz(int cpu);
+  CTP_DLL size_t GetCpuMinFreqMhz(int cpu);
 
-  HSHM_DLL size_t GetCpuMaxFreqMhz(int cpu);
+  CTP_DLL size_t GetCpuMaxFreqMhz(int cpu);
 
-  HSHM_DLL void SetCpuFreqMhz(int cpu, size_t cpu_freq_mhz);
+  CTP_DLL void SetCpuFreqMhz(int cpu, size_t cpu_freq_mhz);
 
-  HSHM_DLL void SetCpuFreqKhz(int cpu, size_t cpu_freq_khz);
+  CTP_DLL void SetCpuFreqKhz(int cpu, size_t cpu_freq_khz);
 
-  HSHM_DLL void SetCpuMinFreqKhz(int cpu, size_t cpu_freq_khz);
+  CTP_DLL void SetCpuMinFreqKhz(int cpu, size_t cpu_freq_khz);
 
-  HSHM_DLL void SetCpuMaxFreqKhz(int cpu, size_t cpu_freq_khz);
+  CTP_DLL void SetCpuMaxFreqKhz(int cpu, size_t cpu_freq_khz);
 
-  HSHM_DLL static int GetCpuCount();
+  CTP_DLL static int GetCpuCount();
 
-  HSHM_DLL static int GetPageSize();
+  CTP_DLL static int GetPageSize();
 
-  HSHM_DLL static int GetTid();
+  CTP_DLL static int GetTid();
 
-  HSHM_DLL static int GetPid();
+  CTP_DLL static int GetPid();
 
-  HSHM_DLL static int GetUid();
+  CTP_DLL static int GetUid();
 
-  HSHM_DLL static int GetGid();
+  CTP_DLL static int GetGid();
 
-  HSHM_DLL static size_t GetRamCapacity();
+  CTP_DLL static size_t GetRamCapacity();
 
-  HSHM_DLL static size_t GetRamAvailable();
+  CTP_DLL static size_t GetRamAvailable();
 
-  HSHM_DLL static CpuTimes GetCpuTimes();
+  CTP_DLL static CpuTimes GetCpuTimes();
 
   static float ComputeCpuUtilization(const CpuTimes &prev,
                                      const CpuTimes &curr) {
@@ -178,67 +178,67 @@ class SystemInfo {
     return static_cast<float>(active_d) / static_cast<float>(total_d) * 100.0f;
   }
 
-  HSHM_DLL static void YieldThread();
+  CTP_DLL static void YieldThread();
 
-  HSHM_DLL static bool CreateTls(ThreadLocalKey &key, void *data);
+  CTP_DLL static bool CreateTls(ThreadLocalKey &key, void *data);
 
-  HSHM_DLL static bool SetTls(const ThreadLocalKey &key, void *data);
+  CTP_DLL static bool SetTls(const ThreadLocalKey &key, void *data);
 
-  HSHM_DLL static void *GetTls(const ThreadLocalKey &key);
+  CTP_DLL static void *GetTls(const ThreadLocalKey &key);
 
-  HSHM_DLL static bool CreateNewSharedMemory(File &fd, const std::string &name,
+  CTP_DLL static bool CreateNewSharedMemory(File &fd, const std::string &name,
                                              size_t size);
 
-  HSHM_DLL static bool OpenSharedMemory(File &fd, const std::string &name);
+  CTP_DLL static bool OpenSharedMemory(File &fd, const std::string &name);
 
-  HSHM_DLL static void CloseSharedMemory(File &file);
+  CTP_DLL static void CloseSharedMemory(File &file);
 
-  HSHM_DLL static void DestroySharedMemory(const std::string &name);
+  CTP_DLL static void DestroySharedMemory(const std::string &name);
 
-  HSHM_DLL static void *MapPrivateMemory(size_t size);
+  CTP_DLL static void *MapPrivateMemory(size_t size);
 
-  HSHM_DLL static void *MapSharedMemory(const File &fd, size_t size, i64 off);
+  CTP_DLL static void *MapSharedMemory(const File &fd, size_t size, i64 off);
 
-  HSHM_DLL static void UnmapMemory(void *ptr, size_t size);
+  CTP_DLL static void UnmapMemory(void *ptr, size_t size);
 
-  HSHM_DLL static void *AlignedAlloc(size_t alignment, size_t size);
+  CTP_DLL static void *AlignedAlloc(size_t alignment, size_t size);
 
-  HSHM_DLL static std::string Getenv(
-      const char *name, size_t max_size = hshm::Unit<size_t>::Megabytes(1));
+  CTP_DLL static std::string Getenv(
+      const char *name, size_t max_size = ctp::Unit<size_t>::Megabytes(1));
 
   static std::string Getenv(
       const std::string &name,
-      size_t max_size = hshm::Unit<size_t>::Megabytes(1)) {
+      size_t max_size = ctp::Unit<size_t>::Megabytes(1)) {
     return Getenv(name.c_str(), max_size);
   }
 
-  HSHM_DLL static void Setenv(const char *name, const std::string &value,
+  CTP_DLL static void Setenv(const char *name, const std::string &value,
                               int overwrite);
 
-  HSHM_DLL static void Unsetenv(const char *name);
+  CTP_DLL static void Unsetenv(const char *name);
 
   /** Get the per-user chimaera tmp directory path (/tmp/chimaera_$USER) */
-  HSHM_DLL static std::string GetMemfdDir();
+  CTP_DLL static std::string GetMemfdDir();
 
   /** Get the full path for a named file in the memfd directory */
-  HSHM_DLL static std::string GetMemfdPath(const std::string &name);
+  CTP_DLL static std::string GetMemfdPath(const std::string &name);
 
   /** Ensure the per-user memfd directory exists */
-  HSHM_DLL static void EnsureMemfdDir();
+  CTP_DLL static void EnsureMemfdDir();
 
-  HSHM_DLL static bool IsProcessAlive(int pid);
+  CTP_DLL static bool IsProcessAlive(int pid);
 
-  HSHM_DLL static std::string GetModuleDirectory();
+  CTP_DLL static std::string GetModuleDirectory();
 
-  HSHM_DLL static std::string GetLibrarySearchPathVar();
+  CTP_DLL static std::string GetLibrarySearchPathVar();
 
-  HSHM_DLL static char GetPathListSeparator();
+  CTP_DLL static char GetPathListSeparator();
 
-  HSHM_DLL static std::string GetSharedLibExtension();
+  CTP_DLL static std::string GetSharedLibExtension();
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
 #undef WIN32_LEAN_AND_MEAN
 
-#endif  // HSHM_SYSINFO_INFO_H_
+#endif  // CTP_SYSINFO_INFO_H_

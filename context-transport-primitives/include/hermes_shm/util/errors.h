@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_ERRORS_H
-#define HSHM_ERRORS_H
+#ifndef CTP_ERRORS_H
+#define CTP_ERRORS_H
 
 #ifdef __cplusplus
 
 #include "hermes_shm/util/error.h"
 
-namespace hshm {
+namespace ctp {
 const Error MEMORY_BACKEND_REPEATED(
     "Attempted to register two backends "
     "with the same id");
@@ -61,8 +61,8 @@ const Error UNORDERED_MAP_CANT_FIND("Could not find key in unordered_map");
 const Error KEY_SET_OUT_OF_BOUNDS("Too many keys in the key set");
 
 const Error ARGPACK_INDEX_OUT_OF_BOUNDS("Argpack index out of bounds");
-}  // namespace hshm
+}  // namespace ctp
 
 #endif
 
-#endif  // HSHM_ERRORS_H
+#endif  // CTP_ERRORS_H

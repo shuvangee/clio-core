@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_THREAD_RWLOCK_H_
-#define HSHM_THREAD_RWLOCK_H_
+#ifndef CTP_THREAD_RWLOCK_H_
+#define CTP_THREAD_RWLOCK_H_
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/thread/lock.h"
@@ -40,7 +40,7 @@
 #include "hermes_shm/types/atomic.h"
 #include "hermes_shm/types/numbers.h"
 
-namespace hshm {
+namespace ctp {
 
 class RwLockMode {
  public:
@@ -53,12 +53,12 @@ class RwLockMode {
 /** A reader-writer lock implementation */
 struct RwLock {
   ipc::atomic<RwLockMode::Type> mode_;
-  ipc::atomic<hshm::reg_uint> readers_;
-  ipc::atomic<hshm::reg_uint> writers_;
-  ipc::atomic<hshm::reg_uint> cur_writer_;
-  ipc::atomic<hshm::big_uint> ticket_;
+  ipc::atomic<ctp::reg_uint> readers_;
+  ipc::atomic<ctp::reg_uint> writers_;
+  ipc::atomic<ctp::reg_uint> cur_writer_;
+  ipc::atomic<ctp::big_uint> ticket_;
   /** Default constructor */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   RwLock()
       : readers_(0),
         writers_(0),
@@ -67,7 +67,7 @@ struct RwLock {
         cur_writer_(0) {}
 
   /** Explicit constructor */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Init() {
     readers_ = 0;
     writers_ = 0;
@@ -76,11 +76,11 @@ struct RwLock {
     cur_writer_ = 0;
   }
 
-  /** Copy constructor (no-op, mirrors hshm::Mutex): copying a live
+  /** Copy constructor (no-op, mirrors ctp::Mutex): copying a live
    *  lock would clone its state, which is never what callers want, but
    *  containers (e.g. priv::vector<RwLock>::operator=) need *some*
    *  copy constructor to be callable. Construct a fresh, unheld lock. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   RwLock(const RwLock & /*other*/)
       : readers_(0),
         writers_(0),
@@ -89,7 +89,7 @@ struct RwLock {
         cur_writer_(0) {}
 
   /** Copy assignment (no-op for state, same rationale as copy ctor). */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   RwLock &operator=(const RwLock & /*other*/) {
     readers_.store(0);
     writers_.store(0);
@@ -100,7 +100,7 @@ struct RwLock {
   }
 
   /** Move constructor */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   RwLock(RwLock &&other) noexcept
       : readers_(other.readers_.load()),
         writers_(other.writers_.load()),
@@ -109,7 +109,7 @@ struct RwLock {
         cur_writer_(other.cur_writer_.load()) {}
 
   /** Move assignment operator */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   RwLock &operator=(RwLock &&other) noexcept {
     if (this != &other) {
       readers_ = other.readers_.load();
@@ -122,7 +122,7 @@ struct RwLock {
   }
 
   /** Acquire read lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void ReadLock(uint32_t owner) {
     RwLockMode::Type mode;
 
@@ -141,18 +141,18 @@ struct RwLock {
           return;
         }
       }
-#if !HSHM_IS_DEVICE_PASS
-      HSHM_THREAD_MODEL->Yield();
+#if !CTP_IS_DEVICE_PASS
+      CTP_THREAD_MODEL->Yield();
 #endif
     } while (true);
   }
 
   /** Release read lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void ReadUnlock() { readers_.fetch_sub(1); }
 
   /** Acquire write lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void WriteLock(uint32_t owner) {
     RwLockMode::Type mode;
     uint32_t cur_writer;
@@ -176,14 +176,14 @@ struct RwLock {
           return;
         }
       }
-#if !HSHM_IS_DEVICE_PASS
-      HSHM_THREAD_MODEL->Yield();
+#if !CTP_IS_DEVICE_PASS
+      CTP_THREAD_MODEL->Yield();
 #endif
     } while (true);
   }
 
   /** Release write lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void WriteUnlock() {
     writers_.fetch_sub(1);
     cur_writer_.fetch_add(1);
@@ -191,7 +191,7 @@ struct RwLock {
 
  private:
   /** Update the mode of the lock */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void UpdateMode(RwLockMode::Type &mode) {
     // When # readers is 0, there is a lag to when the mode is updated
     // When # writers is 0, there is a lag to when the mode is updated
@@ -210,18 +210,18 @@ struct ScopedRwReadLock {
   bool is_locked_;
 
   /** Acquire the read lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   explicit ScopedRwReadLock(RwLock &lock, uint32_t owner)
       : lock_(lock), is_locked_(false) {
     Lock(owner);
   }
 
   /** Release the read lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ~ScopedRwReadLock() { Unlock(); }
 
   /** Explicitly acquire read lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Lock(uint32_t owner) {
     if (!is_locked_) {
       lock_.ReadLock(owner);
@@ -230,7 +230,7 @@ struct ScopedRwReadLock {
   }
 
   /** Explicitly release read lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Unlock() {
     if (is_locked_) {
       lock_.ReadUnlock();
@@ -245,18 +245,18 @@ struct ScopedRwWriteLock {
   bool is_locked_;
 
   /** Acquire the write lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   explicit ScopedRwWriteLock(RwLock &lock, uint32_t owner)
       : lock_(lock), is_locked_(false) {
     Lock(owner);
   }
 
   /** Release the write lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ~ScopedRwWriteLock() { Unlock(); }
 
   /** Explicity acquire the write lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Lock(uint32_t owner) {
     if (!is_locked_) {
       lock_.WriteLock(owner);
@@ -265,7 +265,7 @@ struct ScopedRwWriteLock {
   }
 
   /** Explicitly release the write lock */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Unlock() {
     if (is_locked_) {
       lock_.WriteUnlock();
@@ -274,14 +274,14 @@ struct ScopedRwWriteLock {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
-using hshm::RwLock;
-using hshm::ScopedRwReadLock;
-using hshm::ScopedRwWriteLock;
+using ctp::RwLock;
+using ctp::ScopedRwReadLock;
+using ctp::ScopedRwWriteLock;
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_THREAD_RWLOCK_H_
+#endif  // CTP_THREAD_RWLOCK_H_

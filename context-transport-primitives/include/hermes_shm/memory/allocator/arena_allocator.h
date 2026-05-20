@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_MEMORY_ALLOCATOR_ARENA_ALLOCATOR_H_
-#define HSHM_MEMORY_ALLOCATOR_ARENA_ALLOCATOR_H_
+#ifndef CTP_MEMORY_ALLOCATOR_ARENA_ALLOCATOR_H_
+#define CTP_MEMORY_ALLOCATOR_ARENA_ALLOCATOR_H_
 
 #include <cstdint>
 #include <limits>
@@ -41,7 +41,7 @@
 #include "heap.h"
 #include "hermes_shm/thread/lock.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Forward declarations
@@ -64,7 +64,7 @@ template<bool ATOMIC>
 class _ArenaAllocator : public Allocator {
  private:
   Heap<ATOMIC> heap_;  /**< Heap for bump-pointer allocation */
-  hipc::atomic<hshm::big_uint> total_alloc_;  /**< Total allocated size tracking */
+  hipc::atomic<ctp::big_uint> total_alloc_;  /**< Total allocated size tracking */
   size_t heap_begin_;  /**< Initial heap offset (for reset) */
   size_t heap_max_;    /**< Maximum heap size (for reset) */
 
@@ -72,7 +72,7 @@ class _ArenaAllocator : public Allocator {
   /**
    * Allocator constructor
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   _ArenaAllocator() : total_alloc_(0), heap_begin_(0), heap_max_(0) {}
 
   /**
@@ -81,7 +81,7 @@ class _ArenaAllocator : public Allocator {
    * @param backend Memory backend
    * @param region_size Size of the region in bytes. If 0, defaults to backend.data_capacity_
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void shm_init(const MemoryBackend &backend, size_t region_size = 0) {
     SetBackend(backend);
     alloc_header_size_ = sizeof(_ArenaAllocator<ATOMIC>);
@@ -121,7 +121,7 @@ class _ArenaAllocator : public Allocator {
    * fully in shared memory. The base class GetBackendData() reconstructs
    * pointers from the this_ offset, so no per-process setup is needed.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void shm_attach(MemoryBackend backend) {
     (void)backend;
   }
@@ -134,23 +134,23 @@ class _ArenaAllocator : public Allocator {
    * @return Offset pointer to allocated memory
    * @throws OUT_OF_MEMORY if allocation fails
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> AllocateOffset(size_t size, size_t alignment = sizeof(size_t)) {
     // Round up size to alignment boundary so next allocation is aligned
     size = (size + alignment - 1) & ~(alignment - 1);
 
     if (heap_.GetRemainingSize() < size) {
-      HSHM_THROW_ERROR(OUT_OF_MEMORY);
+      CTP_THROW_ERROR(OUT_OF_MEMORY);
     }
 
     // Allocate from heap
     size_t off = heap_.Allocate(size);
     if (off == 0 && heap_.GetOffset() != 0) {
       // Allocation failed (out of memory)
-      HSHM_THROW_ERROR(OUT_OF_MEMORY);
+      CTP_THROW_ERROR(OUT_OF_MEMORY);
     }
 
-#ifdef HSHM_ALLOC_TRACK_SIZE
+#ifdef CTP_ALLOC_TRACK_SIZE
     total_alloc_ += size;
 #endif
     return OffsetPtr<>(off);
@@ -161,11 +161,11 @@ class _ArenaAllocator : public Allocator {
    *
    * Arena allocators do not support reallocation.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> ReallocateOffsetNoNullCheck(OffsetPtr<> p, size_t new_size) {
     (void)p;
     (void)new_size;
-    HSHM_THROW_ERROR(NOT_IMPLEMENTED,
+    CTP_THROW_ERROR(NOT_IMPLEMENTED,
                      "ArenaAllocator does not support reallocation");
     return OffsetPtr<>(0);
   }
@@ -176,7 +176,7 @@ class _ArenaAllocator : public Allocator {
    * Arena allocators do not support freeing individual allocations.
    * Memory is freed in bulk when the arena is reset or destroyed.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FreeOffsetNoNullCheck(OffsetPtr<> p) {
     (void)p;
     // Arena allocator does not support individual frees
@@ -188,7 +188,7 @@ class _ArenaAllocator : public Allocator {
    *
    * @return Total bytes allocated
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t GetCurrentlyAllocatedSize() {
     return (size_t)total_alloc_.load();
   }
@@ -198,7 +198,7 @@ class _ArenaAllocator : public Allocator {
    *
    * Arena allocators do not require TLS.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void CreateTls() {
     // No TLS needed for arena allocator
   }
@@ -208,19 +208,19 @@ class _ArenaAllocator : public Allocator {
    *
    * Arena allocators do not require TLS.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FreeTls() {
     // No TLS needed for arena allocator
   }
 
   /** Arena allocator is already a bump allocator — PushArena is a no-op */
-  HSHM_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block, size_t size) {
+  CTP_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block, size_t size) {
     (void)prior; (void)block; (void)size;
     return false;
   }
 
   /** No-op */
-  HSHM_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
+  CTP_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
     (void)prior; (void)block;
   }
 
@@ -229,9 +229,9 @@ class _ArenaAllocator : public Allocator {
    *
    * Resets the heap offset to the initial position, effectively freeing all allocations.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Reset() {
-#ifdef HSHM_ALLOC_TRACK_SIZE
+#ifdef CTP_ALLOC_TRACK_SIZE
     total_alloc_ = 0;
 #endif
     heap_.Init(heap_begin_, heap_max_);
@@ -242,7 +242,7 @@ class _ArenaAllocator : public Allocator {
    *
    * @return Current heap offset
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t GetHeapOffset() const {
     return heap_.GetOffset();
   }
@@ -252,12 +252,12 @@ class _ArenaAllocator : public Allocator {
    *
    * @return Bytes remaining
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t GetRemainingSize() const {
     return heap_.GetRemainingSize();
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_MEMORY_ALLOCATOR_ARENA_ALLOCATOR_H_
+#endif  // CTP_MEMORY_ALLOCATOR_ARENA_ALLOCATOR_H_

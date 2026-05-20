@@ -31,16 +31,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_MPI_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_MPI_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_MPI_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_MPI_H_
 
-#if HSHM_ENABLE_MPI
+#if CTP_ENABLE_MPI
 
 #include <mpi.h>
 
 #include "timer.h"
 
-namespace hshm {
+namespace ctp {
 
 class MpiTimer : public Timer {
  public:
@@ -80,6 +80,6 @@ class MpiTimer : public Timer {
   }
 };
 
-}  // namespace hshm
-#endif  // HSHM_ENABLE_MPI
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_MPI_H_
+}  // namespace ctp
+#endif  // CTP_ENABLE_MPI
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_MPI_H_

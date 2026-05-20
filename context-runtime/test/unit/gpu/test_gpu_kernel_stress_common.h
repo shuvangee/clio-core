@@ -27,7 +27,7 @@
  *   6. The host walks all N tasks and verifies result_value_ matches
  *      the chimod's formula for that slot's input.
  *
- * Tests in this file are gated by the relevant `HSHM_ENABLE_*` macros
+ * Tests in this file are gated by the relevant `CTP_ENABLE_*` macros
  * so each backend's source file (test_gpu_kernel_stress_gpu.cc for
  * CUDA/ROCm, test_gpu_kernel_stress_sycl.cc for SYCL) compiles only
  * when its backend is on.

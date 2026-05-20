@@ -74,7 +74,7 @@
 #include "hermes_shm/compress/blosc.h"
 #include "hermes_shm/compress/snappy.h"
 
-#if HSHM_ENABLE_COMPRESS && HSHM_ENABLE_LIBPRESSIO
+#if CTP_ENABLE_COMPRESS && CTP_ENABLE_LIBPRESSIO
 #include "hermes_shm/compress/libpressio_modes.h"
 #endif
 
@@ -146,7 +146,7 @@ inline double GetCpuTimeNs() {
  * Benchmark a single compressor on the given data
  */
 CompressionResult BenchmarkCompressor(
-    hshm::Compressor* compressor,
+    ctp::Compressor* compressor,
     const std::string& library,
     const std::string& preset,
     const std::vector<double>& data,
@@ -323,7 +323,7 @@ int main(int argc, char* argv[]) {
   struct CompressorConfig {
     std::string library;
     std::string preset;
-    std::unique_ptr<hshm::Compressor> compressor;
+    std::unique_ptr<ctp::Compressor> compressor;
   };
 
   std::vector<CompressorConfig> compressors;
@@ -333,87 +333,87 @@ int main(int argc, char* argv[]) {
 
   // ZSTD (3 modes)
   compressors.push_back({"zstd", "fast",
-                         std::make_unique<hshm::ZstdWithModes>(hshm::LosslessMode::FAST)});
+                         std::make_unique<ctp::ZstdWithModes>(ctp::LosslessMode::FAST)});
   compressors.push_back({"zstd", "balanced",
-                         std::make_unique<hshm::ZstdWithModes>(hshm::LosslessMode::BALANCED)});
+                         std::make_unique<ctp::ZstdWithModes>(ctp::LosslessMode::BALANCED)});
   compressors.push_back({"zstd", "best",
-                         std::make_unique<hshm::ZstdWithModes>(hshm::LosslessMode::BEST)});
+                         std::make_unique<ctp::ZstdWithModes>(ctp::LosslessMode::BEST)});
 
   // LZ4 (3 modes)
   compressors.push_back({"lz4", "fast",
-                         std::make_unique<hshm::Lz4WithModes>(hshm::LosslessMode::FAST)});
+                         std::make_unique<ctp::Lz4WithModes>(ctp::LosslessMode::FAST)});
   compressors.push_back({"lz4", "balanced",
-                         std::make_unique<hshm::Lz4WithModes>(hshm::LosslessMode::BALANCED)});
+                         std::make_unique<ctp::Lz4WithModes>(ctp::LosslessMode::BALANCED)});
   compressors.push_back({"lz4", "best",
-                         std::make_unique<hshm::Lz4WithModes>(hshm::LosslessMode::BEST)});
+                         std::make_unique<ctp::Lz4WithModes>(ctp::LosslessMode::BEST)});
 
   // Blosc2 (1 mode)
   compressors.push_back({"blosc2", "default",
-                         std::make_unique<hshm::Blosc>()});
+                         std::make_unique<ctp::Blosc>()});
 
   // ZLIB (3 modes)
   compressors.push_back({"zlib", "fast",
-                         std::make_unique<hshm::ZlibWithModes>(hshm::LosslessMode::FAST)});
+                         std::make_unique<ctp::ZlibWithModes>(ctp::LosslessMode::FAST)});
   compressors.push_back({"zlib", "balanced",
-                         std::make_unique<hshm::ZlibWithModes>(hshm::LosslessMode::BALANCED)});
+                         std::make_unique<ctp::ZlibWithModes>(ctp::LosslessMode::BALANCED)});
   compressors.push_back({"zlib", "best",
-                         std::make_unique<hshm::ZlibWithModes>(hshm::LosslessMode::BEST)});
+                         std::make_unique<ctp::ZlibWithModes>(ctp::LosslessMode::BEST)});
 
   // BZIP2 (3 modes)
   compressors.push_back({"bzip2", "fast",
-                         std::make_unique<hshm::Bzip2WithModes>(hshm::LosslessMode::FAST)});
+                         std::make_unique<ctp::Bzip2WithModes>(ctp::LosslessMode::FAST)});
   compressors.push_back({"bzip2", "balanced",
-                         std::make_unique<hshm::Bzip2WithModes>(hshm::LosslessMode::BALANCED)});
+                         std::make_unique<ctp::Bzip2WithModes>(ctp::LosslessMode::BALANCED)});
   compressors.push_back({"bzip2", "best",
-                         std::make_unique<hshm::Bzip2WithModes>(hshm::LosslessMode::BEST)});
+                         std::make_unique<ctp::Bzip2WithModes>(ctp::LosslessMode::BEST)});
 
   // LZMA (3 modes)
   compressors.push_back({"lzma", "fast",
-                         std::make_unique<hshm::LzmaWithModes>(hshm::LosslessMode::FAST)});
+                         std::make_unique<ctp::LzmaWithModes>(ctp::LosslessMode::FAST)});
   compressors.push_back({"lzma", "balanced",
-                         std::make_unique<hshm::LzmaWithModes>(hshm::LosslessMode::BALANCED)});
+                         std::make_unique<ctp::LzmaWithModes>(ctp::LosslessMode::BALANCED)});
   compressors.push_back({"lzma", "best",
-                         std::make_unique<hshm::LzmaWithModes>(hshm::LosslessMode::BEST)});
+                         std::make_unique<ctp::LzmaWithModes>(ctp::LosslessMode::BEST)});
 
   // BROTLI (3 modes)
   compressors.push_back({"brotli", "fast",
-                         std::make_unique<hshm::BrotliWithModes>(hshm::LosslessMode::FAST)});
+                         std::make_unique<ctp::BrotliWithModes>(ctp::LosslessMode::FAST)});
   compressors.push_back({"brotli", "balanced",
-                         std::make_unique<hshm::BrotliWithModes>(hshm::LosslessMode::BALANCED)});
+                         std::make_unique<ctp::BrotliWithModes>(ctp::LosslessMode::BALANCED)});
   compressors.push_back({"brotli", "best",
-                         std::make_unique<hshm::BrotliWithModes>(hshm::LosslessMode::BEST)});
+                         std::make_unique<ctp::BrotliWithModes>(ctp::LosslessMode::BEST)});
 
   // SNAPPY (1 mode)
   compressors.push_back({"snappy", "default",
-                         std::make_unique<hshm::Snappy>()});
+                         std::make_unique<ctp::Snappy>()});
 
-#if HSHM_ENABLE_COMPRESS && HSHM_ENABLE_LIBPRESSIO
+#if CTP_ENABLE_COMPRESS && CTP_ENABLE_LIBPRESSIO
   // Lossy compressors (LibPressio)
   HLOG(kInfo, "Adding lossy compressors (LibPressio enabled)...");
 
   // ZFP (3 modes)
   compressors.push_back({"zfp", "fast",
-                         std::make_unique<hshm::LibPressioWithModes>("zfp", hshm::CompressionMode::FAST)});
+                         std::make_unique<ctp::LibPressioWithModes>("zfp", ctp::CompressionMode::FAST)});
   compressors.push_back({"zfp", "balanced",
-                         std::make_unique<hshm::LibPressioWithModes>("zfp", hshm::CompressionMode::BALANCED)});
+                         std::make_unique<ctp::LibPressioWithModes>("zfp", ctp::CompressionMode::BALANCED)});
   compressors.push_back({"zfp", "best",
-                         std::make_unique<hshm::LibPressioWithModes>("zfp", hshm::CompressionMode::BEST)});
+                         std::make_unique<ctp::LibPressioWithModes>("zfp", ctp::CompressionMode::BEST)});
 
   // SZ3 (3 modes)
   compressors.push_back({"sz3", "fast",
-                         std::make_unique<hshm::LibPressioWithModes>("sz3", hshm::CompressionMode::FAST)});
+                         std::make_unique<ctp::LibPressioWithModes>("sz3", ctp::CompressionMode::FAST)});
   compressors.push_back({"sz3", "balanced",
-                         std::make_unique<hshm::LibPressioWithModes>("sz3", hshm::CompressionMode::BALANCED)});
+                         std::make_unique<ctp::LibPressioWithModes>("sz3", ctp::CompressionMode::BALANCED)});
   compressors.push_back({"sz3", "best",
-                         std::make_unique<hshm::LibPressioWithModes>("sz3", hshm::CompressionMode::BEST)});
+                         std::make_unique<ctp::LibPressioWithModes>("sz3", ctp::CompressionMode::BEST)});
 
   // FPZIP (3 modes)
   compressors.push_back({"fpzip", "fast",
-                         std::make_unique<hshm::LibPressioWithModes>("fpzip", hshm::CompressionMode::FAST)});
+                         std::make_unique<ctp::LibPressioWithModes>("fpzip", ctp::CompressionMode::FAST)});
   compressors.push_back({"fpzip", "balanced",
-                         std::make_unique<hshm::LibPressioWithModes>("fpzip", hshm::CompressionMode::BALANCED)});
+                         std::make_unique<ctp::LibPressioWithModes>("fpzip", ctp::CompressionMode::BALANCED)});
   compressors.push_back({"fpzip", "best",
-                         std::make_unique<hshm::LibPressioWithModes>("fpzip", hshm::CompressionMode::BEST)});
+                         std::make_unique<ctp::LibPressioWithModes>("fpzip", ctp::CompressionMode::BEST)});
 #else
   HLOG(kInfo, "Lossy compressors disabled (LibPressio not available)");
 #endif

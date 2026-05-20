@@ -75,7 +75,7 @@ class PoolQuery {
   /**
    * Default constructor
    */
-  HSHM_CROSS_FUN PoolQuery()
+  CTP_CROSS_FUN PoolQuery()
       : routing_mode_(RoutingMode::Local), hash_value_(0),
         container_id_(kInvalidContainerId),
         range_offset_(0), range_count_(0), node_id_(0), ret_node_(0),
@@ -84,7 +84,7 @@ class PoolQuery {
   /**
    * Copy constructor
    */
-  HSHM_CROSS_FUN PoolQuery(const PoolQuery& other)
+  CTP_CROSS_FUN PoolQuery(const PoolQuery& other)
       : routing_mode_(other.routing_mode_),
         hash_value_(other.hash_value_),
         container_id_(other.container_id_),
@@ -98,7 +98,7 @@ class PoolQuery {
   /**
    * Assignment operator
    */
-  HSHM_CROSS_FUN PoolQuery& operator=(const PoolQuery& other) {
+  CTP_CROSS_FUN PoolQuery& operator=(const PoolQuery& other) {
     if (this != &other) {
       routing_mode_ = other.routing_mode_;
       hash_value_ = other.hash_value_;
@@ -116,7 +116,7 @@ class PoolQuery {
   /**
    * Destructor
    */
-  HSHM_CROSS_FUN ~PoolQuery() {}
+  CTP_CROSS_FUN ~PoolQuery() {}
 
   // Static factory methods to create different types of PoolQuery
 
@@ -124,7 +124,7 @@ class PoolQuery {
    * Create a local routing pool query
    * @return PoolQuery configured for local container routing
    */
-  static HSHM_CROSS_FUN PoolQuery Local(u32 parallelism = 32) {
+  static CTP_CROSS_FUN PoolQuery Local(u32 parallelism = 32) {
     PoolQuery query;
     query.routing_mode_ = RoutingMode::Local;
     query.hash_value_ = 0;
@@ -185,7 +185,7 @@ class PoolQuery {
    * Create a pool query for GPU → CPU direction
    * @return PoolQuery configured for routing from GPU back to CPU
    */
-  static HSHM_CROSS_FUN PoolQuery ToLocalCpu(u32 parallelism = 32) {
+  static CTP_CROSS_FUN PoolQuery ToLocalCpu(u32 parallelism = 32) {
     PoolQuery query;
     query.routing_mode_ = RoutingMode::ToLocalCpu;
     query.parallelism_ = parallelism;
@@ -196,7 +196,7 @@ class PoolQuery {
    * Create a null pool query (do nothing)
    * @return PoolQuery configured to skip execution
    */
-  static HSHM_CROSS_FUN PoolQuery Null() {
+  static CTP_CROSS_FUN PoolQuery Null() {
     PoolQuery query;
     query.routing_mode_ = RoutingMode::Null;
     return query;
@@ -221,19 +221,19 @@ class PoolQuery {
    * Get the hash value for hash-based routing modes
    * @return Hash value used for container routing
    */
-  HSHM_CROSS_FUN u32 GetHash() const { return hash_value_; }
+  CTP_CROSS_FUN u32 GetHash() const { return hash_value_; }
 
   /**
    * Get the container ID for direct ID routing mode
    * @return Container ID for direct routing
    */
-  HSHM_CROSS_FUN ContainerId GetContainerId() const { return container_id_; }
+  CTP_CROSS_FUN ContainerId GetContainerId() const { return container_id_; }
 
   /**
    * Check if a specific container ID has been set
    * @return true if container_id is not kInvalidContainerId
    */
-  HSHM_CROSS_FUN bool HasContainerId() const {
+  CTP_CROSS_FUN bool HasContainerId() const {
     return container_id_ != kInvalidContainerId;
   }
 
@@ -241,31 +241,31 @@ class PoolQuery {
    * Get the range offset for range routing mode
    * @return Starting offset in the container range
    */
-  HSHM_CROSS_FUN u32 GetRangeOffset() const { return range_offset_; }
+  CTP_CROSS_FUN u32 GetRangeOffset() const { return range_offset_; }
 
   /**
    * Get the range count for range routing mode
    * @return Number of containers in the range
    */
-  HSHM_CROSS_FUN u32 GetRangeCount() const { return range_count_; }
+  CTP_CROSS_FUN u32 GetRangeCount() const { return range_count_; }
 
   /**
    * Get the node ID for physical routing mode
    * @return Node ID for physical routing
    */
-  HSHM_CROSS_FUN u32 GetNodeId() const { return node_id_; }
+  CTP_CROSS_FUN u32 GetNodeId() const { return node_id_; }
 
   /**
    * Determine the routing mode of this pool query
    * @return RoutingMode enum indicating how this query should be routed
    */
-  HSHM_CROSS_FUN RoutingMode GetRoutingMode() const { return routing_mode_; }
+  CTP_CROSS_FUN RoutingMode GetRoutingMode() const { return routing_mode_; }
 
   /**
    * Check if pool query is in Local routing mode
    * @return true if routing mode is Local
    */
-  HSHM_CROSS_FUN bool IsLocalMode() const {
+  CTP_CROSS_FUN bool IsLocalMode() const {
     return routing_mode_ == RoutingMode::Local;
   }
 
@@ -273,7 +273,7 @@ class PoolQuery {
    * Check if pool query is in DirectId routing mode
    * @return true if routing mode is DirectId
    */
-  HSHM_CROSS_FUN bool IsDirectIdMode() const {
+  CTP_CROSS_FUN bool IsDirectIdMode() const {
     return routing_mode_ == RoutingMode::DirectId;
   }
 
@@ -281,7 +281,7 @@ class PoolQuery {
    * Check if pool query is in DirectHash routing mode
    * @return true if routing mode is DirectHash
    */
-  HSHM_CROSS_FUN bool IsDirectHashMode() const {
+  CTP_CROSS_FUN bool IsDirectHashMode() const {
     return routing_mode_ == RoutingMode::DirectHash;
   }
 
@@ -289,7 +289,7 @@ class PoolQuery {
    * Check if pool query is in Range routing mode
    * @return true if routing mode is Range
    */
-  HSHM_CROSS_FUN bool IsRangeMode() const {
+  CTP_CROSS_FUN bool IsRangeMode() const {
     return routing_mode_ == RoutingMode::Range;
   }
 
@@ -297,7 +297,7 @@ class PoolQuery {
    * Check if pool query is in Broadcast routing mode
    * @return true if routing mode is Broadcast
    */
-  HSHM_CROSS_FUN bool IsBroadcastMode() const {
+  CTP_CROSS_FUN bool IsBroadcastMode() const {
     return routing_mode_ == RoutingMode::Broadcast;
   }
 
@@ -305,7 +305,7 @@ class PoolQuery {
    * Check if pool query is in Physical routing mode
    * @return true if routing mode is Physical
    */
-  HSHM_CROSS_FUN bool IsPhysicalMode() const {
+  CTP_CROSS_FUN bool IsPhysicalMode() const {
     return routing_mode_ == RoutingMode::Physical;
   }
 
@@ -313,7 +313,7 @@ class PoolQuery {
    * Check if pool query is in Dynamic routing mode
    * @return true if routing mode is Dynamic
    */
-  HSHM_CROSS_FUN bool IsDynamicMode() const {
+  CTP_CROSS_FUN bool IsDynamicMode() const {
     return routing_mode_ == RoutingMode::Dynamic;
   }
 
@@ -321,7 +321,7 @@ class PoolQuery {
    * Check if pool query is in ToLocalCpu routing mode
    * @return true if routing mode is ToLocalCpu
    */
-  HSHM_CROSS_FUN bool IsToLocalCpuMode() const {
+  CTP_CROSS_FUN bool IsToLocalCpuMode() const {
     return routing_mode_ == RoutingMode::ToLocalCpu;
   }
 
@@ -329,7 +329,7 @@ class PoolQuery {
    * Check if pool query is in Null routing mode
    * @return true if routing mode is Null
    */
-  HSHM_CROSS_FUN bool IsNullMode() const {
+  CTP_CROSS_FUN bool IsNullMode() const {
     return routing_mode_ == RoutingMode::Null;
   }
 
@@ -337,7 +337,7 @@ class PoolQuery {
    * Set the return node ID for distributed task responses
    * @param ret_node Node ID where task results should be returned
    */
-  HSHM_CROSS_FUN void SetReturnNode(u32 ret_node) {
+  CTP_CROSS_FUN void SetReturnNode(u32 ret_node) {
     ret_node_ = ret_node;
   }
 
@@ -345,7 +345,7 @@ class PoolQuery {
    * Get the return node ID for distributed task responses
    * @return Node ID where task results should be returned
    */
-  HSHM_CROSS_FUN u32 GetReturnNode() const {
+  CTP_CROSS_FUN u32 GetReturnNode() const {
     return ret_node_;
   }
 
@@ -353,29 +353,29 @@ class PoolQuery {
    * Get the per-task network timeout
    * @return Network timeout in seconds, or -1 if unset (use global default)
    */
-  HSHM_CROSS_FUN float GetNetTimeout() const { return net_timeout_; }
+  CTP_CROSS_FUN float GetNetTimeout() const { return net_timeout_; }
 
   /**
    * Set the per-task network timeout
    * @param t Timeout in seconds. Use -1 for default, 0 for immediate fail.
    */
-  HSHM_CROSS_FUN void SetNetTimeout(float t) { net_timeout_ = t; }
+  CTP_CROSS_FUN void SetNetTimeout(float t) { net_timeout_ = t; }
 
   /**
    * Get the parallelism level for GPU task dispatch
    * @return Number of threads (1 = lane 0 only, 32 = full warp, >32 = multi-warp)
    */
-  HSHM_CROSS_FUN u32 GetParallelism() const { return parallelism_; }
+  CTP_CROSS_FUN u32 GetParallelism() const { return parallelism_; }
 
   /** Set the parallelism level for GPU task dispatch */
-  HSHM_CROSS_FUN void SetParallelism(u32 parallelism) { parallelism_ = parallelism; }
+  CTP_CROSS_FUN void SetParallelism(u32 parallelism) { parallelism_ = parallelism; }
 
   /**
    * Serialization support for any archive type
    * @param ar Archive for serialization
    */
   template <class Archive>
-  HSHM_CROSS_FUN void serialize(Archive& ar) {
+  CTP_CROSS_FUN void serialize(Archive& ar) {
     ar.range(routing_mode_, hash_value_, container_id_, range_offset_,
              range_count_, node_id_, ret_node_, net_timeout_, parallelism_);
   }

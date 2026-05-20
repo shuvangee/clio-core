@@ -28,7 +28,7 @@ target_link_directories(clio_cte_fuse PRIVATE ${FUSE3_LIBRARY_DIRS})
 target_link_libraries(clio_cte_fuse
     ${FUSE3_LIBRARIES}
     wrp_cte_core_client
-    hshm::cxx)
+    ctp::cxx)
 
 install(TARGETS clio_cte_fuse
     RUNTIME DESTINATION ${WRP_CTE_INSTALL_BIN_DIR})

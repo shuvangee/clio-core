@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_SHM_DATA_STRUCTURES_CONTAINERS_ALGORITHM_H
-#define HSHM_SHM_SHM_DATA_STRUCTURES_CONTAINERS_ALGORITHM_H
+#ifndef CTP_SHM_SHM_DATA_STRUCTURES_CONTAINERS_ALGORITHM_H
+#define CTP_SHM_SHM_DATA_STRUCTURES_CONTAINERS_ALGORITHM_H
 
 #include <hermes_shm/constants/macros.h>
 #include <hermes_shm/types/numbers.h>
 
-namespace hshm {
+namespace ctp {
 
 /** Iterator type */
 template <typename IterT>
@@ -46,24 +46,24 @@ using iterator_type_v =
 
 /** Swap two values */
 template <typename T>
-HSHM_CROSS_FUN void swap(T &a, T &b) {
+CTP_CROSS_FUN void swap(T &a, T &b) {
   T tmp = a;
   a = b;
   b = tmp;
 }
 
 /** Default sorting algorithm */
-#define HSHM_DEFAULT_SORT_CMP hshm ::less_than<iterator_type_v<IterT>>
+#define CTP_DEFAULT_SORT_CMP ctp ::less_than<iterator_type_v<IterT>>
 
 /** Greater than comparison */
 template <typename IterT>
-HSHM_CROSS_FUN bool greater_than(const IterT &a, const IterT &b) {
+CTP_CROSS_FUN bool greater_than(const IterT &a, const IterT &b) {
   return a > b;
 }
 
 /** Less than comparison */
 template <typename IterT>
-HSHM_CROSS_FUN bool less_than(const IterT &a, const IterT &b) {
+CTP_CROSS_FUN bool less_than(const IterT &a, const IterT &b) {
   return a < b;
 }
 
@@ -73,8 +73,8 @@ using Comparitor = bool (*)(const T &a, const T &b);
 
 /** Check if a set of values is sorted */
 template <typename IterT, typename CmpT = Comparitor<iterator_type_v<IterT>>>
-HSHM_CROSS_FUN bool is_sorted(IterT start, const IterT &end,
-                              CmpT &&cmp = HSHM_DEFAULT_SORT_CMP) {
+CTP_CROSS_FUN bool is_sorted(IterT start, const IterT &end,
+                              CmpT &&cmp = CTP_DEFAULT_SORT_CMP) {
   if (start == end) {
     return true;
   }
@@ -92,27 +92,27 @@ HSHM_CROSS_FUN bool is_sorted(IterT start, const IterT &end,
 /** General sort forward declaration */
 template <typename IterT, typename CmpT = Comparitor<iterator_type_v<IterT>>,
           int INSERT_SORT_CUTOFF = 32>
-HSHM_CROSS_FUN void sort(IterT start, const IterT &end,
-                         CmpT &&cmp = HSHM_DEFAULT_SORT_CMP);
+CTP_CROSS_FUN void sort(IterT start, const IterT &end,
+                         CmpT &&cmp = CTP_DEFAULT_SORT_CMP);
 
 /** Insertion sort forward declaration */
 template <typename IterT, typename CmpT = Comparitor<iterator_type_v<IterT>>>
-HSHM_CROSS_FUN void insertion_sort(IterT start, const IterT &end,
-                                   CmpT &&cmp = HSHM_DEFAULT_SORT_CMP);
+CTP_CROSS_FUN void insertion_sort(IterT start, const IterT &end,
+                                   CmpT &&cmp = CTP_DEFAULT_SORT_CMP);
 
 /** heap_sort forward declaration */
 template <typename IterT, typename CmpT = Comparitor<iterator_type_v<IterT>>>
-HSHM_CROSS_FUN void heap_sort(IterT start, const IterT &end,
-                              CmpT &&cmp = HSHM_DEFAULT_SORT_CMP);
+CTP_CROSS_FUN void heap_sort(IterT start, const IterT &end,
+                              CmpT &&cmp = CTP_DEFAULT_SORT_CMP);
 
 /** Quicksort forward declaration */
 template <typename IterT, typename CmpT = Comparitor<iterator_type_v<IterT>>>
-HSHM_CROSS_FUN void quick_sort(IterT start, const IterT &end,
-                               CmpT &&cmp = HSHM_DEFAULT_SORT_CMP);
+CTP_CROSS_FUN void quick_sort(IterT start, const IterT &end,
+                               CmpT &&cmp = CTP_DEFAULT_SORT_CMP);
 
 /** Sort using either insertion sort of quick_sort */
 template <typename IterT, typename CmpT, int INSERT_SORT_CUTOFF>
-HSHM_CROSS_FUN void sort(IterT start, const IterT &end, CmpT &&cmp) {
+CTP_CROSS_FUN void sort(IterT start, const IterT &end, CmpT &&cmp) {
   if (end - start < INSERT_SORT_CUTOFF) {
     insertion_sort(start, end, cmp);
   } else {
@@ -122,7 +122,7 @@ HSHM_CROSS_FUN void sort(IterT start, const IterT &end, CmpT &&cmp) {
 
 /** Sort a set of values using insertion sort */
 template <typename IterT, typename CmpT>
-HSHM_CROSS_FUN void insertion_sort(IterT start, const IterT &end, CmpT &&cmp) {
+CTP_CROSS_FUN void insertion_sort(IterT start, const IterT &end, CmpT &&cmp) {
   if (start == end) {
     return;
   }
@@ -137,7 +137,7 @@ HSHM_CROSS_FUN void insertion_sort(IterT start, const IterT &end, CmpT &&cmp) {
 
 /** Build a hepa from a vector */
 template <typename IterT, typename CmpT>
-HSHM_CROSS_FUN void heapify(IterT start, size_t n, size_t i, CmpT &&cmp) {
+CTP_CROSS_FUN void heapify(IterT start, size_t n, size_t i, CmpT &&cmp) {
   size_t largest = i;
   size_t left = 2 * i + 1;
   size_t right = 2 * i + 2;
@@ -154,7 +154,7 @@ HSHM_CROSS_FUN void heapify(IterT start, size_t n, size_t i, CmpT &&cmp) {
 
 /** Sort a set of values with heap sort */
 template <typename IterT, typename CmpT>
-HSHM_CROSS_FUN void heap_sort(IterT start, const IterT &end, CmpT &&cmp) {
+CTP_CROSS_FUN void heap_sort(IterT start, const IterT &end, CmpT &&cmp) {
   size_t n = end - start;
 
   // Build heap
@@ -169,7 +169,7 @@ HSHM_CROSS_FUN void heap_sort(IterT start, const IterT &end, CmpT &&cmp) {
 
 /** Sort a set of values using quick sort */
 template <typename IterT, typename CmpT>
-HSHM_CROSS_FUN void quick_sort(IterT start, const IterT &end, CmpT &&cmp) {
+CTP_CROSS_FUN void quick_sort(IterT start, const IterT &end, CmpT &&cmp) {
   if (start >= end - 1) {
     return;
   }
@@ -188,6 +188,6 @@ HSHM_CROSS_FUN void quick_sort(IterT start, const IterT &end, CmpT &&cmp) {
   sort(store + 1, end, cmp);
 }
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_SHM_SHM_DATA_STRUCTURES_CONTAINERS_ALGORITHM_H
+#endif  // CTP_SHM_SHM_DATA_STRUCTURES_CONTAINERS_ALGORITHM_H

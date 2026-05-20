@@ -120,13 +120,13 @@ struct CustomTask : public chi::Task {
    * This includes: data_, operation_id_
    */
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive& ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive& ar) {
     Task::SerializeIn(ar);
     ar(data_, operation_id_);
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive& ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive& ar) {
     Task::SerializeOut(ar);
     ar(data_);
   }
@@ -186,13 +186,13 @@ struct CoMutexTestTask : public chi::Task {
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive& ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive& ar) {
     Task::SerializeIn(ar);
     ar(test_id_, hold_duration_ms_);
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive& ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive& ar) {
     Task::SerializeOut(ar);
     // No output parameters for this task
   }
@@ -250,13 +250,13 @@ struct CoRwLockTestTask : public chi::Task {
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive& ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive& ar) {
     Task::SerializeIn(ar);
     ar(test_id_, is_writer_, hold_duration_ms_);
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive& ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive& ar) {
     Task::SerializeOut(ar);
     // No output parameters for this task
   }
@@ -315,13 +315,13 @@ struct WaitTestTask : public chi::Task {
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive& ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive& ar) {
     Task::SerializeIn(ar);
     ar(depth_, test_id_, current_depth_);
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive& ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive& ar) {
     Task::SerializeOut(ar);
     ar(current_depth_);  // Return the final depth reached
   }
@@ -376,12 +376,12 @@ struct TestLargeOutputTask : public chi::Task {
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive& ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive& ar) {
     Task::SerializeIn(ar);
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive& ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive& ar) {
     Task::SerializeOut(ar);
     ar(data_);
   }
@@ -418,12 +418,12 @@ struct GpuSubmitTask : public chi::Task {
   OUT chi::u32 counter_value_;  // Atomic counter: number of lanes that executed
 
   /** SHM default constructor */
-  HSHM_CROSS_FUN GpuSubmitTask()
+  CTP_CROSS_FUN GpuSubmitTask()
       : chi::Task(), gpu_id_(0), test_value_(0), result_value_(0),
         counter_value_(0) {}
 
   /** Emplace constructor */
-  HSHM_CROSS_FUN explicit GpuSubmitTask(
+  CTP_CROSS_FUN explicit GpuSubmitTask(
       const chi::TaskId &task_node,
       const chi::PoolId &pool_id,
       const chi::PoolQuery &pool_query,
@@ -441,13 +441,13 @@ struct GpuSubmitTask : public chi::Task {
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive& ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive& ar) {
     Task::SerializeIn(ar);
     ar(gpu_id_, test_value_, result_value_);
   }
 
   template<typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive& ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive& ar) {
     Task::SerializeOut(ar);
     ar(result_value_, counter_value_);
   }
@@ -456,7 +456,7 @@ struct GpuSubmitTask : public chi::Task {
    * Copy from another GpuSubmitTask (assumes this task is already constructed)
    * @param other Pointer to the source task to copy from
    */
-  HSHM_CROSS_FUN void Copy(const hipc::FullPtr<GpuSubmitTask> &other) {
+  CTP_CROSS_FUN void Copy(const hipc::FullPtr<GpuSubmitTask> &other) {
     // Copy base Task fields
     Task::Copy(other.template Cast<Task>());
     // Copy GpuSubmitTask-specific fields
@@ -470,7 +470,7 @@ struct GpuSubmitTask : public chi::Task {
    * Aggregate replica results into this task
    * @param other Pointer to the replica task to aggregate from
    */
-  HSHM_CROSS_FUN void Aggregate(const hipc::FullPtr<chi::Task> &other_base) {
+  CTP_CROSS_FUN void Aggregate(const hipc::FullPtr<chi::Task> &other_base) {
     Task::Aggregate(other_base);
     Copy(other_base.template Cast<GpuSubmitTask>());
   }
@@ -485,10 +485,10 @@ struct SubtaskTestTask : public chi::Task {
   IN chi::u32 num_subtasks_;  /**< Number of subtasks to spawn (for benchmarking) */
   OUT chi::u32 result_value_;
 
-  HSHM_CROSS_FUN SubtaskTestTask()
+  CTP_CROSS_FUN SubtaskTestTask()
       : chi::Task(), test_value_(0), num_subtasks_(1), result_value_(0) {}
 
-  HSHM_CROSS_FUN explicit SubtaskTestTask(
+  CTP_CROSS_FUN explicit SubtaskTestTask(
       const chi::TaskId &task_node,
       const chi::PoolId &pool_id,
       const chi::PoolQuery &pool_query,
@@ -504,14 +504,14 @@ struct SubtaskTestTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(test_value_);
     ar(num_subtasks_);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(result_value_);
   }

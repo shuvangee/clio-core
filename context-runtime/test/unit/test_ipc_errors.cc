@@ -135,7 +135,7 @@ TEST_CASE("IpcErrors - Huge Buffer Allocation", "[ipc][errors][memory]") {
   REQUIRE(ipc != nullptr);
 
   // Try to allocate impossibly large buffer
-  size_t huge_size = hshm::Unit<size_t>::Terabytes(100);
+  size_t huge_size = ctp::Unit<size_t>::Terabytes(100);
   auto buf = ipc->AllocateBuffer(huge_size);
 
   // Should return null pointer, not crash

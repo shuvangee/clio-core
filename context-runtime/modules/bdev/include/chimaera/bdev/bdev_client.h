@@ -49,8 +49,8 @@ namespace chimaera::bdev {
 
 class Client : public chi::ContainerClient {
  public:
-  HSHM_CROSS_FUN Client() = default;
-  HSHM_CROSS_FUN explicit Client(const chi::PoolId& pool_id) { Init(pool_id); }
+  CTP_CROSS_FUN Client() = default;
+  CTP_CROSS_FUN explicit Client(const chi::PoolId& pool_id) { Init(pool_id); }
 
   /**
    * Create bdev container - asynchronous

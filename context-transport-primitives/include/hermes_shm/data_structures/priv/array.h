@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_PRIV_ARRAY_H_
-#define HSHM_DATA_STRUCTURES_PRIV_ARRAY_H_
+#ifndef CTP_DATA_STRUCTURES_PRIV_ARRAY_H_
+#define CTP_DATA_STRUCTURES_PRIV_ARRAY_H_
 
 #include "hermes_shm/constants/macros.h"
 #include <cstring>
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Fixed-size stack-allocated array.
@@ -56,20 +56,20 @@ class array {
   size_t size_;
 
  public:
-  HSHM_INLINE_CROSS_FUN array() : size_(0) {}
+  CTP_INLINE_CROSS_FUN array() : size_(0) {}
 
-  HSHM_INLINE_CROSS_FUN T *data() { return data_; }
-  HSHM_INLINE_CROSS_FUN const T *data() const { return data_; }
-  HSHM_INLINE_CROSS_FUN size_t size() const { return size_; }
-  HSHM_INLINE_CROSS_FUN static constexpr size_t capacity() { return N; }
+  CTP_INLINE_CROSS_FUN T *data() { return data_; }
+  CTP_INLINE_CROSS_FUN const T *data() const { return data_; }
+  CTP_INLINE_CROSS_FUN size_t size() const { return size_; }
+  CTP_INLINE_CROSS_FUN static constexpr size_t capacity() { return N; }
 
-  HSHM_INLINE_CROSS_FUN void resize(size_t new_size) { size_ = new_size; }
-  HSHM_INLINE_CROSS_FUN void reserve(size_t) {}
+  CTP_INLINE_CROSS_FUN void resize(size_t new_size) { size_ = new_size; }
+  CTP_INLINE_CROSS_FUN void reserve(size_t) {}
 
-  HSHM_INLINE_CROSS_FUN T &operator[](size_t i) { return data_[i]; }
-  HSHM_INLINE_CROSS_FUN const T &operator[](size_t i) const { return data_[i]; }
+  CTP_INLINE_CROSS_FUN T &operator[](size_t i) { return data_[i]; }
+  CTP_INLINE_CROSS_FUN const T &operator[](size_t i) const { return data_[i]; }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_DATA_STRUCTURES_PRIV_ARRAY_H_
+#endif  // CTP_DATA_STRUCTURES_PRIV_ARRAY_H_

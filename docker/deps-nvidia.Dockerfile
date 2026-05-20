@@ -123,7 +123,7 @@ RUN apt-get update \
 #
 # Installs the AMD ROCm 6.4 toolchain configured for the NVIDIA backend
 # (HIP-NVCC). hipcc dispatches to nvcc, the HIP host headers map onto
-# cudart, and code compiled with HSHM_ENABLE_ROCM=1 runs on the local
+# cudart, and code compiled with CTP_ENABLE_ROCM=1 runs on the local
 # CUDA GPU. The hip-dev metapackage normally pulls in `hipcc` (a thin
 # wrapper that defaults to AMD); we install `hipcc-nvidia` instead and
 # extract hip-dev with --force-overwrite so the dev headers land

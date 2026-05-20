@@ -60,7 +60,7 @@ function(add_cae_unit_test TEST_NAME TEST_SOURCE)
       wrp_cae_core_client
       wrp_cte_core_client
       chimaera::cxx
-      hshm::configure
+      ctp::configure
       ${ARG_EXTRA_LIBS}
   )
 
@@ -160,7 +160,7 @@ target_link_libraries(test_cae_comprehensive
     wrp_cte_core_client
     chimaera::admin_runtime
     chimaera::bdev_runtime
-    hshm::cxx
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -270,7 +270,7 @@ target_link_libraries(test_export_data
     wrp_cae_core_client
     wrp_cte_core_client
     chimaera::cxx
-    hshm::configure
+    ctp::configure
     ${CMAKE_THREAD_LIBS_INIT}
 )
 

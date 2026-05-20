@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_INCLUDE_HSHM_TYPES_ARGPACK_H_
-#define HSHM_INCLUDE_HSHM_TYPES_ARGPACK_H_
+#ifndef CTP_INCLUDE_HSHM_TYPES_ARGPACK_H_
+#define CTP_INCLUDE_HSHM_TYPES_ARGPACK_H_
 
 #include <utility>
 
@@ -40,7 +40,7 @@
 #include "numbers.h"
 // #include <functional>
 
-namespace hshm {
+namespace ctp {
 
 /** Type which indicates that a constructor takes ArgPacks as input */
 struct PiecewiseConstruct {};
@@ -55,15 +55,15 @@ struct ArgPackRecur {
   ArgPackRecur<idx + 1, Args...> recur_; /**< Remaining args */
 
   /** Default constructor */
-  HSHM_INLINE_CROSS_FUN ArgPackRecur() {}
+  CTP_INLINE_CROSS_FUN ArgPackRecur() {}
 
   /** Constructor. Rvalue reference. */
-  HSHM_INLINE_CROSS_FUN explicit ArgPackRecur(T arg, Args &&...args)
+  CTP_INLINE_CROSS_FUN explicit ArgPackRecur(T arg, Args &&...args)
       : arg_(std::forward<T>(arg)), recur_(std::forward<Args>(args)...) {}
 
   /** Forward an rvalue reference (only if argpack) */
   template <size_t i>
-  HSHM_INLINE_CROSS_FUN constexpr decltype(auto) Forward() {
+  CTP_INLINE_CROSS_FUN constexpr decltype(auto) Forward() {
     if constexpr (i == idx) {
       return std::forward<T>(arg_);
     } else {
@@ -76,11 +76,11 @@ struct ArgPackRecur {
 template <size_t idx>
 struct ArgPackRecur<idx, EndTemplateRecurrence> {
   /** Default constructor */
-  HSHM_INLINE_CROSS_FUN ArgPackRecur() {}
+  CTP_INLINE_CROSS_FUN ArgPackRecur() {}
 
   /** Forward an rvalue reference (only if argpack) */
   template <size_t i>
-  HSHM_INLINE_CROSS_FUN constexpr void Forward() {
+  CTP_INLINE_CROSS_FUN constexpr void Forward() {
     // TODO(llogan): fix assert
     STATIC_ASSERT(true, "(Forward) ArgPack index outside of range", void);
   }
@@ -95,22 +95,22 @@ struct ArgPack {
   static constexpr const size_t size_ = sizeof...(Args);
 
   /** General Constructor. */
-  HSHM_INLINE_CROSS_FUN ArgPack(Args &&...args)  // NOLINT
+  CTP_INLINE_CROSS_FUN ArgPack(Args &&...args)  // NOLINT
       : recur_(std::forward<Args>(args)...) {}
 
   /** Get forward reference */
   template <size_t idx>
-  HSHM_INLINE_CROSS_FUN constexpr decltype(auto) Forward() {
+  CTP_INLINE_CROSS_FUN constexpr decltype(auto) Forward() {
     return recur_.template Forward<idx>();
   }
 
   /** Size */
-  HSHM_INLINE_CROSS_FUN constexpr static size_t Size() { return size_; }
+  CTP_INLINE_CROSS_FUN constexpr static size_t Size() { return size_; }
 };
 
 /** Make an argpack */
 template <typename... Args>
-HSHM_INLINE_CROSS_FUN constexpr ArgPack<Args &&...> make_argpack(
+CTP_INLINE_CROSS_FUN constexpr ArgPack<Args &&...> make_argpack(
     Args &&...args) {
   return ArgPack<Args &&...>(std::forward<Args>(args)...);
 }
@@ -130,7 +130,7 @@ class PassArgPack {
  public:
   /** Call function with ArgPack */
   template <typename ArgPackT, typename F>
-  HSHM_INLINE_CROSS_FUN constexpr static decltype(auto) Call(ArgPackT &&pack,
+  CTP_INLINE_CROSS_FUN constexpr static decltype(auto) Call(ArgPackT &&pack,
                                                              F &&f) {
     return _CallRecur<0, ArgPackT, F>(std::forward<ArgPackT>(pack),
                                       std::forward<F>(f));
@@ -139,7 +139,7 @@ class PassArgPack {
  private:
   /** Unpacks the ArgPack and passes it to the function */
   template <size_t i, typename ArgPackT, typename F, typename... CurArgs>
-  HSHM_INLINE_CROSS_FUN constexpr static decltype(auto) _CallRecur(
+  CTP_INLINE_CROSS_FUN constexpr static decltype(auto) _CallRecur(
       ArgPackT &&pack, F &&f, CurArgs &&...args) {
     if constexpr (i < ArgPackT::Size()) {
       return _CallRecur<i + 1, ArgPackT, F>(
@@ -161,7 +161,7 @@ class MergeArgPacks {
  public:
   /** Call function with ArgPack */
   template <typename... ArgPacks>
-  HSHM_INLINE_CROSS_FUN constexpr static decltype(auto) Merge(
+  CTP_INLINE_CROSS_FUN constexpr static decltype(auto) Merge(
       ArgPacks &&...packs) {
     return _MergePacksRecur<0>(make_argpack(std::forward<ArgPacks>(packs)...));
   }
@@ -169,7 +169,7 @@ class MergeArgPacks {
  private:
   /** Unpacks the C++ parameter pack of ArgPacks */
   template <size_t cur_pack, typename ArgPacksT, typename... CurArgs>
-  HSHM_INLINE_CROSS_FUN constexpr static decltype(auto) _MergePacksRecur(
+  CTP_INLINE_CROSS_FUN constexpr static decltype(auto) _MergePacksRecur(
       ArgPacksT &&packs, CurArgs &&...args) {
     if constexpr (cur_pack < ArgPacksT::Size()) {
       return _MergeRecur<cur_pack, ArgPacksT, 0>(
@@ -185,7 +185,7 @@ class MergeArgPacks {
   /** Unpacks the C++ parameter pack of ArgPacks */
   template <size_t cur_pack, typename ArgPacksT, size_t i, typename ArgPackT,
             typename... CurArgs>
-  HSHM_INLINE_CROSS_FUN constexpr static decltype(auto) _MergeRecur(
+  CTP_INLINE_CROSS_FUN constexpr static decltype(auto) _MergeRecur(
       ArgPacksT &&packs, ArgPackT &&pack, CurArgs &&...args) {
     if constexpr (i < ArgPackT::Size()) {
       return _MergeRecur<cur_pack, ArgPacksT, i + 1, ArgPackT>(
@@ -203,7 +203,7 @@ class ProductArgPacks {
  public:
   /** The product function */
   template <typename ProductPackT, typename... ArgPacks>
-  HSHM_INLINE_CROSS_FUN constexpr static decltype(auto) Product(
+  CTP_INLINE_CROSS_FUN constexpr static decltype(auto) Product(
       ProductPackT &&prod_pack, ArgPacks &&...packs) {
     return _ProductPacksRecur<0>(
         std::forward<ProductPackT>(prod_pack),
@@ -214,7 +214,7 @@ class ProductArgPacks {
   /** Prepend \a ArgPack prod_pack to every ArgPack in orig_packs */
   template <size_t cur_pack, typename ProductPackT, typename OrigPacksT,
             typename... NewPacks>
-  HSHM_INLINE_CROSS_FUN constexpr static decltype(auto) _ProductPacksRecur(
+  CTP_INLINE_CROSS_FUN constexpr static decltype(auto) _ProductPacksRecur(
       ProductPackT &&prod_pack, OrigPacksT &&orig_packs, NewPacks &&...packs) {
     if constexpr (cur_pack < OrigPacksT::Size()) {
       return _ProductPacksRecur<cur_pack + 1>(
@@ -233,7 +233,7 @@ class ProductArgPacks {
 template <typename T, T Val>
 struct MakeConstexpr {
   constexpr static T val_ = Val;
-  HSHM_INLINE_CROSS_FUN constexpr static T Get() { return val_; }
+  CTP_INLINE_CROSS_FUN constexpr static T Get() { return val_; }
 };
 
 /** Apply a function over an entire TupleBase / tuple */
@@ -242,14 +242,14 @@ class IterateArgpack {
  public:
   /** Apply a function to every element of a tuple */
   template <typename TupleT, typename F>
-  HSHM_INLINE_CROSS_FUN constexpr static void Apply(TupleT &&pack, F &&f) {
+  CTP_INLINE_CROSS_FUN constexpr static void Apply(TupleT &&pack, F &&f) {
     _Apply<0, TupleT, F>(std::forward<TupleT>(pack), std::forward<F>(f));
   }
 
  private:
   /** Apply the function recursively */
   template <size_t i, typename TupleT, typename F>
-  HSHM_INLINE_CROSS_FUN constexpr static void _Apply(TupleT &&pack, F &&f) {
+  CTP_INLINE_CROSS_FUN constexpr static void _Apply(TupleT &&pack, F &&f) {
     if constexpr (i < TupleT::Size()) {
       if constexpr (reverse) {
         _Apply<i + 1, TupleT, F>(std::forward<TupleT>(pack),
@@ -270,6 +270,6 @@ using ForwardIterateArgpack = IterateArgpack<false>;
 /** Reverse iterate over tuple and apply function */
 using ReverseIterateArgpack = IterateArgpack<true>;
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_INCLUDE_HSHM_TYPES_ARGPACK_H_
+#endif  // CTP_INCLUDE_HSHM_TYPES_ARGPACK_H_

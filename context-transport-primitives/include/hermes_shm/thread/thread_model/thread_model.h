@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_THREAD_THREAD_H_
-#define HSHM_THREAD_THREAD_H_
+#ifndef CTP_THREAD_THREAD_H_
+#define CTP_THREAD_THREAD_H_
 
 #include <atomic>
 #include <cstdint>
@@ -43,28 +43,28 @@
 #include "hermes_shm/types/bitfield.h"
 #include "hermes_shm/types/numbers.h"
 
-#if HSHM_ENABLE_PTHREADS
+#if CTP_ENABLE_PTHREADS
 #include <pthread.h>
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
 #include <thallium.hpp>
 #endif
 #include <thread>
 
-namespace hshm {
+namespace ctp {
 
 /** Available threads that are mapped */
 enum class ThreadType { kNone, kPthread, kArgobots, kCuda, kRocm, kStdThread };
 
 /** Thread-local key */
 union ThreadLocalKey {
-#if HSHM_ENABLE_PTHREADS
+#if CTP_ENABLE_PTHREADS
   pthread_key_t pthread_key_;
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
   ABT_key argobots_key_;
 #endif
-#if HSHM_ENABLE_WINDOWS_THREADS
+#if CTP_ENABLE_WINDOWS_THREADS
   DWORD windows_key_;
 #endif
 };
@@ -77,7 +77,7 @@ struct ThreadGroupContext {
 
 /** Thread group */
 struct ThreadGroup {
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
   ABT_xstream abtxstream_ = nullptr;
 #endif
 };
@@ -94,39 +94,39 @@ struct ThreadParams {
 /** Thread */
 struct Thread {
   ThreadGroup group_;
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
   ABT_thread abt_thread_ = nullptr;
 #endif
-#if HSHM_ENABLE_PTHREADS
+#if CTP_ENABLE_PTHREADS
   pthread_t pthread_thread_;
 #endif
   std::thread std_thread_;
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-namespace hshm::thread {
+namespace ctp::thread {
 
 /** Thread-local key */
-using hshm::ThreadLocalKey;
+using ctp::ThreadLocalKey;
 
 /** Thread group */
-using hshm::ThreadGroup;
+using ctp::ThreadGroup;
 
 /** Thread */
-using hshm::Thread;
+using ctp::Thread;
 
 /** Thread group context */
-using hshm::ThreadGroupContext;
+using ctp::ThreadGroupContext;
 
 /** Thread-local storage */
 class ThreadLocalData {
  public:
-  // HSHM_CROSS_FUN
+  // CTP_CROSS_FUN
   // void destroy() = 0;
 
   template <typename TLS>
-  HSHM_CROSS_FUN static void destroy_wrap(void *data) {
+  CTP_CROSS_FUN static void destroy_wrap(void *data) {
     if (data) {
       // TODO(llogan): Figure out why this segfaults on exit
       //   if constexpr (std::is_base_of_v<ThreadLocalData, TLS>) {
@@ -143,14 +143,14 @@ class ThreadModel {
 
  public:
   /** Initializer */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   explicit ThreadModel(ThreadType type) : type_(type) {}
 
   /** Get the thread model type */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   ThreadType GetType() { return type_; }
 };
 
-}  // namespace hshm::thread
+}  // namespace ctp::thread
 
-#endif  // HSHM_THREAD_THREAD_H_
+#endif  // CTP_THREAD_THREAD_H_

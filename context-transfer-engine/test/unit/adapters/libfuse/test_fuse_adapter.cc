@@ -72,7 +72,7 @@ class FuseAdapterTestFixture {
   bool target_initialized_ = false;
 
   FuseAdapterTestFixture() {
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
     REQUIRE(!home_dir.empty());
     test_storage_path_ = home_dir + "/cte_fuse_test.dat";
 
@@ -167,7 +167,7 @@ class FuseAdapterTestFixture {
 // ============================================================================
 
 TEST_CASE("FUSE CTE - Tag create and exists", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_test/tag_exists";
@@ -187,7 +187,7 @@ TEST_CASE("FUSE CTE - Tag create and exists", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - Tag deletion", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_test/tag_delete";
@@ -208,7 +208,7 @@ TEST_CASE("FUSE CTE - Tag deletion", "[fuse][cte]") {
 // ============================================================================
 
 TEST_CASE("FUSE CTE - CteDirExists for implicit directories", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   // Create tags that imply directory structure
@@ -240,7 +240,7 @@ TEST_CASE("FUSE CTE - CteDirExists for implicit directories", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - CteListDirectChildren", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string f1 = "/fuse_list_test/alpha.txt";
@@ -268,7 +268,7 @@ TEST_CASE("FUSE CTE - CteListDirectChildren", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - CteListSubdirs", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string f1 = "/fuse_subdir_test/x/file1.txt";
@@ -299,7 +299,7 @@ TEST_CASE("FUSE CTE - CteListSubdirs", "[fuse][cte]") {
 // ============================================================================
 
 TEST_CASE("FUSE CTE - Small write and read round-trip", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_io_test/small_rw";
@@ -320,7 +320,7 @@ TEST_CASE("FUSE CTE - Small write and read round-trip", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - Multi-page write and read", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_io_test/multipage_rw";
@@ -356,7 +356,7 @@ TEST_CASE("FUSE CTE - Multi-page write and read", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - Partial page write with offset", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_io_test/partial_page";
@@ -378,7 +378,7 @@ TEST_CASE("FUSE CTE - Partial page write with offset", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - Cross-page write simulation", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_io_test/cross_page";
@@ -413,7 +413,7 @@ TEST_CASE("FUSE CTE - Cross-page write simulation", "[fuse][cte]") {
 // ============================================================================
 
 TEST_CASE("FUSE Integration - Full file lifecycle", "[fuse][integration]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   // 1. Create file (tag)

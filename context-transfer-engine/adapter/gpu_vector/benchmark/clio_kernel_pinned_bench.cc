@@ -37,14 +37,14 @@
  * Reports min / median / max wall time + median bandwidth per iter.
  */
 
-#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#if (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL
 
 #include <hermes_shm/util/gpu_api.h>
 
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
 #include <cuda_runtime.h>
 #endif
-#if HSHM_ENABLE_ROCM
+#if CTP_ENABLE_ROCM
 #include <hip/hip_runtime.h>
 #endif
 
@@ -241,9 +241,9 @@ void RunTarget(const Opts &o, Target tgt) {
 
   char *buf = nullptr;
   if (tgt == Target::kPinned) {
-    buf = hshm::GpuApi::MallocHost<char>(total_bytes);
+    buf = ctp::GpuApi::MallocHost<char>(total_bytes);
   } else {
-    buf = hshm::GpuApi::Malloc<char>(total_bytes);
+    buf = ctp::GpuApi::Malloc<char>(total_bytes);
   }
   if (!buf) {
     std::fprintf(stderr, "Allocation failed for %zu bytes on %s\n",
@@ -270,7 +270,7 @@ void RunTarget(const Opts &o, Target tgt) {
   if (o.concurrent_flush) {
     cudaStreamCreateWithFlags(&flush_stream, cudaStreamNonBlocking);
     flush_sink_cap = 64 * 1024;
-    flush_sink = hshm::GpuApi::MallocHost<unsigned int>(flush_sink_cap);
+    flush_sink = ctp::GpuApi::MallocHost<unsigned int>(flush_sink_cap);
     std::memset(flush_sink, 0, flush_sink_cap * sizeof(unsigned int));
   }
 
@@ -308,12 +308,12 @@ void RunTarget(const Opts &o, Target tgt) {
   // Cleanup.
   cudaStreamDestroy(main_stream);
   if (flush_stream) cudaStreamDestroy(flush_stream);
-  if (flush_sink) hshm::GpuApi::FreeHost(flush_sink);
+  if (flush_sink) ctp::GpuApi::FreeHost(flush_sink);
   cudaFree(read_sink);
   if (tgt == Target::kPinned) {
-    hshm::GpuApi::FreeHost(buf);
+    ctp::GpuApi::FreeHost(buf);
   } else {
-    hshm::GpuApi::Free(buf);
+    ctp::GpuApi::Free(buf);
   }
 }
 
@@ -323,7 +323,7 @@ int main(int argc, char *argv[]) {
   Opts o;
   if (!ParseOpts(argc, argv, o)) return 2;
 
-  hshm::GpuApi::SetDevice(o.gpu_id);
+  ctp::GpuApi::SetDevice(o.gpu_id);
 
   std::printf(
       "[KERN-BENCH] blocks=%u per_block=%.2f MiB page=%.2f MiB total=%.2f MiB "
@@ -349,4 +349,4 @@ int main(int argc, char *argv[]) {
 
 int main() { return 0; }
 
-#endif  // (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#endif  // (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL

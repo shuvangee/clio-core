@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_MEMORY_ALLOCATOR_ROUND_ROBIN_ALLOCATOR_H_
-#define HSHM_MEMORY_ALLOCATOR_ROUND_ROBIN_ALLOCATOR_H_
+#ifndef CTP_MEMORY_ALLOCATOR_ROUND_ROBIN_ALLOCATOR_H_
+#define CTP_MEMORY_ALLOCATOR_ROUND_ROBIN_ALLOCATOR_H_
 
 #include "hermes_shm/memory/allocator/allocator.h"
 #include "hermes_shm/memory/allocator/buddy_allocator.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 class _RoundRobinAllocator;
 typedef BaseAllocator<_RoundRobinAllocator> RoundRobinAllocator;
@@ -54,7 +54,7 @@ struct RrPartitionBlock {
   hipc::atomic<int> lock_;         /**< Spinlock: 0=unlocked, 1=locked */
   BuddyAllocator alloc_;          /**< Shared buddy allocator (MUST BE LAST) */
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   RrPartitionBlock() : initialized_(0), lock_(0) {}
 
   /**
@@ -63,37 +63,37 @@ struct RrPartitionBlock {
    * @param region_size Total partition size including this header
    * @return true on success
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool shm_init(const MemoryBackend &backend, size_t region_size) {
     size_t alloc_region_size = region_size - sizeof(RrPartitionBlock);
     alloc_.shm_init(backend, alloc_region_size);
     lock_.store(0);
     initialized_.store(1);
-#if !HSHM_IS_HOST
+#if !CTP_IS_HOST
     __threadfence_system();
 #endif
     return true;
   }
 
   /** Acquire the spinlock (busy-wait with threadfence on GPU) */
-  HSHM_INLINE_CROSS_FUN void Lock() {
+  CTP_INLINE_CROSS_FUN void Lock() {
     int expected = 0;
     while (!lock_.compare_exchange_strong(expected, 1)) {
       expected = 0;
-      hshm::ipc::threadfence();
+      ctp::ipc::threadfence();
     }
   }
 
   /** Release the spinlock */
-  HSHM_INLINE_CROSS_FUN void Unlock() {
+  CTP_INLINE_CROSS_FUN void Unlock() {
     lock_.store(0);
-#if !HSHM_IS_HOST
+#if !CTP_IS_HOST
     __threadfence();
 #endif
   }
 
   /** Allocate with lock held */
-  HSHM_INLINE_CROSS_FUN OffsetPtr<> LockedAllocate(size_t size) {
+  CTP_INLINE_CROSS_FUN OffsetPtr<> LockedAllocate(size_t size) {
     Lock();
     OffsetPtr<> p = alloc_.AllocateOffset(size);
     Unlock();
@@ -101,7 +101,7 @@ struct RrPartitionBlock {
   }
 
   /** Free with lock held */
-  HSHM_INLINE_CROSS_FUN void LockedFree(OffsetPtr<> p) {
+  CTP_INLINE_CROSS_FUN void LockedFree(OffsetPtr<> p) {
     if (p.IsNull()) return;
     Lock();
     alloc_.FreeOffsetNoNullCheck(p);
@@ -133,7 +133,7 @@ class _RoundRobinAllocator : public Allocator {
   char * volatile base_;              /**< Cached base pointer */
 
  public:
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   _RoundRobinAllocator()
       : heap_ready_(0), next_partition_(0),
         num_partitions_(0), partition_size_(0), base_(nullptr) {}
@@ -152,7 +152,7 @@ class _RoundRobinAllocator : public Allocator {
    * @param partition_size Bytes per partition (0 = auto-compute)
    * @return true on success
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool shm_init(const MemoryBackend &backend,
                 size_t region_size = 0,
                 int num_partitions = 64,
@@ -196,7 +196,7 @@ class _RoundRobinAllocator : public Allocator {
    * Thread-safe: uses atomic increment on the counter.
    * @return Partition index [0, num_partitions_)
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   int ClaimPartition() {
     int idx = next_partition_.fetch_add(1);
     return idx % num_partitions_;
@@ -206,7 +206,7 @@ class _RoundRobinAllocator : public Allocator {
    * Get an RrPartitionBlock by partition index.
    * O(1) — computed directly from fixed layout.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   RrPartitionBlock* GetPartitionBlock(int partition_id) {
     char *b = base_;
     size_t ps = partition_size_;
@@ -219,7 +219,7 @@ class _RoundRobinAllocator : public Allocator {
    * Lazily initialize a partition.
    * Only called once per partition (checked via initialized_ flag).
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool LazyInitPartition(int partition_id) {
     if (partition_id < 0 || partition_id >= num_partitions_) {
       return false;
@@ -241,7 +241,7 @@ class _RoundRobinAllocator : public Allocator {
    * @param partition_id Partition index from ClaimPartition()
    * @return Pointer to the partition's BuddyAllocator, or nullptr
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   BuddyAllocator* GetAllocator(int partition_id) {
     if (!LazyInitPartition(partition_id)) return nullptr;
     return &GetPartitionBlock(partition_id)->alloc_;
@@ -253,7 +253,7 @@ class _RoundRobinAllocator : public Allocator {
    * @param partition_id Partition to allocate from
    * @return Offset pointer to allocated memory
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> AllocateOffset(size_t size, int partition_id) {
     if (!LazyInitPartition(partition_id)) {
       return OffsetPtr<>::GetNull();
@@ -266,9 +266,9 @@ class _RoundRobinAllocator : public Allocator {
    * Falls back to warp-ID-based partition like PartitionedAllocator.
    * Prefer using the partition_id overload with ClaimPartition().
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> AllocateOffset(size_t size) {
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
     int tid = static_cast<int>((blockIdx.x * blockDim.x + threadIdx.x) / 32);
     int partition_id = tid % num_partitions_;
 #else
@@ -278,7 +278,7 @@ class _RoundRobinAllocator : public Allocator {
   }
 
   /** Reallocate (not supported) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<> ReallocateOffsetNoNullCheck(OffsetPtr<> p, size_t new_size) {
     (void)p; (void)new_size;
     return OffsetPtr<>::GetNull();
@@ -287,7 +287,7 @@ class _RoundRobinAllocator : public Allocator {
   /**
    * Free memory. Determines owning partition by address arithmetic.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FreeOffsetNoNullCheck(OffsetPtr<> p) {
     char *ptr_addr = base_ + p.load();
     char *partitions_base = base_ + sizeof(_RoundRobinAllocator);
@@ -300,14 +300,14 @@ class _RoundRobinAllocator : public Allocator {
   }
 
   /** Free memory (null-safe wrapper) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FreeOffset(OffsetPtr<> p) {
     if (p.IsNull()) return;
     FreeOffsetNoNullCheck(p);
   }
 
   /** Push arena on a specific partition's BuddyAllocator */
-  HSHM_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block,
+  CTP_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block,
                                       size_t size, int partition_id) {
     if (!LazyInitPartition(partition_id)) return false;
     auto *pblock = GetPartitionBlock(partition_id);
@@ -318,9 +318,9 @@ class _RoundRobinAllocator : public Allocator {
   }
 
   /** Push arena with auto-detected partition */
-  HSHM_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block,
+  CTP_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block,
                                       size_t size) {
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
     int tid = static_cast<int>((blockIdx.x * blockDim.x + threadIdx.x) / 32);
     return PushArenaState(prior, block, size, tid % num_partitions_);
 #else
@@ -329,7 +329,7 @@ class _RoundRobinAllocator : public Allocator {
   }
 
   /** Pop arena on the owning partition */
-  HSHM_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
+  CTP_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
     if (block.IsNull()) return;
     char *ptr_addr = base_ + block.load();
     char *partitions_base = base_ + sizeof(_RoundRobinAllocator);
@@ -345,28 +345,28 @@ class _RoundRobinAllocator : public Allocator {
   }
 
   /** No-op TLS management */
-  HSHM_CROSS_FUN void CreateTls() {}
-  HSHM_CROSS_FUN void FreeTls() {}
+  CTP_CROSS_FUN void CreateTls() {}
+  CTP_CROSS_FUN void FreeTls() {}
 
   /** Mark the allocator as ready (grid-level sync) */
-  HSHM_CROSS_FUN void MarkReady() {
+  CTP_CROSS_FUN void MarkReady() {
     heap_ready_.store(1);
-#if !HSHM_IS_HOST
+#if !CTP_IS_HOST
     __threadfence_system();
 #endif
   }
 
   /** Spin-wait until the allocator is marked ready */
-  HSHM_CROSS_FUN void WaitReady() {
-#if !HSHM_IS_HOST
+  CTP_CROSS_FUN void WaitReady() {
+#if !CTP_IS_HOST
     while (heap_ready_.load_device() != 1) {
-      hshm::ipc::threadfence();
+      ctp::ipc::threadfence();
     }
-    hshm::ipc::threadfence_system();
+    ctp::ipc::threadfence_system();
 #endif
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_MEMORY_ALLOCATOR_ROUND_ROBIN_ALLOCATOR_H_
+#endif  // CTP_MEMORY_ALLOCATOR_ROUND_ROBIN_ALLOCATOR_H_

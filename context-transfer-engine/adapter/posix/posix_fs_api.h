@@ -111,8 +111,8 @@ private:
     buf.st_ino = SyntheticInode(astat.path_);
     buf.st_mode = S_IFREG | 0644;
     buf.st_nlink = 1;
-    buf.st_uid = HSHM_SYSTEM_INFO->uid_;
-    buf.st_gid = HSHM_SYSTEM_INFO->gid_;
+    buf.st_uid = CTP_SYSTEM_INFO->uid_;
+    buf.st_gid = CTP_SYSTEM_INFO->gid_;
     buf.st_rdev = 0;
     size_t size = GetSize(f, astat);
     buf.st_size = static_cast<off_t>(size);
@@ -314,11 +314,11 @@ public:
 #include "hermes_shm/util/singleton.h"
 
 namespace clio::cae {
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(PosixFs, g_posix_fs);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(PosixFs, g_posix_fs);
 }
 
 /** Simplify access to the stateless PosixFs Singleton */
-#define WRP_CTE_POSIX_FS (HSHM_GET_GLOBAL_PTR_VAR(clio::cae::PosixFs, clio::cae::g_posix_fs))
+#define WRP_CTE_POSIX_FS (CTP_GET_GLOBAL_PTR_VAR(clio::cae::PosixFs, clio::cae::g_posix_fs))
 #define WRP_CTE_POSIX_FS_T clio::cae::PosixFs *
 
 #endif // WRP_CTE_ADAPTER_POSIX_NATIVE_H_

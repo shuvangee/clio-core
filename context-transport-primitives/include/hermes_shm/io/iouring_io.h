@@ -31,10 +31,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_IO_IOURING_IO_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_IO_IOURING_IO_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_IO_IOURING_IO_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_IO_IOURING_IO_H_
 
-#if HSHM_ENABLE_IO_URING
+#if CTP_ENABLE_IO_URING
 
 #include "async_io.h"
 #include <liburing.h>
@@ -48,7 +48,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace hshm {
+namespace ctp {
 
 class IoUringAsyncIO : public AsyncIO {
  public:
@@ -238,8 +238,8 @@ class IoUringAsyncIO : public AsyncIO {
   std::unordered_map<IoToken, IoResult> completed_;
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_IO_URING
+#endif  // CTP_ENABLE_IO_URING
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_IO_IOURING_IO_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_IO_IOURING_IO_H_

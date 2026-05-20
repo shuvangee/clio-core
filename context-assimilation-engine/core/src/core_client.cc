@@ -38,7 +38,7 @@
 #include <wrp_cae/core/core_client.h>
 
 // Global CAE client singleton definition
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(wrp_cae::core::Client, g_cae_client);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(wrp_cae::core::Client, g_cae_client);
 
 /**
  * Initialize CAE client singleton
@@ -63,7 +63,7 @@ bool WRP_CAE_CLIENT_INIT(const std::string &config_path,
   }
 
   // Get or create the CAE client singleton
-  auto *cae_client = HSHM_GET_GLOBAL_PTR_VAR(wrp_cae::core::Client, g_cae_client);
+  auto *cae_client = CTP_GET_GLOBAL_PTR_VAR(wrp_cae::core::Client, g_cae_client);
   if (!cae_client) {
     return false;
   }

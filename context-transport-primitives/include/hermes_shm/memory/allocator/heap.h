@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_MEMORY_ALLOCATOR_HEAP_H_
-#define HSHM_MEMORY_ALLOCATOR_HEAP_H_
+#ifndef CTP_MEMORY_ALLOCATOR_HEAP_H_
+#define CTP_MEMORY_ALLOCATOR_HEAP_H_
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/types/atomic.h"
 #include "hermes_shm/util/errors.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Heap helper class for simple bump-pointer allocation
@@ -58,7 +58,7 @@ class Heap {
   /**
    * Default constructor
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   Heap() : heap_(0), max_offset_(0) {}
 
   /**
@@ -67,7 +67,7 @@ class Heap {
    * @param initial_offset Initial heap offset
    * @param max_offset Maximum offset the heap can reach (initial_offset + max_size)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   Heap(size_t initial_offset, size_t max_offset)
       : heap_(initial_offset), max_offset_(max_offset) {}
 
@@ -77,7 +77,7 @@ class Heap {
    * @param initial_offset Initial heap offset
    * @param max_offset Maximum offset the heap can reach (initial_offset + max_size)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Init(size_t initial_offset, size_t max_offset) {
     heap_.store(initial_offset);
     max_offset_ = max_offset;
@@ -89,7 +89,7 @@ class Heap {
    * @param size Number of bytes to allocate
    * @return Offset of the allocated region, or 0 on failure (out of memory)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t Allocate(size_t size) {
     // Check if heap may have enough space
     if (heap_.load() + size > max_offset_) {
@@ -116,7 +116,7 @@ class Heap {
    *
    * @return Current offset at the top of the heap
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t GetOffset() const {
     return heap_.load();
   }
@@ -126,7 +126,7 @@ class Heap {
    *
    * @return Maximum offset the heap can reach
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t GetMaxOffset() const {
     return max_offset_;
   }
@@ -136,7 +136,7 @@ class Heap {
    *
    * @return Maximum size the heap can grow to
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t GetMaxSize() const {
     return max_offset_;
   }
@@ -146,13 +146,13 @@ class Heap {
    *
    * @return Number of bytes remaining
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t GetRemainingSize() const {
     size_t current = heap_.load();
     return (current < max_offset_) ? (max_offset_ - current) : 0;
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_MEMORY_ALLOCATOR_HEAP_H_
+#endif  // CTP_MEMORY_ALLOCATOR_HEAP_H_

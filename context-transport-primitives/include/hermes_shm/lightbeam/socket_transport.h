@@ -42,7 +42,7 @@
 #include "lightbeam.h"
 #include "posix_socket.h"
 
-namespace hshm::lbm {
+namespace ctp::lbm {
 
 /** Action that records a fired event into a SocketTransport's vector */
 class SocketFiredAction : public EventAction {
@@ -180,7 +180,7 @@ class SocketTransport : public Transport {
     Bulk bulk;
     bulk.data = ptr;
     bulk.size = data_size;
-    bulk.flags = hshm::bitfield32_t(flags);
+    bulk.flags = ctp::bitfield32_t(flags);
     return bulk;
   }
 
@@ -260,7 +260,7 @@ class SocketTransport : public Transport {
     //    we will hand to writev — no intermediate std::string copy.
     std::vector<char> meta_buf;
     {
-      hshm::ipc::GlobalSerialize<std::vector<char>> ar(meta_buf);
+      ctp::ipc::GlobalSerialize<std::vector<char>> ar(meta_buf);
       ar(meta);
       ar.Finalize();
     }
@@ -402,7 +402,7 @@ class SocketTransport : public Transport {
     if (rc != 0) return -1;
 
     try {
-      hshm::ipc::GlobalDeserialize<std::vector<char>> ar(meta_buf);
+      ctp::ipc::GlobalDeserialize<std::vector<char>> ar(meta_buf);
       ar(meta);
     } catch (const std::exception& e) {
       HLOG(kFatal, "Socket RecvMetadata: Deserialization failed - {} (len={})",
@@ -485,4 +485,4 @@ class SocketTransport : public Transport {
   SocketFiredAction fired_action_;       // Action that populates fired_events_
 };
 
-}  // namespace hshm::lbm
+}  // namespace ctp::lbm

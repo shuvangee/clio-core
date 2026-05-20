@@ -27,7 +27,7 @@ bool IpcCpu2CpuZmq::RuntimeRecv(IpcManager *ipc, u32 &tasks_received) {
   // Process both TCP and IPC servers
   for (int mode_idx = 0; mode_idx < 2; ++mode_idx) {
     IpcMode mode = (mode_idx == 0) ? IpcMode::kTcp : IpcMode::kIpc;
-    hshm::lbm::Transport *transport = ipc->GetClientTransport(mode);
+    ctp::lbm::Transport *transport = ipc->GetClientTransport(mode);
     if (!transport) continue;
 
     // Drain all pending messages from this transport. Unbounded `while`
@@ -219,7 +219,7 @@ bool IpcCpu2CpuZmq::RuntimeSend(
       }
 
       // Get response transport and routing info from FutureShm
-      hshm::lbm::Transport *response_transport =
+      ctp::lbm::Transport *response_transport =
           future_shm->response_transport_;
       if (!response_transport) {
         HLOG(kError, "IpcCpu2CpuZmq::RuntimeSend: No response transport "
@@ -254,7 +254,7 @@ bool IpcCpu2CpuZmq::RuntimeSend(
       // frame; at high concurrency the ROUTER socket can transiently
       // return EAGAIN. Without retry the response is lost and the client
       // spins on FUTURE_COMPLETE forever, so re-queue on failure.
-      int rc = response_transport->Send(archive, hshm::lbm::LbmContext());
+      int rc = response_transport->Send(archive, ctp::lbm::LbmContext());
       if (rc != 0) {
         size_t fail_total =
             send_fail_counter.fetch_add(1, std::memory_order_relaxed) + 1;

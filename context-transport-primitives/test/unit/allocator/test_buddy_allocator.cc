@@ -38,7 +38,7 @@
 #include "hermes_shm/memory/backend/malloc_backend.h"
 #include "hermes_shm/memory/allocator/buddy_allocator.h"
 
-using hshm::testing::AllocatorTest;
+using ctp::testing::AllocatorTest;
 
 TEST_CASE("BuddyAllocator - Allocate and Free Immediate", "[BuddyAllocator]") {
   hipc::MallocBackend backend;
@@ -105,7 +105,7 @@ TEST_CASE("BuddyAllocator - Random Allocation", "[BuddyAllocator]") {
     catch (const std::exception &e) {
       std::cout << ("TestRandomAllocation(16) failed: " + std::string(e.what()));
     }
-    catch (const hshm::Error &e) {
+    catch (const ctp::Error &e) {
       std::cout << ("TestRandomAllocation(16) failed: " + std::string(e.what()));
     }
   }
@@ -172,7 +172,7 @@ TEST_CASE("BuddyAllocator - Weird Offset Allocation", "[BuddyAllocator]") {
       tester.TestRandomAllocation(16);
     } catch (const std::exception &e) {
       std::cout << ("TestRandomAllocation failed: " + std::string(e.what()));
-    } catch (const hshm::Error &e) {
+    } catch (const ctp::Error &e) {
       std::cout << ("TestRandomAllocation failed: " + std::string(e.what()));
     }
   }

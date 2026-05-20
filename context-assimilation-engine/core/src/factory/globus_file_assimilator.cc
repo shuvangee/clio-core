@@ -442,7 +442,7 @@ static std::string UrlEncodePath(const std::string& path) {
 
 // Fork + exec curl to perform HTTP requests.  This completely avoids the
 // glibc NSS SIGSEGV that occurs when getaddrinfo() is called from inside a
-// chimaera worker-thread context (dlopen'd module + hshm allocator + NSS
+// chimaera worker-thread context (dlopen'd module + ctp allocator + NSS
 // lazy-init = null nss_action_list → segfault at address 0x2).
 //
 // RunCurlCapture: forks curl and returns stdout as a string.

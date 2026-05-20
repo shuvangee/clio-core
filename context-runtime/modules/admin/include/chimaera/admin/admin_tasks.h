@@ -37,7 +37,7 @@
 #include <chimaera/chimaera.h>
 #include <chimaera/config_manager.h>
 #include <hermes_shm/memory/allocator/malloc_allocator.h>
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
 #include <yaml-cpp/yaml.h>
 #include "hermes_shm/data_structures/serialization/global_serialize.h"
 #include <unordered_map>
@@ -126,7 +126,7 @@ struct BaseCreateTask : public chi::Task {
         is_admin_(IS_ADMIN),
         do_compose_(DO_COMPOSE),
         client_(nullptr) {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     HLOG(kDebug,
          "BaseCreateTask default constructor: IS_ADMIN={}, DO_COMPOSE={}, "
          "do_compose_={}",
@@ -156,7 +156,7 @@ struct BaseCreateTask : public chi::Task {
     task_flags_.Clear();
     pool_query_ = pool_query;
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     HLOG(kDebug,
          "BaseCreateTask emplace constructor: chimod_name={}, pool_name={}",
          chimod_name, pool_name);
@@ -193,7 +193,7 @@ struct BaseCreateTask : public chi::Task {
     task_flags_.Clear();
     pool_query_ = pool_query;
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     HLOG(kDebug,
          "BaseCreateTask emplace constructor (const char* chimod): chimod_name={}, pool_name={}",
          chimod_name, pool_name);
@@ -210,7 +210,7 @@ struct BaseCreateTask : public chi::Task {
   }
 
   /** Emplace constructor for GPU: takes const char* names, leaves chimod_params_ empty */
-  HSHM_CROSS_FUN explicit BaseCreateTask(
+  CTP_CROSS_FUN explicit BaseCreateTask(
       const chi::TaskId &task_node, const chi::PoolId &task_pool_id,
       const chi::PoolQuery &pool_query, const char *chimod_name,
       const char *pool_name, const chi::PoolId &target_pool_id,
@@ -245,7 +245,7 @@ struct BaseCreateTask : public chi::Task {
         is_admin_(IS_ADMIN),
         do_compose_(DO_COMPOSE),
         client_(nullptr) {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     HLOG(kDebug,
          "BaseCreateTask COMPOSE constructor: IS_ADMIN={}, DO_COMPOSE={}, "
          "do_compose_={}, pool_name={}",
@@ -261,7 +261,7 @@ struct BaseCreateTask : public chi::Task {
     chi::Task::Serialize(CHI_PRIV_ALLOC, chimod_params_, pool_config);
   }
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   /**
    * Set parameters by serializing them to chimod_params_
    * Does nothing if do_compose_ is true (compose mode)
@@ -294,7 +294,7 @@ struct BaseCreateTask : public chi::Task {
     }
   }
 #else
-  HSHM_GPU_FUN CreateParamsT GetParams() const {
+  CTP_GPU_FUN CreateParamsT GetParams() const {
     return CreateParamsT{};
   }
 #endif
@@ -305,8 +305,8 @@ struct BaseCreateTask : public chi::Task {
    * is_admin_, do_compose_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
-#if HSHM_IS_HOST
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
+#if CTP_IS_HOST
     HLOG(kDebug,
          "BaseCreateTask::SerializeIn BEFORE: do_compose_={}, is_admin_={}",
          do_compose_, is_admin_);
@@ -314,7 +314,7 @@ struct BaseCreateTask : public chi::Task {
     Task::SerializeIn(ar);
     ar(chimod_name_, pool_name_, chimod_params_, new_pool_id_, is_admin_,
        do_compose_);
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     HLOG(kDebug,
          "BaseCreateTask::SerializeIn AFTER: do_compose_={}, is_admin_={}",
          do_compose_, is_admin_);
@@ -327,7 +327,7 @@ struct BaseCreateTask : public chi::Task {
    * is_admin_, do_compose_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(chimod_name_, chimod_params_, new_pool_id_, error_message_, is_admin_,
        do_compose_);
@@ -338,7 +338,7 @@ struct BaseCreateTask : public chi::Task {
    * @param other Pointer to the source task to copy from
    */
   void Copy(const hipc::FullPtr<BaseCreateTask> &other) {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     HLOG(kDebug,
          "BaseCreateTask::Copy() BEFORE: this->do_compose_={}, "
          "other->do_compose_={}",
@@ -354,7 +354,7 @@ struct BaseCreateTask : public chi::Task {
     error_message_ = other->error_message_;
     is_admin_ = other->is_admin_;
     do_compose_ = other->do_compose_;
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     HLOG(kDebug, "BaseCreateTask::Copy() AFTER: this->do_compose_={}",
          do_compose_);
 #endif
@@ -446,7 +446,7 @@ struct DestroyPoolTask : public chi::Task {
    * This includes: target_pool_id_, destruction_flags_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(target_pool_id_, destruction_flags_);
   }
@@ -456,7 +456,7 @@ struct DestroyPoolTask : public chi::Task {
    * This includes: error_message_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(error_message_);
   }
@@ -524,7 +524,7 @@ struct StopRuntimeTask : public chi::Task {
    * This includes: shutdown_flags_, grace_period_ms_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(shutdown_flags_, grace_period_ms_);
   }
@@ -534,7 +534,7 @@ struct StopRuntimeTask : public chi::Task {
    * This includes: error_message_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(error_message_);
   }
@@ -589,7 +589,7 @@ struct FlushTask : public chi::Task {
    * No additional parameters for FlushTask
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     // No additional parameters to serialize for flush
   }
@@ -599,7 +599,7 @@ struct FlushTask : public chi::Task {
    * This includes: total_work_done_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(total_work_done_);
   }
@@ -664,7 +664,7 @@ struct SendTask : public chi::Task {
    * Serialize IN and INOUT parameters for network transfer
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(transfer_flags_);
   }
@@ -673,7 +673,7 @@ struct SendTask : public chi::Task {
    * Serialize OUT and INOUT parameters for network transfer
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(error_message_);
   }
@@ -733,7 +733,7 @@ struct RecvTask : public chi::Task {
    * Serialize IN and INOUT parameters for network transfer
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(transfer_flags_);
   }
@@ -742,7 +742,7 @@ struct RecvTask : public chi::Task {
    * Serialize OUT and INOUT parameters for network transfer
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(error_message_);
   }
@@ -839,12 +839,12 @@ struct ClientConnectTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(response_, server_generation_, server_pid_, worker_queues_off_, num_gpus_, gpu_queue_depth_);
     for (chi::u32 i = 0; i < kMaxGpuDevices; ++i) {
@@ -912,12 +912,12 @@ struct ClientRecvTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(tasks_received_);
   }
@@ -957,12 +957,12 @@ struct ClientSendTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(tasks_sent_);
   }
@@ -1011,7 +1011,7 @@ struct WreapDeadIpcsTask : public chi::Task {
    * No additional parameters for WreapDeadIpcsTask
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     // No additional parameters to serialize
   }
@@ -1021,7 +1021,7 @@ struct WreapDeadIpcsTask : public chi::Task {
    * This includes: reaped_count_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(reaped_count_);
   }
@@ -1069,13 +1069,13 @@ struct MonitorTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(query_);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(results_);
   }
@@ -1119,7 +1119,7 @@ class TaskBatch {
    */
   template <typename TaskT, typename... Args>
   void Add(Args &&...args) {
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
     // Host-only: under any device pass (CUDA __device__, SYCL device
     // compilation) `CHI_IPC` resolves to a `chi::gpu::IpcManager*` which
     // has no `NewTask` after the producer-only redesign. Skip the body
@@ -1142,7 +1142,7 @@ class TaskBatch {
     // Append serialized data
     const auto &data = archive.GetData();
     serialized_data_.insert(serialized_data_.end(), data.begin(), data.end());
-#endif  // HSHM_IS_HOST
+#endif  // CTP_IS_HOST
   }
 
   /**
@@ -1245,7 +1245,7 @@ struct SubmitBatchTask : public chi::Task {
    * This includes: task_infos_, serialized_data_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(task_infos_, serialized_data_);
   }
@@ -1255,7 +1255,7 @@ struct SubmitBatchTask : public chi::Task {
    * This includes: tasks_completed_, error_message_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(tasks_completed_, error_message_);
   }
@@ -1377,7 +1377,7 @@ struct RegisterMemoryTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(alloc_major_, alloc_minor_, memory_type_, gpu_id_, data_capacity_);
     if constexpr (Archive::is_saving::value) {
@@ -1388,7 +1388,7 @@ struct RegisterMemoryTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(success_);
   }
@@ -1437,12 +1437,12 @@ struct RestartContainersTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(containers_restarted_, error_message_);
   }
@@ -1494,13 +1494,13 @@ struct AddNodeTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(new_node_ip_, new_node_port_);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(new_node_id_, error_message_);
   }
@@ -1557,13 +1557,13 @@ struct ChangeAddressTableTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(target_pool_id_, container_id_, new_node_id_);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(error_message_);
   }
@@ -1615,13 +1615,13 @@ struct MigrateContainersTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(migrations_json_);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(num_migrated_, error_message_);
   }
@@ -1660,12 +1660,12 @@ struct HeartbeatTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
   }
 
@@ -1700,12 +1700,12 @@ struct HeartbeatProbeTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
   }
 
@@ -1746,13 +1746,13 @@ struct ProbeRequestTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(target_node_id_);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(probe_result_);
   }
@@ -1807,13 +1807,13 @@ struct RecoverContainersTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(assignments_data_, dead_node_id_);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(num_recovered_, error_message_);
   }
@@ -1884,12 +1884,12 @@ struct SystemMonitorTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
   }
 
@@ -1930,13 +1930,13 @@ struct AnnounceShutdownTask : public chi::Task {
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     ar(shutting_down_node_id_);
   }
 
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
   }
 

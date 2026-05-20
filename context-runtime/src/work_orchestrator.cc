@@ -49,7 +49,7 @@
 #include "chimaera/ipc_manager.h"
 
 // Global pointer variable definition for Work Orchestrator singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::WorkOrchestrator, g_work_orchestrator);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::WorkOrchestrator, g_work_orchestrator);
 
 namespace chi {
 
@@ -66,7 +66,7 @@ bool WorkOrchestrator::Init() {
 
   // Initialize HSHM TLS key for workers
   if (!chi_cur_worker_key_created_) {
-    HSHM_THREAD_MODEL->CreateTls<class Worker>(chi_cur_worker_key_, nullptr);
+    CTP_THREAD_MODEL->CreateTls<class Worker>(chi_cur_worker_key_, nullptr);
     chi_cur_worker_key_created_ = true;
   }
 
@@ -75,7 +75,7 @@ bool WorkOrchestrator::Init() {
   active_lanes_ = nullptr;
 
   // Initialize HSHM thread group first
-  auto thread_model = HSHM_THREAD_MODEL;
+  auto thread_model = CTP_THREAD_MODEL;
   thread_group_ = thread_model->CreateThreadGroup({});
 
   ConfigManager *config = CHI_CONFIG_MANAGER;
@@ -173,20 +173,20 @@ void WorkOrchestrator::StopWorkers() {
       if (lane) {
         pid_t tid = lane->GetTid();
         if (tid > 0) {
-          hshm::lbm::EventManager::Signal(runtime_pid, tid);
+          ctp::lbm::EventManager::Signal(runtime_pid, tid);
         }
       }
     }
   }
 
   // Wait for worker threads with a hard 5-second deadline per thread.
-  // hshm::Thread uses pthread_create internally, so we use pthread_thread_
+  // ctp::Thread uses pthread_create internally, so we use pthread_thread_
   // directly — std_thread_ is never populated when using the Pthread model.
   auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
 
   size_t joined_count = 0;
   for (auto &thread : worker_threads_) {
-    // pthread_thread_ is 0 when the hshm Thread was never started
+    // pthread_thread_ is 0 when the ctp Thread was never started
     if (thread.pthread_thread_ == 0) {
       ++joined_count;
       continue;
@@ -325,7 +325,7 @@ bool WorkOrchestrator::SpawnWorkerThreads() {
   }
 
   // Use HSHM thread model to spawn worker threads
-  auto thread_model = HSHM_THREAD_MODEL;
+  auto thread_model = CTP_THREAD_MODEL;
   worker_threads_.reserve(all_workers_.size());
 
   try {
@@ -333,7 +333,7 @@ bool WorkOrchestrator::SpawnWorkerThreads() {
       auto *worker = all_workers_[i];
       if (worker) {
         // Spawn thread using HSHM thread model
-        hshm::thread::Thread thread = thread_model->Spawn(
+        ctp::thread::Thread thread = thread_model->Spawn(
             thread_group_, [worker](int tid) { worker->Run(); },
             static_cast<int>(i));
         worker_threads_.emplace_back(std::move(thread));

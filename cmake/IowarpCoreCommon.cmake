@@ -253,7 +253,7 @@ function(wrp_core_apply_sycl_flags target)
             "before defining SYCL targets")
     endif()
 
-    target_compile_definitions(${target} PRIVATE HSHM_ENABLE_SYCL=1)
+    target_compile_definitions(${target} PRIVATE CTP_ENABLE_SYCL=1)
 
     if(WRP_SYCL_COMPILER STREQUAL "DPCPP")
         # -fsycl-allow-func-ptr is a Clang -cc1 flag in current DPC++
@@ -913,7 +913,7 @@ function(add_chimod_client)
     endif()
   endif()
 
-  # Clients only link to hshm::cxx (no Boost)
+  # Clients only link to ctp::cxx (no Boost)
   target_link_libraries(${TARGET_NAME}
     PUBLIC
       ${CORE_LIB}

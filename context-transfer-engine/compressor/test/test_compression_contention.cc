@@ -226,7 +226,7 @@ class SimulationThread {
 
 class CompressionThread {
  public:
-  CompressionThread(hshm::Compressor* compressor,
+  CompressionThread(ctp::Compressor* compressor,
                    ThreadSafeQueue<std::shared_ptr<DataChunk>>* queue,
                    std::atomic<bool>* done,
                    std::atomic<size_t>* total_output_size,
@@ -252,7 +252,7 @@ class CompressionThread {
   }
 
  private:
-  hshm::Compressor* compressor_;
+  ctp::Compressor* compressor_;
   ThreadSafeQueue<std::shared_ptr<DataChunk>>* queue_;
   std::atomic<bool>* done_;
   std::atomic<size_t>* total_output_size_;
@@ -325,9 +325,9 @@ BenchmarkResult RunBenchmark(const std::string& lib_name,
   result.input_mb = (cfg.ChunkSize() * cfg.num_outputs) / (1024.0 * 1024.0);
 
   // Create compressor using factory
-  std::unique_ptr<hshm::Compressor> compressor;
+  std::unique_ptr<ctp::Compressor> compressor;
   if (lib_name != "NONE") {
-    compressor = hshm::CompressionFactory::GetPreset(lib_name, hshm::CompressionPreset::BEST);
+    compressor = ctp::CompressionFactory::GetPreset(lib_name, ctp::CompressionPreset::BEST);
   }
 
   // Create queue and control flags
@@ -491,7 +491,7 @@ int main(int argc, char* argv[]) {
     "BZIP2",
     "Blosc2",
 // Libpressio compressors disabled due to memory issues
-// #ifdef HSHM_ENABLE_LIBPRESSIO
+// #ifdef CTP_ENABLE_LIBPRESSIO
 //     "ZFP",
 //     "SZ3",
 //     "FPZIP",

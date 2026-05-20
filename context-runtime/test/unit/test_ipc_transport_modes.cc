@@ -62,7 +62,7 @@ using namespace chi;
 
 inline chi::priv::vector<chimaera::bdev::Block> WrapBlock(
     const chimaera::bdev::Block& block) {
-  chi::priv::vector<chimaera::bdev::Block> blocks(HSHM_MALLOC);
+  chi::priv::vector<chimaera::bdev::Block> blocks(CTP_MALLOC);
   blocks.push_back(block);
   return blocks;
 }
@@ -94,9 +94,9 @@ void SubmitTasksForMode(const std::string &mode_name) {
 
   // --- Category 3: Write + Read I/O round-trip (1MB transfer) ---
   // Generate 1MB test data
-  std::vector<hshm::u8> write_data(kIoSize);
+  std::vector<ctp::u8> write_data(kIoSize);
   for (size_t i = 0; i < kIoSize; ++i) {
-    write_data[i] = static_cast<hshm::u8>((0xAB + i) % 256);
+    write_data[i] = static_cast<ctp::u8>((0xAB + i) % 256);
   }
 
   // Write 1MB
@@ -128,7 +128,7 @@ void SubmitTasksForMode(const std::string &mode_name) {
       CHI_IPC->ToFullPtr(read_task->data_.template Cast<char>());
   REQUIRE_FALSE(data_ptr.IsNull());
   size_t actual_read = read_task->bytes_read_;
-  std::vector<hshm::u8> read_data(actual_read);
+  std::vector<ctp::u8> read_data(actual_read);
   memcpy(read_data.data(), data_ptr.ptr_, actual_read);
   size_t verify_size = std::min(actual_written, actual_read);
 

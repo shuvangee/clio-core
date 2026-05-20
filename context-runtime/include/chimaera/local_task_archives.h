@@ -75,7 +75,7 @@ struct LocalTaskInfo {
    * @param ar Archive instance
    */
   template <class Archive>
-  HSHM_CROSS_FUN void serialize(Archive &ar) {
+  CTP_CROSS_FUN void serialize(Archive &ar) {
     ar(task_id_.pid_, task_id_.tid_, task_id_.major_, task_id_.replica_id_,
        task_id_.unique_, task_id_.node_id_, task_id_.net_key_);
     ar(pool_id_.major_, pool_id_.minor_);
@@ -85,8 +85,8 @@ struct LocalTaskInfo {
 
 }  // namespace chi
 
-// Add local serialization support for LocalTaskInfo in hshm::ipc namespace
-namespace hshm::ipc {
+// Add local serialization support for LocalTaskInfo in ctp::ipc namespace
+namespace ctp::ipc {
 
 /**
  * Save LocalTaskInfo to local archive
@@ -94,7 +94,7 @@ namespace hshm::ipc {
  * @param info LocalTaskInfo to serialize
  */
 template <typename Ar>
-HSHM_CROSS_FUN void save(Ar &ar, const chi::LocalTaskInfo &info) {
+CTP_CROSS_FUN void save(Ar &ar, const chi::LocalTaskInfo &info) {
   // Serialize TaskId fields
   ar << info.task_id_.pid_;
   ar << info.task_id_.tid_;
@@ -116,7 +116,7 @@ HSHM_CROSS_FUN void save(Ar &ar, const chi::LocalTaskInfo &info) {
  * @param info LocalTaskInfo to deserialize into
  */
 template <typename Ar>
-HSHM_CROSS_FUN void load(Ar &ar, chi::LocalTaskInfo &info) {
+CTP_CROSS_FUN void load(Ar &ar, chi::LocalTaskInfo &info) {
   // Deserialize TaskId fields
   ar >> info.task_id_.pid_;
   ar >> info.task_id_.tid_;
@@ -132,14 +132,14 @@ HSHM_CROSS_FUN void load(Ar &ar, chi::LocalTaskInfo &info) {
   ar >> info.method_id_;
 }
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
 namespace chi {
 
 // Base type for LbmMeta inheritance: use CHI_PRIV_ALLOC_T so that
 // ShmTransport::Recv can allocate internal buffers on GPU (BuddyAllocator)
 // and on host (MallocAllocator).
-using LocalLbmBase = hshm::lbm::LbmMeta<CHI_PRIV_ALLOC_T>;
+using LocalLbmBase = ctp::lbm::LbmMeta<CHI_PRIV_ALLOC_T>;
 
 using LocalTaskInfoVec = chi::priv::vector<LocalTaskInfo>;
 
@@ -156,36 +156,36 @@ class CalculateSizeTaskArchive {
   using supports_range_ops = std::true_type;
 
  private:
-  hshm::ipc::CalculateSizeArchive calc_;
+  ctp::ipc::CalculateSizeArchive calc_;
   bool is_pod_ = false;
 
  public:
-  HSHM_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
-  HSHM_CROSS_FUN void PopPod() { is_pod_ = false; }
+  CTP_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
+  CTP_CROSS_FUN void PopPod() { is_pod_ = false; }
 
-  HSHM_CROSS_FUN explicit CalculateSizeTaskArchive(LocalMsgType /*msg_type*/)
+  CTP_CROSS_FUN explicit CalculateSizeTaskArchive(LocalMsgType /*msg_type*/)
       {}
 
   /** Get the total computed size */
-  HSHM_INLINE_CROSS_FUN size_t size() const { return calc_.size(); }
+  CTP_INLINE_CROSS_FUN size_t size() const { return calc_.size(); }
 
   /** Serialize operator — for non-Task types, delegates to CalculateSizeArchive */
   template <typename T>
-  HSHM_CROSS_FUN CalculateSizeTaskArchive &operator<<(const T &obj) {
+  CTP_CROSS_FUN CalculateSizeTaskArchive &operator<<(const T &obj) {
     calc_ << obj;
     return *this;
   }
 
   /** & operator */
   template <typename T>
-  HSHM_CROSS_FUN CalculateSizeTaskArchive &operator&(const T &obj) {
+  CTP_CROSS_FUN CalculateSizeTaskArchive &operator&(const T &obj) {
     calc_ << obj;
     return *this;
   }
 
   /** Call operator */
   template <typename... Args>
-  HSHM_CROSS_FUN void operator()(Args &...args) {
+  CTP_CROSS_FUN void operator()(Args &...args) {
     if (is_pod_) {
       calc_.range(args...);
     } else {
@@ -194,31 +194,31 @@ class CalculateSizeTaskArchive {
   }
 
   /** Write raw binary data — just accumulate size */
-  HSHM_CROSS_FUN void write_binary(const char *data, size_t size) {
+  CTP_CROSS_FUN void write_binary(const char *data, size_t size) {
     calc_.write_binary(data, size);
   }
 
   /** write_range — compute span size */
   template <typename FirstT, typename LastT>
-  HSHM_INLINE_CROSS_FUN void write_range(const FirstT *first,
+  CTP_INLINE_CROSS_FUN void write_range(const FirstT *first,
                                           const LastT *last) {
     calc_.write_range(first, last);
   }
 
   /** range() — compute span size of contiguous POD fields */
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN void range(Args &...args) {
+  CTP_INLINE_CROSS_FUN void range(Args &...args) {
     calc_.range(args...);
   }
 
   /** Fused string save — just accumulate size */
-  HSHM_CROSS_FUN void save_string_fused(const char *str_data, size_t len) {
+  CTP_CROSS_FUN void save_string_fused(const char *str_data, size_t len) {
     calc_.save_string_fused(str_data, len);
   }
 
   /** Bulk transfer size for ShmPtr */
   template <typename T>
-  HSHM_CROSS_FUN void bulk(hipc::ShmPtr<T> ptr, size_t size, uint32_t flags) {
+  CTP_CROSS_FUN void bulk(hipc::ShmPtr<T> ptr, size_t size, uint32_t flags) {
     if (!ptr.alloc_id_.IsNull()) {
       // mode=0: uint8_t + size_t + u32 + u32
       calc_.cur_off_ += sizeof(uint8_t) + sizeof(size_t) +
@@ -237,7 +237,7 @@ class CalculateSizeTaskArchive {
 
   /** Bulk transfer size for FullPtr */
   template <typename T>
-  HSHM_CROSS_FUN void bulk(const hipc::FullPtr<T> &ptr, size_t size,
+  CTP_CROSS_FUN void bulk(const hipc::FullPtr<T> &ptr, size_t size,
                            uint32_t flags) {
     if (!ptr.shm_.alloc_id_.IsNull()) {
       calc_.cur_off_ += sizeof(uint8_t) + sizeof(size_t) +
@@ -251,7 +251,7 @@ class CalculateSizeTaskArchive {
 
   /** Bulk transfer size for raw pointer */
   template <typename T>
-  HSHM_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
+  CTP_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
     (void)ptr; (void)flags;
     calc_.cur_off_ += size;
   }
@@ -260,7 +260,7 @@ class CalculateSizeTaskArchive {
 /**
  * Archive for saving tasks (inputs or outputs) using LocalSerialize.
  * Templated on BufferT so callers can use any vector-like container
- * (e.g., chi::priv::vector<char>, hshm::priv::wrap_vector, etc.).
+ * (e.g., chi::priv::vector<char>, ctp::priv::wrap_vector, etc.).
  *
  * Does NOT own the buffer — callers provide a reference.
  * Inherits from LbmMeta for ShmTransport::Send compatibility.
@@ -281,27 +281,27 @@ class LocalSaveTaskArchive : public LocalLbmBase {
 
  private:
   BufferT &buffer_;
-  hshm::ipc::LocalSerialize<BufferT> serializer_;
+  ctp::ipc::LocalSerialize<BufferT> serializer_;
   bool is_pod_ = false;
 
  public:
-  HSHM_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
-  HSHM_CROSS_FUN void PopPod() { is_pod_ = false; }
+  CTP_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
+  CTP_CROSS_FUN void PopPod() { is_pod_ = false; }
 
   /** Mark this archive for warp-parallel write_binary calls */
-  HSHM_INLINE_CROSS_FUN void SetWarpConverged(bool v) {
+  CTP_INLINE_CROSS_FUN void SetWarpConverged(bool v) {
     serializer_.warp_converged_ = v;
   }
 
   /** Reset for reuse — avoids re-allocating the buffer between tasks */
-  HSHM_CROSS_FUN void Reset(LocalMsgType msg_type) {
+  CTP_CROSS_FUN void Reset(LocalMsgType msg_type) {
     msg_type_ = msg_type;
     task_infos_.resize(0);
     serializer_.cur_off_ = 0;
   }
 
   /** Get the number of bytes actually serialized (not the buffer capacity) */
-  HSHM_INLINE_CROSS_FUN size_t GetSerializedSize() const {
+  CTP_INLINE_CROSS_FUN size_t GetSerializedSize() const {
     return serializer_.cur_off_;
   }
 
@@ -311,7 +311,7 @@ class LocalSaveTaskArchive : public LocalLbmBase {
    * LoadTaskArchive::serialize.
    */
   template <typename Ar>
-  HSHM_CROSS_FUN void serialize(Ar &ar) {
+  CTP_CROSS_FUN void serialize(Ar &ar) {
     if constexpr (Ar::is_saving::value) {
       serializer_.Finalize();
     }
@@ -329,7 +329,7 @@ class LocalSaveTaskArchive : public LocalLbmBase {
    * @param buffer External buffer to serialize into
    */
   template <typename AllocPtrT>
-  HSHM_CROSS_FUN LocalSaveTaskArchive(LocalMsgType msg_type,
+  CTP_CROSS_FUN LocalSaveTaskArchive(LocalMsgType msg_type,
                                        AllocPtrT *alloc,
                                        BufferT &buffer)
       : Base(alloc),
@@ -343,7 +343,7 @@ class LocalSaveTaskArchive : public LocalLbmBase {
   /**
    * Constructor with default allocator and external buffer reference.
    */
-  HSHM_CROSS_FUN LocalSaveTaskArchive(LocalMsgType msg_type,
+  CTP_CROSS_FUN LocalSaveTaskArchive(LocalMsgType msg_type,
                                        BufferT &buffer)
       : Base(CHI_PRIV_ALLOC),
         task_infos_(CHI_PRIV_ALLOC),
@@ -364,7 +364,7 @@ class LocalSaveTaskArchive : public LocalLbmBase {
    * Serialize operator - handles Task-derived types specially
    */
   template <typename T>
-  HSHM_CROSS_FUN LocalSaveTaskArchive &operator<<(T &value) {
+  CTP_CROSS_FUN LocalSaveTaskArchive &operator<<(T &value) {
     if constexpr (std::is_base_of_v<Task, T>) {
       // Record task information
       LocalTaskInfo info{value.task_id_, value.pool_id_, value.method_};
@@ -383,12 +383,12 @@ class LocalSaveTaskArchive : public LocalLbmBase {
   }
 
   template <typename T>
-  HSHM_CROSS_FUN LocalSaveTaskArchive &operator&(T &value) {
+  CTP_CROSS_FUN LocalSaveTaskArchive &operator&(T &value) {
     return *this << value;
   }
 
   template <typename... Args>
-  HSHM_CROSS_FUN void operator()(Args &...args) {
+  CTP_CROSS_FUN void operator()(Args &...args) {
     if (is_pod_) {
       serializer_.range(args...);
     } else {
@@ -398,7 +398,7 @@ class LocalSaveTaskArchive : public LocalLbmBase {
 
  private:
   template <typename T>
-  HSHM_CROSS_FUN void SerializeArg(T &arg) {
+  CTP_CROSS_FUN void SerializeArg(T &arg) {
     if constexpr (std::is_base_of_v<Task,
                                     std::remove_pointer_t<std::decay_t<T>>>) {
       *this << arg;
@@ -408,27 +408,27 @@ class LocalSaveTaskArchive : public LocalLbmBase {
   }
 
  public:
-  HSHM_CROSS_FUN void write_binary(const char *data, size_t size) {
+  CTP_CROSS_FUN void write_binary(const char *data, size_t size) {
     serializer_.write_binary(data, size);
   }
 
-  HSHM_CROSS_FUN void save_string_fused(const char *str_data, size_t len) {
+  CTP_CROSS_FUN void save_string_fused(const char *str_data, size_t len) {
     serializer_.save_string_fused(str_data, len);
   }
 
   template <typename FirstT, typename LastT>
-  HSHM_INLINE_CROSS_FUN void write_range(const FirstT *first,
+  CTP_INLINE_CROSS_FUN void write_range(const FirstT *first,
                                           const LastT *last) {
     serializer_.write_range(first, last);
   }
 
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN void range(Args &...args) {
+  CTP_INLINE_CROSS_FUN void range(Args &...args) {
     serializer_.range(args...);
   }
 
   template <typename T>
-  HSHM_CROSS_FUN void bulk(hipc::ShmPtr<T> ptr, size_t size, uint32_t flags) {
+  CTP_CROSS_FUN void bulk(hipc::ShmPtr<T> ptr, size_t size, uint32_t flags) {
     if (!ptr.alloc_id_.IsNull()) {
       uint8_t mode = 0;
       serializer_ << mode;
@@ -451,7 +451,7 @@ class LocalSaveTaskArchive : public LocalLbmBase {
   }
 
   template <typename T>
-  HSHM_CROSS_FUN void bulk(const hipc::FullPtr<T> &ptr, size_t size,
+  CTP_CROSS_FUN void bulk(const hipc::FullPtr<T> &ptr, size_t size,
                            uint32_t flags) {
     if (!ptr.shm_.alloc_id_.IsNull()) {
       uint8_t mode = 0;
@@ -470,25 +470,25 @@ class LocalSaveTaskArchive : public LocalLbmBase {
   }
 
   template <typename T>
-  HSHM_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
+  CTP_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
     (void)flags;
     serializer_.write_binary(reinterpret_cast<const char *>(ptr), size);
   }
 
   const LocalTaskInfoVec &GetTaskInfos() const { return task_infos_; }
-  HSHM_CROSS_FUN LocalMsgType GetMsgType() const { return msg_type_; }
+  CTP_CROSS_FUN LocalMsgType GetMsgType() const { return msg_type_; }
 
-  HSHM_CROSS_FUN size_t GetSize() {
+  CTP_CROSS_FUN size_t GetSize() {
     serializer_.Finalize();
     return buffer_.size();
   }
 
-  HSHM_CROSS_FUN const BufferT &GetData() {
+  CTP_CROSS_FUN const BufferT &GetData() {
     serializer_.Finalize();
     return buffer_;
   }
 
-  HSHM_CROSS_FUN BufferT &GetMutableData() {
+  CTP_CROSS_FUN BufferT &GetMutableData() {
     serializer_.Finalize();
     return buffer_;
   }
@@ -517,23 +517,23 @@ class LocalLoadTaskArchive : public LocalLbmBase {
 
  private:
   BufferT &data_;
-  hshm::ipc::LocalDeserialize<BufferT> deserializer_;
+  ctp::ipc::LocalDeserialize<BufferT> deserializer_;
   size_t current_task_index_;
   bool is_pod_ = false;
 
  public:
-  HSHM_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
-  HSHM_CROSS_FUN void PopPod() { is_pod_ = false; }
+  CTP_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
+  CTP_CROSS_FUN void PopPod() { is_pod_ = false; }
 
   /** Mark this archive for warp-parallel read_binary calls */
-  HSHM_INLINE_CROSS_FUN void SetWarpConverged(bool v) {
+  CTP_INLINE_CROSS_FUN void SetWarpConverged(bool v) {
     deserializer_.warp_converged_ = v;
   }
 
   /** Reset for reuse with the same buffer */
-  HSHM_CROSS_FUN void Reset(LocalMsgType msg_type) {
+  CTP_CROSS_FUN void Reset(LocalMsgType msg_type) {
     msg_type_ = msg_type;
-    new (&deserializer_) hshm::ipc::LocalDeserialize<BufferT>(data_);
+    new (&deserializer_) ctp::ipc::LocalDeserialize<BufferT>(data_);
     current_task_index_ = 0;
     task_infos_.resize(0);
   }
@@ -542,11 +542,11 @@ class LocalLoadTaskArchive : public LocalLbmBase {
    * Serialize for ShmTransport compatibility.
    */
   template <typename Ar>
-  HSHM_CROSS_FUN void serialize(Ar &ar) {
+  CTP_CROSS_FUN void serialize(Ar &ar) {
     ar(this->send, this->recv, this->send_bulks, this->recv_bulks);
     ar(task_infos_, msg_type_);
     ar(data_);
-    new (&deserializer_) hshm::ipc::LocalDeserialize<BufferT>(data_);
+    new (&deserializer_) ctp::ipc::LocalDeserialize<BufferT>(data_);
   }
 
   /**
@@ -554,7 +554,7 @@ class LocalLoadTaskArchive : public LocalLbmBase {
    * The archive does NOT own the buffer.
    */
   template <typename AllocPtrT>
-  HSHM_CROSS_FUN LocalLoadTaskArchive(AllocPtrT *alloc,
+  CTP_CROSS_FUN LocalLoadTaskArchive(AllocPtrT *alloc,
                                        BufferT &buffer)
       : Base(alloc),
         task_infos_(alloc),
@@ -566,7 +566,7 @@ class LocalLoadTaskArchive : public LocalLbmBase {
   /**
    * Constructor with default allocator and external buffer reference.
    */
-  HSHM_CROSS_FUN explicit LocalLoadTaskArchive(BufferT &buffer)
+  CTP_CROSS_FUN explicit LocalLoadTaskArchive(BufferT &buffer)
       : Base(CHI_PRIV_ALLOC),
         task_infos_(CHI_PRIV_ALLOC),
         msg_type_(LocalMsgType::kSerializeIn),
@@ -582,7 +582,7 @@ class LocalLoadTaskArchive : public LocalLbmBase {
 
  public:
   template <typename T>
-  HSHM_CROSS_FUN LocalLoadTaskArchive &operator>>(T &value) {
+  CTP_CROSS_FUN LocalLoadTaskArchive &operator>>(T &value) {
     if constexpr (std::is_base_of_v<Task, T>) {
       if (msg_type_ == LocalMsgType::kSerializeIn) {
         value.SerializeIn(*this);
@@ -596,7 +596,7 @@ class LocalLoadTaskArchive : public LocalLbmBase {
   }
 
   template <typename T>
-  HSHM_CROSS_FUN LocalLoadTaskArchive &operator&(T &value) {
+  CTP_CROSS_FUN LocalLoadTaskArchive &operator&(T &value) {
     return *this >> value;
   }
 
@@ -608,7 +608,7 @@ class LocalLoadTaskArchive : public LocalLbmBase {
       } else if (msg_type_ == LocalMsgType::kSerializeOut) {
         value->SerializeOut(*this);
       }
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
       current_task_index_++;
 #endif
     } else {
@@ -618,7 +618,7 @@ class LocalLoadTaskArchive : public LocalLbmBase {
   }
 
   template <typename... Args>
-  HSHM_CROSS_FUN void operator()(Args &...args) {
+  CTP_CROSS_FUN void operator()(Args &...args) {
     if (is_pod_) {
       deserializer_.range(args...);
     } else {
@@ -628,7 +628,7 @@ class LocalLoadTaskArchive : public LocalLbmBase {
 
  private:
   template <typename T>
-  HSHM_CROSS_FUN void DeserializeArg(T &arg) {
+  CTP_CROSS_FUN void DeserializeArg(T &arg) {
     if constexpr (std::is_base_of_v<Task,
                                     std::remove_pointer_t<std::decay_t<T>>>) {
       *this >> arg;
@@ -638,41 +638,41 @@ class LocalLoadTaskArchive : public LocalLbmBase {
   }
 
  public:
-  HSHM_CROSS_FUN void read_binary(char *data, size_t size) {
+  CTP_CROSS_FUN void read_binary(char *data, size_t size) {
     deserializer_.read_binary(data, size);
   }
 
   template <typename FirstT, typename LastT>
-  HSHM_INLINE_CROSS_FUN void read_range(FirstT *first, LastT *last) {
+  CTP_INLINE_CROSS_FUN void read_range(FirstT *first, LastT *last) {
     deserializer_.read_range(first, last);
   }
 
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN void range(Args &...args) {
+  CTP_INLINE_CROSS_FUN void range(Args &...args) {
     deserializer_.range(args...);
   }
 
   template <typename T>
-  HSHM_CROSS_FUN void bulk(hipc::ShmPtr<T> &ptr, size_t size, uint32_t flags) {
+  CTP_CROSS_FUN void bulk(hipc::ShmPtr<T> &ptr, size_t size, uint32_t flags) {
     (void)flags;
     uint8_t mode = 0;
     deserializer_ >> mode;
     if (mode == 1) {
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
       ptr.alloc_id_.SetNull();
       ptr.off_ = 0;
 #else
-      hipc::FullPtr<char> buf = HSHM_MALLOC->AllocateObjs<char>(size);
+      hipc::FullPtr<char> buf = CTP_MALLOC->AllocateObjs<char>(size);
       deserializer_.read_binary(buf.ptr_, size);
       ptr.off_ = buf.shm_.off_.load();
       ptr.alloc_id_ = buf.shm_.alloc_id_;
 #endif
     } else if (mode == 2) {
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
       ptr.alloc_id_.SetNull();
       ptr.off_ = 0;
 #else
-      hipc::FullPtr<char> buf = HSHM_MALLOC->AllocateObjs<char>(size);
+      hipc::FullPtr<char> buf = CTP_MALLOC->AllocateObjs<char>(size);
       ptr.off_ = buf.shm_.off_.load();
       ptr.alloc_id_ = buf.shm_.alloc_id_;
 #endif
@@ -696,13 +696,13 @@ class LocalLoadTaskArchive : public LocalLbmBase {
     uint8_t mode = 0;
     deserializer_ >> mode;
     if (mode == 1) {
-      hipc::FullPtr<char> buf = HSHM_MALLOC->AllocateObjs<char>(size);
+      hipc::FullPtr<char> buf = CTP_MALLOC->AllocateObjs<char>(size);
       deserializer_.read_binary(buf.ptr_, size);
       ptr.shm_.off_ = buf.shm_.off_.load();
       ptr.shm_.alloc_id_ = buf.shm_.alloc_id_;
       ptr.ptr_ = reinterpret_cast<T *>(buf.ptr_);
     } else if (mode == 2) {
-      hipc::FullPtr<char> buf = HSHM_MALLOC->AllocateObjs<char>(size);
+      hipc::FullPtr<char> buf = CTP_MALLOC->AllocateObjs<char>(size);
       ptr.shm_.off_ = buf.shm_.off_.load();
       ptr.shm_.alloc_id_ = buf.shm_.alloc_id_;
       ptr.ptr_ = reinterpret_cast<T *>(buf.ptr_);
@@ -716,7 +716,7 @@ class LocalLoadTaskArchive : public LocalLbmBase {
   }
 
   template <typename T>
-  HSHM_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
+  CTP_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
     (void)flags;
     deserializer_.read_binary(reinterpret_cast<char *>(ptr), size);
   }
@@ -725,9 +725,9 @@ class LocalLoadTaskArchive : public LocalLbmBase {
   const LocalTaskInfo &GetCurrentTaskInfo() const {
     return task_infos_[current_task_index_];
   }
-  HSHM_CROSS_FUN LocalMsgType GetMsgType() const { return msg_type_; }
+  CTP_CROSS_FUN LocalMsgType GetMsgType() const { return msg_type_; }
   void ResetTaskIndex() { current_task_index_ = 0; }
-  HSHM_CROSS_FUN void SetMsgType(LocalMsgType msg_type) {
+  CTP_CROSS_FUN void SetMsgType(LocalMsgType msg_type) {
     msg_type_ = msg_type;
   }
 };
@@ -737,8 +737,8 @@ using DefaultSaveArchive = LocalSaveTaskArchive<chi::priv::vector<char>>;
 using DefaultLoadArchive = LocalLoadTaskArchive<chi::priv::vector<char>>;
 
 /** Wrap-vector archive aliases for zero-copy GPU transport */
-using WrapSaveArchive = LocalSaveTaskArchive<hshm::priv::wrap_vector>;
-using WrapLoadArchive = LocalLoadTaskArchive<hshm::priv::wrap_vector>;
+using WrapSaveArchive = LocalSaveTaskArchive<ctp::priv::wrap_vector>;
+using WrapLoadArchive = LocalLoadTaskArchive<ctp::priv::wrap_vector>;
 
 /**
  * Lightweight GPU save archive — no LbmMeta, no task_infos vectors.
@@ -752,45 +752,45 @@ class GpuSaveTaskArchive {
   using supports_range_ops = std::true_type;
 
   LocalMsgType msg_type_;
-  hshm::priv::wrap_vector &buffer_;
-  hshm::ipc::LocalSerialize<hshm::priv::wrap_vector> serializer_;
+  ctp::priv::wrap_vector &buffer_;
+  ctp::ipc::LocalSerialize<ctp::priv::wrap_vector> serializer_;
   bool is_pod_ = false;
 
-  HSHM_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
-  HSHM_CROSS_FUN void PopPod() { is_pod_ = false; }
+  CTP_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
+  CTP_CROSS_FUN void PopPod() { is_pod_ = false; }
 
-  HSHM_CROSS_FUN GpuSaveTaskArchive(LocalMsgType msg_type,
-                                      hshm::priv::wrap_vector &buffer)
+  CTP_CROSS_FUN GpuSaveTaskArchive(LocalMsgType msg_type,
+                                      ctp::priv::wrap_vector &buffer)
       : msg_type_(msg_type), buffer_(buffer), serializer_(buffer) {}
 
-  HSHM_CROSS_FUN void Reset(LocalMsgType msg_type) {
+  CTP_CROSS_FUN void Reset(LocalMsgType msg_type) {
     msg_type_ = msg_type;
     serializer_.cur_off_ = 0;
   }
 
-  HSHM_INLINE_CROSS_FUN void SetWarpConverged(bool v) {
+  CTP_INLINE_CROSS_FUN void SetWarpConverged(bool v) {
     serializer_.warp_converged_ = v;
   }
 
-  HSHM_INLINE_CROSS_FUN size_t GetSerializedSize() const {
+  CTP_INLINE_CROSS_FUN size_t GetSerializedSize() const {
     return serializer_.cur_off_;
   }
 
-  HSHM_CROSS_FUN LocalMsgType GetMsgType() const { return msg_type_; }
+  CTP_CROSS_FUN LocalMsgType GetMsgType() const { return msg_type_; }
 
   template <typename T>
-  HSHM_CROSS_FUN GpuSaveTaskArchive &operator<<(T &value) {
+  CTP_CROSS_FUN GpuSaveTaskArchive &operator<<(T &value) {
     serializer_ << value;
     return *this;
   }
 
   template <typename T>
-  HSHM_CROSS_FUN GpuSaveTaskArchive &operator&(T &value) {
+  CTP_CROSS_FUN GpuSaveTaskArchive &operator&(T &value) {
     return *this << value;
   }
 
   template <typename... Args>
-  HSHM_CROSS_FUN void operator()(Args &...args) {
+  CTP_CROSS_FUN void operator()(Args &...args) {
     if (is_pod_) {
       serializer_.range(args...);
     } else {
@@ -798,35 +798,35 @@ class GpuSaveTaskArchive {
     }
   }
 
-  HSHM_CROSS_FUN void write_binary(const char *data, size_t size) {
+  CTP_CROSS_FUN void write_binary(const char *data, size_t size) {
     serializer_.write_binary(data, size);
   }
 
-  HSHM_CROSS_FUN void save_string_fused(const char *str_data, size_t len) {
+  CTP_CROSS_FUN void save_string_fused(const char *str_data, size_t len) {
     serializer_.save_string_fused(str_data, len);
   }
 
   template <typename FirstT, typename LastT>
-  HSHM_INLINE_CROSS_FUN void write_range(const FirstT *first,
+  CTP_INLINE_CROSS_FUN void write_range(const FirstT *first,
                                           const LastT *last) {
     serializer_.write_range(first, last);
   }
 
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN void range(Args &...args) {
+  CTP_INLINE_CROSS_FUN void range(Args &...args) {
     serializer_.range(args...);
   }
 
   /** GPU bulk: ShmPtr copied as-is (same address space) */
   template <typename T>
-  HSHM_CROSS_FUN void bulk(hipc::ShmPtr<T> ptr, size_t size, uint32_t flags) {
+  CTP_CROSS_FUN void bulk(hipc::ShmPtr<T> ptr, size_t size, uint32_t flags) {
     (void)size; (void)flags;
     serializer_.write_binary(reinterpret_cast<const char *>(&ptr), sizeof(ptr));
   }
 
   /** GPU bulk: FullPtr copied as-is */
   template <typename T>
-  HSHM_CROSS_FUN void bulk(const hipc::FullPtr<T> &ptr, size_t size,
+  CTP_CROSS_FUN void bulk(const hipc::FullPtr<T> &ptr, size_t size,
                            uint32_t flags) {
     (void)size; (void)flags;
     serializer_.write_binary(reinterpret_cast<const char *>(&ptr), sizeof(ptr));
@@ -834,7 +834,7 @@ class GpuSaveTaskArchive {
 
   /** GPU bulk: raw pointer — copy data inline */
   template <typename T>
-  HSHM_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
+  CTP_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
     (void)flags;
     serializer_.write_binary(reinterpret_cast<const char *>(ptr), size);
   }
@@ -852,45 +852,45 @@ class GpuLoadTaskArchive {
   using supports_range_ops = std::true_type;
 
   LocalMsgType msg_type_;
-  hshm::priv::wrap_vector &data_;
-  hshm::ipc::LocalDeserialize<hshm::priv::wrap_vector> deserializer_;
+  ctp::priv::wrap_vector &data_;
+  ctp::ipc::LocalDeserialize<ctp::priv::wrap_vector> deserializer_;
   bool is_pod_ = false;
 
-  HSHM_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
-  HSHM_CROSS_FUN void PopPod() { is_pod_ = false; }
+  CTP_CROSS_FUN void PushPod(bool val) { is_pod_ = val; }
+  CTP_CROSS_FUN void PopPod() { is_pod_ = false; }
 
-  HSHM_CROSS_FUN GpuLoadTaskArchive(hshm::priv::wrap_vector &buffer)
+  CTP_CROSS_FUN GpuLoadTaskArchive(ctp::priv::wrap_vector &buffer)
       : msg_type_(LocalMsgType::kSerializeIn), data_(buffer),
         deserializer_(buffer) {}
 
-  HSHM_CROSS_FUN void Reset(LocalMsgType msg_type) {
+  CTP_CROSS_FUN void Reset(LocalMsgType msg_type) {
     msg_type_ = msg_type;
     deserializer_.cur_off_ = 0;
   }
 
-  HSHM_CROSS_FUN void SetMsgType(LocalMsgType msg_type) {
+  CTP_CROSS_FUN void SetMsgType(LocalMsgType msg_type) {
     msg_type_ = msg_type;
   }
 
-  HSHM_INLINE_CROSS_FUN void SetWarpConverged(bool v) {
+  CTP_INLINE_CROSS_FUN void SetWarpConverged(bool v) {
     deserializer_.warp_converged_ = v;
   }
 
-  HSHM_CROSS_FUN LocalMsgType GetMsgType() const { return msg_type_; }
+  CTP_CROSS_FUN LocalMsgType GetMsgType() const { return msg_type_; }
 
   template <typename T>
-  HSHM_CROSS_FUN GpuLoadTaskArchive &operator>>(T &value) {
+  CTP_CROSS_FUN GpuLoadTaskArchive &operator>>(T &value) {
     deserializer_ >> value;
     return *this;
   }
 
   template <typename T>
-  HSHM_CROSS_FUN GpuLoadTaskArchive &operator&(T &value) {
+  CTP_CROSS_FUN GpuLoadTaskArchive &operator&(T &value) {
     return *this >> value;
   }
 
   template <typename... Args>
-  HSHM_CROSS_FUN void operator()(Args &...args) {
+  CTP_CROSS_FUN void operator()(Args &...args) {
     if (is_pod_) {
       deserializer_.range(args...);
     } else {
@@ -898,23 +898,23 @@ class GpuLoadTaskArchive {
     }
   }
 
-  HSHM_CROSS_FUN void read_binary(char *data, size_t size) {
+  CTP_CROSS_FUN void read_binary(char *data, size_t size) {
     deserializer_.read_binary(data, size);
   }
 
   template <typename FirstT, typename LastT>
-  HSHM_INLINE_CROSS_FUN void read_range(FirstT *first, LastT *last) {
+  CTP_INLINE_CROSS_FUN void read_range(FirstT *first, LastT *last) {
     deserializer_.read_range(first, last);
   }
 
   template <typename... Args>
-  HSHM_INLINE_CROSS_FUN void range(Args &...args) {
+  CTP_INLINE_CROSS_FUN void range(Args &...args) {
     deserializer_.range(args...);
   }
 
   /** GPU bulk: ShmPtr copied as-is (same address space) */
   template <typename T>
-  HSHM_CROSS_FUN void bulk(hipc::ShmPtr<T> &ptr, size_t size,
+  CTP_CROSS_FUN void bulk(hipc::ShmPtr<T> &ptr, size_t size,
                            uint32_t flags) {
     (void)size; (void)flags;
     deserializer_.read_binary(reinterpret_cast<char *>(&ptr), sizeof(ptr));
@@ -922,7 +922,7 @@ class GpuLoadTaskArchive {
 
   /** GPU bulk: FullPtr copied as-is */
   template <typename T>
-  HSHM_CROSS_FUN void bulk(hipc::FullPtr<T> &ptr, size_t size,
+  CTP_CROSS_FUN void bulk(hipc::FullPtr<T> &ptr, size_t size,
                            uint32_t flags) {
     (void)size; (void)flags;
     deserializer_.read_binary(reinterpret_cast<char *>(&ptr), sizeof(ptr));
@@ -930,7 +930,7 @@ class GpuLoadTaskArchive {
 
   /** GPU bulk: raw pointer — read data inline */
   template <typename T>
-  HSHM_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
+  CTP_CROSS_FUN void bulk(T *ptr, size_t size, uint32_t flags) {
     (void)flags;
     deserializer_.read_binary(reinterpret_cast<char *>(ptr), size);
   }

@@ -87,7 +87,7 @@ class ReorganizeBlobTestFixture {
     INFO("=== Initializing ReorganizeBlob Test ===");
 
     // Setup paths
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
     REQUIRE(!home_dir.empty());
     config_path_ = chi_test_data_dir() + "/reorganize_blob_config.yaml";
     file_storage_path_ = chi_test_data_dir() + "/reorganize_blob_storage.bin";

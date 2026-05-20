@@ -177,10 +177,10 @@ WorkloadConfig ParseArgs(int argc, char** argv) {
   while ((opt = getopt_long(argc, argv, "i:t:c:n:p:x:o:Th", long_options, &option_index)) != -1) {
     switch (opt) {
       case 'i':
-        config.io_size_per_rank = hshm::ConfigParse::ParseSize(optarg);
+        config.io_size_per_rank = ctp::ConfigParse::ParseSize(optarg);
         break;
       case 't':
-        config.transfer_size = hshm::ConfigParse::ParseSize(optarg);
+        config.transfer_size = ctp::ConfigParse::ParseSize(optarg);
         break;
       case 'c':
         config.compute_time_ms = std::stoi(optarg);

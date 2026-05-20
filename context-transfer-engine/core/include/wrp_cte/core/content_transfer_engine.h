@@ -114,9 +114,9 @@ private:
 }  // namespace wrp_cte::core
 
 // Global pointer variable declaration for ContentTransferEngine singleton (outside namespace)
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(wrp_cte::core::ContentTransferEngine, g_cte_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(wrp_cte::core::ContentTransferEngine, g_cte_manager);
 
 // Macro for accessing the ContentTransferEngine singleton using global pointer variable
-#define CTE_MANAGER (HSHM_GET_GLOBAL_PTR_VAR(wrp_cte::core::ContentTransferEngine, g_cte_manager))
+#define CTE_MANAGER (CTP_GET_GLOBAL_PTR_VAR(wrp_cte::core::ContentTransferEngine, g_cte_manager))
 
 #endif  // WRP_CTE_CORE_CONTENT_TRANSFER_ENGINE_H_

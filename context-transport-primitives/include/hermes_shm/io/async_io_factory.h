@@ -31,17 +31,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_FACTORY_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_FACTORY_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_FACTORY_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_FACTORY_H_
 
 #include <memory>
 #include "async_io.h"
 
-#if HSHM_ENABLE_LIBAIO
+#if CTP_ENABLE_LIBAIO
 #include "libaio_io.h"
 #endif
 
-#if HSHM_ENABLE_IO_URING
+#if CTP_ENABLE_IO_URING
 #include "iouring_io.h"
 #endif
 
@@ -53,11 +53,11 @@
 #include "iocp_io.h"
 #endif
 
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
 #include "nixl_io.h"
 #endif
 
-namespace hshm {
+namespace ctp {
 
 enum class AsyncIoBackend {
   kLinuxAio,   /**< libaio (Linux) */
@@ -78,17 +78,17 @@ class AsyncIoFactory {
     }
 
     switch (backend) {
-#if HSHM_ENABLE_LIBAIO
+#if CTP_ENABLE_LIBAIO
       case AsyncIoBackend::kLinuxAio:
         return std::make_unique<LinuxAioAsyncIO>(io_depth);
 #endif
 
-#if HSHM_ENABLE_IO_URING
+#if CTP_ENABLE_IO_URING
       case AsyncIoBackend::kIoUring:
         return std::make_unique<IoUringAsyncIO>(io_depth);
 #endif
 
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
       case AsyncIoBackend::kNixl:
         return std::make_unique<NixlAsyncIO>(io_depth);
 #endif
@@ -110,11 +110,11 @@ class AsyncIoFactory {
 
  private:
   static AsyncIoBackend GetDefaultBackend() {
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     return AsyncIoBackend::kNixl;
-#elif HSHM_ENABLE_IO_URING
+#elif CTP_ENABLE_IO_URING
     return AsyncIoBackend::kIoUring;
-#elif HSHM_ENABLE_LIBAIO
+#elif CTP_ENABLE_LIBAIO
     return AsyncIoBackend::kLinuxAio;
 #elif defined(_WIN32)
     return AsyncIoBackend::kIocp;
@@ -124,6 +124,6 @@ class AsyncIoFactory {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_FACTORY_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_IO_ASYNC_IO_FACTORY_H_

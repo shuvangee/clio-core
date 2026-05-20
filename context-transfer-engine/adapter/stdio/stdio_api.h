@@ -74,7 +74,7 @@ typedef long int (*ftell_t)(FILE* fp);
 
 namespace clio::cae {
 
-using hshm::RealApi;
+using ctp::RealApi;
 
 /** Pointers to the real stdio API */
 class StdioApi : public RealApi {
@@ -193,7 +193,7 @@ class StdioApi : public RealApi {
 
 // Singleton macros
 #define WRP_CTE_STDIO_API \
-  hshm::Singleton<::clio::cae::StdioApi>::GetInstance()
+  ctp::Singleton<::clio::cae::StdioApi>::GetInstance()
 #define WRP_CTE_STDIO_API_T clio::cae::StdioApi*
 
 #endif  // WRP_CTE_ADAPTER_STDIO_H

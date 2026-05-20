@@ -10,7 +10,7 @@ This directory contains a comprehensive benchmark suite for measuring the perfor
 
 ## Building
 
-The benchmark is built automatically when `HSHM_ENABLE_BENCHMARKS` is enabled:
+The benchmark is built automatically when `CTP_ENABLE_BENCHMARKS` is enabled:
 
 ```bash
 cmake --preset=debug -DWRP_CORE_ENABLE_BENCHMARKS=ON

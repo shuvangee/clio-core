@@ -26,9 +26,9 @@ Future<TaskT> IpcCpu2CpuZmq::ClientSend(IpcManager *ipc,
   SaveTaskArchive archive(MsgType::kSerializeIn, ipc->zmq_transport_.get());
   archive << (*task_ptr.ptr_);
 
-  // Allocate FutureShm via HSHM_MALLOC (no copy_space needed)
+  // Allocate FutureShm via CTP_MALLOC (no copy_space needed)
   size_t alloc_size = sizeof(FutureShm);
-  hipc::FullPtr<char> buffer = HSHM_MALLOC->AllocateObjs<char>(alloc_size);
+  hipc::FullPtr<char> buffer = CTP_MALLOC->AllocateObjs<char>(alloc_size);
   if (buffer.IsNull()) {
     HLOG(kError, "SendZmq: Failed to allocate FutureShm ({} bytes)",
          alloc_size);
@@ -51,7 +51,7 @@ Future<TaskT> IpcCpu2CpuZmq::ClientSend(IpcManager *ipc,
   // Send via lightbeam PUSH client
   {
     std::lock_guard<std::mutex> lock(ipc->zmq_client_send_mutex_);
-    ipc->zmq_transport_->Send(archive, hshm::lbm::LbmContext());
+    ipc->zmq_transport_->Send(archive, ctp::lbm::LbmContext());
   }
 
   hipc::ShmPtr<FutureShm> future_shm_shmptr =
@@ -83,7 +83,7 @@ bool IpcCpu2CpuZmq::ClientRecv(IpcManager *ipc,
   // ZMQ wait loop: spin until FUTURE_COMPLETE
   auto start = std::chrono::steady_clock::now();
   while (!future_shm->flags_.Any(FutureShm::FUTURE_COMPLETE)) {
-    HSHM_THREAD_MODEL->Yield();
+    CTP_THREAD_MODEL->Yield();
     float elapsed =
         std::chrono::duration<float>(std::chrono::steady_clock::now() - start)
             .count();
@@ -154,7 +154,7 @@ void IpcCpu2CpuZmq::ResendTask(IpcManager *ipc, Future<TaskT> &future) {
   }
   {
     std::lock_guard<std::mutex> lock(ipc->zmq_client_send_mutex_);
-    ipc->zmq_transport_->Send(archive, hshm::lbm::LbmContext());
+    ipc->zmq_transport_->Send(archive, ctp::lbm::LbmContext());
   }
 }
 

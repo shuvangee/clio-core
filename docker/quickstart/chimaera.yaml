@@ -24,8 +24,8 @@ networking:
 
 # -- Logging ------------------------------------------------------------------
 # Logging is controlled by environment variables, not this file.
-#   HSHM_LOG_LEVEL : debug, info, success, warning, error, fatal (default: info)
-#   HSHM_LOG_OUT   : path to a log file (default: console only)
+#   CTP_LOG_LEVEL : debug, info, success, warning, error, fatal (default: info)
+#   CTP_LOG_OUT   : path to a log file (default: console only)
 
 # -- Runtime ------------------------------------------------------------------
 runtime:

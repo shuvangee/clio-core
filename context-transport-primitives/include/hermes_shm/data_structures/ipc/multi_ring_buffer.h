@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_IPC_MULTI_RING_BUFFER_H_
-#define HSHM_DATA_STRUCTURES_IPC_MULTI_RING_BUFFER_H_
+#ifndef CTP_DATA_STRUCTURES_IPC_MULTI_RING_BUFFER_H_
+#define CTP_DATA_STRUCTURES_IPC_MULTI_RING_BUFFER_H_
 
 #include "hermes_shm/data_structures/ipc/shm_container.h"
 #include "hermes_shm/data_structures/ipc/vector.h"
@@ -40,7 +40,7 @@
 #include "hermes_shm/constants/macros.h"
 #include <cassert>
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Multi-lane ring buffer container for shared memory.
@@ -117,7 +117,7 @@ class multi_ring_buffer : public ShmContainer<AllocT> {
    * @param num_prios The number of priority levels per lane
    * @param depth The depth (capacity) of each individual ring buffer
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   explicit multi_ring_buffer(AllocT *alloc, size_t num_lanes, size_t num_prios,
                              size_t depth)
       : ShmContainer<AllocT>(alloc),
@@ -143,7 +143,7 @@ class multi_ring_buffer : public ShmContainer<AllocT> {
   /**
    * Destructor
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ~multi_ring_buffer() {
     // Vector destructor handles cleanup automatically
   }
@@ -160,7 +160,7 @@ class multi_ring_buffer : public ShmContainer<AllocT> {
    *
    * Asserts that lane_id < num_lanes_ and prio < num_prios_
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   ring_buffer_type& GetLane(size_t lane_id, size_t prio) {
     assert(lane_id < num_lanes_);
     assert(prio < num_prios_);
@@ -181,7 +181,7 @@ class multi_ring_buffer : public ShmContainer<AllocT> {
    *
    * Asserts that lane_id < num_lanes_ and prio < num_prios_
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const ring_buffer_type& GetLane(size_t lane_id, size_t prio) const {
     assert(lane_id < num_lanes_);
     assert(prio < num_prios_);
@@ -195,7 +195,7 @@ class multi_ring_buffer : public ShmContainer<AllocT> {
    *
    * @return The number of lanes in this multi-ring buffer
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_t GetNumLanes() const {
     return num_lanes_;
   }
@@ -205,7 +205,7 @@ class multi_ring_buffer : public ShmContainer<AllocT> {
    *
    * @return The number of priority levels per lane
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_t GetNumPrios() const {
     return num_prios_;
   }
@@ -215,7 +215,7 @@ class multi_ring_buffer : public ShmContainer<AllocT> {
    *
    * @return Total number of ring buffers (num_lanes * num_prios)
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_t GetTotalBuffers() const {
     return num_lanes_ * num_prios_;
   }
@@ -258,6 +258,6 @@ using multi_mpsc_ring_buffer =
                       (RING_BUFFER_MPSC_FLAGS | RING_BUFFER_FIXED_SIZE |
                        RING_BUFFER_WAIT_FOR_SPACE)>;
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_DATA_STRUCTURES_IPC_MULTI_RING_BUFFER_H_
+#endif  // CTP_DATA_STRUCTURES_IPC_MULTI_RING_BUFFER_H_

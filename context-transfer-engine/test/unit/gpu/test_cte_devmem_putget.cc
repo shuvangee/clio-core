@@ -37,7 +37,7 @@
  *     wakeup signal.
  */
 
-#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#if (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL
 
 #include "simple_test.h"
 
@@ -75,7 +75,7 @@ cte::TagId g_tag_id;
 
 /** One-shot bring-up: server, CTE pool, kRam bdev target, tag. */
 void EnsureInit() {
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
   if (g_initialized) return;
   std::fprintf(stderr, "[INIT] Bringing up Chimaera server\n");
   REQUIRE(chi::CHIMAERA_INIT(chi::ChimaeraMode::kServer));
@@ -152,7 +152,7 @@ __global__ void DevMemSubmitGetKernel(chi::IpcManagerGpuInfo info,
 chi::u32 VerifyDevicePattern(const char *device_buf, chi::u32 size,
                               chi::u32 seed) {
   std::vector<char> host(size);
-  hshm::GpuApi::Memcpy(host.data(), device_buf, size);
+  ctp::GpuApi::Memcpy(host.data(), device_buf, size);
   for (chi::u32 i = 0; i < size; ++i) {
     char want = static_cast<char>((seed ^ i) & 0xFFu);
     if (host[i] != want) return i;
@@ -160,7 +160,7 @@ chi::u32 VerifyDevicePattern(const char *device_buf, chi::u32 size,
   return size;  // all match
 }
 
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 
 TEST_CASE("CTE PutBlob+GetBlob round trip with device-memory task & data",
           "[cte][devmem][putblob][getblob]") {
@@ -210,7 +210,7 @@ TEST_CASE("CTE PutBlob+GetBlob round trip with device-memory task & data",
       /*score=*/-1.0f, cte::Context(), /*flags=*/chi::u32(0));
   put_proto_task->pod_size_ = sizeof(cte::PutBlobTask);
   new (put_proto + sizeof(cte::PutBlobTask)) chi::gpu::FutureShm();
-  hshm::GpuApi::Memcpy(task_dev_base, put_proto, sizeof(put_proto));
+  ctp::GpuApi::Memcpy(task_dev_base, put_proto, sizeof(put_proto));
 
   // GetBlob prototype:
   alignas(64) char get_proto[kGetSlot];
@@ -225,14 +225,14 @@ TEST_CASE("CTE PutBlob+GetBlob round trip with device-memory task & data",
       get_blob_shm);
   get_proto_task->pod_size_ = sizeof(cte::GetBlobTask);
   new (get_proto + sizeof(cte::GetBlobTask)) chi::gpu::FutureShm();
-  hshm::GpuApi::Memcpy(task_dev_base + kPutSlot, get_proto, sizeof(get_proto));
+  ctp::GpuApi::Memcpy(task_dev_base + kPutSlot, get_proto, sizeof(get_proto));
 
   // ---- 3) Fill blob_data on device with the source pattern. ----
   chi::u32 fill_threads = 256;
   chi::u32 fill_blocks = (kBlobBytes + fill_threads - 1) / fill_threads;
   DevMemFillKernel<<<fill_blocks, fill_threads>>>(blob_dev, kBlobBytes,
                                                     kPatternSeed);
-  hshm::GpuApi::Synchronize();
+  ctp::GpuApi::Synchronize();
 
   // ---- 4) Build kernel-visible FullPtrs (raw device addresses
   //         stashed in off_, null alloc_id). ----
@@ -251,12 +251,12 @@ TEST_CASE("CTE PutBlob+GetBlob round trip with device-memory task & data",
   std::fprintf(stderr, "[PUT] launching DevMemSubmitPutKernel\n");
   auto t0 = std::chrono::steady_clock::now();
   DevMemSubmitPutKernel<<<1, 32>>>(gpu_info, put_fp);
-  hshm::GpuApi::Synchronize();
+  ctp::GpuApi::Synchronize();
   auto t1 = std::chrono::steady_clock::now();
 
   // Pull return_code_ back from device.
   cte::PutBlobTask put_after{};
-  hshm::GpuApi::Memcpy(reinterpret_cast<char *>(&put_after),
+  ctp::GpuApi::Memcpy(reinterpret_cast<char *>(&put_after),
                         task_dev_base, sizeof(cte::PutBlobTask));
   std::fprintf(stderr, "[PUT] return_code=%u took=%lld ms\n",
                put_after.return_code_.load(),
@@ -267,17 +267,17 @@ TEST_CASE("CTE PutBlob+GetBlob round trip with device-memory task & data",
   // ---- 6) Zero out the blob_data buffer on device so the GetBlob
   //         readback is verifiable. ----
   std::vector<char> zeros(kBlobBytes, 0);
-  hshm::GpuApi::Memcpy(blob_dev, zeros.data(), kBlobBytes);
+  ctp::GpuApi::Memcpy(blob_dev, zeros.data(), kBlobBytes);
 
   // ---- 7) Launch the GetBlob kernel and wait. ----
   std::fprintf(stderr, "[GET] launching DevMemSubmitGetKernel\n");
   auto g0 = std::chrono::steady_clock::now();
   DevMemSubmitGetKernel<<<1, 32>>>(gpu_info, get_fp);
-  hshm::GpuApi::Synchronize();
+  ctp::GpuApi::Synchronize();
   auto g1 = std::chrono::steady_clock::now();
 
   cte::GetBlobTask get_after{};
-  hshm::GpuApi::Memcpy(reinterpret_cast<char *>(&get_after),
+  ctp::GpuApi::Memcpy(reinterpret_cast<char *>(&get_after),
                         task_dev_base + kPutSlot,
                         sizeof(cte::GetBlobTask));
   std::fprintf(stderr, "[GET] return_code=%u took=%lld ms\n",
@@ -303,7 +303,7 @@ TEST_CASE("CTE PutBlob+GetBlob round trip with device-memory task & data",
   ipc->FreeGpuBackend(/*gpu_id=*/0, task_alloc_id);
 }
 
-#endif  // !HSHM_IS_DEVICE_PASS
+#endif  // !CTP_IS_DEVICE_PASS
 
 SIMPLE_TEST_MAIN()
 
@@ -311,4 +311,4 @@ SIMPLE_TEST_MAIN()
 
 int main() { return 0; }
 
-#endif  // (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#endif  // (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL

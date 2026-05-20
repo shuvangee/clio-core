@@ -249,7 +249,7 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   peer_recv_thread_ = std::thread([this]() {
     pthread_setname_np(pthread_self(), "chi-peer-recv");
     auto *ipc_manager = CHI_IPC;
-    hshm::lbm::Transport *lbm_transport = nullptr;
+    ctp::lbm::Transport *lbm_transport = nullptr;
     for (int spin = 0; spin < 1000 && !recv_shutdown_.load(); ++spin) {
       lbm_transport = ipc_manager->GetMainTransport();
       if (lbm_transport) break;
@@ -322,8 +322,8 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   // Initialize system stats ring buffer and spawn periodic monitor task
   system_stats_ring_ = std::make_unique<
       hipc::circular_mpsc_ring_buffer<SystemStats, hipc::MallocAllocator>>(
-      HSHM_MALLOC, kSystemStatsRingSize);
-  prev_cpu_times_ = hshm::SystemInfo::GetCpuTimes();
+      CTP_MALLOC, kSystemStatsRingSize);
+  prev_cpu_times_ = ctp::SystemInfo::GetCpuTimes();
   client_.AsyncSystemMonitor(chi::PoolQuery::Local(), 1000000);  // 1s
 
   HLOG(kDebug,
@@ -403,7 +403,7 @@ chi::TaskResume Runtime::GetOrCreatePool(
     task->return_code_ = 99;
     std::string error_msg =
         std::string("Exception during pool creation: ") + e.what();
-    task->error_message_ = chi::priv::string(HSHM_MALLOC, error_msg);
+    task->error_message_ = chi::priv::string(CTP_MALLOC, error_msg);
     HLOG(kError, "Admin: Pool creation failed with exception: {}", e.what());
   }
   CHI_CO_RETURN;
@@ -457,7 +457,7 @@ chi::TaskResume Runtime::DestroyPool(hipc::FullPtr<DestroyPoolTask> task,
     task->return_code_ = 99;
     std::string error_msg =
         std::string("Exception during pool destruction: ") + e.what();
-    task->error_message_ = chi::priv::string(HSHM_MALLOC, error_msg);
+    task->error_message_ = chi::priv::string(CTP_MALLOC, error_msg);
     HLOG(kError, "Admin: Pool destruction failed with exception: {}", e.what());
   }
   CHI_CO_RETURN;
@@ -691,7 +691,7 @@ void Runtime::SendIn(hipc::FullPtr<chi::Task> origin_task,
     // Get or create persistent Lightbeam client using connection pool
     auto *config_manager = CHI_CONFIG_MANAGER;
     int port = static_cast<int>(config_manager->GetPort());
-    hshm::lbm::Transport *lbm_transport =
+    ctp::lbm::Transport *lbm_transport =
         ipc_manager->GetOrCreateClient(target_host->ip_address, port);
 
     if (!lbm_transport) {
@@ -713,7 +713,7 @@ void Runtime::SendIn(hipc::FullPtr<chi::Task> origin_task,
     container->SaveTask(task_copy->method_, archive, task_copy);
     uint64_t ser_dt = HrtNs() - ser_t0;
 
-    hshm::lbm::LbmContext ctx(0);  // Non-blocking async send
+    ctp::lbm::LbmContext ctx(0);  // Non-blocking async send
     HLOG(kDebug, "[SendIn] Task {} sending to node {} via lightbeam",
          origin_task->task_id_, target_node_id);
     uint64_t lbm_t0 = HrtNs();
@@ -839,7 +839,7 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
 
   auto *config_manager = CHI_CONFIG_MANAGER;
   int port = static_cast<int>(config_manager->GetPort());
-  hshm::lbm::Transport *lbm_transport =
+  ctp::lbm::Transport *lbm_transport =
       ipc_manager->GetOrCreateClient(target_host->ip_address, port);
 
   if (lbm_transport == nullptr) {
@@ -860,7 +860,7 @@ void Runtime::SendOut(hipc::FullPtr<chi::Task> origin_task) {
   container->SaveTask(origin_task->method_, archive, origin_task);
   uint64_t sout_ser_dt = HrtNs() - sout_ser_t0;
 
-  hshm::lbm::LbmContext ctx(0);
+  ctp::lbm::LbmContext ctx(0);
   uint64_t sout_lbm_t0 = HrtNs();
   int rc = lbm_transport->Send(archive, ctx);
   uint64_t sout_lbm_dt = HrtNs() - sout_lbm_t0;
@@ -1039,7 +1039,7 @@ chi::TaskResume Runtime::Send(hipc::FullPtr<SendTask> task,
  */
 void Runtime::RecvIn(hipc::FullPtr<RecvTask> task,
                      chi::LoadTaskArchive &archive,
-                     hshm::lbm::Transport *lbm_transport) {
+                     ctp::lbm::Transport *lbm_transport) {
   auto *ipc_manager = CHI_IPC;
   auto *pool_manager = CHI_POOL_MANAGER;
 
@@ -1192,7 +1192,7 @@ void Runtime::RecvIn(hipc::FullPtr<RecvTask> task,
  */
 void Runtime::RecvOut(hipc::FullPtr<RecvTask> task,
                       chi::LoadTaskArchive &archive,
-                      hshm::lbm::Transport *lbm_transport) {
+                      ctp::lbm::Transport *lbm_transport) {
   auto *pool_manager = CHI_POOL_MANAGER;
 
   const auto &task_infos = archive.GetTaskInfos();
@@ -1400,7 +1400,7 @@ chi::TaskResume Runtime::Recv(hipc::FullPtr<RecvTask> task,
   // Get the main server from CHI_IPC (already bound during initialization)
   auto *ipc_manager = CHI_IPC;
 
-  hshm::lbm::Transport *lbm_transport = ipc_manager->GetMainTransport();
+  ctp::lbm::Transport *lbm_transport = ipc_manager->GetMainTransport();
   if (lbm_transport == nullptr) {
     CHI_CO_RETURN;
   }
@@ -2075,7 +2075,7 @@ chi::TaskResume Runtime::RegisterMemory(hipc::FullPtr<RegisterMemoryTask> task,
     case MemoryType::kPinnedHostMemory:
     case MemoryType::kGpuDeviceMemory:
     case MemoryType::kManagedUvm: {
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
       auto *gpu_ipc = ipc_manager->GetGpuIpcManager();
       if (!gpu_ipc) {
         HLOG(kError, "Admin::RegisterMemory: gpu_ipc_ not initialized");
@@ -2190,7 +2190,7 @@ chi::TaskResume Runtime::RestartContainers(
     task->return_code_ = 99;
     std::string error_msg =
         std::string("Exception during RestartContainers: ") + e.what();
-    task->error_message_ = chi::priv::string(HSHM_MALLOC, error_msg);
+    task->error_message_ = chi::priv::string(CTP_MALLOC, error_msg);
     HLOG(kError, "Admin: RestartContainers failed: {}", e.what());
   }
   (void)rctx;
@@ -2280,7 +2280,7 @@ chi::TaskResume Runtime::ChangeAddressTable(
     task->SetReturnCode(0);
   } else {
     task->error_message_ = chi::priv::string(
-        HSHM_MALLOC, "Failed to update container node mapping");
+        CTP_MALLOC, "Failed to update container node mapping");
     task->SetReturnCode(1);
   }
   CHI_CO_RETURN;
@@ -2302,7 +2302,7 @@ chi::TaskResume Runtime::MigrateContainers(
   std::vector<chi::MigrateInfo> migrations;
   {
     std::vector<char> buf(data.begin(), data.end());
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ar(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ar(buf);
     ar(migrations);
   }
 
@@ -2369,7 +2369,7 @@ bool Runtime::RetrySendToNode(RetryEntry &entry, chi::u64 node_id) {
     return false;
   }
   int port = static_cast<int>(config_manager->GetPort());
-  hshm::lbm::Transport *lbm_transport =
+  ctp::lbm::Transport *lbm_transport =
       ipc_manager->GetOrCreateClient(target_host->ip_address, port);
   if (!lbm_transport) {
     return false;
@@ -2381,7 +2381,7 @@ bool Runtime::RetrySendToNode(RetryEntry &entry, chi::u64 node_id) {
   }
   chi::SaveTaskArchive archive(chi::MsgType::kSerializeIn, lbm_transport);
   container->SaveTask(entry.task->method_, archive, entry.task);
-  hshm::lbm::LbmContext ctx(0);
+  ctp::lbm::LbmContext ctx(0);
   int rc = lbm_transport->Send(archive, ctx);
   return rc == 0;
 }
@@ -3050,7 +3050,7 @@ chi::TaskResume Runtime::RecoverContainers(
   {
     std::string data = task->assignments_data_.str();
     std::vector<char> buf(data.begin(), data.end());
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ar(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ar(buf);
     ar(assignments);
   }
 
@@ -3107,8 +3107,8 @@ chi::TaskResume Runtime::SystemMonitor(hipc::FullPtr<SystemMonitorTask> task,
           .count());
 
   // DRAM
-  stats.ram_total_bytes_ = HSHM_SYSTEM_INFO->ram_size_;
-  stats.ram_available_bytes_ = hshm::SystemInfo::GetRamAvailable();
+  stats.ram_total_bytes_ = CTP_SYSTEM_INFO->ram_size_;
+  stats.ram_available_bytes_ = ctp::SystemInfo::GetRamAvailable();
   if (stats.ram_total_bytes_ > 0) {
     stats.ram_usage_pct_ =
         (1.0f - static_cast<float>(stats.ram_available_bytes_) /
@@ -3117,9 +3117,9 @@ chi::TaskResume Runtime::SystemMonitor(hipc::FullPtr<SystemMonitorTask> task,
   }
 
   // CPU
-  hshm::CpuTimes cur = hshm::SystemInfo::GetCpuTimes();
+  ctp::CpuTimes cur = ctp::SystemInfo::GetCpuTimes();
   stats.cpu_usage_pct_ =
-      hshm::SystemInfo::ComputeCpuUtilization(prev_cpu_times_, cur);
+      ctp::SystemInfo::ComputeCpuUtilization(prev_cpu_times_, cur);
   prev_cpu_times_ = cur;
 
   // GPU/HBM — stub (zeroed by default constructor)

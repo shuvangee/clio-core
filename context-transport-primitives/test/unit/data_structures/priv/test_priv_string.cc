@@ -37,7 +37,7 @@
 #include <string>
 #include <memory>
 
-using namespace hshm::priv;
+using namespace ctp::priv;
 
 // ============================================================================
 // Helper: Simple allocator for testing (same as vector tests)
@@ -634,7 +634,7 @@ TEST_CASE("String: serialize small SSO string", "[priv_string][serialization]") 
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -642,7 +642,7 @@ TEST_CASE("String: serialize small SSO string", "[priv_string][serialization]") 
   // Deserialize
   basic_string<char, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -661,7 +661,7 @@ TEST_CASE("String: serialize large string exceeding SSO", "[priv_string][seriali
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -669,7 +669,7 @@ TEST_CASE("String: serialize large string exceeding SSO", "[priv_string][seriali
   // Deserialize
   basic_string<char, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -683,7 +683,7 @@ TEST_CASE("String: serialize empty string", "[priv_string][serialization]") {
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -691,7 +691,7 @@ TEST_CASE("String: serialize empty string", "[priv_string][serialization]") {
   // Deserialize
   basic_string<char, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -705,7 +705,7 @@ TEST_CASE("String: serialize string with special characters", "[priv_string][ser
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -713,7 +713,7 @@ TEST_CASE("String: serialize string with special characters", "[priv_string][ser
   // Deserialize
   basic_string<char, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -727,7 +727,7 @@ TEST_CASE("String: serialize exactly SSO size boundary", "[priv_string][serializ
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -735,7 +735,7 @@ TEST_CASE("String: serialize exactly SSO size boundary", "[priv_string][serializ
   // Deserialize
   basic_string<char, SimpleHeapAllocator, 32> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -755,12 +755,12 @@ TEST_CASE("String: LocalSerialize small SSO string", "[priv_string][local_serial
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   basic_string<char, SimpleHeapAllocator> restored(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -779,12 +779,12 @@ TEST_CASE("String: LocalSerialize large string exceeding SSO", "[priv_string][lo
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   basic_string<char, SimpleHeapAllocator> restored(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -798,12 +798,12 @@ TEST_CASE("String: LocalSerialize empty string", "[priv_string][local_serialize]
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   basic_string<char, SimpleHeapAllocator> restored(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -819,14 +819,14 @@ TEST_CASE("String: LocalSerialize multiple strings", "[priv_string][local_serial
 
   // Serialize multiple strings
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << str1 << str2 << str3;
 
   // Deserialize multiple strings
   basic_string<char, SimpleHeapAllocator> restored1(&g_allocator);
   basic_string<char, SimpleHeapAllocator> restored2(&g_allocator);
   basic_string<char, SimpleHeapAllocator> restored3(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored1 >> restored2 >> restored3;
 
   // Verify
@@ -840,12 +840,12 @@ TEST_CASE("String: LocalSerialize with operator() syntax", "[priv_string][local_
 
   // Serialize using operator()
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer(original);
 
   // Deserialize using operator()
   basic_string<char, SimpleHeapAllocator> restored(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer(restored);
 
   // Verify

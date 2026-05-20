@@ -48,7 +48,7 @@
 
 using json = nlohmann::json;
 
-namespace hshm {
+namespace ctp {
 namespace compress {
 
 // ============================================================================
@@ -544,4 +544,4 @@ QValue QTablePredictor::GetPrediction(const QState& state) {
 }
 
 }  // namespace compress
-}  // namespace hshm
+}  // namespace ctp

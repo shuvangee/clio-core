@@ -26,7 +26,7 @@ This package mirrors the manual sbatch script
      pipeline-level `mpi_cmd` and `ssh_cmd` YAML keys, the same way the
      IOR + wrp_runtime pipeline uses them.
 
-  3) We propagate CHI_SERVER_CONF / HSHM_LOG_LEVEL / CHI_IPC_MODE
+  3) We propagate CHI_SERVER_CONF / CTP_LOG_LEVEL / CHI_IPC_MODE
      (wrp_runtime publishes these via setenv on configure), TMPDIR,
      and CHI_MEMFD_DIR (top-level env: in the pipeline yaml). The
      first four go through OpenMPI's `-x` (literal values). The fifth,
@@ -152,7 +152,7 @@ class WrpXnodeBdevBench(Application):
         comes from `ssh_cmd`. Both fall back to plain `mpiexec` if
         unset, but the ares pipelines always set them.
 
-        Per-rank env: ``CHI_SERVER_CONF`` / ``HSHM_LOG_LEVEL`` /
+        Per-rank env: ``CHI_SERVER_CONF`` / ``CTP_LOG_LEVEL`` /
         ``CHI_IPC_MODE`` / ``TMPDIR`` go through OpenMPI's `-x` —
         verbatim values, no shell expansion. ``CHI_MEMFD_DIR``, by
         contrast, intentionally embeds the literal token ``$HOSTNAME``
@@ -182,7 +182,7 @@ class WrpXnodeBdevBench(Application):
         # -x as literal values from this process's env.
         forwarded_env = [
             'CHI_SERVER_CONF',
-            'HSHM_LOG_LEVEL',
+            'CTP_LOG_LEVEL',
             'CHI_IPC_MODE',
             'TMPDIR',
         ]

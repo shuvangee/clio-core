@@ -46,14 +46,14 @@ namespace chi {
  */
 class CoRwLock {
  public:
-  hshm::RwLock lock_;
+  ctp::RwLock lock_;
   LockOwnerId holder_;
   u32 write_depth_;
   u32 read_depth_;
 
   CoRwLock() : write_depth_(0), read_depth_(0) {}
 
-  /** Deleted copy constructor (matches hshm::RwLock) */
+  /** Deleted copy constructor (matches ctp::RwLock) */
   CoRwLock(const CoRwLock &other) = delete;
 
   CoRwLock(CoRwLock &&other) noexcept

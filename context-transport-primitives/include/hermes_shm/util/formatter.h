@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_ERROR_SERIALIZER_H
-#define HSHM_ERROR_SERIALIZER_H
+#ifndef CTP_ERROR_SERIALIZER_H
+#define CTP_ERROR_SERIALIZER_H
 
 #include <cstring>
 #include <list>
@@ -48,16 +48,16 @@
 #if defined(__has_feature)
 #if __has_feature(memory_sanitizer)
 #include <sanitizer/msan_interface.h>
-#define HSHM_MSAN_UNPOISON_STRING(s) \
+#define CTP_MSAN_UNPOISON_STRING(s) \
   __msan_unpoison((s).data(), (s).size())
 #else
-#define HSHM_MSAN_UNPOISON_STRING(s) ((void)0)
+#define CTP_MSAN_UNPOISON_STRING(s) ((void)0)
 #endif
 #else
-#define HSHM_MSAN_UNPOISON_STRING(s) ((void)0)
+#define CTP_MSAN_UNPOISON_STRING(s) ((void)0)
 #endif
 
-namespace hshm {
+namespace ctp {
 
 class Formatter {
  public:
@@ -67,7 +67,7 @@ class Formatter {
     std::vector<std::pair<size_t, size_t>> offsets = tokenize(fmt);
     size_t packlen = make_argpack(std::forward<Args>(args)...).Size();
     if (offsets.size() != packlen + 1) {
-      HSHM_MSAN_UNPOISON_STRING(fmt);
+      CTP_MSAN_UNPOISON_STRING(fmt);
       return fmt;
     }
     auto lambda = [&ss, &fmt, &offsets](auto i, auto &&arg) {
@@ -85,7 +85,7 @@ class Formatter {
       ss << fmt.substr(sub.first, sub.second);
     }
     std::string result = ss.str();
-    HSHM_MSAN_UNPOISON_STRING(result);
+    CTP_MSAN_UNPOISON_STRING(result);
     return result;
   }
 
@@ -119,6 +119,6 @@ class Formatter {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ERROR_SERIALIZER_H
+#endif  // CTP_ERROR_SERIALIZER_H

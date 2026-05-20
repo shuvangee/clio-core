@@ -37,7 +37,7 @@
 #include <vector>
 #include <memory>
 
-using namespace hshm::priv;
+using namespace ctp::priv;
 
 // ============================================================================
 // Helper: Simple wrapper allocator for private-memory vectors
@@ -1009,7 +1009,7 @@ TEST_CASE("Vector: serialize POD type (int)", "[priv_vector][serialization]") {
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -1017,7 +1017,7 @@ TEST_CASE("Vector: serialize POD type (int)", "[priv_vector][serialization]") {
   // Deserialize
   vector<int, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -1036,7 +1036,7 @@ TEST_CASE("Vector: serialize POD type (double)", "[priv_vector][serialization]")
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -1044,7 +1044,7 @@ TEST_CASE("Vector: serialize POD type (double)", "[priv_vector][serialization]")
   // Deserialize
   vector<double, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -1059,7 +1059,7 @@ TEST_CASE("Vector: serialize empty vector", "[priv_vector][serialization]") {
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -1067,7 +1067,7 @@ TEST_CASE("Vector: serialize empty vector", "[priv_vector][serialization]") {
   // Deserialize
   vector<int, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -1083,7 +1083,7 @@ TEST_CASE("Vector: serialize complex type (std::string)", "[priv_vector][seriali
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -1091,7 +1091,7 @@ TEST_CASE("Vector: serialize complex type (std::string)", "[priv_vector][seriali
   // Deserialize
   vector<std::string, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -1110,7 +1110,7 @@ TEST_CASE("Vector: serialize large vector", "[priv_vector][serialization]") {
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -1118,7 +1118,7 @@ TEST_CASE("Vector: serialize large vector", "[priv_vector][serialization]") {
   // Deserialize
   vector<int, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -1135,7 +1135,7 @@ TEST_CASE("Vector: serialize single element", "[priv_vector][serialization]") {
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -1143,7 +1143,7 @@ TEST_CASE("Vector: serialize single element", "[priv_vector][serialization]") {
   // Deserialize
   vector<int, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -1159,7 +1159,7 @@ TEST_CASE("Vector: serialize struct type", "[priv_vector][serialization]") {
 
   // Serialize
   std::vector<char> buf;
-  hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+  ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
   oarchive(original);
   oarchive.Finalize();
   std::string result(buf.begin(), buf.end());
@@ -1167,7 +1167,7 @@ TEST_CASE("Vector: serialize struct type", "[priv_vector][serialization]") {
   // Deserialize
   vector<Point, SimpleHeapAllocator> restored(&g_allocator);
   std::vector<char> ibuf(result.begin(), result.end());
-  hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
+  ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(ibuf);
   iarchive(restored);
 
   // Verify
@@ -1194,12 +1194,12 @@ TEST_CASE("Vector: LocalSerialize integer vector", "[priv_vector][local_serializ
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   vector<int, SimpleHeapAllocator> restored(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -1214,12 +1214,12 @@ TEST_CASE("Vector: LocalSerialize empty vector", "[priv_vector][local_serialize]
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   vector<int, SimpleHeapAllocator> restored(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -1235,12 +1235,12 @@ TEST_CASE("Vector: LocalSerialize large vector", "[priv_vector][local_serialize]
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   vector<int, SimpleHeapAllocator> restored(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -1264,14 +1264,14 @@ TEST_CASE("Vector: LocalSerialize multiple vectors", "[priv_vector][local_serial
 
   // Serialize multiple vectors
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << vec1 << vec2 << vec3;
 
   // Deserialize multiple vectors
   vector<int, SimpleHeapAllocator> restored1(&g_allocator);
   vector<int, SimpleHeapAllocator> restored2(&g_allocator);
   vector<int, SimpleHeapAllocator> restored3(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored1 >> restored2 >> restored3;
 
   // Verify
@@ -1293,12 +1293,12 @@ TEST_CASE("Vector: LocalSerialize with operator() syntax", "[priv_vector][local_
 
   // Serialize using operator()
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer(original);
 
   // Deserialize using operator()
   vector<int, SimpleHeapAllocator> restored(&g_allocator);
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer(restored);
 
   // Verify

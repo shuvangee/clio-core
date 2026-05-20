@@ -31,62 +31,62 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_MACROS_H
-#define HSHM_MACROS_H
+#ifndef CTP_MACROS_H
+#define CTP_MACROS_H
 
 /** For windows */
 // #define _CRT_SECURE_NO_DEPRECATE
 
 /** Function content selector for CUDA */
 #ifdef __CUDA_ARCH__
-#define HSHM_IS_CUDA_GPU
+#define CTP_IS_CUDA_GPU
 #endif
 
 /** Function content selector for ROCm */
 #if __HIP_DEVICE_COMPILE__
-#define HSHM_IS_ROCM_GPU
+#define CTP_IS_ROCM_GPU
 #endif
 
 /** Function content selector for CPU vs GPU.
  *
- * HSHM_IS_GPU stays gated to CUDA/ROCm device passes only — code under
- * `#if HSHM_IS_GPU` uses raw nvcc/hipcc intrinsics (__threadfence,
+ * CTP_IS_GPU stays gated to CUDA/ROCm device passes only — code under
+ * `#if CTP_IS_GPU` uses raw nvcc/hipcc intrinsics (__threadfence,
  * atomicCAS, __shfl_sync) that DPC++ does not provide. SYCL device-side
- * code paths are guarded with HSHM_IS_SYCL_DEVICE.
+ * code paths are guarded with CTP_IS_SYCL_DEVICE.
  *
- * HSHM_IS_DEVICE_PASS (defined after HSHM_IS_SYCL_DEVICE further down
+ * CTP_IS_DEVICE_PASS (defined after CTP_IS_SYCL_DEVICE further down
  * this file) is the union: any device-only compilation pass. Use it to
  * elide host-only headers (cout, FILE*, std streams) that would otherwise
  * leak into DPC++'s SYCL device pass parsing. */
-#if defined(HSHM_IS_CUDA_GPU) || defined(HSHM_IS_ROCM_GPU)
-#define HSHM_IS_GPU 1
-#define HSHM_IS_HOST 0
+#if defined(CTP_IS_CUDA_GPU) || defined(CTP_IS_ROCM_GPU)
+#define CTP_IS_GPU 1
+#define CTP_IS_HOST 0
 #else
-#define HSHM_IS_GPU 0
-#define HSHM_IS_HOST 1
+#define CTP_IS_GPU 0
+#define CTP_IS_HOST 1
 #endif
 
 /** Import / export flags for MSVC DLLs */
-#if HSHM_COMPILER_MSVC
-#define HSHM_DLL_EXPORT __declspec(dllexport)
-#define HSHM_DLL_IMPORT __declspec(dllimport)
+#if CTP_COMPILER_MSVC
+#define CTP_DLL_EXPORT __declspec(dllexport)
+#define CTP_DLL_IMPORT __declspec(dllimport)
 #else
-#define HSHM_DLL_EXPORT __attribute__((visibility("default")))
-#define HSHM_DLL_IMPORT __attribute__((visibility("default")))
+#define CTP_DLL_EXPORT __attribute__((visibility("default")))
+#define CTP_DLL_IMPORT __attribute__((visibility("default")))
 #endif
 
 /** DLL import / export for HSHM code */
-#if HSHM_ENABLE_DLL_EXPORT
-#define HSHM_DLL HSHM_DLL_EXPORT
+#if CTP_ENABLE_DLL_EXPORT
+#define CTP_DLL CTP_DLL_EXPORT
 #else
-#define HSHM_DLL HSHM_DLL_IMPORT
+#define CTP_DLL CTP_DLL_IMPORT
 #endif
 
 /** DLL import / export for singletons */
-#ifdef HSHM_COMPILING_DLL
-#define HSHM_DLL_SINGLETON HSHM_DLL_EXPORT
+#ifdef CTP_COMPILING_DLL
+#define CTP_DLL_SINGLETON CTP_DLL_EXPORT
 #else
-#define HSHM_DLL_SINGLETON HSHM_DLL_IMPORT
+#define CTP_DLL_SINGLETON CTP_DLL_IMPORT
 #endif
 
 /**
@@ -105,86 +105,86 @@
 #define VANISH
 #define __TU(X) TYPE_UNWRAP(X)
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
-#define HSHM_ENABLE_CUDA_OR_ROCM 1
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
+#define CTP_ENABLE_CUDA_OR_ROCM 1
 #endif
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
-#define HSHM_ENABLE_GPU 1
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
+#define CTP_ENABLE_GPU 1
 #endif
 
 /** Detect GPU compilers.
- * These combine the CMake build flag (HSHM_ENABLE_CUDA / HSHM_ENABLE_ROCM)
+ * These combine the CMake build flag (CTP_ENABLE_CUDA / CTP_ENABLE_ROCM)
  * with the actual compiler detection (__CUDACC__ / __HIPCC__) so that GPU
  * code paths are only compiled when BOTH the build was configured for the
  * GPU backend AND the file is being compiled by the GPU compiler.
  * All other files MUST use these macros instead of raw __CUDACC__ etc. */
-#if HSHM_ENABLE_CUDA && defined(__CUDACC__)
-#define HSHM_IS_CUDA_COMPILER 1
+#if CTP_ENABLE_CUDA && defined(__CUDACC__)
+#define CTP_IS_CUDA_COMPILER 1
 #else
-#define HSHM_IS_CUDA_COMPILER 0
+#define CTP_IS_CUDA_COMPILER 0
 #endif
 
 /** HIP-NVCC: when WRP_ROCM_HIP_PLATFORM=nvidia, hipcc invokes nvcc and
  *  __CUDACC__ is defined (not __HIPCC__) — but we still want
- *  HSHM_IS_ROCM_COMPILER=1 since the build was configured for ROCm and
+ *  CTP_IS_ROCM_COMPILER=1 since the build was configured for ROCm and
  *  the headers expose HIP types via the HIP-NVCC shim. */
-#if HSHM_ENABLE_ROCM && (defined(__HIPCC__) || defined(__CUDACC__))
-#define HSHM_IS_ROCM_COMPILER 1
+#if CTP_ENABLE_ROCM && (defined(__HIPCC__) || defined(__CUDACC__))
+#define CTP_IS_ROCM_COMPILER 1
 #else
-#define HSHM_IS_ROCM_COMPILER 0
+#define CTP_IS_ROCM_COMPILER 0
 #endif
 
 /** Detect SYCL compiler (Intel oneAPI icpx -fsycl, AdaptiveCpp acpp). */
-#if HSHM_ENABLE_SYCL && defined(SYCL_LANGUAGE_VERSION)
-#define HSHM_IS_SYCL_COMPILER 1
+#if CTP_ENABLE_SYCL && defined(SYCL_LANGUAGE_VERSION)
+#define CTP_IS_SYCL_COMPILER 1
 #else
-#define HSHM_IS_SYCL_COMPILER 0
+#define CTP_IS_SYCL_COMPILER 0
 #endif
 
 /** Detect device-side SYCL compilation pass.
  *  __SYCL_DEVICE_ONLY__ is defined by both DPC++ and AdaptiveCpp during the
  *  device pass of single-source SYCL compilation. */
-#if HSHM_IS_SYCL_COMPILER && defined(__SYCL_DEVICE_ONLY__)
-#define HSHM_IS_SYCL_DEVICE 1
+#if CTP_IS_SYCL_COMPILER && defined(__SYCL_DEVICE_ONLY__)
+#define CTP_IS_SYCL_DEVICE 1
 #else
-#define HSHM_IS_SYCL_DEVICE 0
+#define CTP_IS_SYCL_DEVICE 0
 #endif
 
 /** Union: any device-only compilation pass. Guard host-only code (std::cout,
- *  FILE*, exceptions) with `#if !HSHM_IS_DEVICE_PASS` so DPC++'s device pass
+ *  FILE*, exceptions) with `#if !CTP_IS_DEVICE_PASS` so DPC++'s device pass
  *  doesn't choke on it during parsing. */
-#if HSHM_IS_GPU || HSHM_IS_SYCL_DEVICE
-#define HSHM_IS_DEVICE_PASS 1
+#if CTP_IS_GPU || CTP_IS_SYCL_DEVICE
+#define CTP_IS_DEVICE_PASS 1
 #else
-#define HSHM_IS_DEVICE_PASS 0
+#define CTP_IS_DEVICE_PASS 0
 #endif
 
-/** HSHM_IS_GPU_COMPILER stays gated to CUDA/ROCm: blocks guarded by it use
+/** CTP_IS_GPU_COMPILER stays gated to CUDA/ROCm: blocks guarded by it use
  *  raw __threadfence / atomicOr / __shfl_sync intrinsics that only exist on
- *  nvcc and hipcc. SYCL device-side code paths use HSHM_IS_SYCL_COMPILER /
- *  HSHM_IS_SYCL_DEVICE plus the abstractions in hermes_shm/util/gpu_intrinsics.h. */
-#if HSHM_IS_CUDA_COMPILER || HSHM_IS_ROCM_COMPILER
-#define HSHM_IS_GPU_COMPILER 1
+ *  nvcc and hipcc. SYCL device-side code paths use CTP_IS_SYCL_COMPILER /
+ *  CTP_IS_SYCL_DEVICE plus the abstractions in hermes_shm/util/gpu_intrinsics.h. */
+#if CTP_IS_CUDA_COMPILER || CTP_IS_ROCM_COMPILER
+#define CTP_IS_GPU_COMPILER 1
 #else
-#define HSHM_IS_GPU_COMPILER 0
+#define CTP_IS_GPU_COMPILER 0
 #endif
 
 /** Includes for CUDA and ROCm.
  * nvcc/hipcc get the full runtime header (includes device builtins).
- * Regular g++/clang++ with HSHM_ENABLE_CUDA/ROCM get the runtime API header
+ * Regular g++/clang++ with CTP_ENABLE_CUDA/ROCM get the runtime API header
  * which provides host-callable functions (cudaMalloc, cudaMemcpy, etc.)
  * without device builtins (atomicAdd, threadIdx, etc.). */
-#if HSHM_IS_CUDA_COMPILER
+#if CTP_IS_CUDA_COMPILER
 #include <cuda_runtime.h>
-#elif HSHM_ENABLE_CUDA
+#elif CTP_ENABLE_CUDA
 #include <cuda_runtime_api.h>
 #endif
 
-#if HSHM_IS_ROCM_COMPILER
+#if CTP_IS_ROCM_COMPILER
 #include <hip/hip_runtime.h>
-#elif HSHM_ENABLE_ROCM
-// g++/clang++ host TUs with HSHM_ENABLE_ROCM get the host-callable HIP
+#elif CTP_ENABLE_ROCM
+// g++/clang++ host TUs with CTP_ENABLE_ROCM get the host-callable HIP
 // runtime API header (hipMalloc, hipMemcpy, hipIpcMemHandle_t, etc.)
 // without device builtins. Under HIP_PLATFORM=nvidia these forward to
 // cudart symbols at link time.
@@ -195,9 +195,9 @@
 // when this TU is being compiled with -fsycl. Host TUs in chimaera_cxx
 // (compiled by dpcpp without -fsycl) still need sycl::malloc_host /
 // sycl::queue / sycl::free declarations because gpu_api.h's sycl::
-// branches activate on HSHM_ENABLE_SYCL=1. The header is plain C++ —
+// branches activate on CTP_ENABLE_SYCL=1. The header is plain C++ —
 // safe to parse without the SYCL compiler frontend.
-#if HSHM_ENABLE_SYCL
+#if CTP_ENABLE_SYCL
 #include <sycl/sycl.hpp>
 #endif
 
@@ -206,7 +206,7 @@
  * that only exist when compiling with nvcc or hipcc.  Defining them
  * unconditionally causes errors when the same header is included in files
  * compiled with a plain C++ compiler (g++/clang++). */
-#if HSHM_IS_GPU_COMPILER
+#if CTP_IS_GPU_COMPILER
 #define ROCM_HOST __host__
 #define ROCM_DEVICE __device__
 #define ROCM_HOST_DEVICE __device__ __host__
@@ -239,62 +239,62 @@
 /**
  * Ensure that the compiler ALWAYS inlines a particular function.
  * */
-#if HSHM_COMPILER_MSVC
-#define HSHM_INLINE_FLAG __forceinline
-#define HSHM_NO_INLINE_FLAG __declspec(noinline)
-#define HSHM_FUNC_IS_USED __declspec(selectany)
-#elif HSHM_COMPILER_GNU
-#define HSHM_INLINE_FLAG __attribute__((always_inline))
-#define HSHM_NO_INLINE_FLAG __attribute__((noinline))
-#define HSHM_FUNC_IS_USED __attribute__((used))
+#if CTP_COMPILER_MSVC
+#define CTP_INLINE_FLAG __forceinline
+#define CTP_NO_INLINE_FLAG __declspec(noinline)
+#define CTP_FUNC_IS_USED __declspec(selectany)
+#elif CTP_COMPILER_GNU
+#define CTP_INLINE_FLAG __attribute__((always_inline))
+#define CTP_NO_INLINE_FLAG __attribute__((noinline))
+#define CTP_FUNC_IS_USED __attribute__((used))
 #else
-#define HSHM_INLINE_FLAG inline
-#define HSHM_NO_INLINE_FLAG
-#define HSHM_FUNC_IS_USED
+#define CTP_INLINE_FLAG inline
+#define CTP_NO_INLINE_FLAG
+#define CTP_FUNC_IS_USED
 #endif
 
-#define HSHM_NO_INLINE HSHM_NO_INLINE_FLAG
-#ifndef HSHM_DEBUG
-#define HSHM_INLINE
+#define CTP_NO_INLINE CTP_NO_INLINE_FLAG
+#ifndef CTP_DEBUG
+#define CTP_INLINE
 #else
-#define HSHM_INLINE inline
+#define CTP_INLINE inline
 #endif
 
 /** Macros for gpu/host function + var */
-#define HSHM_HOST_FUN ROCM_HOST
-#define HSHM_HOST_VAR ROCM_HOST
-#define HSHM_GPU_FUN ROCM_DEVICE
-#define HSHM_GPU_VAR ROCM_DEVICE
-#define HSHM_CROSS_FUN ROCM_HOST_DEVICE
-#define HSHM_GPU_KERNEL ROCM_KERNEL
+#define CTP_HOST_FUN ROCM_HOST
+#define CTP_HOST_VAR ROCM_HOST
+#define CTP_GPU_FUN ROCM_DEVICE
+#define CTP_GPU_VAR ROCM_DEVICE
+#define CTP_CROSS_FUN ROCM_HOST_DEVICE
+#define CTP_GPU_KERNEL ROCM_KERNEL
 
 /** Macro for inline gpu/host function + var */
-#if HSHM_IS_GPU_COMPILER
-#define HSHM_INLINE_CROSS_FUN HSHM_CROSS_FUN __forceinline__
+#if CTP_IS_GPU_COMPILER
+#define CTP_INLINE_CROSS_FUN CTP_CROSS_FUN __forceinline__
 #else
-#define HSHM_INLINE_CROSS_FUN HSHM_CROSS_FUN inline
+#define CTP_INLINE_CROSS_FUN CTP_CROSS_FUN inline
 #endif
-#define HSHM_INLINE_CROSS_VAR HSHM_CROSS_FUN inline
-#define HSHM_INLINE_GPU_FUN ROCM_DEVICE HSHM_INLINE
-#define HSHM_INLINE_GPU_VAR ROCM_DEVICE inline
-#define HSHM_INLINE_HOST_FUN ROCM_HOST HSHM_INLINE
-#define HSHM_INLINE_HOST_VAR ROCM_HOST inline
+#define CTP_INLINE_CROSS_VAR CTP_CROSS_FUN inline
+#define CTP_INLINE_GPU_FUN ROCM_DEVICE CTP_INLINE
+#define CTP_INLINE_GPU_VAR ROCM_DEVICE inline
+#define CTP_INLINE_HOST_FUN ROCM_HOST CTP_INLINE
+#define CTP_INLINE_HOST_VAR ROCM_HOST inline
 
 /** Macro for selective cross function */
-#if HSHM_IS_HOST
-#define HSHM_CROSS_FUN_SEL HSHM_HOST_FUN
-#define HSHM_INLINE_CROSS_FUN_SEL HSHM_INLINE_HOST_FUN
+#if CTP_IS_HOST
+#define CTP_CROSS_FUN_SEL CTP_HOST_FUN
+#define CTP_INLINE_CROSS_FUN_SEL CTP_INLINE_HOST_FUN
 #else
-#define HSHM_CROSS_FUN_SEL HSHM_GPU_FUN
-#define HSHM_INLINE_CROSS_FUN_SEL HSHM_INLINE_GPU_FUN
+#define CTP_CROSS_FUN_SEL CTP_GPU_FUN
+#define CTP_INLINE_CROSS_FUN_SEL CTP_INLINE_GPU_FUN
 #endif
 
 /** Test cross functions */
-#define HSHM_NO_INLINE_CROSS_FUN HSHM_NO_INLINE HSHM_CROSS_FUN HSHM_FUNC_IS_USED
+#define CTP_NO_INLINE_CROSS_FUN CTP_NO_INLINE CTP_CROSS_FUN CTP_FUNC_IS_USED
 
 /** Mark a device function whose definition lives in another translation unit.
  *
- *  Use on every HSHM_GPU_FUN declaration in chimod headers (e.g. bdev's
+ *  Use on every CTP_GPU_FUN declaration in chimod headers (e.g. bdev's
  *  AllocateBlocks(), CTE core's PutBlob()) when the body sits in a
  *  separate _gpu.cc / _sycl.cc TU.
  *
@@ -306,10 +306,10 @@
  *    marked SYCL_EXTERNAL — without the marker, DPC++ fails the device
  *    compile with "SYCL kernel cannot call an undefined function". The
  *    matching definition's TU must also be compiled with -fsycl. */
-#if HSHM_IS_SYCL_COMPILER
-#define HSHM_DEVICE_EXTERN SYCL_EXTERNAL
+#if CTP_IS_SYCL_COMPILER
+#define CTP_DEVICE_EXTERN SYCL_EXTERNAL
 #else
-#define HSHM_DEVICE_EXTERN
+#define CTP_DEVICE_EXTERN
 #endif
 
 /** Mark a function whose address is taken on the device.
@@ -326,10 +326,10 @@
  *    makes call sites work under the sycl_ext_oneapi_virtual_functions
  *    extension when WRP_SYCL_ALLOW_VIRTUAL_FUNCTIONS is on. Override with
  *    -DHSHM_NO_SYCL_INDIRECTLY_CALLABLE=1 to fall back to no-op. */
-#if HSHM_IS_SYCL_COMPILER && !defined(HSHM_NO_SYCL_INDIRECTLY_CALLABLE)
-#define HSHM_INDIRECTLY_CALLABLE [[intel::device_indirectly_callable]]
+#if CTP_IS_SYCL_COMPILER && !defined(CTP_NO_SYCL_INDIRECTLY_CALLABLE)
+#define CTP_INDIRECTLY_CALLABLE [[intel::device_indirectly_callable]]
 #else
-#define HSHM_INDIRECTLY_CALLABLE
+#define CTP_INDIRECTLY_CALLABLE
 #endif
 
 /** Bitfield macros */
@@ -343,7 +343,7 @@
 #define CLS_CROSS_CONST CLS_CONST
 
 /** Class constant macro */
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
 #define GLOBAL_CONST inline const
 #define GLOBAL_CROSS_CONST inline const
 #else
@@ -352,42 +352,42 @@
 #endif
 
 /** Namespace definitions */
-namespace hshm {}
-namespace hshm::ipc {}
-namespace hipc = hshm::ipc;
+namespace ctp {}
+namespace ctp::ipc {}
+namespace hipc = ctp::ipc;
 
 /** The name of the current device */
-#define HSHM_DEV_TYPE_CPU 0
-#define HSHM_DEV_TYPE_GPU 1
-#if HSHM_IS_HOST
+#define CTP_DEV_TYPE_CPU 0
+#define CTP_DEV_TYPE_GPU 1
+#if CTP_IS_HOST
 #define kCurrentDevice "cpu"
-#define kCurrentDeviceType HSHM_DEV_TYPE_CPU
-#define HSHM_GPU_OR_HOST host
+#define kCurrentDeviceType CTP_DEV_TYPE_CPU
+#define CTP_GPU_OR_HOST host
 #else
 #define kCurrentDevice "gpu"
-#define kCurrentDeviceType HSHM_DEV_TYPE_GPU
-#define HSHM_GPU_OR_HOST gpu
+#define kCurrentDeviceType CTP_DEV_TYPE_GPU
+#define CTP_GPU_OR_HOST gpu
 #endif
 
 /***************************************************
  * CUSTOM SETTINGS FOR ALLOCATORS
  * ************************************************* */
 /** Define the root allocator class */
-#ifndef HSHM_ROOT_ALLOC_T
-#define HSHM_ROOT_ALLOC_T hipc::StackAllocator
+#ifndef CTP_ROOT_ALLOC_T
+#define CTP_ROOT_ALLOC_T hipc::StackAllocator
 #endif
-#define HSHM_ROOT_ALLOC \
-  HSHM_MEMORY_MANAGER->template GetRootAllocator<HSHM_ROOT_ALLOC_T>()
+#define CTP_ROOT_ALLOC \
+  CTP_MEMORY_MANAGER->template GetRootAllocator<CTP_ROOT_ALLOC_T>()
 
-#define HSHM_DEFAULT_ALLOC \
-  HSHM_MEMORY_MANAGER->template GetDefaultAllocator<HSHM_DEFAULT_ALLOC_T>()
+#define CTP_DEFAULT_ALLOC \
+  CTP_MEMORY_MANAGER->template GetDefaultAllocator<CTP_DEFAULT_ALLOC_T>()
 
-#ifndef HSHM_DEFAULT_ALLOC_GPU_T
-#define HSHM_DEFAULT_ALLOC_GPU_T hipc::PartitionedAllocator
+#ifndef CTP_DEFAULT_ALLOC_GPU_T
+#define CTP_DEFAULT_ALLOC_GPU_T hipc::PartitionedAllocator
 #endif
 
 /** Default memory context macro (no longer used - kept for compatibility) */
-#define HSHM_MCTX (void)0
+#define CTP_MCTX (void)0
 
 /** Compatability hack for static_assert */
 template <bool TRUTH, typename T = int>
@@ -400,4 +400,4 @@ class assert_hack {
 #define STATIC_ASSERT(TRUTH, MSG, T) \
   static_assert(assert_hack<TRUTH, __TU(T)>::value, MSG)
 
-#endif  // HSHM_MACROS_H
+#endif  // CTP_MACROS_H

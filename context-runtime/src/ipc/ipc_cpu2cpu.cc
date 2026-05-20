@@ -12,7 +12,7 @@ namespace chi {
 
 hipc::FullPtr<Task> IpcCpu2Cpu::RuntimeRecv(
     IpcManager *ipc, Future<Task> &future, Container *container,
-    u32 method_id, hshm::lbm::Transport *recv_transport) {
+    u32 method_id, ctp::lbm::Transport *recv_transport) {
   auto future_shm = future.GetFutureShm();
   FullPtr<Task> task_full_ptr = future.GetTaskPtr();
 
@@ -23,7 +23,7 @@ hipc::FullPtr<Task> IpcCpu2Cpu::RuntimeRecv(
   }
 
   // Build SHM context for transfer
-  hshm::lbm::LbmContext ctx;
+  ctp::lbm::LbmContext ctx;
   ctx.copy_space = future_shm->copy_space;
   ctx.shm_info_ = &future_shm->input_;
 
@@ -51,13 +51,13 @@ hipc::FullPtr<Task> IpcCpu2Cpu::RuntimeRecv(
 void IpcCpu2Cpu::RuntimeSend(
     IpcManager *ipc, const FullPtr<Task> &task_ptr,
     RunContext *run_ctx, Container *container,
-    hshm::lbm::Transport *send_transport) {
+    ctp::lbm::Transport *send_transport) {
   auto future_shm = run_ctx->future_.GetFutureShm();
 
   // Serialize outputs into SHM ring buffer
   future_shm->output_.copy_space_size_ =
       future_shm->input_.copy_space_size_;
-  hshm::lbm::LbmContext ctx;
+  ctp::lbm::LbmContext ctx;
   ctx.copy_space = future_shm->copy_space;
   ctx.shm_info_ = &future_shm->output_;
   SaveTaskArchive archive(MsgType::kSerializeOut, send_transport);

@@ -31,17 +31,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_LIBPRESSIO_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_LIBPRESSIO_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_LIBPRESSIO_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_LIBPRESSIO_H_
 
-#if HSHM_ENABLE_COMPRESS && HSHM_ENABLE_LIBPRESSIO
+#if CTP_ENABLE_COMPRESS && CTP_ENABLE_LIBPRESSIO
 
 #include <libpressio/libpressio.h>
 #include <cstring>
 
 #include "compress.h"
 
-namespace hshm {
+namespace ctp {
 
 /**
  * LibPressio wrapper class for lossy compressors.
@@ -299,8 +299,8 @@ class LibPressio : public Compressor {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_COMPRESS && HSHM_ENABLE_LIBPRESSIO
+#endif  // CTP_ENABLE_COMPRESS && CTP_ENABLE_LIBPRESSIO
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_LIBPRESSIO_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_LIBPRESSIO_H_

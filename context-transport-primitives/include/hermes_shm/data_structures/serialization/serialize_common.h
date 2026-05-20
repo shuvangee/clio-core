@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_SERIALIZE_COMMON_H_
-#define HSHM_SHM_SERIALIZE_COMMON_H_
+#ifndef CTP_SHM_SERIALIZE_COMMON_H_
+#define CTP_SHM_SERIALIZE_COMMON_H_
 
 #include <stddef.h>
 
 // #include "hermes_shm/data_structures/ipc/hash.h"  // Deleted during hard refactoring
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 // Detect if serialization function exists
 template <typename, typename, typename = void>
@@ -140,7 +140,7 @@ struct has_resize_no_init<T,
 
 /** Resize container without zero-filling when possible. */
 template <typename ContainerT>
-HSHM_INLINE_CROSS_FUN void resize_for_overwrite(ContainerT &c, size_t n) {
+CTP_INLINE_CROSS_FUN void resize_for_overwrite(ContainerT &c, size_t n) {
   if constexpr (has_resize_no_init<ContainerT>::value) {
     c.resize_no_init(n);
   } else {
@@ -149,24 +149,24 @@ HSHM_INLINE_CROSS_FUN void resize_for_overwrite(ContainerT &c, size_t n) {
 }
 
 template <typename Ar, typename T>
-HSHM_INLINE_CROSS_FUN void write_binary(Ar &ar, const T *data, size_t size) {
+CTP_INLINE_CROSS_FUN void write_binary(Ar &ar, const T *data, size_t size) {
   ar.write_binary((const char *)data, size);
 }
 template <typename Ar, typename T>
-HSHM_INLINE_CROSS_FUN void read_binary(Ar &ar, T *data, size_t size) {
+CTP_INLINE_CROSS_FUN void read_binary(Ar &ar, T *data, size_t size) {
   ar.read_binary((char *)data, size);
 }
 
 /** Serialize a generic string. */
 template <typename Ar, typename StringT>
-HSHM_INLINE_CROSS_FUN void save_string(Ar &ar, const StringT &text) {
+CTP_INLINE_CROSS_FUN void save_string(Ar &ar, const StringT &text) {
   ar.save_string_fused(text.data(), text.size());
 }
 /** Deserialize a generic string.
  *  Uses load_string_fused when the archive supports it (fused size+data read).
  *  Otherwise falls back to separate read operations. */
 template <typename Ar, typename StringT>
-HSHM_INLINE_CROSS_FUN void load_string(Ar &ar, StringT &text) {
+CTP_INLINE_CROSS_FUN void load_string(Ar &ar, StringT &text) {
   size_t size = 0;
   ar >> size;
   resize_for_overwrite(text, size);
@@ -175,7 +175,7 @@ HSHM_INLINE_CROSS_FUN void load_string(Ar &ar, StringT &text) {
 
 /** Serialize a generic vector */
 template <typename Ar, typename ContainerT, typename T>
-HSHM_INLINE_CROSS_FUN void save_vec(Ar &ar, const ContainerT &obj) {
+CTP_INLINE_CROSS_FUN void save_vec(Ar &ar, const ContainerT &obj) {
   ar << obj.size();
   if constexpr (std::is_arithmetic_v<T>) {
     write_binary(ar, (char *)obj.data(), obj.size() * sizeof(T));
@@ -187,7 +187,7 @@ HSHM_INLINE_CROSS_FUN void save_vec(Ar &ar, const ContainerT &obj) {
 }
 /** Deserialize a generic vector */
 template <typename Ar, typename ContainerT, typename T>
-HSHM_INLINE_CROSS_FUN void load_vec(Ar &ar, ContainerT &obj) {
+CTP_INLINE_CROSS_FUN void load_vec(Ar &ar, ContainerT &obj) {
   size_t size = 0;
   ar >> size;
   if constexpr (std::is_arithmetic_v<T>) {
@@ -203,7 +203,7 @@ HSHM_INLINE_CROSS_FUN void load_vec(Ar &ar, ContainerT &obj) {
 
 /** Serialize a generic list */
 template <typename Ar, typename ContainerT, typename T>
-HSHM_INLINE_CROSS_FUN void save_list(Ar &ar, const ContainerT &obj) {
+CTP_INLINE_CROSS_FUN void save_list(Ar &ar, const ContainerT &obj) {
   ar << obj.size();
   for (auto iter = obj.cbegin(); iter != obj.cend(); ++iter) {
     ar << (*iter);
@@ -211,7 +211,7 @@ HSHM_INLINE_CROSS_FUN void save_list(Ar &ar, const ContainerT &obj) {
 }
 /** Deserialize a generic list */
 template <typename Ar, typename ContainerT, typename T>
-HSHM_INLINE_CROSS_FUN void load_list(Ar &ar, ContainerT &obj) {
+CTP_INLINE_CROSS_FUN void load_list(Ar &ar, ContainerT &obj) {
   size_t size = 0;
   ar >> size;
   for (size_t i = 0; i < size; ++i) {
@@ -223,7 +223,7 @@ HSHM_INLINE_CROSS_FUN void load_list(Ar &ar, ContainerT &obj) {
 
 /** Serialize a generic list */
 template <typename Ar, typename ContainerT, typename KeyT, typename T>
-HSHM_INLINE_CROSS_FUN void save_map(Ar &ar, const ContainerT &obj) {
+CTP_INLINE_CROSS_FUN void save_map(Ar &ar, const ContainerT &obj) {
   ar << obj.size();
   for (auto iter = obj.cbegin(); iter != obj.cend(); ++iter) {
     ar << (*iter).first;
@@ -232,7 +232,7 @@ HSHM_INLINE_CROSS_FUN void save_map(Ar &ar, const ContainerT &obj) {
 }
 /** Deserialize a generic list */
 template <typename Ar, typename ContainerT, typename KeyT, typename T>
-HSHM_INLINE_CROSS_FUN void load_map(Ar &ar, ContainerT &obj) {
+CTP_INLINE_CROSS_FUN void load_map(Ar &ar, ContainerT &obj) {
   size_t size = 0;
   ar >> size;
   for (size_t i = 0; i < size; ++i) {
@@ -244,6 +244,6 @@ HSHM_INLINE_CROSS_FUN void load_map(Ar &ar, ContainerT &obj) {
   }
 }
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_SHM_SERIALIZE_COMMON_H_
+#endif  // CTP_SHM_SERIALIZE_COMMON_H_

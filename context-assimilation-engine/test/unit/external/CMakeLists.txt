@@ -17,7 +17,7 @@ endif()
 find_package(iowarp-core CONFIG REQUIRED)
 # This automatically provides:
 #   Core Components:
-#     - All hshm::* modular targets (hshm::cxx, hshm::configure, hshm::serialize, etc.)
+#     - All ctp::* modular targets (ctp::cxx, ctp::configure, ctp::serialize, etc.)
 #     - chimaera::cxx (core runtime library)
 #     - ChiMod build utilities (add_chimod_client, add_chimod_runtime, etc.)
 #
@@ -76,7 +76,7 @@ message(STATUS "External Developer Notes:")
 message(STATUS "  This test demonstrates proper external linking to IOWarp libraries.")
 message(STATUS "  Required package: iowarp-core (single unified package)")
 message(STATUS "  iowarp-core automatically provides:")
-message(STATUS "    - HermesShm: All hshm::* modular targets")
+message(STATUS "    - HermesShm: All ctp::* modular targets")
 message(STATUS "    - Chimaera: chimaera::cxx and build utilities")
 message(STATUS "    - Core ChiMods: admin, bdev (always available)")
 message(STATUS "    - Optional ChiMods: CTE, CAE (if enabled at build time)")

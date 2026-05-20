@@ -11,7 +11,7 @@
 #include "chimaera/types.h"
 #include "chimaera/task.h"
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 
 namespace chi {
 
@@ -43,7 +43,7 @@ struct IpcGpu2Cpu {
    * @return gpu::Future<TaskT> bound to the FutureShm.
    */
   template <typename TaskT>
-  static HSHM_GPU_FUN gpu::Future<TaskT> ClientSend(
+  static CTP_GPU_FUN gpu::Future<TaskT> ClientSend(
       gpu::IpcManager *ipc, const hipc::FullPtr<TaskT> &task_ptr);
 
   /**
@@ -56,7 +56,7 @@ struct IpcGpu2Cpu {
    */
   static hipc::FullPtr<Task> RuntimeRecv(
       IpcManager *ipc, Future<Task> &future, Container *container,
-      u32 method_id, hshm::lbm::Transport *recv_transport);
+      u32 method_id, ctp::lbm::Transport *recv_transport);
 
   /**
    * CPU-side: write POD output bytes back to the original device buffer
@@ -70,5 +70,5 @@ struct IpcGpu2Cpu {
 
 }  // namespace chi
 
-#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#endif  // CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 #endif  // CHIMAERA_INCLUDE_CHIMAERA_IPC_GPU2CPU_H_

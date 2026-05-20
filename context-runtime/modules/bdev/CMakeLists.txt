@@ -3,24 +3,24 @@ cmake_minimum_required(VERSION 3.10)
 # Collect optional NIXL dependency
 set(BDEV_OPTIONAL_LIBS "")
 if(WRP_CORE_ENABLE_NIXL)
-  list(APPEND BDEV_OPTIONAL_LIBS hshm::nixl)
+  list(APPEND BDEV_OPTIONAL_LIBS ctp::nixl)
 endif()
 
 # Collect optional CUDA dependency for kHbm/kPinned bdev types
 set(BDEV_GPU_LIBS "")
 if(WRP_CORE_ENABLE_CUDA)
-  list(APPEND BDEV_GPU_LIBS hshm::cuda_cxx)
+  list(APPEND BDEV_GPU_LIBS ctp::cuda_cxx)
 elseif(WRP_CORE_ENABLE_ROCM)
-  list(APPEND BDEV_GPU_LIBS hshm::rocm_cxx)
+  list(APPEND BDEV_GPU_LIBS ctp::rocm_cxx)
 endif()
 
-# Client library — hshm::aio provides async I/O headers via its INTERFACE includes
+# Client library — ctp::aio provides async I/O headers via its INTERFACE includes
 add_chimod_client(
   SOURCES
     src/bdev_client.cc
   LINK_LIBRARIES
     chimaera_admin_client
-    hshm::aio
+    ctp::aio
     ${BDEV_OPTIONAL_LIBS}
 )
 
@@ -31,7 +31,7 @@ add_chimod_runtime(
     src/autogen/bdev_lib_exec.cc
   LINK_LIBRARIES
     chimaera_admin_runtime
-    hshm::aio
+    ctp::aio
     ${BDEV_OPTIONAL_LIBS}
     ${BDEV_GPU_LIBS}
 )
@@ -48,7 +48,7 @@ add_chimod_runtime(
 #   endif()
 #
 # Until then, the kHbm bdev path under SYCL is compiled out by the
-# `#if HSHM_ENABLE_SYCL && !(CUDA||ROCM)` guard in src/bdev_runtime.cc.
+# `#if CTP_ENABLE_SYCL && !(CUDA||ROCM)` guard in src/bdev_runtime.cc.
 
 # Unit tests
 if(WRP_CORE_ENABLE_TESTS)

@@ -47,7 +47,7 @@ class WrpCteLibfuse(Service):
 
     def _configure(self, **kwargs):
         super()._configure(**kwargs)
-        self.setenv('HSHM_LOG_LEVEL', self.config['log_level'])
+        self.setenv('CTP_LOG_LEVEL', self.config['log_level'])
         self.setenv('CHI_WITH_RUNTIME', '0')
 
     def start(self):

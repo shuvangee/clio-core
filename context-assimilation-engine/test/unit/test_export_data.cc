@@ -144,7 +144,7 @@ class ExportDataFixture {
 
 // ---------------------------------------------------------------------------
 // ExportDataTask struct tests
-// (require runtime for HSHM_MALLOC, so all use ExportDataFixture)
+// (require runtime for CTP_MALLOC, so all use ExportDataFixture)
 // ---------------------------------------------------------------------------
 
 TEST_CASE("ExportData - Task default constructor", "[cae][export][task]") {
@@ -192,7 +192,7 @@ TEST_CASE("ExportData - Task Copy", "[cae][export][task]") {
                                           "tag_copy", "/tmp/copy.bin", "binary");
   src->bytes_exported_ = 42;
   src->result_code_ = 7;
-  src->error_message_ = chi::priv::string("copy_err", HSHM_MALLOC);
+  src->error_message_ = chi::priv::string("copy_err", CTP_MALLOC);
 
   auto dst = ipc->NewTask<ExportDataTask>();
   dst->Copy(src);
@@ -250,7 +250,7 @@ TEST_CASE("ExportData - Task SerializeIn roundtrip", "[cae][export][task]") {
   // Write IN fields (tag_name_, output_path_, format_)
   std::vector<char> buf;
   {
-    hshm::ipc::GlobalSerialize<std::vector<char>> oa(buf);
+    ctp::ipc::GlobalSerialize<std::vector<char>> oa(buf);
     task->SerializeIn(oa);
     oa.Finalize();
   }
@@ -258,7 +258,7 @@ TEST_CASE("ExportData - Task SerializeIn roundtrip", "[cae][export][task]") {
   // Read them back into a fresh task
   auto t2 = ipc->NewTask<ExportDataTask>();
   {
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
     t2->SerializeIn(ia);
   }
 
@@ -278,19 +278,19 @@ TEST_CASE("ExportData - Task SerializeOut roundtrip", "[cae][export][task]") {
   auto task = ipc->NewTask<ExportDataTask>();
   task->result_code_ = 3;
   task->bytes_exported_ = 777;
-  task->error_message_ = chi::priv::string("err_msg", HSHM_MALLOC);
+  task->error_message_ = chi::priv::string("err_msg", CTP_MALLOC);
 
   // Write OUT fields (result_code_, error_message_, bytes_exported_)
   std::vector<char> buf;
   {
-    hshm::ipc::GlobalSerialize<std::vector<char>> oa(buf);
+    ctp::ipc::GlobalSerialize<std::vector<char>> oa(buf);
     task->SerializeOut(oa);
     oa.Finalize();
   }
 
   auto t2 = ipc->NewTask<ExportDataTask>();
   {
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
     t2->SerializeOut(ia);
   }
 
@@ -512,7 +512,7 @@ TEST_CASE("ParseOmni - Task Copy", "[cae][export][task]") {
                                          contexts);
   src->num_tasks_scheduled_ = 3;
   src->result_code_ = 2;
-  src->error_message_ = chi::priv::string("omni_err", HSHM_MALLOC);
+  src->error_message_ = chi::priv::string("omni_err", CTP_MALLOC);
 
   auto dst = ipc->NewTask<ParseOmniTask>();
   dst->Copy(src);
@@ -570,14 +570,14 @@ TEST_CASE("ParseOmni - Task SerializeIn roundtrip", "[cae][export][task]") {
 
   std::vector<char> buf;
   {
-    hshm::ipc::GlobalSerialize<std::vector<char>> oa(buf);
+    ctp::ipc::GlobalSerialize<std::vector<char>> oa(buf);
     task->SerializeIn(oa);
     oa.Finalize();
   }
 
   auto t2 = ipc->NewTask<ParseOmniTask>();
   {
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
     t2->SerializeIn(ia);
   }
 
@@ -595,18 +595,18 @@ TEST_CASE("ParseOmni - Task SerializeOut roundtrip", "[cae][export][task]") {
   auto task = ipc->NewTask<ParseOmniTask>();
   task->num_tasks_scheduled_ = 7;
   task->result_code_ = 4;
-  task->error_message_ = chi::priv::string("out_err", HSHM_MALLOC);
+  task->error_message_ = chi::priv::string("out_err", CTP_MALLOC);
 
   std::vector<char> buf;
   {
-    hshm::ipc::GlobalSerialize<std::vector<char>> oa(buf);
+    ctp::ipc::GlobalSerialize<std::vector<char>> oa(buf);
     task->SerializeOut(oa);
     oa.Finalize();
   }
 
   auto t2 = ipc->NewTask<ParseOmniTask>();
   {
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
     t2->SerializeOut(ia);
   }
 
@@ -671,7 +671,7 @@ TEST_CASE("ProcessHdf5Dataset - Task Copy", "[cae][export][task]") {
                                                    "/ds",
                                                    "prefix_x");
   src->result_code_ = 5;
-  src->error_message_ = chi::priv::string("hdf5_err", HSHM_MALLOC);
+  src->error_message_ = chi::priv::string("hdf5_err", CTP_MALLOC);
 
   auto dst = ipc->NewTask<ProcessHdf5DatasetTask>();
   dst->Copy(src);
@@ -697,14 +697,14 @@ TEST_CASE("ProcessHdf5Dataset - Task Aggregate keeps first error",
                                                     chi::PoolQuery::Local(),
                                                     "/f1.h5", "/d1", "p1");
   orig->result_code_ = -1;
-  orig->error_message_ = chi::priv::string("first_err", HSHM_MALLOC);
+  orig->error_message_ = chi::priv::string("first_err", CTP_MALLOC);
 
   auto rep = ipc->NewTask<ProcessHdf5DatasetTask>(chi::CreateTaskId(),
                                                    wrp_cae::core::kCaePoolId,
                                                    chi::PoolQuery::Local(),
                                                    "/f2.h5", "/d2", "p2");
   rep->result_code_ = -2;
-  rep->error_message_ = chi::priv::string("second_err", HSHM_MALLOC);
+  rep->error_message_ = chi::priv::string("second_err", CTP_MALLOC);
 
   // orig already has error → keeps its own error, does not overwrite
   orig->Aggregate(rep.template Cast<chi::Task>());
@@ -733,7 +733,7 @@ TEST_CASE("ProcessHdf5Dataset - Task Aggregate adopts replica error",
                                                    chi::PoolQuery::Local(),
                                                    "/f4.h5", "/d4", "p4");
   rep->result_code_ = -3;
-  rep->error_message_ = chi::priv::string("rep_err", HSHM_MALLOC);
+  rep->error_message_ = chi::priv::string("rep_err", CTP_MALLOC);
 
   // orig has no error → adopts replica's error
   orig->Aggregate(rep.template Cast<chi::Task>());
@@ -759,14 +759,14 @@ TEST_CASE("ProcessHdf5Dataset - Task SerializeIn roundtrip",
                                                     "ser_prefix");
   std::vector<char> buf;
   {
-    hshm::ipc::GlobalSerialize<std::vector<char>> oa(buf);
+    ctp::ipc::GlobalSerialize<std::vector<char>> oa(buf);
     task->SerializeIn(oa);
     oa.Finalize();
   }
 
   auto t2 = ipc->NewTask<ProcessHdf5DatasetTask>();
   {
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
     t2->SerializeIn(ia);
   }
 
@@ -786,18 +786,18 @@ TEST_CASE("ProcessHdf5Dataset - Task SerializeOut roundtrip",
   auto *ipc = CHI_IPC;
   auto task = ipc->NewTask<ProcessHdf5DatasetTask>();
   task->result_code_ = 8;
-  task->error_message_ = chi::priv::string("ds_err", HSHM_MALLOC);
+  task->error_message_ = chi::priv::string("ds_err", CTP_MALLOC);
 
   std::vector<char> buf;
   {
-    hshm::ipc::GlobalSerialize<std::vector<char>> oa(buf);
+    ctp::ipc::GlobalSerialize<std::vector<char>> oa(buf);
     task->SerializeOut(oa);
     oa.Finalize();
   }
 
   auto t2 = ipc->NewTask<ProcessHdf5DatasetTask>();
   {
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ia(buf);
     t2->SerializeOut(ia);
   }
 

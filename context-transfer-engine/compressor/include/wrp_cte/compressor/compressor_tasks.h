@@ -239,7 +239,7 @@ struct DynamicScheduleTask : public chi::Task {
   // SHM constructor
   DynamicScheduleTask()
       : chi::Task(), tag_id_(wrp_cte::core::TagId::GetNull()),
-        blob_name_(HSHM_MALLOC), offset_(0), size_(0),
+        blob_name_(CTP_MALLOC), offset_(0), size_(0),
         blob_data_(hipc::ShmPtr<>::GetNull()), score_(0.5f),
         context_(), flags_(0), core_pool_id_(chi::PoolId::GetNull()),
         tier_score_(0.0f) {}
@@ -256,7 +256,7 @@ struct DynamicScheduleTask : public chi::Task {
                                chi::u32 flags,
                                const chi::PoolId &core_pool_id)
       : chi::Task(task_id, pool_id, pool_query, Method::kDynamicSchedule),
-        tag_id_(tag_id), blob_name_(HSHM_MALLOC, blob_name),
+        tag_id_(tag_id), blob_name_(CTP_MALLOC, blob_name),
         offset_(offset), size_(size), blob_data_(blob_data), score_(score),
         context_(context), flags_(flags), core_pool_id_(core_pool_id),
         tier_score_(0.0f) {}
@@ -312,7 +312,7 @@ struct CompressTask : public chi::Task {
   // SHM constructor
   CompressTask()
       : chi::Task(), tag_id_(wrp_cte::core::TagId::GetNull()),
-        blob_name_(HSHM_MALLOC), offset_(0), size_(0),
+        blob_name_(CTP_MALLOC), offset_(0), size_(0),
         blob_data_(hipc::ShmPtr<>::GetNull()), score_(0.5f),
         context_(), flags_(0), core_pool_id_(chi::PoolId::GetNull()),
         tier_score_(0.0f) {}
@@ -329,7 +329,7 @@ struct CompressTask : public chi::Task {
                         chi::u32 flags,
                         const chi::PoolId &core_pool_id)
       : chi::Task(task_id, pool_id, pool_query, Method::kCompress),
-        tag_id_(tag_id), blob_name_(HSHM_MALLOC, blob_name),
+        tag_id_(tag_id), blob_name_(CTP_MALLOC, blob_name),
         offset_(offset), size_(size), blob_data_(blob_data), score_(score),
         context_(context), flags_(flags), core_pool_id_(core_pool_id),
         tier_score_(0.0f) {}
@@ -384,7 +384,7 @@ struct DecompressTask : public chi::Task {
   // SHM constructor
   DecompressTask()
       : chi::Task(), tag_id_(wrp_cte::core::TagId::GetNull()),
-        blob_name_(HSHM_MALLOC), offset_(0), size_(0), flags_(0),
+        blob_name_(CTP_MALLOC), offset_(0), size_(0), flags_(0),
         blob_data_(hipc::ShmPtr<>::GetNull()),
         core_pool_id_(chi::PoolId::GetNull()),
         output_size_(0), decompress_time_ms_(0.0) {}
@@ -399,7 +399,7 @@ struct DecompressTask : public chi::Task {
                           chi::u32 flags, hipc::ShmPtr<> blob_data,
                           const chi::PoolId &core_pool_id)
       : chi::Task(task_id, pool_id, pool_query, Method::kDecompress),
-        tag_id_(tag_id), blob_name_(HSHM_MALLOC, blob_name),
+        tag_id_(tag_id), blob_name_(CTP_MALLOC, blob_name),
         offset_(offset), size_(size), flags_(flags), blob_data_(blob_data),
         core_pool_id_(core_pool_id),
         output_size_(0), decompress_time_ms_(0.0) {}

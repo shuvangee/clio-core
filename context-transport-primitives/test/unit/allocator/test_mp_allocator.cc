@@ -36,7 +36,7 @@
 #include "hermes_shm/memory/backend/posix_mmap.h"
 #include "hermes_shm/memory/allocator/mp_allocator.h"
 
-using hshm::testing::AllocatorTest;
+using ctp::testing::AllocatorTest;
 
 TEST_CASE("ProducerConsumerAllocator - Allocate and Free Immediate", "[ProducerConsumerAllocator]") {
   hipc::PosixMmap backend;

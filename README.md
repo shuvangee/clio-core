@@ -301,7 +301,7 @@ target_link_libraries(my_app
 **What `find_package(iowarp-core)` provides:**
 
 *Core Components:*
-- All `hshm::*` modular targets (cxx, configure, serialize, interceptor, lightbeam, thread_all, mpi, compress, encrypt)
+- All `ctp::*` modular targets (cxx, configure, serialize, interceptor, lightbeam, thread_all, mpi, compress, encrypt)
 - `chimaera::cxx` (core runtime library)
 - ChiMod build utilities
 

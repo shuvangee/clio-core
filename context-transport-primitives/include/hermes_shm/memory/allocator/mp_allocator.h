@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_MEMORY_ALLOCATOR_MP_ALLOCATOR_H_
-#define HSHM_MEMORY_ALLOCATOR_MP_ALLOCATOR_H_
+#ifndef CTP_MEMORY_ALLOCATOR_MP_ALLOCATOR_H_
+#define CTP_MEMORY_ALLOCATOR_MP_ALLOCATOR_H_
 
 #include "hermes_shm/memory/allocator/allocator.h"
 #include "hermes_shm/memory/allocator/buddy_allocator.h"
@@ -44,7 +44,7 @@
 #include <unistd.h>
 #endif
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Forward declarations
@@ -125,7 +125,7 @@ class PcThreadBlock : public pre::slist_node {
 class _ProducerConsumerAllocator : public Allocator {
  public:
   int tid_count_;               /**< Number of thread blocks allocated */
-  hshm::Mutex lock_;            /**< Mutex protecting global allocator */
+  ctp::Mutex lock_;            /**< Mutex protecting global allocator */
   ThreadLocalKey tblock_key_;   /**< TLS key for PcThreadBlock* */
   size_t thread_unit_;          /**< Default PcThreadBlock expansion size */
   BuddyAllocator alloc_;        /**< Global buddy allocator */
@@ -158,7 +158,7 @@ class _ProducerConsumerAllocator : public Allocator {
 
     // Set up TLS key
     void *null_ptr = nullptr;
-    if (!HSHM_THREAD_MODEL->CreateTls<void>(tblock_key_, null_ptr)) {
+    if (!CTP_THREAD_MODEL->CreateTls<void>(tblock_key_, null_ptr)) {
       return false;
     }
 
@@ -211,7 +211,7 @@ class _ProducerConsumerAllocator : public Allocator {
    */
   PcThreadBlock* EnsureTls() {
     // Check if we already have a PcThreadBlock in TLS
-    void *tblock_data = HSHM_THREAD_MODEL->GetTls<void>(tblock_key_);
+    void *tblock_data = CTP_THREAD_MODEL->GetTls<void>(tblock_key_);
     if (tblock_data != nullptr) {
       return reinterpret_cast<PcThreadBlock*>(tblock_data);
     }
@@ -229,7 +229,7 @@ class _ProducerConsumerAllocator : public Allocator {
     // Initialize PcThreadBlock and store in TLS
     int tid = tid_count_++;
     tblock_ptr.ptr_->shm_init(GetBackend(), thread_unit_, tid);
-    HSHM_THREAD_MODEL->SetTls<void>(
+    CTP_THREAD_MODEL->SetTls<void>(
         tblock_key_, reinterpret_cast<void*>(tblock_ptr.ptr_));
     return tblock_ptr.ptr_;
   }
@@ -268,7 +268,7 @@ class _ProducerConsumerAllocator : public Allocator {
   OffsetPtr<> ReallocateOffsetNoNullCheck(OffsetPtr<> p, size_t new_size) {
     (void)p;
     (void)new_size;
-    HSHM_THROW_ERROR(NOT_IMPLEMENTED,
+    CTP_THROW_ERROR(NOT_IMPLEMENTED,
                      "ProducerConsumerAllocator does not support reallocation");
     return OffsetPtr<>();
   }
@@ -374,6 +374,6 @@ class _ProducerConsumerAllocator : public Allocator {
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_MEMORY_ALLOCATOR_MP_ALLOCATOR_H_
+#endif  // CTP_MEMORY_ALLOCATOR_MP_ALLOCATOR_H_

@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_ERROR_H
-#define HSHM_ERROR_H
+#ifndef CTP_ERROR_H
+#define CTP_ERROR_H
 
 // #ifdef __cplusplus
 
@@ -43,11 +43,11 @@
 
 #include "hermes_shm/util/formatter.h"
 
-#define HSHM_ERROR_TYPE std::shared_ptr<hshm::Error>
-#define HSHM_ERROR_HANDLE_START() try {
-#define HSHM_ERROR_HANDLE_END()         \
+#define CTP_ERROR_TYPE std::shared_ptr<ctp::Error>
+#define CTP_ERROR_HANDLE_START() try {
+#define CTP_ERROR_HANDLE_END()         \
   }                                     \
-  catch (HSHM_ERROR_TYPE & err) {       \
+  catch (CTP_ERROR_TYPE & err) {       \
     err->print();                       \
     exit(-1024);                        \
   }                                     \
@@ -55,25 +55,25 @@
     std::cerr << e.what() << std::endl; \
     exit(-1024);                        \
   }
-#define HSHM_ERROR_HANDLE_TRY try
-#define HSHM_ERROR_PTR err
-#define HSHM_ERROR_HANDLE_CATCH catch (HSHM_ERROR_TYPE & HSHM_ERROR_PTR)
-#define HSHM_ERROR_IS(err, check) (err->get_code() == check.get_code())
+#define CTP_ERROR_HANDLE_TRY try
+#define CTP_ERROR_PTR err
+#define CTP_ERROR_HANDLE_CATCH catch (CTP_ERROR_TYPE & CTP_ERROR_PTR)
+#define CTP_ERROR_IS(err, check) (err->get_code() == check.get_code())
 
 // Exceptions are unsupported in any GPU device pass (CUDA __device__,
-// HIP __device__, and SYCL kernels). HSHM_IS_DEVICE_PASS is the union
-// of HSHM_IS_GPU and HSHM_IS_SYCL_DEVICE — using it here keeps DPC++'s
+// HIP __device__, and SYCL kernels). CTP_IS_DEVICE_PASS is the union
+// of CTP_IS_GPU and CTP_IS_SYCL_DEVICE — using it here keeps DPC++'s
 // SYCL device pass from parsing through `throw` into <stdexcept> and
 // the libstdc++ exception class hierarchy.
-#if !HSHM_IS_DEVICE_PASS
-#define HSHM_THROW_ERROR(CODE, ...) throw CODE.format(__VA_ARGS__)
-#define HSHM_THROW_STD_ERROR(...) throw std::runtime_error(__VA_ARGS__);
+#if !CTP_IS_DEVICE_PASS
+#define CTP_THROW_ERROR(CODE, ...) throw CODE.format(__VA_ARGS__)
+#define CTP_THROW_STD_ERROR(...) throw std::runtime_error(__VA_ARGS__);
 #else
-#define HSHM_THROW_ERROR(CODE, ...)
-#define HSHM_THROW_STD_ERROR(...)
+#define CTP_THROW_ERROR(CODE, ...)
+#define CTP_THROW_STD_ERROR(...)
 #endif
 
-namespace hshm {
+namespace ctp {
 
 class Error : std::exception {
  private:
@@ -98,8 +98,8 @@ class Error : std::exception {
   void print() { std::cout << what() << std::endl; }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
 // #endif
 
-#endif  // HSHM_ERROR_H
+#endif  // CTP_ERROR_H

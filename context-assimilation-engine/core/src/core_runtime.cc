@@ -105,7 +105,7 @@ chi::TaskResume Runtime::ParseOmni(hipc::FullPtr<ParseOmniTask> task,
   try {
     std::string data = task->serialized_ctx_.str();
     std::vector<char> buf(data.begin(), data.end());
-    hshm::ipc::GlobalDeserialize<std::vector<char>> ar(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> ar(buf);
     ar(assimilation_contexts);
   } catch (const std::exception& e) {
     HLOG(kError, "ParseOmni: Failed to deserialize AssimilationCtx vector: {}",
@@ -193,7 +193,7 @@ chi::TaskResume Runtime::ProcessHdf5Dataset(
          task->file_path_.str());
     task->result_code_ = -1;
     task->error_message_ =
-        chi::priv::string("Failed to open HDF5 file", HSHM_MALLOC);
+        chi::priv::string("Failed to open HDF5 file", CTP_MALLOC);
     CHI_CO_RETURN;
   }
 
@@ -212,7 +212,7 @@ chi::TaskResume Runtime::ProcessHdf5Dataset(
          task->dataset_path_.str(), result);
     task->result_code_ = result;
     task->error_message_ =
-        chi::priv::string("Dataset processing failed", HSHM_MALLOC);
+        chi::priv::string("Dataset processing failed", CTP_MALLOC);
   } else {
     HLOG(kInfo, "ProcessHdf5Dataset: Successfully processed dataset '{}'",
          task->dataset_path_.str());
@@ -221,7 +221,7 @@ chi::TaskResume Runtime::ProcessHdf5Dataset(
 #else
   task->result_code_ = -1;
   task->error_message_ =
-      chi::priv::string("HDF5 support not compiled in", HSHM_MALLOC);
+      chi::priv::string("HDF5 support not compiled in", CTP_MALLOC);
 #endif
   CHI_CO_RETURN;
   CHI_TASK_BODY_END
@@ -252,7 +252,7 @@ chi::TaskResume Runtime::ExportData(hipc::FullPtr<ExportDataTask> task,
   if (tag_id.IsNull()) {
     HLOG(kError, "ExportData: tag '{}' not found", tag_name);
     task->result_code_ = -1;
-    task->error_message_ = chi::priv::string("Tag not found", HSHM_MALLOC);
+    task->error_message_ = chi::priv::string("Tag not found", CTP_MALLOC);
     CHI_CO_RETURN;
   }
 
@@ -274,7 +274,7 @@ chi::TaskResume Runtime::ExportData(hipc::FullPtr<ExportDataTask> task,
       HLOG(kError, "ExportData: failed to create HDF5 file '{}'", output_path);
       task->result_code_ = -2;
       task->error_message_ =
-          chi::priv::string("Failed to create HDF5 file", HSHM_MALLOC);
+          chi::priv::string("Failed to create HDF5 file", CTP_MALLOC);
       CHI_CO_RETURN;
     }
 
@@ -319,7 +319,7 @@ chi::TaskResume Runtime::ExportData(hipc::FullPtr<ExportDataTask> task,
 #else
     task->result_code_ = -3;
     task->error_message_ =
-        chi::priv::string("HDF5 support not compiled in", HSHM_MALLOC);
+        chi::priv::string("HDF5 support not compiled in", CTP_MALLOC);
 #endif
   } else {
     // Binary format: sequential blob data with a simple header per blob
@@ -328,7 +328,7 @@ chi::TaskResume Runtime::ExportData(hipc::FullPtr<ExportDataTask> task,
       HLOG(kError, "ExportData: failed to open '{}' for writing", output_path);
       task->result_code_ = -2;
       task->error_message_ =
-          chi::priv::string("Failed to open output file", HSHM_MALLOC);
+          chi::priv::string("Failed to open output file", CTP_MALLOC);
       CHI_CO_RETURN;
     }
 

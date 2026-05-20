@@ -200,12 +200,12 @@ void LocalScheduler::AdjustPolling(RunContext *run_ctx) {
 }
 
 u32 LocalScheduler::MapByPidTid(u32 num_lanes) {
-  auto *sys_info = HSHM_SYSTEM_INFO;
+  auto *sys_info = CTP_SYSTEM_INFO;
   pid_t pid = sys_info->pid_;
-  auto tid = HSHM_THREAD_MODEL->GetTid();
+  auto tid = CTP_THREAD_MODEL->GetTid();
 
   size_t combined_hash =
-      std::hash<pid_t>{}(pid) ^ (std::hash<hshm::u64>{}(tid.tid_) << 1);
+      std::hash<pid_t>{}(pid) ^ (std::hash<ctp::u64>{}(tid.tid_) << 1);
   return static_cast<u32>(combined_hash % num_lanes);
 }
 

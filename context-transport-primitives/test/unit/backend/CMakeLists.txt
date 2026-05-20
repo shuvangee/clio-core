@@ -12,7 +12,7 @@ if (WRP_CORE_ENABLE_MPI)
             memory_slots.cc)
     add_dependencies(test_backend_exec hermes_shm_host)
     target_link_libraries(test_backend_exec
-            hermes_shm_host Catch2::Catch2 hshm::mpi)
+            hermes_shm_host Catch2::Catch2 ctp::mpi)
 
     #------------------------------------------------------------------------------
     # Test Cases

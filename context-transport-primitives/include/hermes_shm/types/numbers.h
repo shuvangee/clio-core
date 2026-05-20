@@ -31,19 +31,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_TYPES_NUMBERS_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_TYPES_NUMBERS_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_TYPES_NUMBERS_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_TYPES_NUMBERS_H_
 
 #include <cstddef>
 #include <cstdint>
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
 #include <iostream>
 #endif
 #include <limits>
 
 #include "hermes_shm/constants/macros.h"
 
-namespace hshm {
+namespace ctp {
 
 typedef uint8_t u8;   /**< 8-bit unsigned integer */
 typedef uint16_t u16; /**< 16-bit unsigned integer */
@@ -66,42 +66,42 @@ typedef long long big_int;           /**< Long long */
 typedef unsigned long long big_uint; /**< Unsigned long long */
 
 struct ThreadId {
-  hshm::u64 tid_;
+  ctp::u64 tid_;
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   ThreadId() {}
 
-  HSHM_INLINE_CROSS_FUN
-  explicit ThreadId(hshm::u64 tid) : tid_(tid) {}
+  CTP_INLINE_CROSS_FUN
+  explicit ThreadId(ctp::u64 tid) : tid_(tid) {}
 
-  HSHM_INLINE_CROSS_FUN
-  static ThreadId GetNull() { return ThreadId{(hshm::u64)-1}; }
+  CTP_INLINE_CROSS_FUN
+  static ThreadId GetNull() { return ThreadId{(ctp::u64)-1}; }
 
-  HSHM_INLINE_CROSS_FUN
-  bool IsNull() const { return tid_ == (hshm::u64)-1; }
+  CTP_INLINE_CROSS_FUN
+  bool IsNull() const { return tid_ == (ctp::u64)-1; }
 
-  HSHM_INLINE_CROSS_FUN
-  void SetNull() { tid_ = (hshm::u64)-1; }
+  CTP_INLINE_CROSS_FUN
+  void SetNull() { tid_ = (ctp::u64)-1; }
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool operator==(const ThreadId &other) const { return tid_ == other.tid_; }
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool operator!=(const ThreadId &other) const { return tid_ != other.tid_; }
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool operator<(const ThreadId &other) const { return tid_ < other.tid_; }
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool operator>(const ThreadId &other) const { return tid_ > other.tid_; }
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool operator<=(const ThreadId &other) const { return tid_ <= other.tid_; }
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool operator>=(const ThreadId &other) const { return tid_ >= other.tid_; }
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   friend std::ostream &operator<<(std::ostream &os, const ThreadId &tid) {
     os << tid.tid_;
     return os;
@@ -109,7 +109,7 @@ struct ThreadId {
 #endif
 };
 
-#if HSHM_ENABLE_CUDA or HSHM_ENABLE_ROCM
+#if CTP_ENABLE_CUDA or CTP_ENABLE_ROCM
 typedef reg_int min_i16;
 typedef reg_int min_i32;
 typedef big_uint min_i64;
@@ -135,7 +135,7 @@ typedef u64 min_u64;
  * @param x The value to compute bit width for
  * @return Number of bits needed (0 for x == 0, floor(log2(x)) + 1 otherwise)
  */
-HSHM_INLINE_CROSS_FUN
+CTP_INLINE_CROSS_FUN
 static size_t BitWidth(size_t x) {
   size_t width = 0;
   while (x > 0) {
@@ -151,7 +151,7 @@ static size_t BitWidth(size_t x) {
  * @param x The value (must be > 0 for valid result)
  * @return floor(log2(x))
  */
-HSHM_INLINE_CROSS_FUN
+CTP_INLINE_CROSS_FUN
 static size_t FloorLog2(size_t x) {
   return BitWidth(x) - 1;
 }
@@ -162,7 +162,7 @@ static size_t FloorLog2(size_t x) {
  * @param x The value (must be > 0 for valid result)
  * @return ceil(log2(x)), or 0 if x <= 1
  */
-HSHM_INLINE_CROSS_FUN
+CTP_INLINE_CROSS_FUN
 static size_t CeilLog2(size_t x) {
   if (x <= 1) return 0;
   return BitWidth(x - 1);
@@ -219,56 +219,56 @@ typedef u32 DWORD;
 /** HANDLE type for windows compatability */
 typedef void *HANDLE;
 
-}  // namespace hshm
+}  // namespace ctp
 
 /** Bytes -> Bytes */
 #ifndef BYTES
-#define BYTES(n) (hshm::u64)((n) * (((hshm::u64)1) << 0))
+#define BYTES(n) (ctp::u64)((n) * (((ctp::u64)1) << 0))
 #endif
 
 /** KILOBYTES -> Bytes */
 #ifndef KILOBYTES
-#define KILOBYTES(n) (hshm::u64)((n) * (((hshm::u64)1) << 10))
+#define KILOBYTES(n) (ctp::u64)((n) * (((ctp::u64)1) << 10))
 #endif
 
 /** MEGABYTES -> Bytes */
 #ifndef MEGABYTES
-#define MEGABYTES(n) (hshm::u64)((n) * (((hshm::u64)1) << 20))
+#define MEGABYTES(n) (ctp::u64)((n) * (((ctp::u64)1) << 20))
 #endif
 
 /** GIGABYTES -> Bytes */
 #ifndef GIGABYTES
-#define GIGABYTES(n) (hshm::u64)((n) * (((hshm::u64)1) << 30))
+#define GIGABYTES(n) (ctp::u64)((n) * (((ctp::u64)1) << 30))
 #endif
 
 /** TERABYTES -> Bytes */
 #ifndef TERABYTES
-#define TERABYTES(n) (hshm::u64)((n) * (((hshm::u64)1) << 40))
+#define TERABYTES(n) (ctp::u64)((n) * (((ctp::u64)1) << 40))
 #endif
 
 /** PETABYTES -> Bytes */
 #ifndef PETABYTES
-#define PETABYTES(n) (hshm::u64)((n) * (((hshm::u64)1) << 50))
+#define PETABYTES(n) (ctp::u64)((n) * (((ctp::u64)1) << 50))
 #endif
 
 /** Seconds to nanoseconds */
 #ifndef SECONDS
-#define SECONDS(n) (hshm::u64)((n) * 1000000000)
+#define SECONDS(n) (ctp::u64)((n) * 1000000000)
 #endif
 
 /** Milliseconds to nanoseconds */
 #ifndef MILLISECONDS
-#define MILLISECONDS(n) (hshm::u64)((n) * 1000000)
+#define MILLISECONDS(n) (ctp::u64)((n) * 1000000)
 #endif
 
 /** Microseconds to nanoseconds */
 #ifndef MICROSECONDS
-#define MICROSECONDS(n) (hshm::u64)((n) * 1000)
+#define MICROSECONDS(n) (ctp::u64)((n) * 1000)
 #endif
 
 /** Nanoseconds to nanoseconds */
 #ifndef NANOSECONDS
-#define NANOSECONDS(n) (hshm::u64)(n)
+#define NANOSECONDS(n) (ctp::u64)(n)
 #endif
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_TYPES_NUMBERS_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_TYPES_NUMBERS_H_

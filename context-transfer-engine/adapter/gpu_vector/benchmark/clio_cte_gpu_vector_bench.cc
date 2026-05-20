@@ -38,7 +38,7 @@
  * expected count given the geometry.
  */
 
-#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#if (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL
 
 #include <chimaera/bdev/bdev_client.h>
 #include <chimaera/chimaera.h>
@@ -167,7 +167,7 @@ bool ParseOpts(int argc, char *argv[], BenchOpts &opts) {
 /** One-shot Chimaera + CTE pool + kRam bdev target setup. Host-only:
  *  AsyncCreate / AsyncRegisterTarget aren't visible in the GPU device
  *  pass (nvcc parses both passes for __global__-bearing TUs). */
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 void EnsureInit(const BenchOpts &opts, chi::u64 bdev_capacity_bytes) {
   std::fprintf(stderr, "[INIT] Starting Chimaera server\n");
   if (!chi::CHIMAERA_INIT(chi::ChimaeraMode::kServer)) {
@@ -216,7 +216,7 @@ void EnsureInit(const BenchOpts &opts, chi::u64 bdev_capacity_bytes) {
   std::this_thread::sleep_for(50ms);
   (void)opts;
 }
-#endif  // !HSHM_IS_DEVICE_PASS
+#endif  // !CTP_IS_DEVICE_PASS
 
 /** Compute the number of expected PutBlobs for the given geometry. */
 chi::u64 ExpectedPuts(chi::u32 nblocks, chi::u32 pages_per_block,
@@ -287,7 +287,7 @@ __global__ void BenchReadKernel(chi::IpcManagerGpuInfo info,
   (void)g_ipc_manager;
 }
 
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 
 /** Format a byte count as a human-friendly MiB / GiB string. */
 std::string FmtBytes(chi::u64 b) {
@@ -441,7 +441,7 @@ int main(int argc, char *argv[]) {
     long long r = 0;
     gv::VectorStats stats_r{};
     if (opts.do_read) {
-      auto *result = hshm::GpuApi::MallocHost<chi::u32>(
+      auto *result = ctp::GpuApi::MallocHost<chi::u32>(
           total_elems * sizeof(chi::u32));
       if (!result) {
         std::fprintf(stderr, "MallocHost(%llu B) returned nullptr\n",
@@ -459,7 +459,7 @@ int main(int argc, char *argv[]) {
       stats_r = vec.StatsSnapshot();
       std::fprintf(stderr, "[BENCH-DBG] iter %u: read done in %lld us\n",
                    it, r);
-      hshm::GpuApi::FreeHost(result);
+      ctp::GpuApi::FreeHost(result);
     }
     cudaStreamDestroy(user_stream);
 
@@ -582,10 +582,10 @@ int main(int argc, char *argv[]) {
 
 int main() { return 0; }
 
-#endif  // !HSHM_IS_DEVICE_PASS
+#endif  // !CTP_IS_DEVICE_PASS
 
 #else
 
 int main() { return 0; }
 
-#endif  // (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#endif  // (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL

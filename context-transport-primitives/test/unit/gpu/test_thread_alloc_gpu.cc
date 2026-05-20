@@ -46,8 +46,8 @@
 #include "hermes_shm/util/gpu_api.h"
 
 using hipc::PartitionedAllocator;
-using hshm::ipc::GpuShmMmap;
-using hshm::ipc::MemoryBackendId;
+using ctp::ipc::GpuShmMmap;
+using ctp::ipc::MemoryBackendId;
 
 /**
  * Init kernel: initialize the ThreadAllocator on GPU-accessible memory.
@@ -59,15 +59,15 @@ __global__ void ThreadAllocInitKernel(
     hipc::MemoryBackendId backend_id,
     int max_threads) {
 
-  auto *alloc = reinterpret_cast<hshm::ipc::_PartitionedAllocator*>(backend_base);
-  new (alloc) hshm::ipc::_PartitionedAllocator();
+  auto *alloc = reinterpret_cast<ctp::ipc::_PartitionedAllocator*>(backend_base);
+  new (alloc) ctp::ipc::_PartitionedAllocator();
 
   hipc::MemoryBackend sub_backend;
   sub_backend.data_ = backend_base;
   sub_backend.data_capacity_ = data_capacity;
   sub_backend.id_ = backend_id;
 
-  size_t thread_unit = (data_capacity - sizeof(hshm::ipc::_PartitionedAllocator)) /
+  size_t thread_unit = (data_capacity - sizeof(ctp::ipc::_PartitionedAllocator)) /
                        max_threads;
   alloc->shm_init(sub_backend, 0, max_threads, thread_unit);
 }
@@ -76,12 +76,12 @@ __global__ void ThreadAllocInitKernel(
  * 128-byte POD struct for testing.
  */
 struct TestObj128 {
-  hshm::u32 magic0_;
+  ctp::u32 magic0_;
   char body_[120];
-  hshm::u32 magic1_;
+  ctp::u32 magic1_;
 
-  HSHM_INLINE_CROSS_FUN void Init(hshm::u32 tid, hshm::u32 idx) {
-    hshm::u32 m = (tid << 16) | (idx & 0xFFFFu);
+  CTP_INLINE_CROSS_FUN void Init(ctp::u32 tid, ctp::u32 idx) {
+    ctp::u32 m = (tid << 16) | (idx & 0xFFFFu);
     magic0_ = m;
     magic1_ = ~m;
     for (int i = 0; i < 120; ++i) {
@@ -89,8 +89,8 @@ struct TestObj128 {
     }
   }
 
-  HSHM_INLINE_CROSS_FUN bool Check(hshm::u32 tid, hshm::u32 idx) const {
-    hshm::u32 m = (tid << 16) | (idx & 0xFFFFu);
+  CTP_INLINE_CROSS_FUN bool Check(ctp::u32 tid, ctp::u32 idx) const {
+    ctp::u32 m = (tid << 16) | (idx & 0xFFFFu);
     if (magic0_ != m) return false;
     if (magic1_ != ~m) return false;
     for (int i = 0; i < 120; ++i) {
@@ -115,7 +115,7 @@ __global__ void ThreadAllocWorkKernel(
     int *d_results) {
 
   int tid = static_cast<int>(blockIdx.x);
-  auto *alloc = reinterpret_cast<hshm::ipc::_PartitionedAllocator*>(backend_base);
+  auto *alloc = reinterpret_cast<ctp::ipc::_PartitionedAllocator*>(backend_base);
 
   // Lazily initialize this thread's partition
   if (!alloc->LazyInitThread(tid)) {
@@ -133,11 +133,11 @@ __global__ void ThreadAllocWorkKernel(
 
     auto *obj = reinterpret_cast<TestObj128*>(
         backend_base + off.load());
-    obj->Init(static_cast<hshm::u32>(tid),
-              static_cast<hshm::u32>(count));
+    obj->Init(static_cast<ctp::u32>(tid),
+              static_cast<ctp::u32>(count));
 
-    if (!obj->Check(static_cast<hshm::u32>(tid),
-                    static_cast<hshm::u32>(count))) {
+    if (!obj->Check(static_cast<ctp::u32>(tid),
+                    static_cast<ctp::u32>(count))) {
       d_results[tid] = -2;
       return;
     }
@@ -174,7 +174,7 @@ __global__ void CrossBlockAllocKernel(
   int tid = static_cast<int>(blockIdx.x);
   if (tid != 0) return;
 
-  auto *alloc = reinterpret_cast<hshm::ipc::_PartitionedAllocator*>(backend_base);
+  auto *alloc = reinterpret_cast<ctp::ipc::_PartitionedAllocator*>(backend_base);
   if (!alloc->LazyInitThread(0)) {
     d_results[0] = -1;
     return;
@@ -187,7 +187,7 @@ __global__ void CrossBlockAllocKernel(
     if (off.IsNull()) break;
 
     auto *obj = reinterpret_cast<TestObj128*>(backend_base + off.load());
-    obj->Init(0, static_cast<hshm::u32>(i));
+    obj->Init(0, static_cast<ctp::u32>(i));
     d_offsets[i] = off.load();
     ++count;
   }
@@ -204,14 +204,14 @@ __global__ void CrossBlockFreeKernel(
   int tid = static_cast<int>(blockIdx.x);
   if (tid != 1) return;
 
-  auto *alloc = reinterpret_cast<hshm::ipc::_PartitionedAllocator*>(backend_base);
+  auto *alloc = reinterpret_cast<ctp::ipc::_PartitionedAllocator*>(backend_base);
 
   int count = 0;
   for (int i = 0; i < num_to_free; ++i) {
     hipc::OffsetPtr<> off(d_offsets[i]);
     // Verify data before freeing
     auto *obj = reinterpret_cast<TestObj128*>(backend_base + off.load());
-    if (!obj->Check(0, static_cast<hshm::u32>(i))) {
+    if (!obj->Check(0, static_cast<ctp::u32>(i))) {
       d_results[3] = -2;
       return;
     }
@@ -229,7 +229,7 @@ __global__ void CrossBlockReallocKernel(
   int tid = static_cast<int>(blockIdx.x);
   if (tid != 0) return;
 
-  auto *alloc = reinterpret_cast<hshm::ipc::_PartitionedAllocator*>(backend_base);
+  auto *alloc = reinterpret_cast<ctp::ipc::_PartitionedAllocator*>(backend_base);
   if (!alloc->LazyInitThread(0)) {
     d_results[2] = -1;
     return;
@@ -242,9 +242,9 @@ __global__ void CrossBlockReallocKernel(
     if (off.IsNull()) break;
 
     auto *obj = reinterpret_cast<TestObj128*>(backend_base + off.load());
-    obj->Init(99, static_cast<hshm::u32>(i));
+    obj->Init(99, static_cast<ctp::u32>(i));
 
-    if (!obj->Check(99, static_cast<hshm::u32>(i))) {
+    if (!obj->Check(99, static_cast<ctp::u32>(i))) {
       d_results[3] = -2;
       return;
     }

@@ -277,7 +277,7 @@ public:
 
 /** Simplify access to the stateless StdioFs Singleton */
 #define WRP_CTE_STDIO_FS                                                        \
-  hshm::Singleton<::clio::cae::StdioFs>::GetInstance()
+  ctp::Singleton<::clio::cae::StdioFs>::GetInstance()
 #define WRP_CTE_STDIO_FS_T clio::cae::StdioFs *
 
 } // namespace clio::cae

@@ -40,7 +40,7 @@
 #include "chimaera/gpu/future.h"
 #include "chimaera/ipc/ipc_gpu2cpu.h"
 
-#if HSHM_ENABLE_GPU
+#if CTP_ENABLE_GPU
 
 #include <memory>
 #include <unordered_map>
@@ -80,15 +80,15 @@ class IpcManager {
   // Device-side GPU thread topology helpers
   // ================================================================
 
-#if HSHM_IS_GPU_COMPILER
-  static HSHM_GPU_FUN inline int GetGpuThreadId() {
+#if CTP_IS_GPU_COMPILER
+  static CTP_GPU_FUN inline int GetGpuThreadId() {
     return threadIdx.x + threadIdx.y * blockDim.x +
            threadIdx.z * blockDim.x * blockDim.y;
   }
-  static HSHM_GPU_FUN inline int GetGpuNumThreads() {
+  static CTP_GPU_FUN inline int GetGpuNumThreads() {
     return blockDim.x * blockDim.y * blockDim.z;
   }
-#elif HSHM_IS_SYCL_COMPILER
+#elif CTP_IS_SYCL_COMPILER
   /** SYCL: producer kernels run as q.single_task — topology is constant. */
   static inline int GetGpuThreadId() { return 0; }
   static inline int GetGpuNumThreads() { return 1; }
@@ -102,7 +102,7 @@ class IpcManager {
    * Initialize the per-block IpcManager from the host-supplied gpu_info.
    * Called by the CHIMAERA_GPU_INIT macro at kernel entry.
    */
-  HSHM_GPU_FUN void ClientInitGpu(const IpcManagerGpuInfo &gpu_info) {
+  CTP_GPU_FUN void ClientInitGpu(const IpcManagerGpuInfo &gpu_info) {
     gpu_info_ = gpu_info;
   }
 
@@ -119,9 +119,9 @@ class IpcManager {
    * receive an empty future (mirrors today's threadIdx==0 guard).
    */
   template <typename TaskT>
-  HSHM_CROSS_FUN gpu::Future<TaskT> Send(
+  CTP_CROSS_FUN gpu::Future<TaskT> Send(
       const hipc::FullPtr<TaskT> &task_ptr) {
-#if HSHM_IS_GPU || HSHM_IS_SYCL_DEVICE
+#if CTP_IS_GPU || CTP_IS_SYCL_DEVICE
     return IpcGpu2Cpu::ClientSend(this, task_ptr);
 #else
     (void)task_ptr;
@@ -129,7 +129,7 @@ class IpcManager {
 #endif
   }
 
-#if HSHM_IS_GPU_COMPILER
+#if CTP_IS_GPU_COMPILER
   /**
    * CUDA/ROCm only: per-block IpcManager lives in __shared__ storage so
    * helpers reachable from the kernel (e.g. IpcGpu2Cpu::ClientSend) can
@@ -137,15 +137,15 @@ class IpcManager {
    * kernel-scope local + `g_ipc_manager_ptr` name-lookup trick (see the
    * SYCL CHIMAERA_GPU_INIT macro below).
    */
-  static HSHM_GPU_FUN __noinline__ IpcManager *GetBlockIpcManager() {
+  static CTP_GPU_FUN __noinline__ IpcManager *GetBlockIpcManager() {
     __shared__ char s_ipc_bytes[sizeof(IpcManager)];
     return reinterpret_cast<IpcManager *>(s_ipc_bytes);
   }
-#endif  // HSHM_IS_GPU_COMPILER
+#endif  // CTP_IS_GPU_COMPILER
 
   /** Kind of memory a client-registered backend lives in. Visible from
    *  both host and device passes so chi::IpcManager helper signatures can
-   *  reference it without HSHM_IS_HOST gating. */
+   *  reference it without CTP_IS_HOST gating. */
   enum class MemKind : unsigned char {
     kPinnedHost = 0,    ///< cudaHostAlloc / hipHostMalloc / sycl::malloc_host
     kManagedUvm = 1,    ///< cudaMallocManaged / hipMallocManaged / sycl::malloc_shared
@@ -162,7 +162,7 @@ class IpcManager {
   // Host-only: per-device queues + client backend registration
   // ================================================================
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
 
   /** Registration record for a client-owned device-memory backend. */
   struct ClientBackend {
@@ -247,7 +247,7 @@ class IpcManager {
     return &it->second;
   }
 
-#endif  // HSHM_IS_HOST
+#endif  // CTP_IS_HOST
 
   IpcManager() = default;
   ~IpcManager() = default;
@@ -264,13 +264,13 @@ class IpcManager {
 // ================================================================
 //
 // CUDA/ROCm: per-block IpcManager lives in __shared__ storage so any
-// HSHM_GPU_FUN helper reachable from the kernel can look it up via
+// CTP_GPU_FUN helper reachable from the kernel can look it up via
 // CHI_IPC = GetBlockIpcManager(). SYCL: kernel functor captures a
 // pointer to a host-allocated USM IpcManager; the macro names that
 // pointer `g_ipc_manager_ptr` so the SYCL CHI_IPC macro (in ipc_manager.h)
 // can resolve it via plain C++ name lookup.
 
-#if HSHM_IS_SYCL_COMPILER
+#if CTP_IS_SYCL_COMPILER
 
 #define CHIMAERA_GPU_INIT(gpu_info, ipc_ptr)                                  \
   chi::gpu::IpcManager *g_ipc_manager_ptr = (ipc_ptr);                        \
@@ -289,7 +289,7 @@ class IpcManager {
   __syncthreads();                                                            \
   chi::gpu::IpcManager &g_ipc_manager = *g_ipc_manager_ptr
 
-#endif  // HSHM_IS_SYCL_COMPILER
+#endif  // CTP_IS_SYCL_COMPILER
 
-#endif  // HSHM_ENABLE_GPU
+#endif  // CTP_ENABLE_GPU
 #endif  // CHIMAERA_INCLUDE_CHIMAERA_GPU_IPC_MANAGER_H_

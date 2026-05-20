@@ -50,16 +50,16 @@
 #include "hermes_shm/memory/backend/gpu_shm_mmap.h"
 #include "hermes_shm/util/gpu_api.h"
 
-using hshm::ipc::BuddyAllocator;
-using hshm::ipc::GpuShmMmap;
-using hshm::ipc::MemoryBackendId;
-using hshm::lbm::Bulk;
-using hshm::lbm::LbmContext;
-using hshm::lbm::LbmMeta;
-using hshm::lbm::ShmTransferInfo;
-using hshm::lbm::ShmTransport;
+using ctp::ipc::BuddyAllocator;
+using ctp::ipc::GpuShmMmap;
+using ctp::ipc::MemoryBackendId;
+using ctp::lbm::Bulk;
+using ctp::lbm::LbmContext;
+using ctp::lbm::LbmMeta;
+using ctp::lbm::ShmTransferInfo;
+using ctp::lbm::ShmTransport;
 
-using GpuAllocT = hshm::ipc::BuddyAllocator;
+using GpuAllocT = ctp::ipc::BuddyAllocator;
 using GpuMeta = LbmMeta<GpuAllocT>;
 
 /**
@@ -125,7 +125,7 @@ __global__ void GpuSendSimpleKernel(GpuAllocT *alloc, const char *src_buffer,
     bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
     bulk.data.shm_.off_ = 0;
     bulk.size = data_size;
-    bulk.flags = hshm::bitfield32_t(BULK_XFER);
+    bulk.flags = ctp::bitfield32_t(BULK_XFER);
     meta.send.push_back(bulk);
     meta.send_bulks = 1;
     LbmContext ctx;
@@ -163,7 +163,7 @@ TEST_CASE("ShmTransfer GPU", "[gpu][transfer]") {
     REQUIRE(init_success);
 
     // Step 2: Create an BuddyAllocator on that backend
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -233,7 +233,7 @@ TEST_CASE("ShmTransfer GPU", "[gpu][transfer]") {
         backend.shm_init(backend_id, kBackendSize, kUrl + "_pattern", kGpuId);
     REQUIRE(init_success);
 
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -296,7 +296,7 @@ TEST_CASE("ShmTransfer GPU", "[gpu][transfer]") {
         backend.shm_init(backend_id, kBackendSize, kUrl + "_direct", kGpuId);
     REQUIRE(init_success);
 
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -339,7 +339,7 @@ TEST_CASE("ShmTransfer GPU", "[gpu][transfer]") {
         backend.shm_init(backend_id, kBackendSize, kUrl + "_large", kGpuId);
     REQUIRE(init_success);
 
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -426,7 +426,7 @@ __global__ void GpuSendKernel(GpuAllocT *alloc, char *data_buf,
     bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
     bulk.data.shm_.off_ = 0;
     bulk.size = data_size;
-    bulk.flags = hshm::bitfield32_t(BULK_XFER);
+    bulk.flags = ctp::bitfield32_t(BULK_XFER);
     meta.send.push_back(bulk);
     meta.send_bulks = 1;
 
@@ -496,7 +496,7 @@ TEST_CASE("ShmTransport Send/Recv GPU", "[gpu][transport]") {
     REQUIRE(init_success);
 
     // Step 2: Create BuddyAllocator on that backend (GPU-accessible)
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -574,7 +574,7 @@ TEST_CASE("ShmTransport Send/Recv GPU", "[gpu][transport]") {
         backend.shm_init(backend_id, kBackendSize, kUrl + "_large", kGpuId);
     REQUIRE(init_success);
 
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -652,7 +652,7 @@ TEST_CASE("ShmTransport Send/Recv GPU", "[gpu][transport]") {
                                      kUrl + "_gpu2gpu_shared", kGpuId));
 
     // Step 2: Create allocators
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *send_alloc = send_backend.MakeAlloc<AllocT>();
     AllocT *recv_alloc = recv_backend.MakeAlloc<AllocT>();
     AllocT *shared_alloc = shared_backend.MakeAlloc<AllocT>();

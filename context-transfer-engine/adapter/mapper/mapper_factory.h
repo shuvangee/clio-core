@@ -53,7 +53,7 @@ class MapperFactory {
   static AbstractMapper* Get(const MapperType& type) {
     switch (type) {
       case MapperType::kBalancedMapper: {
-        return hshm::Singleton<BalancedMapper>::GetInstance();
+        return ctp::Singleton<BalancedMapper>::GetInstance();
       }
       default: {
         // TODO(llogan): @error_handling Mapper not implemented

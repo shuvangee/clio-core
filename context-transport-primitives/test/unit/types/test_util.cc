@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define HSHM_COMPILING_DLL
+#define CTP_COMPILING_DLL
 
 #include "basic_test.h"
 #include "hermes_shm/data_structures/internal/shm_archive.h"
@@ -44,80 +44,80 @@
 #include "hermes_shm/util/type_switch.h"
 
 TEST_CASE("TypeSwitch") {
-  typedef hshm::type_switch<int, int, std::string, std::string, size_t,
+  typedef ctp::type_switch<int, int, std::string, std::string, size_t,
                             size_t>::type internal_t;
   REQUIRE(std::is_same_v<internal_t, int>);
 
-  typedef hshm::type_switch<size_t, int, std::string, std::string, size_t,
+  typedef ctp::type_switch<size_t, int, std::string, std::string, size_t,
                             size_t>::type internal2_t;
   REQUIRE(std::is_same_v<internal2_t, size_t>);
 
-  typedef hshm::type_switch<std::string, int, std::string, std::string, size_t,
+  typedef ctp::type_switch<std::string, int, std::string, std::string, size_t,
                             size_t>::type internal3_t;
   REQUIRE(std::is_same_v<internal3_t, std::string>);
 
-  typedef hshm::type_switch<std::vector<int>, int, std::string, std::string,
+  typedef ctp::type_switch<std::vector<int>, int, std::string, std::string,
                             size_t, size_t>::type internal4_t;
   REQUIRE(std::is_same_v<internal4_t, int>);
 }
 
 TEST_CASE("TestPathParser") {
-  hshm::SystemInfo::Setenv("PATH_PARSER_TEST", "HOME", true);
-  auto x = hshm::ConfigParse::ExpandPath("${PATH_PARSER_TEST}/hello");
-  hshm::SystemInfo::Unsetenv("PATH_PARSER_TEST");
-  auto y = hshm::ConfigParse::ExpandPath("${PATH_PARSER_TEST}/hello");
-  auto z = hshm::ConfigParse::ExpandPath("${HOME}/hello");
+  ctp::SystemInfo::Setenv("PATH_PARSER_TEST", "HOME", true);
+  auto x = ctp::ConfigParse::ExpandPath("${PATH_PARSER_TEST}/hello");
+  ctp::SystemInfo::Unsetenv("PATH_PARSER_TEST");
+  auto y = ctp::ConfigParse::ExpandPath("${PATH_PARSER_TEST}/hello");
+  auto z = ctp::ConfigParse::ExpandPath("${HOME}/hello");
   REQUIRE(x == "HOME/hello");
   REQUIRE(y == "/hello");
   REQUIRE(z != "${HOME}/hello");
 }
 
 TEST_CASE("TestNumberParser") {
-  REQUIRE(hshm::Unit<hshm::u64>::Kilobytes(1.5) == 1536);
-  REQUIRE(hshm::Unit<hshm::u64>::Megabytes(1.5) == 1572864);
-  REQUIRE(hshm::Unit<hshm::u64>::Gigabytes(1.5) == 1610612736);
-  REQUIRE(hshm::Unit<hshm::u64>::Terabytes(1.5) == 1649267441664);
-  REQUIRE(hshm::Unit<hshm::u64>::Petabytes(1.5) == 1688849860263936);
+  REQUIRE(ctp::Unit<ctp::u64>::Kilobytes(1.5) == 1536);
+  REQUIRE(ctp::Unit<ctp::u64>::Megabytes(1.5) == 1572864);
+  REQUIRE(ctp::Unit<ctp::u64>::Gigabytes(1.5) == 1610612736);
+  REQUIRE(ctp::Unit<ctp::u64>::Terabytes(1.5) == 1649267441664);
+  REQUIRE(ctp::Unit<ctp::u64>::Petabytes(1.5) == 1688849860263936);
 
-  std::pair<std::string, hshm::u64> sizes[] = {
+  std::pair<std::string, ctp::u64> sizes[] = {
       {"1", 1},
       {"1.5", 1},
-      {"1KB", hshm::Unit<hshm::u64>::Kilobytes(1)},
-      {"1.5MB", hshm::Unit<hshm::u64>::Megabytes(1.5)},
-      {"1.5GB", hshm::Unit<hshm::u64>::Gigabytes(1.5)},
-      {"2TB", hshm::Unit<hshm::u64>::Terabytes(2)},
-      {"1.5PB", hshm::Unit<hshm::u64>::Petabytes(1.5)},
+      {"1KB", ctp::Unit<ctp::u64>::Kilobytes(1)},
+      {"1.5MB", ctp::Unit<ctp::u64>::Megabytes(1.5)},
+      {"1.5GB", ctp::Unit<ctp::u64>::Gigabytes(1.5)},
+      {"2TB", ctp::Unit<ctp::u64>::Terabytes(2)},
+      {"1.5PB", ctp::Unit<ctp::u64>::Petabytes(1.5)},
   };
 
   for (auto &[text, val] : sizes) {
-    REQUIRE(hshm::ConfigParse::ParseSize(text) == val);
+    REQUIRE(ctp::ConfigParse::ParseSize(text) == val);
   }
-  REQUIRE(hshm::ConfigParse::ParseSize("inf"));
+  REQUIRE(ctp::ConfigParse::ParseSize("inf"));
 }
 
 TEST_CASE("TestSystemInfo") {
   // GetModuleDirectory: should return a non-empty path (exercises PATH_MAX buffer)
-  std::string mod_dir = hshm::SystemInfo::GetModuleDirectory();
+  std::string mod_dir = ctp::SystemInfo::GetModuleDirectory();
   REQUIRE(!mod_dir.empty());
 
   // GetMemfdDir / GetMemfdPath: exercises the /tmp/chimaera_<user> path helpers
-  std::string memfd_dir = hshm::SystemInfo::GetMemfdDir();
+  std::string memfd_dir = ctp::SystemInfo::GetMemfdDir();
   REQUIRE(!memfd_dir.empty());
   REQUIRE(memfd_dir.find("/tmp/") != std::string::npos);
 
-  std::string memfd_path = hshm::SystemInfo::GetMemfdPath("test_shm");
+  std::string memfd_path = ctp::SystemInfo::GetMemfdPath("test_shm");
   REQUIRE(!memfd_path.empty());
   REQUIRE(memfd_path.find("test_shm") != std::string::npos);
 
   // GetSharedLibExtension / GetLibrarySearchPathVar / GetPathListSeparator
-  std::string ext = hshm::SystemInfo::GetSharedLibExtension();
+  std::string ext = ctp::SystemInfo::GetSharedLibExtension();
   REQUIRE(!ext.empty());
   REQUIRE(ext == ".so" || ext == ".dylib" || ext == ".dll");
 
-  std::string lib_var = hshm::SystemInfo::GetLibrarySearchPathVar();
+  std::string lib_var = ctp::SystemInfo::GetLibrarySearchPathVar();
   REQUIRE(!lib_var.empty());
 
-  char sep = hshm::SystemInfo::GetPathListSeparator();
+  char sep = ctp::SystemInfo::GetPathListSeparator();
   REQUIRE((sep == ':' || sep == ';'));
 }
 
@@ -136,7 +136,7 @@ TEST_CASE("TestAutoTrace") {
   AUTO_TRACE(0);
 
   TIMER_START("Example");
-  HSHM_THREAD_MODEL->SleepForUs(1000);
+  CTP_THREAD_MODEL->SleepForUs(1000);
   TIMER_END();
 }
 
@@ -144,7 +144,7 @@ TEST_CASE("TestLogger") {
   HLOG(kInfo, "I'm more likely to be printed: {}", 0);
   HLOG(kDebug, "I'm not likely to be printed: {}", 10);
 
-  HSHM_LOG->DisableCode(kDebug);
+  CTP_LOG->DisableCode(kDebug);
   HLOG(kInfo, "I'm more likely to be printed (2): {}", 0);
   HLOG(kDebug, "I won't be printed: {}", 10);
 
@@ -161,27 +161,27 @@ TEST_CASE("TestFormatter") {
   int i = 0;
 
   PAGE_DIVIDE("Test with equivalent parameters") {
-    std::string name = hshm::Formatter::format("bucket{}_{}", rank, i);
+    std::string name = ctp::Formatter::format("bucket{}_{}", rank, i);
     REQUIRE(name == "bucket0_0");
   }
 
   PAGE_DIVIDE("Test with equivalent parameters at start") {
-    std::string name = hshm::Formatter::format("{}bucket{}", rank, i);
+    std::string name = ctp::Formatter::format("{}bucket{}", rank, i);
     REQUIRE(name == "0bucket0");
   }
 
   PAGE_DIVIDE("Test with too many parameters") {
-    std::string name = hshm::Formatter::format("bucket", rank, i);
+    std::string name = ctp::Formatter::format("bucket", rank, i);
     REQUIRE(name == "bucket");
   }
 
   PAGE_DIVIDE("Test with fewer parameters") {
-    std::string name = hshm::Formatter::format("bucket{}_{}", rank);
+    std::string name = ctp::Formatter::format("bucket{}_{}", rank);
     REQUIRE(name == "bucket{}_{}");
   }
 
   PAGE_DIVIDE("Test with parameters next to each other") {
-    std::string name = hshm::Formatter::format("bucket{}{}", rank, i);
+    std::string name = ctp::Formatter::format("bucket{}{}", rank, i);
     REQUIRE(name == "bucket00");
   }
 }

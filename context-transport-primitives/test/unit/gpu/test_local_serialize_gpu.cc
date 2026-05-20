@@ -32,11 +32,11 @@
  */
 
 /**
- * GPU unit test for serialization with hshm::priv::vector
+ * GPU unit test for serialization with ctp::priv::vector
  *
  * This test verifies that serialization works correctly between GPU and CPU:
  * 1. Allocates pinned host memory using GpuShmMmap backend
- * 2. GPU kernel serializes integers and floats into hshm::priv::vector
+ * 2. GPU kernel serializes integers and floats into ctp::priv::vector
  *    (using byte-by-byte push_back, the proven GPU-compatible pattern)
  * 3. CPU deserializes using LocalDeserialize and verifies the data
  *
@@ -53,9 +53,9 @@
 #include "hermes_shm/memory/backend/gpu_shm_mmap.h"
 #include "hermes_shm/util/gpu_api.h"
 
-using hshm::ipc::ArenaAllocator;
-using hshm::ipc::GpuShmMmap;
-using hshm::ipc::MemoryBackendId;
+using ctp::ipc::ArenaAllocator;
+using ctp::ipc::GpuShmMmap;
+using ctp::ipc::MemoryBackendId;
 
 /**
  * Helper to serialize a value byte-by-byte into a vector on GPU
@@ -80,7 +80,7 @@ __device__ void GpuSerializeValue(VecT *vec, const T &value) {
 /**
  * GPU kernel to serialize integers and floats into a vector
  *
- * This kernel demonstrates serialization working on GPU with hshm::priv::vector
+ * This kernel demonstrates serialization working on GPU with ctp::priv::vector
  * using byte-by-byte push_back (the pattern proven to work in test_gpu_shm_mmap.cc).
  *
  * @tparam AllocT The allocator type
@@ -93,7 +93,7 @@ __device__ void GpuSerializeValue(VecT *vec, const T &value) {
  */
 template <typename AllocT>
 __global__ void SerializeKernel(AllocT *alloc,
-                                hshm::priv::vector<char, AllocT> *vec,
+                                ctp::priv::vector<char, AllocT> *vec,
                                 int *int_vals, float *float_vals,
                                 size_t num_ints, size_t num_floats) {
   // Use byte-by-byte serialization (matches test_gpu_shm_mmap.cc pattern)
@@ -127,7 +127,7 @@ __global__ void SerializeKernel(AllocT *alloc,
  * @param value Value to append
  */
 template <typename AllocT>
-__global__ void SerializeAppendKernel(hshm::priv::vector<char, AllocT> *vec,
+__global__ void SerializeAppendKernel(ctp::priv::vector<char, AllocT> *vec,
                                       int value) {
   // Use byte-by-byte serialization to append
   GpuSerializeValue(vec, value);
@@ -155,7 +155,7 @@ TEST_CASE("LocalSerialize GPU", "[gpu][serialize]") {
     REQUIRE(alloc_ptr != nullptr);
 
     // Step 3: Allocate a priv::vector<char> from allocator
-    using CharVector = hshm::priv::vector<char, AllocT>;
+    using CharVector = ctp::priv::vector<char, AllocT>;
     CharVector *vec_ptr = alloc_ptr->NewObj<CharVector>(alloc_ptr).ptr_;
     REQUIRE(vec_ptr != nullptr);
 
@@ -196,7 +196,7 @@ TEST_CASE("LocalSerialize GPU", "[gpu][serialize]") {
     REQUIRE(!vec_ptr->empty());
 
     // Step 7: Deserialize on CPU
-    hshm::ipc::LocalDeserialize<CharVector> deserializer(*vec_ptr);
+    ctp::ipc::LocalDeserialize<CharVector> deserializer(*vec_ptr);
 
     // Deserialize integer count
     size_t num_ints;
@@ -239,7 +239,7 @@ TEST_CASE("LocalSerialize GPU", "[gpu][serialize]") {
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
-    using CharVector = hshm::priv::vector<char, AllocT>;
+    using CharVector = ctp::priv::vector<char, AllocT>;
     CharVector *vec_ptr = alloc_ptr->NewObj<CharVector>(alloc_ptr).ptr_;
     REQUIRE(vec_ptr != nullptr);
 
@@ -275,7 +275,7 @@ TEST_CASE("LocalSerialize GPU", "[gpu][serialize]") {
     REQUIRE(!vec_ptr->empty());
 
     // Deserialize and verify
-    hshm::ipc::LocalDeserialize<CharVector> deserializer(*vec_ptr);
+    ctp::ipc::LocalDeserialize<CharVector> deserializer(*vec_ptr);
 
     size_t num_ints;
     deserializer >> num_ints;
@@ -313,7 +313,7 @@ TEST_CASE("LocalSerialize GPU", "[gpu][serialize]") {
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
-    using CharVector = hshm::priv::vector<char, AllocT>;
+    using CharVector = ctp::priv::vector<char, AllocT>;
     CharVector *vec_ptr = alloc_ptr->NewObj<CharVector>(alloc_ptr).ptr_;
     REQUIRE(vec_ptr != nullptr);
     vec_ptr->reserve(4096);
@@ -342,7 +342,7 @@ TEST_CASE("LocalSerialize GPU", "[gpu][serialize]") {
     REQUIRE(err == cudaSuccess);
 
     // Deserialize
-    hshm::ipc::LocalDeserialize<CharVector> deserializer(*vec_ptr);
+    ctp::ipc::LocalDeserialize<CharVector> deserializer(*vec_ptr);
 
     size_t num_ints;
     deserializer >> num_ints;

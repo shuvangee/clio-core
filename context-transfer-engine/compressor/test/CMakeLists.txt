@@ -10,7 +10,7 @@ add_executable(test_distribution_classifier_exec
 )
 target_link_libraries(test_distribution_classifier_exec
   wrp_cte::compressor_runtime
-  hshm::compress
+  ctp::compress
   Catch2::Catch2WithMain
 )
 add_test(NAME test_distribution_classifier COMMAND test_distribution_classifier_exec)
@@ -21,7 +21,7 @@ add_executable(test_linreg_table_predictor_exec
 )
 target_link_libraries(test_linreg_table_predictor_exec
   wrp_cte::compressor_runtime
-  hshm::compress
+  ctp::compress
   Catch2::Catch2WithMain
 )
 add_test(NAME test_linreg_table_predictor COMMAND test_linreg_table_predictor_exec)
@@ -32,7 +32,7 @@ add_executable(test_qtable_predictor_exec
 )
 target_link_libraries(test_qtable_predictor_exec
   wrp_cte::compressor_runtime
-  hshm::compress
+  ctp::compress
   Catch2::Catch2WithMain
 )
 add_test(NAME test_qtable_predictor COMMAND test_qtable_predictor_exec)
@@ -60,8 +60,8 @@ target_link_libraries(test_compressor_functional
   chimaera::admin_client        # For admin client
   chimaera::bdev_runtime        # For bdev runtime
   chimaera::bdev_client         # For bdev client
-  hshm::compress                # For compression libraries
-  hshm::cxx                     # For HermesShm library
+  ctp::compress                # For compression libraries
+  ctp::cxx                     # For HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}     # Threading support
 )
 
@@ -125,8 +125,8 @@ target_link_libraries(test_transparent_compress
   chimaera::admin_client
   chimaera::bdev_runtime
   chimaera::bdev_client
-  hshm::compress
-  hshm::cxx
+  ctp::compress
+  ctp::cxx
   ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -171,8 +171,8 @@ target_link_libraries(test_adios2_transparent_compress
   chimaera::admin_client
   chimaera::bdev_runtime
   chimaera::bdev_client
-  hshm::compress
-  hshm::cxx
+  ctp::compress
+  ctp::cxx
   ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -214,7 +214,7 @@ target_link_libraries(clio_cte_compress_bench
     wrp_cte::core_client          # CTE core client library
     wrp_cte::core_runtime         # CTE core runtime (for compression context)
     chimaera::cxx                 # Core Chimaera library
-    hshm::compress                # Compression library
+    ctp::compress                # Compression library
     ${CMAKE_THREAD_LIBS_INIT}     # Threading support (for pthread_setaffinity_np)
 )
 
@@ -235,8 +235,8 @@ add_executable(test_compression_contention_exec
     test_compression_contention.cc
 )
 target_link_libraries(test_compression_contention_exec
-    hshm::compress
-    hshm::cxx
+    ctp::compress
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_compile_features(test_compression_contention_exec PRIVATE cxx_std_17)
@@ -263,8 +263,8 @@ target_include_directories(test_compression_benchmark_exec PRIVATE
 )
 target_link_libraries(test_compression_benchmark_exec
     wrp_cte::compressor_runtime
-    hshm::compress
-    hshm::cxx
+    ctp::compress
+    ctp::cxx
     Catch2::Catch2WithMain
     ${CMAKE_THREAD_LIBS_INIT}
 )
@@ -312,8 +312,8 @@ if(MPI_FOUND)
         wrp_cte::core_client
         wrp_cte::core_runtime
         chimaera::cxx
-        hshm::compress
-        hshm::cxx
+        ctp::compress
+        ctp::cxx
         ${MPI_CXX_LIBRARIES}
         ${CMAKE_THREAD_LIBS_INIT}
     )

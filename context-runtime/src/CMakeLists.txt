@@ -20,8 +20,8 @@ file(GLOB_RECURSE CHIMAERA_MODULE_GPU_SOURCES
 # Separate GPU sources (_gpu.cc / _sycl.cc / _hip.cc files) from CPU
 # sources. _gpu.cc and _hip.cc are compiled by NVCC/HIPCC under
 # WRP_CORE_ENABLE_CUDA/ROCM, and skipped under SYCL via their own
-# `#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM` guard. _sycl.cc is the
-# SYCL twin: gated by `#if HSHM_ENABLE_SYCL` and compiled by
+# `#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM` guard. _sycl.cc is the
+# SYCL twin: gated by `#if CTP_ENABLE_SYCL` and compiled by
 # add_sycl_library() when WRP_CORE_ENABLE_SYCL is on.
 set(CHIMAERA_GPU_SOURCES "")
 set(CHIMAERA_CPU_SOURCES "")
@@ -74,10 +74,10 @@ if(CHIMAERA_GPU_SOURCES)
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../context-transfer-engine/core/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     )
-    target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC hshm::cuda_cxx)
-    # PRIVATE link: prevents HSHM_ENABLE_CUDA from propagating to g++ compilations
+    target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC ctp::cuda_cxx)
+    # PRIVATE link: prevents CTP_ENABLE_CUDA from propagating to g++ compilations
     # of chimaera_cxx sources (transport-primitives headers use CUDA builtins
-    # guarded by HSHM_ENABLE_CUDA which are not available in g++)
+    # guarded by CTP_ENABLE_CUDA which are not available in g++)
     target_link_libraries(${CHIMAERA_LIB_NAME} PRIVATE ${CHIMAERA_LIB_NAME}_gpu)
   elseif(WRP_CORE_ENABLE_SYCL)
     add_sycl_library(${CHIMAERA_LIB_NAME}_gpu SHARED TRUE ${CHIMAERA_GPU_SOURCES}
@@ -99,15 +99,15 @@ if(CHIMAERA_GPU_SOURCES)
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../context-transfer-engine/core/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     )
-    target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC hshm::cxx)
+    target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC ctp::cxx)
     target_link_libraries(${CHIMAERA_LIB_NAME} PRIVATE ${CHIMAERA_LIB_NAME}_gpu)
-    # Add HSHM_ENABLE_SYCL=1 + sycl headers to the host library (NOT -fsycl,
+    # Add CTP_ENABLE_SYCL=1 + sycl headers to the host library (NOT -fsycl,
     # which would force a device-pass parse of every host TU and trip
     # type-mismatches on host-only methods accessed via CHI_IPC). Without
     # -fsycl, host code uses sycl::malloc_host / sycl::queue / sycl::free
     # as plain runtime API calls. The chimaera_cxx_gpu library compiled by
     # add_sycl_library still gets full -fsycl + device-pass treatment.
-    target_compile_definitions(${CHIMAERA_LIB_NAME} PRIVATE HSHM_ENABLE_SYCL=1)
+    target_compile_definitions(${CHIMAERA_LIB_NAME} PRIVATE CTP_ENABLE_SYCL=1)
     if(EXISTS "/opt/intel/dpcpp/include/sycl/sycl.hpp")
       target_include_directories(${CHIMAERA_LIB_NAME} PRIVATE
           /opt/intel/dpcpp/include
@@ -127,11 +127,11 @@ if(CHIMAERA_GPU_SOURCES)
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../context-transfer-engine/core/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     )
-    # Link hshm::rocm_cxx so HSHM_ENABLE_ROCM=1 propagates to chimaera_cxx
+    # Link ctp::rocm_cxx so CTP_ENABLE_ROCM=1 propagates to chimaera_cxx
     # (PRIVATE link to ${CHIMAERA_LIB_NAME}_gpu carries those compile
     # definitions into chimaera_cxx's own TUs without exposing them to
     # external consumers — same model as the CUDA branch above).
-    target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC hshm::rocm_cxx)
+    target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC ctp::rocm_cxx)
     target_link_libraries(${CHIMAERA_LIB_NAME} PRIVATE ${CHIMAERA_LIB_NAME}_gpu)
   endif()
 endif()
@@ -146,7 +146,7 @@ target_include_directories(${CHIMAERA_LIB_NAME} PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
-# When CUDA is enabled, g++ source files get HSHM_ENABLE_CUDA=1 transitively from
+# When CUDA is enabled, g++ source files get CTP_ENABLE_CUDA=1 transitively from
 # the GPU library link. They need the CUDA toolkit include directory so that
 # cuda_runtime_api.h (host-callable CUDA runtime functions) can be found.
 if(WRP_CORE_ENABLE_CUDA AND CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
@@ -158,13 +158,13 @@ if(WRP_CORE_ENABLE_CUDA AND CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
   target_link_libraries(${CHIMAERA_LIB_NAME} PUBLIC CUDA::cudart)
 endif()
 
-# ROCm twin: g++ source files get HSHM_ENABLE_ROCM=1 from the chimaera_cxx_gpu
+# ROCm twin: g++ source files get CTP_ENABLE_ROCM=1 from the chimaera_cxx_gpu
 # PRIVATE link, so they need the HIP host-API headers (hip/hip_runtime_api.h) to
 # resolve hipMalloc / hipMemcpy / hipIpcMemHandle_t etc. Under HIP_PLATFORM=nvidia
 # the HIP runtime forwards to cudart, so cudart needs to be linked too.
 if(WRP_CORE_ENABLE_ROCM)
   target_include_directories(${CHIMAERA_LIB_NAME} PUBLIC ${ROCM_ROOT}/include)
-  target_compile_definitions(${CHIMAERA_LIB_NAME} PUBLIC HSHM_ENABLE_ROCM=1)
+  target_compile_definitions(${CHIMAERA_LIB_NAME} PUBLIC CTP_ENABLE_ROCM=1)
   if(WRP_ROCM_HIP_PLATFORM STREQUAL "nvidia")
     target_compile_definitions(${CHIMAERA_LIB_NAME} PUBLIC
       __HIP_PLATFORM_NVIDIA__=1
@@ -190,13 +190,13 @@ target_compile_definitions(${CHIMAERA_LIB_NAME} PRIVATE
 
 # Link libraries
 # Chimaera runtime links to hshm modular targets
-# Clients only link to hshm::cxx
+# Clients only link to ctp::cxx
 target_link_libraries(${CHIMAERA_LIB_NAME}
   PUBLIC
-    hshm::cxx
-    hshm::serialize  # For cereal
+    ctp::cxx
+    ctp::serialize  # For cereal
     Threads::Threads
-    hshm::lightbeam  # For ZMQ transport
+    ctp::lightbeam  # For ZMQ transport
     # chimods_admin_client  # Admin client library for global task routing - TODO: Enable when admin chimod is built
 )
 

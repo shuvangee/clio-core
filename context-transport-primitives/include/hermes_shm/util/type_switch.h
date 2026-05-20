@@ -31,12 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_STATIC_SWITCH_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_STATIC_SWITCH_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_UTIL_STATIC_SWITCH_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_UTIL_STATIC_SWITCH_H_
 
 #include <functional>
 
-namespace hshm {
+namespace ctp {
 
 /** Ends the recurrence of the switch-case */
 class EndTypeSwitch {};
@@ -64,6 +64,6 @@ struct type_switch<T, Default, EndTypeSwitch, EndTypeSwitch> {
   typedef Default type;
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_STATIC_SWITCH_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_UTIL_STATIC_SWITCH_H_

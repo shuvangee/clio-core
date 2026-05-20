@@ -93,7 +93,7 @@ struct GpuTagEntry {
   chi::u32 _pad0_;
   char tag_name_[kMaxName];
 
-  HSHM_CROSS_FUN void Reset() {
+  CTP_CROSS_FUN void Reset() {
     state_ = kEmpty;
     tag_major_ = 0;
     tag_minor_ = 0;
@@ -118,7 +118,7 @@ struct GpuBlobEntry {
   chi::u32 _pad0_;
   char blob_name_[kMaxName];
 
-  HSHM_CROSS_FUN void Reset() {
+  CTP_CROSS_FUN void Reset() {
     state_ = kEmpty;
     tag_major_ = 0;
     tag_minor_ = 0;
@@ -145,7 +145,7 @@ enum StorageClass : chi::u32 {
 };
 
 /** Whether a storage class is eligible for the GPU cache. */
-HSHM_CROSS_FUN inline bool IsGpuVisible(chi::u32 sc) {
+CTP_CROSS_FUN inline bool IsGpuVisible(chi::u32 sc) {
   return sc == kStorageRam || sc == kStorageHbm || sc == kStoragePinned;
 }
 
@@ -159,7 +159,7 @@ inline chi::u32 BdevTypeToStorageClass(const char *bdev_type) {
 }
 
 /** Copy at most kMaxName-1 bytes of src into dst, NUL-terminated. */
-HSHM_CROSS_FUN inline void CopyName(char *dst, const char *src) {
+CTP_CROSS_FUN inline void CopyName(char *dst, const char *src) {
   chi::u32 i = 0;
   if (src) {
     for (; i + 1 < kMaxName && src[i] != '\0'; ++i) dst[i] = src[i];
@@ -168,14 +168,14 @@ HSHM_CROSS_FUN inline void CopyName(char *dst, const char *src) {
 }
 
 /** GPU-safe length (no libc dependency). */
-HSHM_CROSS_FUN inline chi::u32 NameLen(const char *s) {
+CTP_CROSS_FUN inline chi::u32 NameLen(const char *s) {
   chi::u32 n = 0;
   while (n < kMaxName && s[n] != '\0') ++n;
   return n;
 }
 
 /** GPU-safe equality (bounded). */
-HSHM_CROSS_FUN inline bool NameEq(const char *a, const char *b) {
+CTP_CROSS_FUN inline bool NameEq(const char *a, const char *b) {
   for (chi::u32 i = 0; i < kMaxName; ++i) {
     if (a[i] != b[i]) return false;
     if (a[i] == '\0') return true;
@@ -188,7 +188,7 @@ HSHM_CROSS_FUN inline bool NameEq(const char *a, const char *b) {
  * Used for both blob and tag name keys. Combined with the tag id for
  * blob entries.
  */
-HSHM_CROSS_FUN inline chi::u64 FnvHashString(const char *s) {
+CTP_CROSS_FUN inline chi::u64 FnvHashString(const char *s) {
   chi::u64 h = 0xcbf29ce484222325ULL;
   for (chi::u32 i = 0; i < kMaxName && s[i] != '\0'; ++i) {
     h ^= static_cast<chi::u64>(static_cast<unsigned char>(s[i]));
@@ -198,7 +198,7 @@ HSHM_CROSS_FUN inline chi::u64 FnvHashString(const char *s) {
 }
 
 /** Hash a (tag, blob_name) tuple. */
-HSHM_CROSS_FUN inline chi::u64 HashBlobKey(chi::u32 tag_major, chi::u32 tag_minor,
+CTP_CROSS_FUN inline chi::u64 HashBlobKey(chi::u32 tag_major, chi::u32 tag_minor,
                                              const char *blob_name) {
   chi::u64 h = FnvHashString(blob_name);
   h ^= (static_cast<chi::u64>(tag_major) << 32) | tag_minor;
@@ -207,7 +207,7 @@ HSHM_CROSS_FUN inline chi::u64 HashBlobKey(chi::u32 tag_major, chi::u32 tag_mino
 }
 
 /** Hash a tag (major, minor) key. */
-HSHM_CROSS_FUN inline chi::u64 HashTagKey(chi::u32 tag_major, chi::u32 tag_minor) {
+CTP_CROSS_FUN inline chi::u64 HashTagKey(chi::u32 tag_major, chi::u32 tag_minor) {
   chi::u64 h = (static_cast<chi::u64>(tag_major) << 32) | tag_minor;
   h ^= 0xcbf29ce484222325ULL;
   h *= 0x100000001b3ULL;
@@ -255,22 +255,22 @@ struct GpuMetadataCacheHeader {
   }
 
   /** Pointer to the tag slot array. */
-  HSHM_CROSS_FUN gpu_cache::GpuTagEntry *TagSlots() {
+  CTP_CROSS_FUN gpu_cache::GpuTagEntry *TagSlots() {
     return reinterpret_cast<gpu_cache::GpuTagEntry *>(
         reinterpret_cast<char *>(this) + sizeof(GpuMetadataCacheHeader));
   }
-  HSHM_CROSS_FUN const gpu_cache::GpuTagEntry *TagSlots() const {
+  CTP_CROSS_FUN const gpu_cache::GpuTagEntry *TagSlots() const {
     return reinterpret_cast<const gpu_cache::GpuTagEntry *>(
         reinterpret_cast<const char *>(this) + sizeof(GpuMetadataCacheHeader));
   }
 
   /** Pointer to the blob slot array. */
-  HSHM_CROSS_FUN gpu_cache::GpuBlobEntry *BlobSlots() {
+  CTP_CROSS_FUN gpu_cache::GpuBlobEntry *BlobSlots() {
     return reinterpret_cast<gpu_cache::GpuBlobEntry *>(
         reinterpret_cast<char *>(TagSlots()) +
         static_cast<size_t>(max_tags_) * sizeof(gpu_cache::GpuTagEntry));
   }
-  HSHM_CROSS_FUN const gpu_cache::GpuBlobEntry *BlobSlots() const {
+  CTP_CROSS_FUN const gpu_cache::GpuBlobEntry *BlobSlots() const {
     return reinterpret_cast<const gpu_cache::GpuBlobEntry *>(
         reinterpret_cast<const char *>(TagSlots()) +
         static_cast<size_t>(max_tags_) * sizeof(gpu_cache::GpuTagEntry));
@@ -298,7 +298,7 @@ struct GpuMetadataCacheHeader {
     for (chi::u32 i = 0; i < max_blobs_; ++i) b[i].Reset();
   }
 
-  HSHM_CROSS_FUN bool ValidMagic() const {
+  CTP_CROSS_FUN bool ValidMagic() const {
     return magic_ == kMagic && version_ == kVersion;
   }
 };
@@ -311,7 +311,7 @@ struct GpuMetadataCacheHeader {
  * Open-addressing with linear probing. Tombstones are reused for
  * inserts but probe walks continue past them.
  */
-HSHM_CROSS_FUN inline gpu_cache::GpuTagEntry *GpuCacheUpsertTag(
+CTP_CROSS_FUN inline gpu_cache::GpuTagEntry *GpuCacheUpsertTag(
     GpuMetadataCacheHeader *hdr, chi::u32 tag_major, chi::u32 tag_minor,
     const char *tag_name) {
   if (!hdr || hdr->max_tags_ == 0) return nullptr;
@@ -355,7 +355,7 @@ HSHM_CROSS_FUN inline gpu_cache::GpuTagEntry *GpuCacheUpsertTag(
  * Find an existing blob entry, or claim a free slot for insertion.
  * Returns nullptr if the table is full.
  */
-HSHM_CROSS_FUN inline gpu_cache::GpuBlobEntry *GpuCacheUpsertBlob(
+CTP_CROSS_FUN inline gpu_cache::GpuBlobEntry *GpuCacheUpsertBlob(
     GpuMetadataCacheHeader *hdr, chi::u32 tag_major, chi::u32 tag_minor,
     const char *blob_name, chi::u64 size, float score, chi::u32 storage_class) {
   if (!hdr || hdr->max_blobs_ == 0) return nullptr;
@@ -405,7 +405,7 @@ HSHM_CROSS_FUN inline gpu_cache::GpuBlobEntry *GpuCacheUpsertBlob(
 }
 
 /** Mark a blob as a tombstone if found; no-op otherwise. */
-HSHM_CROSS_FUN inline bool GpuCacheRemoveBlob(GpuMetadataCacheHeader *hdr,
+CTP_CROSS_FUN inline bool GpuCacheRemoveBlob(GpuMetadataCacheHeader *hdr,
                                                chi::u32 tag_major,
                                                chi::u32 tag_minor,
                                                const char *blob_name) {
@@ -432,7 +432,7 @@ HSHM_CROSS_FUN inline bool GpuCacheRemoveBlob(GpuMetadataCacheHeader *hdr,
  * Mark a tag as tombstone and remove all blobs owned by that tag.
  * Returns the number of blob entries removed.
  */
-HSHM_CROSS_FUN inline chi::u32 GpuCacheRemoveTag(GpuMetadataCacheHeader *hdr,
+CTP_CROSS_FUN inline chi::u32 GpuCacheRemoveTag(GpuMetadataCacheHeader *hdr,
                                                    chi::u32 tag_major,
                                                    chi::u32 tag_minor) {
   if (!hdr) return 0;
@@ -476,7 +476,7 @@ HSHM_CROSS_FUN inline chi::u32 GpuCacheRemoveTag(GpuMetadataCacheHeader *hdr,
  * Read-only lookup of a blob entry. Used by GPU readers.
  * Returns nullptr if the blob is not currently in the cache.
  */
-HSHM_CROSS_FUN inline const gpu_cache::GpuBlobEntry *GpuCacheFindBlob(
+CTP_CROSS_FUN inline const gpu_cache::GpuBlobEntry *GpuCacheFindBlob(
     const GpuMetadataCacheHeader *hdr, chi::u32 tag_major, chi::u32 tag_minor,
     const char *blob_name) {
   if (!hdr || hdr->max_blobs_ == 0) return nullptr;
@@ -497,7 +497,7 @@ HSHM_CROSS_FUN inline const gpu_cache::GpuBlobEntry *GpuCacheFindBlob(
 }
 
 /** Read-only lookup of a tag entry. */
-HSHM_CROSS_FUN inline const gpu_cache::GpuTagEntry *GpuCacheFindTag(
+CTP_CROSS_FUN inline const gpu_cache::GpuTagEntry *GpuCacheFindTag(
     const GpuMetadataCacheHeader *hdr, chi::u32 tag_major,
     chi::u32 tag_minor) {
   if (!hdr || hdr->max_tags_ == 0) return nullptr;

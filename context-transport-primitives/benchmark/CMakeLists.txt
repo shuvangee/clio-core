@@ -20,7 +20,7 @@ if(WRP_CORE_ENABLE_ZMQ)
           zmq_ipc_latency_benchmark.cc)
   add_dependencies(zmq_ipc_latency_benchmark hermes_shm_host)
   target_link_libraries(zmq_ipc_latency_benchmark
-          hshm::lightbeam
+          ctp::lightbeam
           Threads::Threads)
   install(TARGETS zmq_ipc_latency_benchmark
           RUNTIME DESTINATION bin)

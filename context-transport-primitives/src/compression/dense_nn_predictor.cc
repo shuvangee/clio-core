@@ -43,7 +43,7 @@
 #include <cmath>
 #include <nlohmann/json.hpp>
 
-namespace hshm {
+namespace ctp {
 namespace compress {
 
 namespace fs = std::filesystem;
@@ -914,4 +914,4 @@ void DenseNNPredictor::ClearExperiences() {
 }
 
 }  // namespace compress
-}  // namespace hshm
+}  // namespace ctp

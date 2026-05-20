@@ -108,11 +108,11 @@ std::vector<wrp_cae::core::AssimilationCtx> LoadOmni(
     // Parse tokens and expand environment variables
     if (transfer["src_token"]) {
       std::string raw_token = transfer["src_token"].as<std::string>();
-      ctx.src_token = hshm::ConfigParse::ExpandPath(raw_token);
+      ctx.src_token = ctp::ConfigParse::ExpandPath(raw_token);
     }
     if (transfer["dst_token"]) {
       std::string raw_token = transfer["dst_token"].as<std::string>();
-      ctx.dst_token = hshm::ConfigParse::ExpandPath(raw_token);
+      ctx.dst_token = ctp::ConfigParse::ExpandPath(raw_token);
     }
 
     // Parse dataset_filter for HDF5 and other hierarchical formats

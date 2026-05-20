@@ -16,7 +16,7 @@
  * register them through admin RegisterMemory.
  */
 
-#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#if (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL
 
 #include "chimaera/ipc_manager.h"
 #include "chimaera/gpu/gpu_ipc_manager.h"
@@ -40,14 +40,14 @@ namespace chi {
 // space) and the cross-shared-library kernel registration was unreliable
 // under HIP-NVCC ("cudaErrorInvalidDeviceFunction" on launch).
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
 
 bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
   if (!per_gpu_devices_.empty()) {
     return true;  // already initialized
   }
 
-  int device_count = static_cast<int>(hshm::GpuApi::GetDeviceCount());
+  int device_count = static_cast<int>(ctp::GpuApi::GetDeviceCount());
   if (device_count <= 0) {
     // CPU-only deployment: leave per_gpu_devices_ empty. Consumers
     // (GetGpuInfo, GetGpuQueue, RegisterClientBackend) all bounds-check
@@ -68,9 +68,9 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
     PerGpuDeviceState &dev = per_gpu_devices_[gpu_id];
     dev.gpu_id = static_cast<u32>(gpu_id);
 
-    hshm::GpuApi::SetDevice(gpu_id);
+    ctp::GpuApi::SetDevice(gpu_id);
 
-    dev.queue_backend = hshm::GpuApi::MallocHost<char>(kQueueBackendBytes);
+    dev.queue_backend = ctp::GpuApi::MallocHost<char>(kQueueBackendBytes);
     if (!dev.queue_backend) {
       HLOG(kError, "ServerInitGpuQueues: MallocHost for queue backend "
            "failed (gpu_id={})", gpu_id);
@@ -133,7 +133,7 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
   chi::g_device_aware_memcpy.store(
       [](void *dst, const void *src, std::size_t n) {
         if (n == 0) return;
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
         // Fast path: when both pointers are plain host memory, use
         // std::memcpy. The CUDA host->host path goes through the driver's
         // generic copy and tops out at ~1.5-3 GB/s on x86; std::memcpy
@@ -166,7 +166,7 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
         CUDA_ERROR_CHECK(cudaMemcpyAsync(dst, src, n,
                                           cudaMemcpyDefault, s));
         CUDA_ERROR_CHECK(cudaStreamSynchronize(s));
-#elif HSHM_ENABLE_ROCM
+#elif CTP_ENABLE_ROCM
         auto is_host_kind = [](const void *p) {
           hipPointerAttribute_t a{};
           hipError_t rc = hipPointerGetAttributes(&a, p);
@@ -196,14 +196,14 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
                                         hipMemcpyDefault, s));
         HIP_ERROR_CHECK(hipStreamSynchronize(s));
 #else
-        hshm::GpuApi::Memcpy(static_cast<char *>(dst),
+        ctp::GpuApi::Memcpy(static_cast<char *>(dst),
                              static_cast<const char *>(src), n);
 #endif
       },
       std::memory_order_release);
   chi::g_is_device_pointer.store(
       [](const void *ptr) -> bool {
-        return hshm::GpuApi::IsDevicePointer(const_cast<void *>(ptr));
+        return ctp::GpuApi::IsDevicePointer(const_cast<void *>(ptr));
       },
       std::memory_order_release);
 
@@ -213,7 +213,7 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
 void gpu::IpcManager::FinalizeGpuQueues() {
   for (auto &dev : per_gpu_devices_) {
     if (dev.queue_backend) {
-      hshm::GpuApi::FreeHost(dev.queue_backend);
+      ctp::GpuApi::FreeHost(dev.queue_backend);
       dev.queue_backend = nullptr;
     }
     dev.gpu2cpu_queue = hipc::FullPtr<chi::GpuTaskQueue>::GetNull();
@@ -252,8 +252,8 @@ bool ChiServerBootstrapHipGpu(IpcManager *self, chi::u32 queue_depth,
   return self->gpu_ipc_->ServerInitGpuQueues(queue_depth);
 }
 
-#endif  // HSHM_IS_HOST
+#endif  // CTP_IS_HOST
 
 }  // namespace chi
 
-#endif  // (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#endif  // (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL

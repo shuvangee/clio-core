@@ -42,24 +42,24 @@
 #include "hermes_shm/util/gpu_api.h"
 #include "hermes_shm/data_structures/serialization/local_serialize.h"
 
-using hshm::ipc::ArenaAllocator;
-using hshm::ipc::GpuShmMmap;
-using hshm::ipc::MemoryBackendId;
-using hshm::ipc::mpsc_ring_buffer;
+using ctp::ipc::ArenaAllocator;
+using ctp::ipc::GpuShmMmap;
+using ctp::ipc::MemoryBackendId;
+using ctp::ipc::mpsc_ring_buffer;
 
 /**
  * Simple POD struct for testing struct transfer through ring buffer
  * from GPU to CPU.
  */
 struct TestTransferStruct {
-  hshm::u64 id_;
+  ctp::u64 id_;
   char data_[64];
 
-  HSHM_INLINE_CROSS_FUN TestTransferStruct() : id_(0) {
+  CTP_INLINE_CROSS_FUN TestTransferStruct() : id_(0) {
     memset(data_, 0, sizeof(data_));
   }
 
-  HSHM_INLINE_CROSS_FUN TestTransferStruct(hshm::u64 id) : id_(id) {
+  CTP_INLINE_CROSS_FUN TestTransferStruct(ctp::u64 id) : id_(id) {
     memset(data_, 9, sizeof(data_));
   }
 };
@@ -69,7 +69,7 @@ struct TestTransferStruct {
  */
 template <typename AllocT>
 struct StringStruct {
-  hshm::priv::string<AllocT> str_;
+  ctp::priv::string<AllocT> str_;
   float value_;
 
   /**
@@ -126,7 +126,7 @@ template <typename AllocT>
 __global__ void PushStructsKernel(
     mpsc_ring_buffer<TestTransferStruct, AllocT> *ring, size_t count) {
   for (size_t i = 0; i < count; ++i) {
-    TestTransferStruct s(static_cast<hshm::u64>(i));
+    TestTransferStruct s(static_cast<ctp::u64>(i));
     ring->Emplace(s);
   }
 }
@@ -135,7 +135,7 @@ __global__ void PushStructsKernel(
  * GPU kernel to serialize data into a vector
  * This demonstrates the serialization pattern that would be used with StringStruct
  *
- * Note: Fully constructing StringStruct with hshm::priv::string on GPU causes memory
+ * Note: Fully constructing StringStruct with ctp::priv::string on GPU causes memory
  * allocation issues, so we demonstrate the serialization format directly.
  * In a real use case, the StringStruct would be constructed on CPU and passed to GPU,
  * or GPU-specific string types would be used.
@@ -350,7 +350,7 @@ TEST_CASE("GpuShmMmap", "[gpu][backend]") {
       TestTransferStruct value;
       bool popped = ring_ptr->Pop(value);
       REQUIRE(popped);
-      REQUIRE(value.id_ == static_cast<hshm::u64>(i));
+      REQUIRE(value.id_ == static_cast<ctp::u64>(i));
       for (size_t j = 0; j < 64; ++j) {
         REQUIRE(value.data_[j] == 9);
       }
@@ -385,7 +385,7 @@ TEST_CASE("GpuShmMmap", "[gpu][backend]") {
       if (!ring_ptr->Pop(value)) {
         continue;  // Not ready yet, keep polling
       }
-      REQUIRE(value.id_ == static_cast<hshm::u64>(popped_count));
+      REQUIRE(value.id_ == static_cast<ctp::u64>(popped_count));
       for (size_t j = 0; j < 64; ++j) {
         REQUIRE(value.data_[j] == 9);
       }

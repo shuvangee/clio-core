@@ -121,11 +121,11 @@ option(WRP_CORE_ENABLE_JARVIS "Enable Jarvis CI infrastructure installation" OFF
 #------------------------------------------------------------------------------
 # HermesShm (context-transport-primitives) Options
 #------------------------------------------------------------------------------
-option(HSHM_ENABLE_PTHREADS "Support spawning pthreads" OFF)
-option(HSHM_ENABLE_WINDOWS_THREADS "Support spawning windows threads" OFF)
-option(HSHM_DEBUG_LOCK "Used for debugging locks" OFF)
-option(HSHM_NO_COMPILE "Disable compiling / installing this library" OFF)
-set(HSHM_LOG_LEVEL "1" CACHE STRING "Log level threshold (0=Debug, 1=Info, 2=Warning, 3=Error, 4=Fatal)")
+option(CLIO_CTP_ENABLE_PTHREADS "Support spawning pthreads" OFF)
+option(CLIO_CTP_ENABLE_WINDOWS_THREADS "Support spawning windows threads" OFF)
+option(CLIO_CTP_DEBUG_LOCK "Used for debugging locks" OFF)
+option(CLIO_CTP_NO_COMPILE "Disable compiling / installing this library" OFF)
+set(CLIO_CTP_LOG_LEVEL "1" CACHE STRING "Log level threshold (0=Debug, 1=Info, 2=Warning, 3=Error, 4=Fatal)")
 
 #------------------------------------------------------------------------------
 # Chimaera (context-runtime) Options
@@ -171,27 +171,27 @@ if(NOT WRP_CORE_ENABLE_TESTS)
   set(BUILD_TESTING OFF CACHE BOOL "Build tests (controlled by WRP_CORE_ENABLE_TESTS)" FORCE)
 endif()
 
-# Set HSHM_ENABLE_* aliases for backward compatibility
-# These allow component code to continue using HSHM_ENABLE_* while we transition
+# Set CTP_ENABLE_* aliases for backward compatibility
+# These allow component code to continue using CTP_ENABLE_* while we transition
 # Mark them as cache variables to prevent options from overriding them
-set(HSHM_ENABLE_MPI ${WRP_CORE_ENABLE_MPI} CACHE BOOL "Enable MPI (controlled by WRP_CORE_ENABLE_MPI)" FORCE)
-set(HSHM_ENABLE_ZMQ ${WRP_CORE_ENABLE_ZMQ} CACHE BOOL "Enable ZMQ (controlled by WRP_CORE_ENABLE_ZMQ)" FORCE)
-set(HSHM_ENABLE_LIBFABRIC ${WRP_CORE_ENABLE_LIBFABRIC} CACHE BOOL "Enable Libfabric (controlled by WRP_CORE_ENABLE_LIBFABRIC)" FORCE)
-set(HSHM_ENABLE_THALLIUM ${WRP_CORE_ENABLE_THALLIUM} CACHE BOOL "Enable Thallium (controlled by WRP_CORE_ENABLE_THALLIUM)" FORCE)
-set(HSHM_ENABLE_OPENMP ${WRP_CORE_ENABLE_OPENMP} CACHE BOOL "Enable OpenMP (controlled by WRP_CORE_ENABLE_OPENMP)" FORCE)
-set(HSHM_ENABLE_CEREAL ${WRP_CORE_ENABLE_CEREAL} CACHE BOOL "Enable Cereal (controlled by WRP_CORE_ENABLE_CEREAL)" FORCE)
-set(HSHM_ENABLE_DOXYGEN ${WRP_CORE_ENABLE_DOXYGEN} CACHE BOOL "Enable Doxygen (controlled by WRP_CORE_ENABLE_DOXYGEN)" FORCE)
-set(HSHM_ENABLE_COMPRESS ${WRP_CTE_ENABLE_COMPRESS} CACHE BOOL "Enable Compress (controlled by WRP_CTE_ENABLE_COMPRESS)" FORCE)
-set(HSHM_ENABLE_ENCRYPT ${WRP_CORE_ENABLE_ENCRYPT} CACHE BOOL "Enable Encrypt (controlled by WRP_CORE_ENABLE_ENCRYPT)" FORCE)
-set(HSHM_ENABLE_ELF ${WRP_CORE_ENABLE_ELF} CACHE BOOL "Enable ELF (controlled by WRP_CORE_ENABLE_ELF)" FORCE)
-set(HSHM_ENABLE_CUDA ${WRP_CORE_ENABLE_CUDA} CACHE BOOL "Enable CUDA (controlled by WRP_CORE_ENABLE_CUDA)" FORCE)
-set(HSHM_ENABLE_ROCM ${WRP_CORE_ENABLE_ROCM} CACHE BOOL "Enable ROCm (controlled by WRP_CORE_ENABLE_ROCM)" FORCE)
-set(HSHM_ENABLE_SYCL ${WRP_CORE_ENABLE_SYCL} CACHE BOOL "Enable SYCL (controlled by WRP_CORE_ENABLE_SYCL)" FORCE)
-set(HSHM_ENABLE_IO_URING ${WRP_CORE_ENABLE_IO_URING} CACHE BOOL "Enable io_uring (controlled by WRP_CORE_ENABLE_IO_URING)" FORCE)
-set(HSHM_ENABLE_NIXL ${WRP_CORE_ENABLE_NIXL} CACHE BOOL "Enable NIXL (controlled by WRP_CORE_ENABLE_NIXL)" FORCE)
-set(HSHM_ENABLE_NVSHMEM ${WRP_CORE_ENABLE_NVSHMEM} CACHE BOOL "Enable NVSHMEM (controlled by WRP_CORE_ENABLE_NVSHMEM)" FORCE)
+set(CLIO_CTP_ENABLE_MPI ${WRP_CORE_ENABLE_MPI} CACHE BOOL "Enable MPI (controlled by WRP_CORE_ENABLE_MPI)" FORCE)
+set(CLIO_CTP_ENABLE_ZMQ ${WRP_CORE_ENABLE_ZMQ} CACHE BOOL "Enable ZMQ (controlled by WRP_CORE_ENABLE_ZMQ)" FORCE)
+set(CLIO_CTP_ENABLE_LIBFABRIC ${WRP_CORE_ENABLE_LIBFABRIC} CACHE BOOL "Enable Libfabric (controlled by WRP_CORE_ENABLE_LIBFABRIC)" FORCE)
+set(CLIO_CTP_ENABLE_THALLIUM ${WRP_CORE_ENABLE_THALLIUM} CACHE BOOL "Enable Thallium (controlled by WRP_CORE_ENABLE_THALLIUM)" FORCE)
+set(CLIO_CTP_ENABLE_OPENMP ${WRP_CORE_ENABLE_OPENMP} CACHE BOOL "Enable OpenMP (controlled by WRP_CORE_ENABLE_OPENMP)" FORCE)
+set(CLIO_CTP_ENABLE_CEREAL ${WRP_CORE_ENABLE_CEREAL} CACHE BOOL "Enable Cereal (controlled by WRP_CORE_ENABLE_CEREAL)" FORCE)
+set(CLIO_CTP_ENABLE_DOXYGEN ${WRP_CORE_ENABLE_DOXYGEN} CACHE BOOL "Enable Doxygen (controlled by WRP_CORE_ENABLE_DOXYGEN)" FORCE)
+set(CLIO_CTP_ENABLE_COMPRESS ${WRP_CTE_ENABLE_COMPRESS} CACHE BOOL "Enable Compress (controlled by WRP_CTE_ENABLE_COMPRESS)" FORCE)
+set(CLIO_CTP_ENABLE_ENCRYPT ${WRP_CORE_ENABLE_ENCRYPT} CACHE BOOL "Enable Encrypt (controlled by WRP_CORE_ENABLE_ENCRYPT)" FORCE)
+set(CLIO_CTP_ENABLE_ELF ${WRP_CORE_ENABLE_ELF} CACHE BOOL "Enable ELF (controlled by WRP_CORE_ENABLE_ELF)" FORCE)
+set(CLIO_CTP_ENABLE_CUDA ${WRP_CORE_ENABLE_CUDA} CACHE BOOL "Enable CUDA (controlled by WRP_CORE_ENABLE_CUDA)" FORCE)
+set(CLIO_CTP_ENABLE_ROCM ${WRP_CORE_ENABLE_ROCM} CACHE BOOL "Enable ROCm (controlled by WRP_CORE_ENABLE_ROCM)" FORCE)
+set(CLIO_CTP_ENABLE_SYCL ${WRP_CORE_ENABLE_SYCL} CACHE BOOL "Enable SYCL (controlled by WRP_CORE_ENABLE_SYCL)" FORCE)
+set(CLIO_CTP_ENABLE_IO_URING ${WRP_CORE_ENABLE_IO_URING} CACHE BOOL "Enable io_uring (controlled by WRP_CORE_ENABLE_IO_URING)" FORCE)
+set(CLIO_CTP_ENABLE_NIXL ${WRP_CORE_ENABLE_NIXL} CACHE BOOL "Enable NIXL (controlled by WRP_CORE_ENABLE_NIXL)" FORCE)
+set(CLIO_CTP_ENABLE_NVSHMEM ${WRP_CORE_ENABLE_NVSHMEM} CACHE BOOL "Enable NVSHMEM (controlled by WRP_CORE_ENABLE_NVSHMEM)" FORCE)
 # Note: Coverage is handled globally via add_compile_options when WRP_CORE_ENABLE_COVERAGE=ON
-# No need for component-level HSHM_ENABLE_COVERAGE
+# No need for component-level CTP_ENABLE_COVERAGE
 
 # Print final test/benchmark configuration
 message(STATUS "Test/Benchmark Configuration:")
@@ -439,7 +439,7 @@ if(WRP_CTE_ENABLE_COMPRESS)
 
     # LibPressio - try find_package first (CMake-based), fall back to pkg-config
     # Make it optional since libpressio may not be installed
-    set(HSHM_ENABLE_LIBPRESSIO OFF)
+    set(CLIO_CTP_ENABLE_LIBPRESSIO OFF)
     find_package(LibPressio QUIET)
     if(LibPressio_FOUND)
         message(STATUS "found libpressio.h via CMake at ${LibPressio_INCLUDE_DIRS}")
@@ -453,12 +453,12 @@ if(WRP_CTE_ENABLE_COMPRESS)
         endif()
         set(libpressio_INCLUDE_DIRS ${LibPressio_INCLUDE_DIRS})
         set(libpressio_LIBRARY_DIRS "")
-        set(HSHM_ENABLE_LIBPRESSIO ON)
+        set(CLIO_CTP_ENABLE_LIBPRESSIO ON)
     else()
         pkg_check_modules(libpressio QUIET libpressio)
         if(libpressio_FOUND)
             message(STATUS "found libpressio.h at ${libpressio_INCLUDE_DIRS}")
-            set(HSHM_ENABLE_LIBPRESSIO ON)
+            set(CLIO_CTP_ENABLE_LIBPRESSIO ON)
         else()
             message(STATUS "libpressio not found - LibPressio wrapper will be disabled")
             set(libpressio_LIBRARIES "")
@@ -501,14 +501,14 @@ if(WRP_CTE_ENABLE_COMPRESS)
         ${blosc2_LIBRARY_DIRS}
     )
     # Only add libpressio if found
-    if(HSHM_ENABLE_LIBPRESSIO)
+    if(CLIO_CTP_ENABLE_LIBPRESSIO)
         list(APPEND COMPRESS_LIBS ${libpressio_LIBRARIES})
         list(APPEND COMPRESS_INCLUDES ${libpressio_INCLUDE_DIRS})
         list(APPEND COMPRESS_LIB_DIRS ${libpressio_LIBRARY_DIRS})
     endif()
 
-    # Make HSHM_ENABLE_LIBPRESSIO available to subdirectories (HSHM)
-    set(HSHM_ENABLE_LIBPRESSIO ${HSHM_ENABLE_LIBPRESSIO} CACHE BOOL "Enable LibPressio wrapper (auto-detected)" FORCE)
+    # Make CTP_ENABLE_LIBPRESSIO available to subdirectories (HSHM)
+    set(CLIO_CTP_ENABLE_LIBPRESSIO ${CLIO_CTP_ENABLE_LIBPRESSIO} CACHE BOOL "Enable LibPressio wrapper (auto-detected)" FORCE)
 endif()
 
 # Encryption libraries (conditional)
@@ -521,7 +521,7 @@ if(WRP_CORE_ENABLE_ENCRYPT)
     set(ENCRYPT_LIB_DIRS ${libcrypto_LIBRARY_DIRS})
 endif()
 
-# Note: ELF library detection moved to after HSHM_ENABLE_ELF is set (line ~520)
+# Note: ELF library detection moved to after CTP_ENABLE_ELF is set (line ~520)
 
 # ZeroMQ (conditional) - try system first, fall back to submodule
 if(WRP_CORE_ENABLE_ZMQ)
@@ -978,8 +978,8 @@ set(_WRP_ENABLED_COMPONENT_DIRS "")
 
 add_subdirectory(context-transport-primitives)
 list(APPEND _WRP_ENABLED_COMPONENT_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/context-transport-primitives")
-# Set HSHM_ROOT for cross-component access
-set(HSHM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/context-transport-primitives" CACHE PATH "Root directory for context-transport-primitives")
+# Set CTP_ROOT for cross-component access
+set(CLIO_CTP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/context-transport-primitives" CACHE PATH "Root directory for context-transport-primitives")
 
 # Runtime component
 if(WRP_CORE_ENABLE_RUNTIME)

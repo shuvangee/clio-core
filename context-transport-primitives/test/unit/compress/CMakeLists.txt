@@ -20,9 +20,9 @@ add_executable(test_compress_exec
 
 add_dependencies(test_compress_exec hermes_shm_host)
 target_link_libraries(test_compress_exec
-        hermes_shm_host hshm::compress Catch2::Catch2)
+        hermes_shm_host ctp::compress Catch2::Catch2)
 target_compile_definitions(test_compress_exec
-        PRIVATE HSHM_ENABLE_COMPRESS=1)
+        PRIVATE CTP_ENABLE_COMPRESS=1)
 
 #------------------------------------------------------------------------------
 # Tests

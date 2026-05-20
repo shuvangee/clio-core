@@ -73,7 +73,7 @@ using namespace chi;
 
 inline chi::priv::vector<chimaera::bdev::Block> WrapBlock(
     const chimaera::bdev::Block& block) {
-  chi::priv::vector<chimaera::bdev::Block> blocks(HSHM_MALLOC);
+  chi::priv::vector<chimaera::bdev::Block> blocks(CTP_MALLOC);
   blocks.push_back(block);
   return blocks;
 }
@@ -139,9 +139,9 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
   chimaera::bdev::Block block = alloc_task->blocks_[0];
 
   // Generate rank-specific test data
-  std::vector<hshm::u8> write_data(io_size);
+  std::vector<ctp::u8> write_data(io_size);
   for (size_t i = 0; i < io_size; ++i) {
-    write_data[i] = static_cast<hshm::u8>((0xAB + rank * 37 + i) % 256);
+    write_data[i] = static_cast<ctp::u8>((0xAB + rank * 37 + i) % 256);
   }
 
   // Write
@@ -196,11 +196,11 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
 
   int mismatches = 0;
   for (size_t i = 0; i < verify_size; ++i) {
-    if (static_cast<hshm::u8>(data_ptr.ptr_[i]) != write_data[i]) {
+    if (static_cast<ctp::u8>(data_ptr.ptr_[i]) != write_data[i]) {
       mismatches++;
       if (mismatches <= 3) {
         HLOG(kError, "[Rank {}] Mismatch at byte {}: got {} expected {}", rank, i,
-             (int)(hshm::u8)data_ptr.ptr_[i], (int)write_data[i]);
+             (int)(ctp::u8)data_ptr.ptr_[i], (int)write_data[i]);
       }
     }
   }

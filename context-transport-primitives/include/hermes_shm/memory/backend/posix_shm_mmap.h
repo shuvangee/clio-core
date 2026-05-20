@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_INCLUDE_MEMORY_BACKEND_POSIX_SHM_MMAP_H
-#define HSHM_INCLUDE_MEMORY_BACKEND_POSIX_SHM_MMAP_H
+#ifndef CTP_INCLUDE_MEMORY_BACKEND_POSIX_SHM_MMAP_H
+#define CTP_INCLUDE_MEMORY_BACKEND_POSIX_SHM_MMAP_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +49,7 @@
 #include "hermes_shm/util/logging.h"
 #include "memory_backend.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 class PosixShmMmap : public MemoryBackend, public UrlMemoryBackend {
  protected:
@@ -58,11 +58,11 @@ class PosixShmMmap : public MemoryBackend, public UrlMemoryBackend {
 
  public:
   /** Constructor */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   PosixShmMmap() : fd_{} {}
 
   /** Destructor */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ~PosixShmMmap() = default;
 
   /**
@@ -194,7 +194,7 @@ class PosixShmMmap : public MemoryBackend, public UrlMemoryBackend {
     char *ptr =
         reinterpret_cast<char *>(SystemInfo::MapSharedMemory(fd_, size, off));
     if (!ptr) {
-      HSHM_THROW_ERROR(SHMEM_CREATE_FAILED);
+      CTP_THROW_ERROR(SHMEM_CREATE_FAILED);
     }
     return ptr;
   }
@@ -223,6 +223,6 @@ class PosixShmMmap : public MemoryBackend, public UrlMemoryBackend {
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_INCLUDE_MEMORY_BACKEND_POSIX_SHM_MMAP_H
+#endif  // CTP_INCLUDE_MEMORY_BACKEND_POSIX_SHM_MMAP_H

@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_TEST_UNIT_ALLOCATOR_ALLOCATOR_TEST_H_
-#define HSHM_TEST_UNIT_ALLOCATOR_ALLOCATOR_TEST_H_
+#ifndef CTP_TEST_UNIT_ALLOCATOR_ALLOCATOR_TEST_H_
+#define CTP_TEST_UNIT_ALLOCATOR_ALLOCATOR_TEST_H_
 
 #include <random>
 #include <thread>
@@ -42,7 +42,7 @@
 #include <cstring>
 #include "hermes_shm/memory/allocator/allocator.h"
 
-namespace hshm::testing {
+namespace ctp::testing {
 
 /**
  * Templated allocator test class
@@ -383,6 +383,6 @@ class AllocatorTest {
   }
 };
 
-}  // namespace hshm::testing
+}  // namespace ctp::testing
 
-#endif  // HSHM_TEST_UNIT_ALLOCATOR_ALLOCATOR_TEST_H_
+#endif  // CTP_TEST_UNIT_ALLOCATOR_ALLOCATOR_TEST_H_

@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
   auto t_start = std::chrono::steady_clock::now();
 
   for (size_t i = 0; i < args.num_ops; ++i) {
-    chi::priv::vector<chimaera::bdev::Block> blocks(HSHM_MALLOC);
+    chi::priv::vector<chimaera::bdev::Block> blocks(CTP_MALLOC);
     chimaera::bdev::Block blk;
     blk.offset_ = rank_offset + i * args.io_size;
     blk.size_ = args.io_size;

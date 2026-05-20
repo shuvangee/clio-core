@@ -54,7 +54,7 @@ if(WRP_CORE_ENABLE_REDIS)
   )
   target_link_libraries(clio_redis_bench
     ${WRP_REDIS_LIBS}
-    hshm::cxx
+    ctp::cxx
   )
   target_compile_features(clio_redis_bench PRIVATE cxx_std_17)
   install(TARGETS clio_redis_bench

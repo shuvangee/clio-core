@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define HSHM_COMPILING_DLL
+#define CTP_COMPILING_DLL
 #define __HSHM_IS_COMPILING__
 
 #include "hermes_shm/introspect/system_info.h"
@@ -53,14 +53,14 @@
 #if defined(__has_feature)
 #if __has_feature(memory_sanitizer)
 #include <sanitizer/msan_interface.h>
-#define HSHM_MSAN_UNPOISON(ptr, size) __msan_unpoison((ptr), (size))
+#define CTP_MSAN_UNPOISON(ptr, size) __msan_unpoison((ptr), (size))
 #else
-#define HSHM_MSAN_UNPOISON(ptr, size) ((void)0)
+#define CTP_MSAN_UNPOISON(ptr, size) ((void)0)
 #endif
 #else
-#define HSHM_MSAN_UNPOISON(ptr, size) ((void)0)
+#define CTP_MSAN_UNPOISON(ptr, size) ((void)0)
 #endif
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #include <limits.h>
 #include <dlfcn.h>
 #include <signal.h>
@@ -80,17 +80,17 @@
 #include <linux/memfd.h>
 #endif
 // WINDOWS
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
 #include <windows.h>
 #else
 #error \
-    "Must define either HSHM_ENABLE_PROCFS_SYSINFO or HSHM_ENABLE_WINDOWS_SYSINFO"
+    "Must define either CTP_ENABLE_PROCFS_SYSINFO or CTP_ENABLE_WINDOWS_SYSINFO"
 #endif
 
-namespace hshm {
+namespace ctp {
 
 void SystemInfo::RefreshCpuFreqKhz() {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   for (int i = 0; i < ncpu_; ++i) {
     cur_cpu_freq_[i] = GetCpuFreqKhz(i);
   }
@@ -98,8 +98,8 @@ void SystemInfo::RefreshCpuFreqKhz() {
 }
 
 size_t SystemInfo::GetCpuFreqKhz(int cpu) {
-#if HSHM_IS_HOST
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_IS_HOST
+#if CTP_ENABLE_PROCFS_SYSINFO
   // Read /sys/devices/system/cpu/cpuN/cpufreq/cpuinfo_cur_freq
   // Use snprintf to build the path so MSan can track the buffer as initialized
   char cpu_path[256];
@@ -109,7 +109,7 @@ size_t SystemInfo::GetCpuFreqKhz(int cpu) {
   size_t freq_khz = 0;
   cpu_file >> freq_khz;
   return freq_khz;
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return 0;
 #endif
 #else
@@ -118,8 +118,8 @@ size_t SystemInfo::GetCpuFreqKhz(int cpu) {
 }
 
 size_t SystemInfo::GetCpuMaxFreqKhz(int cpu) {
-#if HSHM_IS_HOST
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_IS_HOST
+#if CTP_ENABLE_PROCFS_SYSINFO
   // Read /sys/devices/system/cpu/cpuN/cpufreq/cpuinfo_max_freq
   char cpu_path[256];
   snprintf(cpu_path, sizeof(cpu_path),
@@ -128,7 +128,7 @@ size_t SystemInfo::GetCpuMaxFreqKhz(int cpu) {
   size_t freq_khz = 0;
   cpu_file >> freq_khz;
   return freq_khz;
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return 0;
 #endif
 #else
@@ -137,16 +137,16 @@ size_t SystemInfo::GetCpuMaxFreqKhz(int cpu) {
 }
 
 size_t SystemInfo::GetCpuMinFreqKhz(int cpu) {
-#if HSHM_IS_HOST
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_IS_HOST
+#if CTP_ENABLE_PROCFS_SYSINFO
   // Read /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
-  std::string cpu_str = hshm::Formatter::format(
+  std::string cpu_str = ctp::Formatter::format(
       "/sys/devices/system/cpu/cpu{}/cpufreq/cpuinfo_min_freq", cpu);
   std::ifstream cpu_file(cpu_str);
   size_t freq_khz;
   cpu_file >> freq_khz;
   return freq_khz;
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return 0;
 #endif
 #else
@@ -172,8 +172,8 @@ void SystemInfo::SetCpuFreqKhz(int cpu, size_t cpu_freq_khz) {
 }
 
 void SystemInfo::SetCpuMinFreqKhz(int cpu, size_t cpu_freq_khz) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
-  std::string cpu_str = hshm::Formatter::format(
+#if CTP_ENABLE_PROCFS_SYSINFO
+  std::string cpu_str = ctp::Formatter::format(
       "/sys/devices/system/cpu/cpu{}/cpufreq/scaling_min_freq", cpu);
   std::ofstream min_freq_file(cpu_str);
   min_freq_file << cpu_freq_khz;
@@ -181,8 +181,8 @@ void SystemInfo::SetCpuMinFreqKhz(int cpu, size_t cpu_freq_khz) {
 }
 
 void SystemInfo::SetCpuMaxFreqKhz(int cpu, size_t cpu_freq_khz) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
-  std::string cpu_str = hshm::Formatter::format(
+#if CTP_ENABLE_PROCFS_SYSINFO
+  std::string cpu_str = ctp::Formatter::format(
       "/sys/devices/system/cpu/cpu{}/cpufreq/scaling_max_freq", cpu);
   std::ofstream max_freq_file(cpu_str);
   max_freq_file << cpu_freq_khz;
@@ -190,7 +190,7 @@ void SystemInfo::SetCpuMaxFreqKhz(int cpu, size_t cpu_freq_khz) {
 }
 
 int SystemInfo::GetCpuCount() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 
 #if __linux__
   return get_nprocs_conf();
@@ -210,7 +210,7 @@ int SystemInfo::GetCpuCount() {
   return count;
 #endif
 
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   SYSTEM_INFO sys_info;
   GetSystemInfo(&sys_info);
   return sys_info.dwNumberOfProcessors;
@@ -219,9 +219,9 @@ int SystemInfo::GetCpuCount() {
 }
 
 int SystemInfo::GetPageSize() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return getpagesize();
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   SYSTEM_INFO sys_info;
   GetSystemInfo(&sys_info);
   if (sys_info.dwAllocationGranularity != 0) {
@@ -232,7 +232,7 @@ int SystemInfo::GetPageSize() {
 }
 
 int SystemInfo::GetTid() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #ifdef SYS_gettid
 #ifdef __linux__
   return (pid_t)syscall(SYS_gettid);
@@ -243,13 +243,13 @@ int SystemInfo::GetTid() {
 #warning "GetTid is not defined"
   return GetPid();
 #endif
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return GetCurrentThreadId();
 #endif
 }
 
 int SystemInfo::GetPid() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #ifdef SYS_getpid
 #ifdef __OpenBSD__
   return (pid_t)getpid();
@@ -260,29 +260,29 @@ int SystemInfo::GetPid() {
 #warning "GetPid is not defined"
   return 0;
 #endif
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return GetCurrentProcessId();
 #endif
 }
 
 int SystemInfo::GetUid() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return getuid();
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return 0;
 #endif
 };
 
 int SystemInfo::GetGid() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return getgid();
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return 0;
 #endif
 };
 
 size_t SystemInfo::GetRamCapacity() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #if __APPLE__ || __OpenBSD__
   int mib[2];
   uint64_t mem_total;  // Use uint64_t for memory sizes
@@ -306,7 +306,7 @@ size_t SystemInfo::GetRamCapacity() {
   sysinfo(&info);
   return info.totalram;
 #endif
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   MEMORYSTATUSEX mem_info;
   mem_info.dwLength = sizeof(mem_info);
   GlobalMemoryStatusEx(&mem_info);
@@ -315,7 +315,7 @@ size_t SystemInfo::GetRamCapacity() {
 }
 
 size_t SystemInfo::GetRamAvailable() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #ifdef __linux__
   std::ifstream meminfo("/proc/meminfo");
   if (!meminfo.is_open()) return 0;
@@ -331,7 +331,7 @@ size_t SystemInfo::GetRamAvailable() {
 #else
   return 0;
 #endif
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   MEMORYSTATUSEX mem_info;
   mem_info.dwLength = sizeof(mem_info);
   GlobalMemoryStatusEx(&mem_info);
@@ -343,7 +343,7 @@ size_t SystemInfo::GetRamAvailable() {
 
 CpuTimes SystemInfo::GetCpuTimes() {
   CpuTimes ct = {};
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #ifdef __linux__
   std::ifstream stat("/proc/stat");
   if (stat.is_open()) {
@@ -357,21 +357,21 @@ CpuTimes SystemInfo::GetCpuTimes() {
 }
 
 void SystemInfo::YieldThread() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   sched_yield();
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   Yield();
 #endif
 }
 
 bool SystemInfo::CreateTls(ThreadLocalKey &key, void *data) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   int ret = pthread_key_create(&key.pthread_key_, nullptr);
   if (ret != 0) {
     return false;
   }
   return SetTls(key, data);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   key.windows_key_ = TlsAlloc();
   if (key.windows_key_ == TLS_OUT_OF_INDEXES) {
     return false;
@@ -381,17 +381,17 @@ bool SystemInfo::CreateTls(ThreadLocalKey &key, void *data) {
 }
 
 bool SystemInfo::SetTls(const ThreadLocalKey &key, void *data) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return pthread_setspecific(key.pthread_key_, data) == 0;
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return TlsSetValue(key.windows_key_, data);
 #endif
 }
 
 void *SystemInfo::GetTls(const ThreadLocalKey &key) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return pthread_getspecific(key.pthread_key_);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return TlsGetValue(key.windows_key_);
 #endif
 }
@@ -424,14 +424,14 @@ std::string SystemInfo::GetMemfdPath(const std::string &name) {
 
 void SystemInfo::EnsureMemfdDir() {
   std::string dir = GetMemfdDir();
-#if HSHM_ENABLE_PROCFS_SYSINFO && __linux__
+#if CTP_ENABLE_PROCFS_SYSINFO && __linux__
   mkdir(dir.c_str(), 0700);
 #endif
 }
 
 bool SystemInfo::CreateNewSharedMemory(File &fd, const std::string &name,
                                        size_t size) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #if __linux__
   fd.posix_fd_ = memfd_create(name.c_str(), 0);
   if (fd.posix_fd_ < 0) {
@@ -464,7 +464,7 @@ bool SystemInfo::CreateNewSharedMemory(File &fd, const std::string &name,
   }
   return true;
 #endif
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   fd.windows_fd_ =
       CreateFileMapping(INVALID_HANDLE_VALUE,  // use paging file
                         nullptr,               // default security
@@ -477,7 +477,7 @@ bool SystemInfo::CreateNewSharedMemory(File &fd, const std::string &name,
 }
 
 bool SystemInfo::OpenSharedMemory(File &fd, const std::string &name) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #if __linux__
   std::string memfd_path = GetMemfdPath(name);
   fd.posix_fd_ = open(memfd_path.c_str(), O_RDWR);
@@ -486,34 +486,34 @@ bool SystemInfo::OpenSharedMemory(File &fd, const std::string &name) {
   fd.posix_fd_ = shm_open(name.c_str(), O_RDWR, 0666);
   return fd.posix_fd_ >= 0;
 #endif
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   fd.windows_fd_ = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
   return fd.windows_fd_ != nullptr;
 #endif
 }
 
 void SystemInfo::CloseSharedMemory(File &file) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   close(file.posix_fd_);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   CloseHandle(file.windows_fd_);
 #endif
 }
 
 void SystemInfo::DestroySharedMemory(const std::string &name) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #if __linux__
   std::string memfd_path = GetMemfdPath(name);
   unlink(memfd_path.c_str());
 #else
   shm_unlink(name.c_str());
 #endif
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
 #endif
 }
 
 void *SystemInfo::MapPrivateMemory(size_t size) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
 #if __APPLE__ || __OpenBSD__
   void *ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -522,29 +522,29 @@ void *SystemInfo::MapPrivateMemory(size_t size) {
                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #endif
   if (ptr != MAP_FAILED && ptr != nullptr) {
-    HSHM_MSAN_UNPOISON(ptr, size);
+    CTP_MSAN_UNPOISON(ptr, size);
   }
   return ptr;
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   void *ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_READWRITE);
   if (ptr) {
-    HSHM_MSAN_UNPOISON(ptr, size);
+    CTP_MSAN_UNPOISON(ptr, size);
   }
   return ptr;
 #endif
 }
 
 void *SystemInfo::MapSharedMemory(const File &fd, size_t size, i64 off) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   void *ptr = mmap64(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED,
                      fd.posix_fd_, off);
   if (ptr == MAP_FAILED) {
     perror("mmap");
     return nullptr;
   }
-  HSHM_MSAN_UNPOISON(ptr, size);
+  CTP_MSAN_UNPOISON(ptr, size);
   return ptr;
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   // Convert i64 to low and high dwords
   DWORD highDword = (DWORD)((off >> 32) & 0xFFFFFFFF);
   DWORD lowDword = (DWORD)(off & 0xFFFFFFFF);
@@ -568,25 +568,25 @@ void *SystemInfo::MapSharedMemory(const File &fd, size_t size, i64 off) {
 }
 
 void SystemInfo::UnmapMemory(void *ptr, size_t size) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   munmap(ptr, size);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   VirtualFree(ptr, size, MEM_RELEASE);
 #endif
 }
 
 void *SystemInfo::AlignedAlloc(size_t alignment, size_t size) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return aligned_alloc(alignment, size);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return _aligned_malloc(size, alignment);
 #endif
 }
 
 bool SystemInfo::IsProcessAlive(int pid) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return kill(pid, 0) != -1 || errno != ESRCH;
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
                          static_cast<DWORD>(pid));
   if (h == NULL) return false;
@@ -596,7 +596,7 @@ bool SystemInfo::IsProcessAlive(int pid) {
 }
 
 std::string SystemInfo::GetModuleDirectory() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   Dl_info dl_info;
   void *addr = reinterpret_cast<void *>(&SystemInfo::GetModuleDirectory);
   if (dladdr(addr, &dl_info) == 0) return "";
@@ -605,7 +605,7 @@ std::string SystemInfo::GetModuleDirectory() {
   std::string resolved_str(resolved);
   auto pos = resolved_str.rfind('/');
   return (pos != std::string::npos) ? resolved_str.substr(0, pos) : std::string();
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   HMODULE hModule = nullptr;
   if (!GetModuleHandleExA(
           GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
@@ -624,23 +624,23 @@ std::string SystemInfo::GetModuleDirectory() {
 }
 
 std::string SystemInfo::GetLibrarySearchPathVar() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return "LD_LIBRARY_PATH";
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return "PATH";
 #endif
 }
 
 char SystemInfo::GetPathListSeparator() {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return ':';
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return ';';
 #endif
 }
 
 std::string SystemInfo::GetSharedLibExtension() {
-#if HSHM_ENABLE_WINDOWS_SYSINFO
+#if CTP_ENABLE_WINDOWS_SYSINFO
   return ".dll";
 #elif __APPLE__
   return ".dylib";
@@ -650,13 +650,13 @@ std::string SystemInfo::GetSharedLibExtension() {
 }
 
 std::string SystemInfo::Getenv(const char *name, size_t max_size) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   char *var = getenv(name);
   if (var == nullptr) {
     return "";
   }
   return std::string(var);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   std::string var;
   var.resize(max_size);
   DWORD len = GetEnvironmentVariable(name, var.data(),
@@ -673,17 +673,17 @@ std::string SystemInfo::Getenv(const char *name, size_t max_size) {
 
 void SystemInfo::Setenv(const char *name, const std::string &value,
                         int overwrite) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   setenv(name, value.c_str(), overwrite);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   SetEnvironmentVariable(name, value.c_str());
 #endif
 }
 
 void SystemInfo::Unsetenv(const char *name) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   unsetenv(name);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   SetEnvironmentVariable(name, nullptr);
 #endif
 }
@@ -694,9 +694,9 @@ SharedLibrary::SharedLibrary(const std::string &name) : handle_(nullptr) {
 
 SharedLibrary::~SharedLibrary() {
   if (handle_) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
     dlclose(handle_);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
     ::FreeLibrary((HMODULE)handle_);
 #endif
     handle_ = nullptr;
@@ -704,25 +704,25 @@ SharedLibrary::~SharedLibrary() {
 }
 
 void SharedLibrary::Load(const std::string &name) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   handle_ = dlopen(name.c_str(), RTLD_GLOBAL | RTLD_NOW);
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   handle_ = LoadLibraryA(name.c_str());
 #endif
 }
 
 std::string SharedLibrary::GetError() const {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return std::string(dlerror());
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return std::string();
 #endif
 }
 
 void *SharedLibrary::GetSymbol(const std::string &name) {
-#if HSHM_ENABLE_PROCFS_SYSINFO
+#if CTP_ENABLE_PROCFS_SYSINFO
   return dlsym(handle_, name.c_str());
-#elif HSHM_ENABLE_WINDOWS_SYSINFO
+#elif CTP_ENABLE_WINDOWS_SYSINFO
   return (void *)::GetProcAddress((HMODULE)handle_, name.c_str());
 #endif
 }
@@ -740,4 +740,4 @@ SharedLibrary &SharedLibrary::operator=(SharedLibrary &&other) noexcept {
   return *this;
 }
 
-}  // namespace hshm
+}  // namespace ctp

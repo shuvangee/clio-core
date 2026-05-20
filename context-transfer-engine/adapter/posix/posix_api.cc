@@ -50,8 +50,8 @@ bool posix_intercepted = true;
 
 namespace clio::cae {
 // Define global pointer variables in source file
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(PosixApi, g_posix_api);
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(PosixFs, g_posix_fs);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(PosixApi, g_posix_api);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(PosixFs, g_posix_fs);
 
 /** Used for compatability with older kernel versions */
 int fxstat_to_fstat(int fd, struct stat *stbuf) {

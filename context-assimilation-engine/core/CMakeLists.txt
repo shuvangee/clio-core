@@ -117,7 +117,7 @@ target_link_libraries(clio_cae_omni
   PRIVATE
     wrp_cae_core_client
     chimaera::cxx
-    hshm::configure
+    ctp::configure
 )
 install(TARGETS clio_cae_omni DESTINATION bin)
 

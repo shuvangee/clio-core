@@ -31,36 +31,36 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_THREAD_THREAD_MANAGER_H_
-#define HSHM_THREAD_THREAD_MANAGER_H_
+#ifndef CTP_THREAD_THREAD_MANAGER_H_
+#define CTP_THREAD_THREAD_MANAGER_H_
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/introspect/system_info.h"
 #include "hermes_shm/thread/thread_model/thread_model.h"
 
-#if HSHM_ENABLE_PTHREADS
+#if CTP_ENABLE_PTHREADS
 #include "thread_model/pthread.h"
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
 #include "thread_model/argobots.h"
 #endif
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
 #include "thread_model/cuda.h"
 #endif
-#if HSHM_ENABLE_ROCM
+#if CTP_ENABLE_ROCM
 #include "thread_model/rocm.h"
 #endif
 #include "hermes_shm/util/singleton.h"
 #include "thread_model/std_thread.h"
 
-#if HSHM_IS_HOST
-#define HSHM_THREAD_MODEL \
-  hshm::CrossSingleton<HSHM_DEFAULT_THREAD_MODEL>::GetInstance()
-#define HSHM_THREAD_MODEL_T hshm::HSHM_DEFAULT_THREAD_MODEL*
-#elif HSHM_IS_GPU
-#define HSHM_THREAD_MODEL \
-  hshm::CrossSingleton<HSHM_DEFAULT_THREAD_MODEL_GPU>::GetInstance()
-#define HSHM_THREAD_MODEL_T hshm::HSHM_DEFAULT_THREAD_MODEL_GPU*
+#if CTP_IS_HOST
+#define CTP_THREAD_MODEL \
+  ctp::CrossSingleton<CTP_DEFAULT_THREAD_MODEL>::GetInstance()
+#define CTP_THREAD_MODEL_T ctp::CTP_DEFAULT_THREAD_MODEL*
+#elif CTP_IS_GPU
+#define CTP_THREAD_MODEL \
+  ctp::CrossSingleton<CTP_DEFAULT_THREAD_MODEL_GPU>::GetInstance()
+#define CTP_THREAD_MODEL_T ctp::CTP_DEFAULT_THREAD_MODEL_GPU*
 #endif
 
-#endif  // HSHM_THREAD_THREAD_MANAGER_H_
+#endif  // CTP_THREAD_THREAD_MANAGER_H_

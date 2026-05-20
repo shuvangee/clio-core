@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_INCLUDE_HSHM_MEMORY_BACKEND_ARRAY_BACKEND_H_
-#define HSHM_INCLUDE_HSHM_MEMORY_BACKEND_ARRAY_BACKEND_H_
+#ifndef CTP_INCLUDE_HSHM_MEMORY_BACKEND_ARRAY_BACKEND_H_
+#define CTP_INCLUDE_HSHM_MEMORY_BACKEND_ARRAY_BACKEND_H_
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,11 +45,11 @@
 #include "hermes_shm/util/errors.h"
 #include "memory_backend.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 class ArrayBackend : public MemoryBackend {
  public:
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ArrayBackend() = default;
 
   ~ArrayBackend() = default;
@@ -64,7 +64,7 @@ class ArrayBackend : public MemoryBackend {
    *
    * The entire region is available as data.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool shm_init(const MemoryBackendId &backend_id, size_t size, char *region) {
     region_ = region;
     header_ = reinterpret_cast<MemoryBackendHeader *>(region_);
@@ -86,7 +86,7 @@ class ArrayBackend : public MemoryBackend {
 
   bool shm_attach(const std::string &url) {
     (void)url;
-    HSHM_THROW_ERROR(SHMEM_NOT_SUPPORTED);
+    CTP_THROW_ERROR(SHMEM_NOT_SUPPORTED);
     return false;
   }
 
@@ -95,6 +95,6 @@ class ArrayBackend : public MemoryBackend {
   void shm_destroy() {}
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_INCLUDE_HSHM_MEMORY_BACKEND_ARRAY_BACKEND_H_
+#endif  // CTP_INCLUDE_HSHM_MEMORY_BACKEND_ARRAY_BACKEND_H_

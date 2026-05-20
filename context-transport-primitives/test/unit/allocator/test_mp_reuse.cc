@@ -16,7 +16,7 @@
 #include <cstring>
 #include <thread>
 
-namespace hipc = hshm::ipc;
+namespace hipc = ctp::ipc;
 
 namespace {
 struct ReuseResult {

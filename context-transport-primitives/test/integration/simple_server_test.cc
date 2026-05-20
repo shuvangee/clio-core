@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
     
     // Create server using the selected backend
     if (protocol == "thallium") {
-        hshm::lbm::thallium::Server server;
+        ctp::lbm::thallium::Server server;
 
         try {
             std::cout << "Starting Thallium server..." << std::endl;
@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     } else {
-        hshm::lbm::Server server;
+        ctp::lbm::Server server;
         std::cout << "Starting ZMQ server..." << std::endl;
         server.StartServer(url);
         

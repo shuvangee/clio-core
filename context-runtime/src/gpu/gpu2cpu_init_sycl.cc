@@ -14,7 +14,7 @@
  * register them through admin RegisterMemory.
  */
 
-#if HSHM_ENABLE_SYCL && !(HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM)
+#if CTP_ENABLE_SYCL && !(CTP_ENABLE_CUDA || CTP_ENABLE_ROCM)
 
 #include "chimaera/ipc_manager.h"
 #include "chimaera/gpu/gpu_ipc_manager.h"
@@ -36,7 +36,7 @@ namespace {
 class chimaera_sycl_init_queue_kernel;
 }
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
 
 bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
   if (!per_gpu_devices_.empty()) return true;
@@ -50,7 +50,7 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
   per_gpu_devices_.resize(sycl_devices.size());
 
   constexpr size_t kQueueBackendBytes = 16 * 1024 * 1024;
-  auto &q = hshm::GpuApi::SyclQueue();
+  auto &q = ctp::GpuApi::SyclQueue();
 
   for (size_t gpu_id = 0; gpu_id < sycl_devices.size(); ++gpu_id) {
     PerGpuDeviceState &dev = per_gpu_devices_[gpu_id];
@@ -116,13 +116,13 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
   chi::g_device_aware_memcpy.store(
       [](void *dst, const void *src, std::size_t n) {
         if (n == 0) return;
-        hshm::GpuApi::Memcpy(static_cast<char *>(dst),
+        ctp::GpuApi::Memcpy(static_cast<char *>(dst),
                              static_cast<const char *>(src), n);
       },
       std::memory_order_release);
   chi::g_is_device_pointer.store(
       [](const void *ptr) -> bool {
-        return hshm::GpuApi::IsDevicePointer(const_cast<void *>(ptr));
+        return ctp::GpuApi::IsDevicePointer(const_cast<void *>(ptr));
       },
       std::memory_order_release);
 
@@ -131,7 +131,7 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
 
 void gpu::IpcManager::FinalizeGpuQueues() {
   if (per_gpu_devices_.empty()) return;
-  auto &q = hshm::GpuApi::SyclQueue();
+  auto &q = ctp::GpuApi::SyclQueue();
   for (auto &dev : per_gpu_devices_) {
     if (dev.queue_backend) {
       sycl::free(dev.queue_backend, q);
@@ -171,8 +171,8 @@ bool ChiServerBootstrapSyclGpu(IpcManager *self, chi::u32 queue_depth,
   return self->gpu_ipc_->ServerInitGpuQueues(queue_depth);
 }
 
-#endif  // HSHM_IS_HOST
+#endif  // CTP_IS_HOST
 
 }  // namespace chi
 
-#endif  // HSHM_ENABLE_SYCL && !(CUDA||ROCM)
+#endif  // CTP_ENABLE_SYCL && !(CUDA||ROCM)

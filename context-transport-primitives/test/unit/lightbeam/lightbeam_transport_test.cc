@@ -39,10 +39,10 @@
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 void TestZeroMQ() {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
   std::cout << "\n==== Testing ZeroMQ ====\n";
 
   std::string addr = "127.0.0.1";

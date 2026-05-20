@@ -32,7 +32,7 @@
  */
 
 #pragma once
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -51,7 +51,7 @@
 #include "lightbeam.h"
 #include "posix_socket.h"
 
-namespace hshm::lbm {
+namespace ctp::lbm {
 
 /** No-op free callback for zmq_msg_init_data zero-copy sends */
 static inline void zmq_noop_free(void *data, void *hint) {
@@ -366,7 +366,7 @@ class ZeroMqTransport : public Transport {
       if (topology_ != Topology::kPushPull) {
         char hostname_buf[64] = {};
         gethostname(hostname_buf, sizeof(hostname_buf) - 1);
-        uint32_t pid = static_cast<uint32_t>(hshm::SystemInfo::GetPid());
+        uint32_t pid = static_cast<uint32_t>(ctp::SystemInfo::GetPid());
         std::string identity = std::string(hostname_buf) + ":" +
                                 std::to_string(pid);
         zmq_setsockopt(socket_, ZMQ_IDENTITY, identity.data(),
@@ -635,7 +635,7 @@ class ZeroMqTransport : public Transport {
     Bulk bulk;
     bulk.data = ptr;
     bulk.size = data_size;
-    bulk.flags = hshm::bitfield32_t(flags);
+    bulk.flags = ctp::bitfield32_t(flags);
     return bulk;
   }
 
@@ -700,7 +700,7 @@ class ZeroMqTransport : public Transport {
     uint64_t t_ser_begin = stamp();
     std::vector<char> meta_buf;
     {
-      hshm::ipc::GlobalSerialize<std::vector<char>> ar(meta_buf);
+      ctp::ipc::GlobalSerialize<std::vector<char>> ar(meta_buf);
       ar(meta);
       ar.Finalize();
     }
@@ -728,7 +728,7 @@ class ZeroMqTransport : public Transport {
       t_id_end = t_id_begin;
       t_delim_end = t_id_begin;
     } else
-#if !HSHM_IS_GPU
+#if !CTP_IS_GPU
     if (IsServer() && !meta.client_info_.identity_.empty()) {
       // ROUTER: send identity + delim frames before meta.
       int rc = zmq_send_eintr(socket_, meta.client_info_.identity_.data(),
@@ -857,7 +857,7 @@ class ZeroMqTransport : public Transport {
       }
       return info;
     }
-#if !HSHM_IS_GPU
+#if !CTP_IS_GPU
     // Copy identity from recv into ClientInfo
     info.identity_ = meta.client_info_.identity_;
 #endif
@@ -936,7 +936,7 @@ class ZeroMqTransport : public Transport {
         zmq_msg_close(&msg);
         return err;
       }
-#if !HSHM_IS_GPU
+#if !CTP_IS_GPU
       meta.client_info_.identity_ = std::string(
           static_cast<char*>(zmq_msg_data(&identity_msg)),
           zmq_msg_size(&identity_msg));
@@ -985,7 +985,7 @@ class ZeroMqTransport : public Transport {
     try {
       std::vector<char> meta_buf(static_cast<char*>(zmq_msg_data(&msg)),
                                   static_cast<char*>(zmq_msg_data(&msg)) + msg_size);
-      hshm::ipc::GlobalDeserialize<std::vector<char>> ar(meta_buf);
+      ctp::ipc::GlobalDeserialize<std::vector<char>> ar(meta_buf);
       ar(meta);
     } catch (const std::exception& e) {
       HLOG(kFatal,
@@ -1133,6 +1133,6 @@ class ZeroMqTransport : public Transport {
   std::string monitor_endpoint_;
 };
 
-}  // namespace hshm::lbm
+}  // namespace ctp::lbm
 
-#endif  // HSHM_ENABLE_ZMQ
+#endif  // CTP_ENABLE_ZMQ

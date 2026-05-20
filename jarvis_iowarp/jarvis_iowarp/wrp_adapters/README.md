@@ -86,7 +86,7 @@ interceptors:
 Paths in the `include` and `exclude` lists support environment variable expansion at both levels:
 
 1. **Python (Jarvis)**: Expands variables when generating the CAE configuration file
-2. **C++ (Runtime)**: Uses `hshm::ConfigParse::ExpandPath` to normalize paths when loading the configuration
+2. **C++ (Runtime)**: Uses `ctp::ConfigParse::ExpandPath` to normalize paths when loading the configuration
 
 ```yaml
 interceptors:

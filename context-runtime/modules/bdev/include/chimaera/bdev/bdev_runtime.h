@@ -60,7 +60,7 @@ namespace chimaera::bdev {
  * for efficient parallel I/O without contention
  */
 struct WorkerIOContext {
-  std::unique_ptr<hshm::AsyncIO> async_io_;  /**< Async I/O backend for this worker */
+  std::unique_ptr<ctp::AsyncIO> async_io_;  /**< Async I/O backend for this worker */
   bool is_initialized_ = false;              /**< Whether this context is initialized */
 
   WorkerIOContext() = default;

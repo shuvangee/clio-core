@@ -41,7 +41,7 @@
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 // Custom metadata class that inherits from LbmMeta
 class TestMeta : public LbmMeta<> {

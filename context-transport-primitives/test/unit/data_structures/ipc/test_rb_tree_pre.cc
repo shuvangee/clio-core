@@ -39,7 +39,7 @@
 #include "hermes_shm/memory/backend/malloc_backend.h"
 #include "hermes_shm/memory/allocator/arena_allocator.h"
 
-using namespace hshm::ipc;
+using namespace ctp::ipc;
 
 /**
  * Test node structure that inherits from rb_node

@@ -33,7 +33,7 @@ target_link_libraries(iowarp_hdf5_vol
     chimaera::admin_client
     chimaera::bdev_runtime
     chimaera::bdev_client
-    hshm::cxx
+    ctp::cxx
     ${HDF5_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )

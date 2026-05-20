@@ -162,7 +162,7 @@ class Client : public chi::ContainerClient {
 }  // namespace wrp_cae::core
 
 // Global pointer-based singleton for CAE client with lazy initialization
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(wrp_cae::core::Client, g_cae_client);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(wrp_cae::core::Client, g_cae_client);
 
 /**
  * Initialize CAE client singleton
@@ -181,7 +181,7 @@ bool WRP_CAE_CLIENT_INIT(const std::string &config_path = "",
  * Returns pointer to the global CAE client instance
  */
 #define WRP_CAE_CLIENT                                                         \
-  (&(*HSHM_GET_GLOBAL_PTR_VAR(wrp_cae::core::Client,                         \
+  (&(*CTP_GET_GLOBAL_PTR_VAR(wrp_cae::core::Client,                         \
                               g_cae_client)))
 
 #endif  // WRP_CAE_CORE_CLIENT_H_

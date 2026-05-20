@@ -36,7 +36,7 @@
 #include <utility>
 #include <cstdint>
 
-namespace hshm::lbm::utils {
+namespace ctp::lbm::utils {
 
 /**
  * @brief Parse a URL into node and service components
@@ -55,4 +55,4 @@ constexpr size_t GetDefaultBufferSize() { return 1024; }
  */
 constexpr size_t GetDefaultCqSize() { return 10; }
 
-}  // namespace hshm::lbm::utils 
+}  // namespace ctp::lbm::utils 

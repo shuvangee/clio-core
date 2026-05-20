@@ -47,7 +47,7 @@
 #include <type_traits>
 #include <random>
 
-namespace hshm {
+namespace ctp {
 
 /**
  * Data type enumeration for statistics calculations
@@ -851,6 +851,6 @@ class BlockSamplerFactory {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
 #endif  // HERMES_SHM_DATA_STATS_H

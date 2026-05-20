@@ -57,7 +57,7 @@ struct IpcManagerGpuInfo {
   /** Ring-buffer depth per lane (informational). */
   u32 gpu_queue_depth = 16;
 
-  HSHM_CROSS_FUN IpcManagerGpuInfo() = default;
+  CTP_CROSS_FUN IpcManagerGpuInfo() = default;
 };
 
 }  // namespace chi

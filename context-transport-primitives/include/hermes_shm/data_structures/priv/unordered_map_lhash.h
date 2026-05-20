@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LHASH_H_
-#define HSHM_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LHASH_H_
+#ifndef CTP_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LHASH_H_
+#define CTP_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LHASH_H_
 
 // `unordered_map_lhash` is the open-addressing / linear-probing hash table
 // that used to be `unordered_map_ll`. Single contiguous slot array,
@@ -46,10 +46,10 @@
 #include "hermes_shm/memory/allocator/malloc_allocator.h"
 #include "hermes_shm/thread/lock/mutex.h"
 
-namespace hshm::priv {
+namespace ctp::priv {
 
-#ifndef HSHM_PRIV_INSERT_RESULT_DEFINED_
-#define HSHM_PRIV_INSERT_RESULT_DEFINED_
+#ifndef CTP_PRIV_INSERT_RESULT_DEFINED_
+#define CTP_PRIV_INSERT_RESULT_DEFINED_
 /** Result of insert / insert_or_assign operations. Same definition is
  *  guarded in `unordered_map_ll.h`; whichever header is included first
  *  installs it, the other one sees the guard and skips. */
@@ -58,7 +58,7 @@ struct InsertResult {
   bool inserted;
   T *value;
 };
-#endif  // HSHM_PRIV_INSERT_RESULT_DEFINED_
+#endif  // CTP_PRIV_INSERT_RESULT_DEFINED_
 
 /**
  * GPU-compatible unordered map using open addressing with linear probing.
@@ -71,13 +71,13 @@ struct InsertResult {
  * @tparam Key      Key type (must support copy/move and operator==)
  * @tparam T        Mapped value type
  * @tparam AllocT   Allocator type (e.g., BuddyAllocator, PartitionedAllocator)
- * @tparam Hash     Hash functor (defaults to hshm::hash<Key>)
- * @tparam KeyEqual Equality functor (defaults to hshm::equal_to<Key>)
+ * @tparam Hash     Hash functor (defaults to ctp::hash<Key>)
+ * @tparam KeyEqual Equality functor (defaults to ctp::equal_to<Key>)
  */
 template <typename Key, typename T,
-          typename AllocT = hshm::ipc::MallocAllocator,
-          typename Hash = hshm::hash<Key>,
-          typename KeyEqual = hshm::equal_to<Key>>
+          typename AllocT = ctp::ipc::MallocAllocator,
+          typename Hash = ctp::hash<Key>,
+          typename KeyEqual = ctp::equal_to<Key>>
 class unordered_map_lhash {
  public:
   using key_type = Key;
@@ -97,10 +97,10 @@ class unordered_map_lhash {
     Key key_;
     T value_;
 
-    HSHM_CROSS_FUN Slot() : state_(kEmpty), key_(), value_() {}
-    HSHM_CROSS_FUN Slot(const Slot &o)
+    CTP_CROSS_FUN Slot() : state_(kEmpty), key_(), value_() {}
+    CTP_CROSS_FUN Slot(const Slot &o)
         : state_(o.state_), key_(o.key_), value_(o.value_) {}
-    HSHM_CROSS_FUN Slot &operator=(const Slot &o) {
+    CTP_CROSS_FUN Slot &operator=(const Slot &o) {
       if (this != &o) {
         state_ = o.state_;
         key_ = o.key_;
@@ -111,33 +111,33 @@ class unordered_map_lhash {
   };
 
   vector<Slot, AllocT> slots_;
-  hshm::ipc::atomic<size_type> size_;
+  ctp::ipc::atomic<size_type> size_;
   AllocT *alloc_;
   Hash hash_fn_;
   KeyEqual key_eq_;
-  vector<hshm::Mutex, AllocT> locks_;
+  vector<ctp::Mutex, AllocT> locks_;
   size_type num_locks_;
 
   /** Get the stripe index for a hash value */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type stripe_of(size_type h) const {
     return h % num_locks_;
   }
 
   /** Lock a stripe */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void lock_stripe(size_type stripe) {
     locks_[stripe].Lock(0);
   }
 
   /** Unlock a stripe */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void unlock_stripe(size_type stripe) {
     locks_[stripe].Unlock();
   }
 
   /** Lock all stripes (for rehash/clear/for_each) */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void lock_all() {
     for (size_type i = 0; i < num_locks_; ++i) {
       locks_[i].Lock(0);
@@ -145,7 +145,7 @@ class unordered_map_lhash {
   }
 
   /** Unlock all stripes */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void unlock_all() {
     for (size_type i = 0; i < num_locks_; ++i) {
       locks_[i].Unlock();
@@ -154,7 +154,7 @@ class unordered_map_lhash {
 
   /** Find the slot index for a key (returns capacity if not found).
    *  Caller must hold the appropriate stripe lock. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type find_slot(const Key &key) const {
     size_type cap = slots_.size();
     if (cap == 0) return cap;
@@ -171,7 +171,7 @@ class unordered_map_lhash {
 
   /** Find the first available slot (empty or tombstone) for insertion.
    *  Caller must hold the appropriate stripe lock. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void find_insert_slot(const Key &key, size_type &out_idx,
                         bool &out_existing) const {
     size_type cap = slots_.size();
@@ -197,7 +197,7 @@ class unordered_map_lhash {
   }
 
   /** Initialize stripe locks */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void init_locks(size_type num_locks) {
     num_locks_ = num_locks;
     locks_.resize(num_locks_);
@@ -212,11 +212,11 @@ class unordered_map_lhash {
    * @param capacity Initial number of slots (hash table size)
    * @param num_locks Number of stripe locks (default: 64)
    */
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   explicit unordered_map_lhash(size_type capacity = 16,
                             size_type num_locks = kDefaultNumLocks)
-      : slots_(HSHM_MALLOC), size_(0), alloc_(HSHM_MALLOC),
-        hash_fn_(), key_eq_(), locks_(HSHM_MALLOC), num_locks_(0) {
+      : slots_(CTP_MALLOC), size_(0), alloc_(CTP_MALLOC),
+        hash_fn_(), key_eq_(), locks_(CTP_MALLOC), num_locks_(0) {
     slots_.resize(capacity);
     init_locks(num_locks < capacity ? num_locks : capacity);
   }
@@ -228,7 +228,7 @@ class unordered_map_lhash {
    * @param capacity Initial number of slots (hash table size)
    * @param num_locks Number of stripe locks (default: 64)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   explicit unordered_map_lhash(AllocT *alloc, size_type capacity = 16,
                             size_type num_locks = kDefaultNumLocks)
       : slots_(alloc), size_(0), alloc_(alloc),
@@ -237,11 +237,11 @@ class unordered_map_lhash {
     init_locks(num_locks < capacity ? num_locks : capacity);
   }
 
-  HSHM_CROSS_FUN ~unordered_map_lhash() = default;
+  CTP_CROSS_FUN ~unordered_map_lhash() = default;
 
   /** Rehash the map to a new capacity, re-inserting all occupied entries.
    *  Acquires all stripe locks. Returns false if allocation fails. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool rehash(size_type new_cap) {
     lock_all();
     bool result = rehash_no_lock(new_cap);
@@ -251,7 +251,7 @@ class unordered_map_lhash {
 
  private:
   /** Rehash without locking (caller must hold all locks) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool rehash_no_lock(size_type new_cap) {
     // Try to allocate new slots first (before destroying old)
     vector<Slot, AllocT> new_slots(alloc_);
@@ -275,7 +275,7 @@ class unordered_map_lhash {
 
   /** Check load factor and rehash if needed (>75% full).
    *  Caller must hold all locks. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void maybe_rehash_locked() {
     size_type cur_size = size_.load();
     if (cur_size * 4 > slots_.size() * 3) {
@@ -284,7 +284,7 @@ class unordered_map_lhash {
   }
 
   /** Insert without rehash check (used internally by rehash) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   InsertResult<T> insert_no_rehash(const Key &key, const T &value) {
     size_type idx;
     bool existing;
@@ -304,7 +304,7 @@ class unordered_map_lhash {
 
  public:
   /** Insert or update a key-value pair (thread-safe) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   InsertResult<T> insert_or_assign(const Key &key, const T &value) {
     size_type h = hash_fn_(key);
     size_type stripe = stripe_of(h);
@@ -315,7 +315,7 @@ class unordered_map_lhash {
   }
 
   /** Insert a key-value pair, only if key doesn't exist (thread-safe) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   InsertResult<T> insert(const Key &key, const T &value) {
     size_type h = hash_fn_(key);
     size_type stripe = stripe_of(h);
@@ -326,7 +326,7 @@ class unordered_map_lhash {
   }
 
   /** Access element, creates with default value if absent (thread-safe) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   T &operator[](const Key &key) {
     size_type h = hash_fn_(key);
     size_type stripe = stripe_of(h);
@@ -337,7 +337,7 @@ class unordered_map_lhash {
   }
 
   /** Lock the stripe for a key. Must call unlock_key() when done. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void lock_key(const Key &key) {
     size_type h = hash_fn_(key);
     size_type s = stripe_of(h);
@@ -345,7 +345,7 @@ class unordered_map_lhash {
   }
 
   /** Unlock the stripe for a key. */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void unlock_key(const Key &key) {
     size_type h = hash_fn_(key);
     size_type s = stripe_of(h);
@@ -353,7 +353,7 @@ class unordered_map_lhash {
   }
 
   /** Find an element (thread-safe, returns pointer valid while map lives) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   T *find(const Key &key) {
     size_type h = hash_fn_(key);
     size_type stripe = stripe_of(h);
@@ -365,20 +365,20 @@ class unordered_map_lhash {
   }
 
   /** Find while holding the stripe lock. Caller must have called lock_key(). */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   T *find_locked(const Key &key) {
     size_type idx = find_slot(key);
     return (idx < slots_.size()) ? &slots_[idx].value_ : nullptr;
   }
 
   /** Insert while holding the stripe lock. Caller must have called lock_key(). */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   InsertResult<T> insert_locked(const Key &key, const T &value) {
     return insert_no_lock(key, value);
   }
 
   /** Erase while holding the stripe lock. Caller must have called lock_key(). */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_type erase_locked(const Key &key) {
     size_type idx = find_slot(key);
     if (idx < slots_.size()) {
@@ -392,7 +392,7 @@ class unordered_map_lhash {
   }
 
   /** Find an element (const, thread-safe) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   const T *find(const Key &key) const {
     size_type h = hash_fn_(key);
     size_type stripe = stripe_of(h);
@@ -404,19 +404,19 @@ class unordered_map_lhash {
   }
 
   /** Check if key exists (thread-safe) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool contains(const Key &key) {
     return find(key) != nullptr;
   }
 
   /** Count occurrences, 0 or 1 (thread-safe) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_type count(const Key &key) {
     return contains(key) ? 1 : 0;
   }
 
   /** Erase element by key (thread-safe) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_type erase(const Key &key) {
     size_type h = hash_fn_(key);
     size_type stripe = stripe_of(h);
@@ -435,7 +435,7 @@ class unordered_map_lhash {
   }
 
   /** Clear all elements (thread-safe, acquires all locks) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void clear() {
     lock_all();
     for (size_type i = 0; i < slots_.size(); ++i) {
@@ -450,20 +450,20 @@ class unordered_map_lhash {
   }
 
   /** Total number of elements */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type size() const { return size_.load(); }
 
   /** Check if empty */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool empty() const { return size() == 0; }
 
   /** Number of slots */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type bucket_count() const { return slots_.size(); }
 
   /** Apply function to each occupied entry (thread-safe, acquires all locks) */
   template <typename Func>
-  HSHM_CROSS_FUN void for_each(Func fn) {
+  CTP_CROSS_FUN void for_each(Func fn) {
     lock_all();
     for (size_type i = 0; i < slots_.size(); ++i) {
       if (slots_[i].state_ == kOccupied) {
@@ -475,7 +475,7 @@ class unordered_map_lhash {
 
   /** Apply function to each occupied entry (const, thread-safe) */
   template <typename Func>
-  HSHM_CROSS_FUN void for_each(Func fn) const {
+  CTP_CROSS_FUN void for_each(Func fn) const {
     const_cast<unordered_map_lhash*>(this)->lock_all();
     for (size_type i = 0; i < slots_.size(); ++i) {
       if (slots_[i].state_ == kOccupied) {
@@ -487,7 +487,7 @@ class unordered_map_lhash {
 
  private:
   /** Insert or assign without locking (caller holds stripe lock) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   InsertResult<T> insert_or_assign_no_lock(const Key &key, const T &value) {
     size_type idx;
     bool existing;
@@ -533,7 +533,7 @@ class unordered_map_lhash {
   }
 
   /** Insert without locking (caller holds stripe lock) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   InsertResult<T> insert_no_lock(const Key &key, const T &value) {
     size_type idx;
     bool existing;
@@ -574,7 +574,7 @@ class unordered_map_lhash {
   }
 
   /** operator[] without locking (caller holds stripe lock) */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   T &subscript_no_lock(const Key &key) {
     size_type idx;
     bool existing;
@@ -623,6 +623,6 @@ class unordered_map_lhash {
   }
 };
 
-}  // namespace hshm::priv
+}  // namespace ctp::priv
 
-#endif  // HSHM_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LHASH_H_
+#endif  // CTP_DATA_STRUCTURES_PRIV_UNORDERED_MAP_LHASH_H_

@@ -50,7 +50,7 @@
 #include <unistd.h>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -78,7 +78,7 @@ static void Require(bool cond, const std::string& msg) {
  *        destination buffers within the same process.
  */
 static void TestDramToMem() {
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
   std::cout << "\n==== TestDramToMem (DRAM→DRAM loopback via NIXL) ====\n";
 
   const std::string payload = "nixl_dram_loopback_test";
@@ -101,7 +101,7 @@ static void TestDramToMem() {
   // Pre-populate recv with destination buffer so NixlTransport writes there
   Bulk recv_bulk;
   recv_bulk.size = kSize;
-  recv_bulk.flags = hshm::bitfield32_t(BULK_XFER);
+  recv_bulk.flags = ctp::bitfield32_t(BULK_XFER);
   recv_bulk.data = hipc::FullPtr<char>(dst.data());
   meta.recv.push_back(recv_bulk);
 
@@ -129,7 +129,7 @@ static void TestDramToMem() {
  *        LbmContext carries a valid dst_fd_.
  */
 static void TestDramToFile() {
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
   std::cout << "\n==== TestDramToFile (DRAM→FILE via NIXL POSIX backend) ====\n";
 
   const std::string payload = "nixl_file_transfer_test_payload";
@@ -201,7 +201,7 @@ static void TestDramToFile() {
  *        to the destination file.
  */
 static void TestMultiBulkToFile() {
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
   std::cout << "\n==== TestMultiBulkToFile (scatter-gather → FILE) ====\n";
 
   const std::string part1 = "Hello, ";

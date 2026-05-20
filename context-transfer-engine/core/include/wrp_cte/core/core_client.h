@@ -42,10 +42,10 @@ namespace wrp_cte::core {
 
 class Client : public chi::ContainerClient {
  public:
-  HSHM_CROSS_FUN Client() = default;
-  HSHM_CROSS_FUN explicit Client(const chi::PoolId &pool_id) { Init(pool_id); }
+  CTP_CROSS_FUN Client() = default;
+  CTP_CROSS_FUN explicit Client(const chi::PoolId &pool_id) { Init(pool_id); }
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   /**
    * Asynchronous container creation - returns immediately
    * @param pool_query Pool query for task routing
@@ -567,11 +567,11 @@ class Client : public chi::ContainerClient {
 
     return ipc_manager->Send(task);
   }
-#endif  // HSHM_IS_HOST
+#endif  // CTP_IS_HOST
 };
 
 // Global pointer-based singleton for CTE client with lazy initialization
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(wrp_cte::core::Client, g_cte_client);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(wrp_cte::core::Client, g_cte_client);
 
 /**
  * Initialize CTE client and configuration subsystem
@@ -723,7 +723,7 @@ void FlushPutBlobTiming(const char *label);
 
 // Global singleton macro for CTE client access (returns pointer, not reference)
 #define WRP_CTE_CLIENT                               \
-  (&(*HSHM_GET_GLOBAL_PTR_VAR(wrp_cte::core::Client, \
+  (&(*CTP_GET_GLOBAL_PTR_VAR(wrp_cte::core::Client, \
                               wrp_cte::core::g_cte_client)))
 
 #endif  // WRPCTE_CORE_CLIENT_H_

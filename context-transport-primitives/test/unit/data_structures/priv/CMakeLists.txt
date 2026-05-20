@@ -9,14 +9,14 @@ add_executable(test_priv_vector_exec
 add_dependencies(test_priv_vector_exec hermes_shm_host)
 target_link_libraries(test_priv_vector_exec
         hermes_shm_host
-        hshm::serialize)
+        ctp::serialize)
 
 add_executable(test_priv_string_exec
         test_priv_string.cc)
 add_dependencies(test_priv_string_exec hermes_shm_host)
 target_link_libraries(test_priv_string_exec
         hermes_shm_host
-        hshm::serialize)
+        ctp::serialize)
 
 #------------------------------------------------------------------------------
 # Test Cases

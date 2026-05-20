@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_PRIV_VECTOR_H_
-#define HSHM_DATA_STRUCTURES_PRIV_VECTOR_H_
+#ifndef CTP_DATA_STRUCTURES_PRIV_VECTOR_H_
+#define CTP_DATA_STRUCTURES_PRIV_VECTOR_H_
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/types/numbers.h"
@@ -44,7 +44,7 @@
 #include <stdexcept>
 #include <algorithm>
 
-namespace hshm::priv {
+namespace ctp::priv {
 
 /**
  * Private-memory vector container with allocator integration and SVO
@@ -91,7 +91,7 @@ class vector {
     /**
      * Default constructor
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator() : ptr_(nullptr) {}
 
     /**
@@ -99,7 +99,7 @@ class vector {
      *
      * @param ptr The element pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     explicit iterator(T *ptr) : ptr_(ptr) {}
 
     /**
@@ -107,7 +107,7 @@ class vector {
      *
      * @return Reference to the current element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T& operator*() const { return *ptr_; }
 
     /**
@@ -115,7 +115,7 @@ class vector {
      *
      * @return Pointer to the current element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T* operator->() const { return ptr_; }
 
     /**
@@ -123,7 +123,7 @@ class vector {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator++() {
       ++ptr_;
       return *this;
@@ -134,7 +134,7 @@ class vector {
      *
      * @return Copy of this iterator before incrementing
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator++(int) {
       iterator temp = *this;
       ++ptr_;
@@ -146,7 +146,7 @@ class vector {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator--() {
       --ptr_;
       return *this;
@@ -157,7 +157,7 @@ class vector {
      *
      * @return Copy of this iterator before decrementing
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator--(int) {
       iterator temp = *this;
       --ptr_;
@@ -170,7 +170,7 @@ class vector {
      * @param n Number of elements to advance
      * @return New iterator advanced by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator+(difference_type n) const {
       return iterator(ptr_ + n);
     }
@@ -181,7 +181,7 @@ class vector {
      * @param n Number of elements to go back
      * @return New iterator moved back by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator-(difference_type n) const {
       return iterator(ptr_ - n);
     }
@@ -192,7 +192,7 @@ class vector {
      * @param n Number of elements to advance
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator+=(difference_type n) {
       ptr_ += n;
       return *this;
@@ -204,7 +204,7 @@ class vector {
      * @param n Number of elements to go back
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator-=(difference_type n) {
       ptr_ -= n;
       return *this;
@@ -216,7 +216,7 @@ class vector {
      * @param other Another iterator
      * @return The number of elements between this and other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     difference_type operator-(const iterator& other) const {
       return ptr_ - other.ptr_;
     }
@@ -227,7 +227,7 @@ class vector {
      * @param n Index offset from current position
      * @return Reference to the element at offset n
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T& operator[](difference_type n) const {
       return ptr_[n];
     }
@@ -238,7 +238,7 @@ class vector {
      * @param other Another iterator
      * @return True if both iterators point to the same element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator==(const iterator& other) const {
       return ptr_ == other.ptr_;
     }
@@ -249,7 +249,7 @@ class vector {
      * @param other Another iterator
      * @return True if iterators point to different elements
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator!=(const iterator& other) const {
       return ptr_ != other.ptr_;
     }
@@ -260,7 +260,7 @@ class vector {
      * @param other Another iterator
      * @return True if this iterator comes before other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<(const iterator& other) const {
       return ptr_ < other.ptr_;
     }
@@ -271,7 +271,7 @@ class vector {
      * @param other Another iterator
      * @return True if this iterator comes before or equals other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<=(const iterator& other) const {
       return ptr_ <= other.ptr_;
     }
@@ -282,7 +282,7 @@ class vector {
      * @param other Another iterator
      * @return True if this iterator comes after other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>(const iterator& other) const {
       return ptr_ > other.ptr_;
     }
@@ -293,7 +293,7 @@ class vector {
      * @param other Another iterator
      * @return True if this iterator comes after or equals other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>=(const iterator& other) const {
       return ptr_ >= other.ptr_;
     }
@@ -303,7 +303,7 @@ class vector {
      *
      * @return The underlying pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T* get() const { return ptr_; }
   };
 
@@ -324,7 +324,7 @@ class vector {
     /**
      * Default constructor
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator() : ptr_(nullptr) {}
 
     /**
@@ -332,7 +332,7 @@ class vector {
      *
      * @param ptr The element pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     explicit const_iterator(const T *ptr) : ptr_(ptr) {}
 
     /**
@@ -340,7 +340,7 @@ class vector {
      *
      * @param it The iterator to convert
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator(const iterator& it) : ptr_(it.get()) {}
 
     /**
@@ -348,7 +348,7 @@ class vector {
      *
      * @return Const reference to the current element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T& operator*() const { return *ptr_; }
 
     /**
@@ -356,7 +356,7 @@ class vector {
      *
      * @return Const pointer to the current element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T* operator->() const { return ptr_; }
 
     /**
@@ -364,7 +364,7 @@ class vector {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator++() {
       ++ptr_;
       return *this;
@@ -375,7 +375,7 @@ class vector {
      *
      * @return Copy of this iterator before incrementing
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator++(int) {
       const_iterator temp = *this;
       ++ptr_;
@@ -387,7 +387,7 @@ class vector {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator--() {
       --ptr_;
       return *this;
@@ -398,7 +398,7 @@ class vector {
      *
      * @return Copy of this iterator before decrementing
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator--(int) {
       const_iterator temp = *this;
       --ptr_;
@@ -411,7 +411,7 @@ class vector {
      * @param n Number of elements to advance
      * @return New iterator advanced by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator+(difference_type n) const {
       return const_iterator(ptr_ + n);
     }
@@ -422,7 +422,7 @@ class vector {
      * @param n Number of elements to go back
      * @return New iterator moved back by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator-(difference_type n) const {
       return const_iterator(ptr_ - n);
     }
@@ -433,7 +433,7 @@ class vector {
      * @param n Number of elements to advance
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator+=(difference_type n) {
       ptr_ += n;
       return *this;
@@ -445,7 +445,7 @@ class vector {
      * @param n Number of elements to go back
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator-=(difference_type n) {
       ptr_ -= n;
       return *this;
@@ -457,7 +457,7 @@ class vector {
      * @param other Another iterator
      * @return The number of elements between this and other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     difference_type operator-(const const_iterator& other) const {
       return ptr_ - other.ptr_;
     }
@@ -468,7 +468,7 @@ class vector {
      * @param n Index offset from current position
      * @return Const reference to the element at offset n
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T& operator[](difference_type n) const {
       return ptr_[n];
     }
@@ -479,7 +479,7 @@ class vector {
      * @param other Another iterator
      * @return True if both iterators point to the same element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator==(const const_iterator& other) const {
       return ptr_ == other.ptr_;
     }
@@ -490,7 +490,7 @@ class vector {
      * @param other Another iterator
      * @return True if iterators point to different elements
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator!=(const const_iterator& other) const {
       return ptr_ != other.ptr_;
     }
@@ -501,7 +501,7 @@ class vector {
      * @param other Another iterator
      * @return True if this iterator comes before other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<(const const_iterator& other) const {
       return ptr_ < other.ptr_;
     }
@@ -512,7 +512,7 @@ class vector {
      * @param other Another iterator
      * @return True if this iterator comes before or equals other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<=(const const_iterator& other) const {
       return ptr_ <= other.ptr_;
     }
@@ -523,7 +523,7 @@ class vector {
      * @param other Another iterator
      * @return True if this iterator comes after other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>(const const_iterator& other) const {
       return ptr_ > other.ptr_;
     }
@@ -534,7 +534,7 @@ class vector {
      * @param other Another iterator
      * @return True if this iterator comes after or equals other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>=(const const_iterator& other) const {
       return ptr_ >= other.ptr_;
     }
@@ -544,7 +544,7 @@ class vector {
      *
      * @return The underlying pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T* get() const { return ptr_; }
   };
 
@@ -573,25 +573,25 @@ class vector {
   /**
    * Get typed pointer to the SVO buffer
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T* svo_data() { return reinterpret_cast<T*>(svo_); }
 
   /**
    * Get const typed pointer to the SVO buffer
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T* svo_data() const { return reinterpret_cast<const T*>(svo_); }
 
   /**
    * Check if vector is currently using the inline SVO buffer
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool IsUsingSvo() const { return data_.ptr_ == svo_data(); }
 
   /**
    * Initialize data_ to point to the SVO buffer with null shm
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void InitSvo() {
     data_ = hipc::FullPtr<T>::GetNull();
     data_.ptr_ = svo_data();
@@ -604,7 +604,7 @@ class vector {
    *
    * @param min_capacity Minimum capacity needed
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void Grow(size_type min_capacity) {
     size_type new_capacity = (capacity_ == 0) ? 1 : capacity_ * 2;
     while (new_capacity < min_capacity) {
@@ -620,7 +620,7 @@ class vector {
    * @param pos Position to construct at
    * @param val Value to move construct
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void ConstructMove(size_type pos, T&& val) {
     if constexpr (kIsPod) {
       data_.ptr_[pos] = static_cast<T&&>(val);
@@ -636,7 +636,7 @@ class vector {
    * @param pos Position to construct at
    * @param val Value to copy construct
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void ConstructCopy(size_type pos, const T& val) {
     if constexpr (kIsPod) {
       data_.ptr_[pos] = val;
@@ -651,7 +651,7 @@ class vector {
    *
    * @param pos Position to destroy
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void Destroy(size_type pos) {
     if constexpr (!kIsPod) {
       data_.ptr_[pos].~T();
@@ -665,7 +665,7 @@ class vector {
    * @param first First position to destroy
    * @param last Last position (exclusive)
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void DestroyRange(size_type first, size_type last) {
     if constexpr (!kIsPod) {
       for (size_type i = first; i < last; ++i) {
@@ -680,7 +680,7 @@ class vector {
    * Call after cudaMemcpy/memcpy when the vector was using SVO (size <= SVO_SIZE).
    * Preserves size_ and the data already in svo_[].
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void FixupSvoPtr() {
     data_.ptr_ = svo_data();
   }
@@ -689,7 +689,7 @@ class vector {
    * Default constructor (no allocator).
    * Creates an empty vector with SVO buffer available.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   vector()
     : size_(0), alloc_(nullptr) {
     InitSvo();
@@ -701,7 +701,7 @@ class vector {
    *
    * @param alloc Pointer to allocator instance for memory management
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   explicit vector(AllocT* alloc)
     : size_(0), alloc_(alloc) {
     InitSvo();
@@ -711,7 +711,7 @@ class vector {
    * Destructor.
    * Destroys all elements and deallocates heap memory if not using SVO.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   ~vector() {
     clear();
     if (!IsUsingSvo() && !data_.IsNull() && alloc_ != nullptr) {
@@ -727,7 +727,7 @@ class vector {
    * @param count Number of elements to create with default values
    * @param alloc Pointer to allocator instance for memory management
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   explicit vector(size_type count, AllocT* alloc)
       : size_(0), alloc_(alloc) {
     InitSvo();
@@ -751,7 +751,7 @@ class vector {
    * @param value Value to initialize elements with
    * @param alloc Pointer to allocator instance for memory management
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   vector(size_type count, const T& value, AllocT* alloc)
       : size_(0), alloc_(alloc) {
     InitSvo();
@@ -768,7 +768,7 @@ class vector {
    * @param init Initializer list
    * @param alloc Pointer to allocator instance for memory management
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   vector(std::initializer_list<T> init, AllocT* alloc)
       : size_(0), alloc_(alloc) {
     InitSvo();
@@ -784,7 +784,7 @@ class vector {
    *
    * @param other Vector to copy from
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   vector(const vector& other)
       : size_(0), alloc_(other.alloc_) {
     InitSvo();
@@ -803,7 +803,7 @@ class vector {
    *
    * @param other Vector to move from
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   vector(vector&& other) noexcept
       : size_(0), alloc_(other.alloc_) {
     if (other.IsUsingSvo()) {
@@ -843,7 +843,7 @@ class vector {
    * @param other Vector to copy from
    * @return Reference to this vector
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   vector& operator=(const vector& other) {
     if (this != &other) {
       clear();
@@ -869,7 +869,7 @@ class vector {
    * @param other Vector to move from
    * @return Reference to this vector
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   vector& operator=(vector&& other) noexcept {
     if (this != &other) {
       clear();
@@ -909,7 +909,7 @@ class vector {
    * @param init Initializer list
    * @return Reference to this vector
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   vector& operator=(std::initializer_list<T> init) {
     clear();
     reserve(init.size());
@@ -927,7 +927,7 @@ class vector {
    * @return Reference to element at position
    * @throws std::out_of_range if position is out of bounds
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& at(size_type pos) {
     if (pos >= size_) {
       throw std::out_of_range("Vector index out of bounds");
@@ -943,7 +943,7 @@ class vector {
    * @return Const reference to element at position
    * @throws std::out_of_range if position is out of bounds
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& at(size_type pos) const {
     if (pos >= size_) {
       throw std::out_of_range("Vector index out of bounds");
@@ -958,7 +958,7 @@ class vector {
    * @param pos Position to access
    * @return Reference to element at position
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& operator[](size_type pos) {
     return data_.ptr_[pos];
   }
@@ -970,7 +970,7 @@ class vector {
    * @param pos Position to access
    * @return Const reference to element at position
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& operator[](size_type pos) const {
     return data_.ptr_[pos];
   }
@@ -981,7 +981,7 @@ class vector {
    *
    * @return Reference to first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& front() {
     return data_.ptr_[0];
   }
@@ -992,7 +992,7 @@ class vector {
    *
    * @return Const reference to first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& front() const {
     return data_.ptr_[0];
   }
@@ -1003,7 +1003,7 @@ class vector {
    *
    * @return Reference to last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& back() {
     return data_.ptr_[size_ - 1];
   }
@@ -1014,7 +1014,7 @@ class vector {
    *
    * @return Const reference to last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& back() const {
     return data_.ptr_[size_ - 1];
   }
@@ -1025,7 +1025,7 @@ class vector {
    *
    * @return Pointer to underlying data array
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T* data() {
     return data_.ptr_;
   }
@@ -1036,7 +1036,7 @@ class vector {
    *
    * @return Const pointer to underlying data array
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T* data() const {
     return data_.ptr_;
   }
@@ -1047,7 +1047,7 @@ class vector {
    *
    * @return Iterator to first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator begin() {
     return iterator(data_.ptr_);
   }
@@ -1058,7 +1058,7 @@ class vector {
    *
    * @return Const iterator to first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator begin() const {
     return const_iterator(data_.ptr_);
   }
@@ -1069,7 +1069,7 @@ class vector {
    *
    * @return Const iterator to first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator cbegin() const {
     return const_iterator(data_.ptr_);
   }
@@ -1080,7 +1080,7 @@ class vector {
    *
    * @return Iterator to one past last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator end() {
     return iterator(data_.ptr_ + size_);
   }
@@ -1091,7 +1091,7 @@ class vector {
    *
    * @return Const iterator to one past last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator end() const {
     return const_iterator(data_.ptr_ + size_);
   }
@@ -1102,7 +1102,7 @@ class vector {
    *
    * @return Const iterator to one past last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator cend() const {
     return const_iterator(data_.ptr_ + size_);
   }
@@ -1112,7 +1112,7 @@ class vector {
    *
    * @return Reverse iterator to last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   reverse_iterator rbegin() {
     return reverse_iterator(end());
   }
@@ -1122,7 +1122,7 @@ class vector {
    *
    * @return Const reverse iterator to last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_reverse_iterator rbegin() const {
     return const_reverse_iterator(end());
   }
@@ -1132,7 +1132,7 @@ class vector {
    *
    * @return Const reverse iterator to last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_reverse_iterator crbegin() const {
     return const_reverse_iterator(end());
   }
@@ -1142,7 +1142,7 @@ class vector {
    *
    * @return Reverse iterator to one before first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   reverse_iterator rend() {
     return reverse_iterator(begin());
   }
@@ -1152,7 +1152,7 @@ class vector {
    *
    * @return Const reverse iterator to one before first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_reverse_iterator rend() const {
     return const_reverse_iterator(begin());
   }
@@ -1162,7 +1162,7 @@ class vector {
    *
    * @return Const reverse iterator to one before first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_reverse_iterator crend() const {
     return const_reverse_iterator(begin());
   }
@@ -1172,7 +1172,7 @@ class vector {
    *
    * @return True if size is zero
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool empty() const {
     return size_ == 0;
   }
@@ -1182,7 +1182,7 @@ class vector {
    *
    * @return Current size
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type size() const {
     return size_;
   }
@@ -1192,7 +1192,7 @@ class vector {
    *
    * @return Current capacity
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type capacity() const {
     return capacity_;
   }
@@ -1205,7 +1205,7 @@ class vector {
    *
    * @param new_capacity Desired capacity
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool reserve(size_type new_capacity) {
     if (new_capacity <= capacity_ || alloc_ == nullptr) {
       return true;
@@ -1243,7 +1243,7 @@ class vector {
    * If on heap, reduces capacity to match current size.
    * If size fits in SVO, moves data back to SVO buffer.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void shrink_to_fit() {
     if (size_ <= capacity_ && alloc_ != nullptr) {
       if (size_ == 0 && !IsUsingSvo()) {
@@ -1287,7 +1287,7 @@ class vector {
    *
    * @param val Element to add
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void push_back(const T& val) {
     if (size_ >= capacity_) {
       Grow(size_ + 1);
@@ -1301,7 +1301,7 @@ class vector {
    *
    * @param val Element to add
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void push_back(T&& val) {
     if (size_ >= capacity_) {
       Grow(size_ + 1);
@@ -1313,7 +1313,7 @@ class vector {
   /**
    * Remove last element from vector
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void pop_back() {
     if (size_ > 0) {
       Destroy(size_ - 1);
@@ -1324,7 +1324,7 @@ class vector {
   /**
    * Clear all elements from vector
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void clear() {
     DestroyRange(0, size_);
     size_ = 0;
@@ -1338,7 +1338,7 @@ class vector {
    * @param val Value to insert
    * @return Iterator to inserted element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator insert(const_iterator pos, const T& val) {
     size_type idx = pos.get() - data_.ptr_;
     if (size_ >= capacity_) {
@@ -1368,7 +1368,7 @@ class vector {
    * @param val Value to insert
    * @return Iterator to inserted element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator insert(const_iterator pos, T&& val) {
     size_type idx = pos.get() - data_.ptr_;
     if (size_ >= capacity_) {
@@ -1399,7 +1399,7 @@ class vector {
    * @param last Iterator to one past last element to insert
    * @return Iterator to first inserted element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator insert(const_iterator pos, const_iterator first,
                   const_iterator last) {
     size_type idx = pos.get() - data_.ptr_;
@@ -1434,7 +1434,7 @@ class vector {
    * @param pos Iterator to element to erase
    * @return Iterator to element following erased element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator erase(const_iterator pos) {
     size_type idx = pos.get() - data_.ptr_;
 
@@ -1460,7 +1460,7 @@ class vector {
    * @param last Iterator to one past last element to erase
    * @return Iterator to element following erased elements
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator erase(const_iterator first, const_iterator last) {
     size_type first_idx = first.get() - data_.ptr_;
     size_type last_idx = last.get() - data_.ptr_;
@@ -1487,7 +1487,7 @@ class vector {
    *
    * @param new_size New size
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool resize_no_init(size_type new_size) {
     if (new_size > capacity_) {
       if (!reserve(new_size)) return false;
@@ -1503,7 +1503,7 @@ class vector {
    * @param new_size New size
    * @return true on success, false if allocation failed
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool resize(size_type new_size) {
     if (new_size > size_) {
       if (new_size > capacity_) {
@@ -1531,7 +1531,7 @@ class vector {
    * @param new_size New size
    * @param value Value to fill new elements with
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool resize(size_type new_size, const T& value) {
     if (new_size > size_) {
       if (new_size > capacity_) {
@@ -1554,7 +1554,7 @@ class vector {
    *
    * @param other Vector to swap with
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void swap(vector& other) noexcept {
     if (!IsUsingSvo() && !other.IsUsingSvo()) {
       // Both on heap — simple pointer swap
@@ -1578,9 +1578,9 @@ class vector {
    * @param ar Archive to save to
    */
   template<class Archive>
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void save(Archive& ar) const {
-    hshm::ipc::save_vec<Archive, vector<T, AllocT, SVO_SIZE>, T>(ar, *this);
+    ctp::ipc::save_vec<Archive, vector<T, AllocT, SVO_SIZE>, T>(ar, *this);
   }
 
   /**
@@ -1591,12 +1591,12 @@ class vector {
    * @param ar Archive to load from
    */
   template<class Archive>
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void load(Archive& ar) {
-    hshm::ipc::load_vec<Archive, vector<T, AllocT, SVO_SIZE>, T>(ar, *this);
+    ctp::ipc::load_vec<Archive, vector<T, AllocT, SVO_SIZE>, T>(ar, *this);
   }
 };
 
-}  // namespace hshm::priv
+}  // namespace ctp::priv
 
-#endif  // HSHM_DATA_STRUCTURES_PRIV_VECTOR_H_
+#endif  // CTP_DATA_STRUCTURES_PRIV_VECTOR_H_

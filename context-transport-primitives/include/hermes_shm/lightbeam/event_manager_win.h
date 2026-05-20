@@ -50,7 +50,7 @@
 
 #include <vector>
 
-namespace hshm::lbm {
+namespace ctp::lbm {
 
 class EventManager {
  public:
@@ -167,4 +167,4 @@ class EventManager {
   std::vector<EventRegistration> registrations_;
 };
 
-}  // namespace hshm::lbm
+}  // namespace ctp::lbm

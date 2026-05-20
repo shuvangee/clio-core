@@ -31,12 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_THREAD_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_THREAD_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_THREAD_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_THREAD_H_
 
 #include "timer.h"
 
-namespace hshm {
+namespace ctp {
 
 class ThreadTimer : public NsecTimer {
  public:
@@ -68,6 +68,6 @@ class ThreadTimer : public NsecTimer {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_THREAD_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_UTIL_TIMER_THREAD_H_

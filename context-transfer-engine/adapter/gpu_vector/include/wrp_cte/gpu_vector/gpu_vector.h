@@ -30,7 +30,7 @@
 #include <string>
 #include <thread>
 
-#if HSHM_IS_GPU_COMPILER
+#if CTP_IS_GPU_COMPILER
 
 namespace wrp_cte::gpu_vector {
 
@@ -126,7 +126,7 @@ class Vector {
    *  are visible to the host through PCIe cache snooping. */
   ::wrp_cte::gpu_vector::VectorStats StatsSnapshot() const {
     ::wrp_cte::gpu_vector::VectorStats out{};
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
     if (impl_ && impl_->stats) out = *impl_->stats;
 #endif
     return out;
@@ -135,7 +135,7 @@ class Vector {
    *  Caller should cudaDeviceSync afterward so any in-flight manager
    *  writes don't race with the host memset. */
   void StatsReset() {
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
     if (impl_ && impl_->stats) {
       std::memset(impl_->stats, 0,
                   sizeof(::wrp_cte::gpu_vector::VectorStats));
@@ -276,7 +276,7 @@ __global__ void DrainKernel(::chi::IpcManagerGpuInfo info, DeviceViewBase v) {
 /** Warp-parallel reduce: each thread feeds a (value, index) pair.
  *  Returns the lane with the minimum value via shuffles. Result is
  *  broadcast to all lanes. */
-HSHM_GPU_FUN void WarpReduceMinScore(float &val, int &idx) {
+CTP_GPU_FUN void WarpReduceMinScore(float &val, int &idx) {
   for (int off = 16; off > 0; off >>= 1) {
     float other_val = __shfl_xor_sync(0xffffffff, val, off);
     int other_idx = __shfl_xor_sync(0xffffffff, idx, off);
@@ -287,7 +287,7 @@ HSHM_GPU_FUN void WarpReduceMinScore(float &val, int &idx) {
   }
 }
 
-HSHM_GPU_FUN void WarpReduceMaxScore(float &val, int &idx) {
+CTP_GPU_FUN void WarpReduceMaxScore(float &val, int &idx) {
   for (int off = 16; off > 0; off >>= 1) {
     float other_val = __shfl_xor_sync(0xffffffff, val, off);
     int other_idx = __shfl_xor_sync(0xffffffff, idx, off);
@@ -298,7 +298,7 @@ HSHM_GPU_FUN void WarpReduceMaxScore(float &val, int &idx) {
   }
 }
 
-HSHM_GPU_FUN chi::u64 WarpReduceMinU64(chi::u64 val) {
+CTP_GPU_FUN chi::u64 WarpReduceMinU64(chi::u64 val) {
   for (int off = 16; off > 0; off >>= 1) {
     chi::u64 hi = __shfl_xor_sync(0xffffffff, (unsigned int)(val >> 32), off);
     chi::u64 lo = __shfl_xor_sync(0xffffffff, (unsigned int)(val & 0xffffffffu), off);
@@ -308,7 +308,7 @@ HSHM_GPU_FUN chi::u64 WarpReduceMinU64(chi::u64 val) {
   return val;
 }
 
-HSHM_GPU_FUN chi::u64 WarpReduceMaxU64(chi::u64 val) {
+CTP_GPU_FUN chi::u64 WarpReduceMaxU64(chi::u64 val) {
   for (int off = 16; off > 0; off >>= 1) {
     chi::u64 hi = __shfl_xor_sync(0xffffffff, (unsigned int)(val >> 32), off);
     chi::u64 lo = __shfl_xor_sync(0xffffffff, (unsigned int)(val & 0xffffffffu), off);
@@ -320,7 +320,7 @@ HSHM_GPU_FUN chi::u64 WarpReduceMaxU64(chi::u64 val) {
 
 /** Scan one tier of a Block's pages[] and report the slot with the
  *  smallest score (skipping kPageBusy, empty slots, and in-flight). */
-HSHM_GPU_FUN void TierMinScore(Block *b, chi::u32 lo, chi::u32 hi,
+CTP_GPU_FUN void TierMinScore(Block *b, chi::u32 lo, chi::u32 hi,
                                 chi::u32 lane,
                                 float &out_min, int &out_slot) {
   float best_v = INFINITY;
@@ -336,7 +336,7 @@ HSHM_GPU_FUN void TierMinScore(Block *b, chi::u32 lo, chi::u32 hi,
   out_slot = best_s;
 }
 
-HSHM_GPU_FUN void TierMaxScore(Block *b, chi::u32 lo, chi::u32 hi,
+CTP_GPU_FUN void TierMaxScore(Block *b, chi::u32 lo, chi::u32 hi,
                                 chi::u32 lane,
                                 float &out_max, int &out_slot) {
   float best_v = -INFINITY;
@@ -355,7 +355,7 @@ HSHM_GPU_FUN void TierMaxScore(Block *b, chi::u32 lo, chi::u32 hi,
 /** Warp-cooperative byte copy: copy `bytes` from src to dst via 4-byte
  *  loads/stores spread across 32 lanes. Both pointers must be 4-byte
  *  aligned and `bytes` must be a multiple of 4. */
-HSHM_GPU_FUN void WarpCopy4(void *dst, const void *src, chi::u64 bytes,
+CTP_GPU_FUN void WarpCopy4(void *dst, const void *src, chi::u64 bytes,
                              chi::u32 lane) {
   chi::u64 n = bytes >> 2;
   unsigned int *d = static_cast<unsigned int *>(dst);
@@ -398,7 +398,7 @@ HSHM_GPU_FUN void WarpCopy4(void *dst, const void *src, chi::u64 bytes,
  * claimed + swaps). 0 means the block was idle this tick. Used by the
  * persistent kernel to decide whether to back off / self-terminate.
  */
-HSHM_GPU_FUN chi::u32 RunCachePass(::chi::gpu::IpcManager *ipc,
+CTP_GPU_FUN chi::u32 RunCachePass(::chi::gpu::IpcManager *ipc,
                                     DeviceViewBase v, Block *b,
                                     chi::u32 lane, chi::u32 total) {
   chi::u32 work = 0;
@@ -839,7 +839,7 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
                           CacheMode mode,
                           chi::u32 manager_threads_per_block,
                           bool allow_cold_miss_fault) {
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
   // Body gated for the host pass only.
   if (nblocks == 0 || gpu_pages_per_block == 0 || page_size_bytes == 0) {
     throw std::invalid_argument(
@@ -953,7 +953,7 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
   //     with spin-wait kernels.
   if (host_pages_per_block > 0) {
     chi::u64 meta_scratch_bytes = static_cast<chi::u64>(block_stride) * nblocks;
-    impl_->host_meta_scratch = hshm::GpuApi::MallocHost<char>(meta_scratch_bytes);
+    impl_->host_meta_scratch = ctp::GpuApi::MallocHost<char>(meta_scratch_bytes);
     if (!impl_->host_meta_scratch) {
       throw std::runtime_error(
           "gpu_vector: host_meta_scratch allocation failed");
@@ -961,17 +961,17 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
     std::memset(impl_->host_meta_scratch, 0, meta_scratch_bytes);
     impl_->block_stride_cached = block_stride;
     impl_->clear_block_arr =
-        hshm::GpuApi::MallocHost<chi::u32>(
+        ctp::GpuApi::MallocHost<chi::u32>(
             sizeof(chi::u32) * detail::kClearBatchCap);
     impl_->clear_slot_arr =
-        hshm::GpuApi::MallocHost<chi::u32>(
+        ctp::GpuApi::MallocHost<chi::u32>(
             sizeof(chi::u32) * detail::kClearBatchCap);
     if (!impl_->clear_block_arr || !impl_->clear_slot_arr) {
       throw std::runtime_error(
           "gpu_vector: clear-batch index array allocation failed");
     }
     // Pinned-host stop flag the persistent kernel polls each iteration.
-    impl_->kernel_stop_flag = hshm::GpuApi::MallocHost<chi::u32>(1);
+    impl_->kernel_stop_flag = ctp::GpuApi::MallocHost<chi::u32>(1);
     if (!impl_->kernel_stop_flag) {
       throw std::runtime_error(
           "gpu_vector: kernel_stop_flag allocation failed");
@@ -1065,7 +1065,7 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
       view_.base, static_cast<char *>(impl_->pages_base),
       static_cast<char *>(impl_->host_pages_base),
       static_cast<char *>(impl_->swap_base));
-  hshm::GpuApi::Synchronize();
+  ctp::GpuApi::Synchronize();
 
   // 7b. Pre-launch the manager kernel ONCE from the main thread so the
   //     CUDA module is fully resident on the device before the cache
@@ -1083,7 +1083,7 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
         info0, view_.base);
     detail::ClearHostPrefetchFlagsBatchKernel<<<1, 1>>>(
         view_.base, impl_->clear_block_arr, impl_->clear_slot_arr, 0);
-    hshm::GpuApi::Synchronize();
+    ctp::GpuApi::Synchronize();
   }
 
   // 8. Spawn the cache-management thread. It periodically launches a
@@ -1140,12 +1140,12 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
   (void)gpu_pages_per_block; (void)host_pages_per_block;
   (void)page_size_bytes; (void)cache_period_us; (void)mode;
   (void)manager_threads_per_block;
-#endif  // !HSHM_IS_DEVICE_PASS
+#endif  // !CTP_IS_DEVICE_PASS
 }
 
 template <typename T>
 inline Vector<T>::~Vector() {
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
   if (!impl_) return;
   // Stop the cache thread. It owns persistent_stream / drain_stream,
   // syncs them, and destroys them as it exits.
@@ -1174,21 +1174,21 @@ inline Vector<T>::~Vector() {
   if (impl_->get_base)
     cpu_ipc->FreeGpuBackend(impl_->gpu_id, impl_->get_alloc_id);
   if (impl_->host_meta_scratch)
-    hshm::GpuApi::FreeHost(impl_->host_meta_scratch);
+    ctp::GpuApi::FreeHost(impl_->host_meta_scratch);
   if (impl_->clear_block_arr)
-    hshm::GpuApi::FreeHost(impl_->clear_block_arr);
+    ctp::GpuApi::FreeHost(impl_->clear_block_arr);
   if (impl_->clear_slot_arr)
-    hshm::GpuApi::FreeHost(impl_->clear_slot_arr);
+    ctp::GpuApi::FreeHost(impl_->clear_slot_arr);
   if (impl_->kernel_stop_flag)
-    hshm::GpuApi::FreeHost(impl_->kernel_stop_flag);
+    ctp::GpuApi::FreeHost(impl_->kernel_stop_flag);
   if (impl_->stats)
     cudaFreeHost(impl_->stats);
-#endif  // !HSHM_IS_DEVICE_PASS
+#endif  // !CTP_IS_DEVICE_PASS
 }
 
 template <typename T>
 inline void Vector<T>::DrainHostPrefetchQueue(void *cuda_stream) {
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
   if (!impl_ || !impl_->host_meta_scratch) return;
   cudaStream_t stream = static_cast<cudaStream_t>(cuda_stream);
   wrp_cte::core::Client cte_client(impl_->cte_pool_id);
@@ -1268,7 +1268,7 @@ inline void Vector<T>::DrainHostPrefetchQueue(void *cuda_stream) {
 
 template <typename T>
 inline void Vector<T>::FlushAllSync() {
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
   // No-op. The persistent manager kernel flushes dirty pages
   // continuously. The Vector is automatically coherent — the user
   // never needs to flush. This method is retained as a no-op so
@@ -1278,6 +1278,6 @@ inline void Vector<T>::FlushAllSync() {
 
 }  // namespace wrp_cte::gpu_vector
 
-#endif  // HSHM_IS_GPU_COMPILER
+#endif  // CTP_IS_GPU_COMPILER
 
 #endif  // WRP_CTE_GPU_VECTOR_H_

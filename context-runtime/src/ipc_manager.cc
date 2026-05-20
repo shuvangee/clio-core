@@ -74,12 +74,12 @@
 #include "chimaera/scheduler/scheduler_factory.h"
 #include "chimaera/task_archives.h"
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
 #include <hermes_shm/util/gpu_api.h>
 #endif
 
 // Global pointer variable definition for IPC manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::IpcManager, g_ipc_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::IpcManager, g_ipc_manager);
 
 #include <chimaera/device_memcpy.h>
 
@@ -164,11 +164,11 @@ bool IpcManager::ClientInit() {
     if (ipc_mode_ == IpcMode::kIpc) {
       // IPC mode: Unix domain socket transport
       std::string ipc_path =
-          hshm::SystemInfo::GetMemfdPath("chimaera_" + std::to_string(port) + ".ipc");
+          ctp::SystemInfo::GetMemfdPath("chimaera_" + std::to_string(port) + ".ipc");
       try {
-        zmq_transport_ = hshm::lbm::TransportFactory::Get(
-            ipc_path, hshm::lbm::TransportType::kSocket,
-            hshm::lbm::TransportMode::kClient, "ipc", 0);
+        zmq_transport_ = ctp::lbm::TransportFactory::Get(
+            ipc_path, ctp::lbm::TransportType::kSocket,
+            ctp::lbm::TransportMode::kClient, "ipc", 0);
         HLOG(kInfo, "IpcManager: IPC transport connected to {}", ipc_path);
       } catch (const std::exception &e) {
         HLOG(kError,
@@ -179,9 +179,9 @@ bool IpcManager::ClientInit() {
     } else {
       // TCP mode: ZMQ DEALER transport
       try {
-        zmq_transport_ = hshm::lbm::TransportFactory::Get(
-            config->GetServerAddr(), hshm::lbm::TransportType::kZeroMq,
-            hshm::lbm::TransportMode::kClient, "tcp", port + 3);
+        zmq_transport_ = ctp::lbm::TransportFactory::Get(
+            config->GetServerAddr(), ctp::lbm::TransportType::kZeroMq,
+            ctp::lbm::TransportMode::kClient, "tcp", port + 3);
         HLOG(kInfo, "IpcManager: DEALER transport connected to port {}",
              port + 3);
       } catch (const std::exception &e) {
@@ -199,9 +199,9 @@ bool IpcManager::ClientInit() {
   // Initialize HSHM TLS key for task counter before calling WaitForLocalServer,
   // which calls CreateTaskId(). Without the key registered first, GetTls() on
   // the zero-initialized key may return a stale/freed pointer → crash.
-  HSHM_THREAD_MODEL->CreateTls<TaskCounter>(chi_task_counter_key_, nullptr);
+  CTP_THREAD_MODEL->CreateTls<TaskCounter>(chi_task_counter_key_, nullptr);
   auto *tls_counter = new TaskCounter();
-  HSHM_THREAD_MODEL->SetTls(chi_task_counter_key_, tls_counter);
+  CTP_THREAD_MODEL->SetTls(chi_task_counter_key_, tls_counter);
 
   // Wait for local server using lightbeam transport
   if (!WaitForLocalServer()) {
@@ -222,10 +222,10 @@ bool IpcManager::ClientInit() {
   // Must happen before any CoRwLock/CoMutex operations (e.g. IncreaseClientShm).
   // Server mode creates it earlier in WorkOrchestrator::Init.
   if (!chi_cur_worker_key_created_) {
-    HSHM_THREAD_MODEL->CreateTls<Worker>(chi_cur_worker_key_, nullptr);
+    CTP_THREAD_MODEL->CreateTls<Worker>(chi_cur_worker_key_, nullptr);
     chi_cur_worker_key_created_ = true;
   }
-  HSHM_THREAD_MODEL->SetTls(chi_cur_worker_key_,
+  CTP_THREAD_MODEL->SetTls(chi_cur_worker_key_,
                             static_cast<Worker *>(nullptr));
 
   // SHM mode: Attach to main SHM segment and initialize queues
@@ -242,7 +242,7 @@ bool IpcManager::ClientInit() {
     size_t initial_size =
         config && config->IsValid()
             ? config->GetMemorySegmentSize(kClientDataSegment)
-            : hshm::Unit<size_t>::Megabytes(256);  // Default 256MB
+            : ctp::Unit<size_t>::Megabytes(256);  // Default 256MB
     if (!IncreaseClientShm(initial_size)) {
       HLOG(
           kError,
@@ -251,10 +251,10 @@ bool IpcManager::ClientInit() {
     }
 
     // Create SHM lightbeam transports for client-side transport
-    shm_send_transport_ = hshm::lbm::TransportFactory::Get(
-        "", hshm::lbm::TransportType::kShm, hshm::lbm::TransportMode::kClient);
-    shm_recv_transport_ = hshm::lbm::TransportFactory::Get(
-        "", hshm::lbm::TransportType::kShm, hshm::lbm::TransportMode::kServer);
+    shm_send_transport_ = ctp::lbm::TransportFactory::Get(
+        "", ctp::lbm::TransportType::kShm, ctp::lbm::TransportMode::kClient);
+    shm_recv_transport_ = ctp::lbm::TransportFactory::Get(
+        "", ctp::lbm::TransportType::kShm, ctp::lbm::TransportMode::kServer);
   }
 
   // Default host until identified
@@ -288,10 +288,10 @@ bool IpcManager::ServerInit() {
   // that crashes on dereference.  WorkOrchestrator::Init() normally creates
   // this key, but it runs after ServerInit(), so we create it here first.
   if (!chi_cur_worker_key_created_) {
-    HSHM_THREAD_MODEL->CreateTls<Worker>(chi_cur_worker_key_, nullptr);
+    CTP_THREAD_MODEL->CreateTls<Worker>(chi_cur_worker_key_, nullptr);
     chi_cur_worker_key_created_ = true;
   }
-  HSHM_THREAD_MODEL->SetTls(chi_cur_worker_key_, static_cast<Worker *>(nullptr));
+  CTP_THREAD_MODEL->SetTls(chi_cur_worker_key_, static_cast<Worker *>(nullptr));
 
   // Clear leftover shared memory segments from previous runs
   ClearUserIpcs();
@@ -306,7 +306,7 @@ bool IpcManager::ServerInit() {
     return false;
   }
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
   // CUDA / ROCm slim path: GPU is a pure task producer that pushes onto
   // gpu2cpu_queue. The bootstrap mirrors the SYCL one — pinned host
   // gpu2cpu_queue + gpu2cpu_copy_backend, on-device GpuTaskQueue
@@ -324,11 +324,11 @@ bool IpcManager::ServerInit() {
       return false;
     }
   }
-#elif HSHM_ENABLE_SYCL
+#elif CTP_ENABLE_SYCL
   // SYCL backend: same shape as the CUDA/HIP path above. Bootstrap
   // helper lives in chimaera_cxx_gpu (gpu2cpu_init_sycl.cc) — call
   // into it via a free function with normal linkage; both libraries
-  // see the same IpcManager layout because HSHM_ENABLE_SYCL=1 is set
+  // see the same IpcManager layout because CTP_ENABLE_SYCL=1 is set
   // on both.
   {
     ConfigManager *config = CHI_CONFIG_MANAGER;
@@ -353,7 +353,7 @@ bool IpcManager::ServerInit() {
 
   // Initialize HSHM TLS key for task counter (needed for CreateTaskId in
   // runtime)
-  HSHM_THREAD_MODEL->CreateTls<TaskCounter>(chi_task_counter_key_, nullptr);
+  CTP_THREAD_MODEL->CreateTls<TaskCounter>(chi_task_counter_key_, nullptr);
 
   // Create scheduler using factory
   auto *config = CHI_CONFIG_MANAGER;
@@ -369,9 +369,9 @@ bool IpcManager::ServerInit() {
 
     try {
       // TCP ROUTER server on port+3
-      client_tcp_transport_ = hshm::lbm::TransportFactory::Get(
-          "0.0.0.0", hshm::lbm::TransportType::kZeroMq,
-          hshm::lbm::TransportMode::kServer, "tcp", port + 3);
+      client_tcp_transport_ = ctp::lbm::TransportFactory::Get(
+          "0.0.0.0", ctp::lbm::TransportType::kZeroMq,
+          ctp::lbm::TransportMode::kServer, "tcp", port + 3);
       HLOG(kInfo, "IpcManager: TCP ROUTER transport bound on port {}",
            port + 3);
     } catch (const std::exception &e) {
@@ -382,10 +382,10 @@ bool IpcManager::ServerInit() {
     try {
       // IPC server on Unix domain socket
       std::string ipc_path =
-          hshm::SystemInfo::GetMemfdPath("chimaera_" + std::to_string(port) + ".ipc");
-      client_ipc_transport_ = hshm::lbm::TransportFactory::Get(
-          ipc_path, hshm::lbm::TransportType::kSocket,
-          hshm::lbm::TransportMode::kServer, "ipc", 0);
+          ctp::SystemInfo::GetMemfdPath("chimaera_" + std::to_string(port) + ".ipc");
+      client_ipc_transport_ = ctp::lbm::TransportFactory::Get(
+          ipc_path, ctp::lbm::TransportType::kSocket,
+          ctp::lbm::TransportMode::kServer, "ipc", 0);
       HLOG(kInfo, "IpcManager: IPC lightbeam server bound on {}", ipc_path);
     } catch (const std::exception &e) {
       HLOG(kError, "IpcManager::ServerInit: Failed to bind IPC server: {}",
@@ -400,10 +400,10 @@ bool IpcManager::ServerInit() {
 void IpcManager::ClientFinalize() {
   // Clean up thread-local task counter
   TaskCounter *counter =
-      HSHM_THREAD_MODEL->GetTls<TaskCounter>(chi_task_counter_key_);
+      CTP_THREAD_MODEL->GetTls<TaskCounter>(chi_task_counter_key_);
   if (counter) {
     delete counter;
-    HSHM_THREAD_MODEL->SetTls(chi_task_counter_key_,
+    CTP_THREAD_MODEL->SetTls(chi_task_counter_key_,
                               static_cast<TaskCounter *>(nullptr));
   }
 
@@ -499,7 +499,7 @@ void IpcManager::AwakenWorker(TaskLane *lane) {
     pid_t runtime_pid = runtime_pid_ ? runtime_pid_ : getpid();
 
     // Send SIGUSR1 to the worker thread in the runtime process
-    int result = hshm::lbm::EventManager::Signal(runtime_pid, tid);
+    int result = ctp::lbm::EventManager::Signal(runtime_pid, tid);
     if (result != 0) {
       HLOG(kError,
            "AwakenWorker: Failed to send SIGUSR1 to runtime_pid={}, tid={} "
@@ -530,7 +530,7 @@ bool IpcManager::ServerInitShm() {
 
     // Initialize main backend with custom header size
     if (!main_backend_.shm_init(main_allocator_id_,
-                                hshm::Unit<size_t>::Bytes(main_segment_size),
+                                ctp::Unit<size_t>::Bytes(main_segment_size),
                                 main_segment_name)) {
       return false;
     }
@@ -549,7 +549,7 @@ bool IpcManager::ServerInitShm() {
     HLOG(kInfo, "Initializing queue shared memory segment: {} bytes ({} KB)",
          queue_segment_size, queue_segment_size / 1024);
     if (!queue_backend_.shm_init(queue_allocator_id_,
-                                 hshm::Unit<size_t>::Bytes(queue_segment_size),
+                                 ctp::Unit<size_t>::Bytes(queue_segment_size),
                                  queue_segment_name)) {
       return false;
     }
@@ -684,7 +684,7 @@ void IpcManager::AssignGpuLanesToWorker() {
   if (lane) {
     pid_t tid = lane->GetTid();
     if (tid > 0) {
-      hshm::lbm::EventManager::Signal(getpid(), tid);
+      ctp::lbm::EventManager::Signal(getpid(), tid);
     }
   }
 }
@@ -725,9 +725,9 @@ bool IpcManager::StartLocalServer() {
     std::string protocol = "tcp";
     u32 port = config->GetPort() + 1;  // Use ZMQ port + 1 for local server
 
-    local_transport_ = hshm::lbm::TransportFactory::Get(
-        addr, hshm::lbm::TransportType::kZeroMq,
-        hshm::lbm::TransportMode::kServer, protocol, port);
+    local_transport_ = ctp::lbm::TransportFactory::Get(
+        addr, ctp::lbm::TransportType::kZeroMq,
+        ctp::lbm::TransportMode::kServer, protocol, port);
 
     if (local_transport_ != nullptr) {
       HLOG(kSuccess, "Successfully started local server at {}:{}", addr, port);
@@ -812,9 +812,9 @@ retry_attempt:
         pending_response_archives_.clear();
       }
       try {
-        zmq_transport_ = hshm::lbm::TransportFactory::Get(
-            config->GetServerAddr(), hshm::lbm::TransportType::kZeroMq,
-            hshm::lbm::TransportMode::kClient, "tcp", port + 3);
+        zmq_transport_ = ctp::lbm::TransportFactory::Get(
+            config->GetServerAddr(), ctp::lbm::TransportType::kZeroMq,
+            ctp::lbm::TransportMode::kClient, "tcp", port + 3);
       } catch (const std::exception &e) {
         HLOG(kError, "WaitForLocalServer: DEALER recreate failed: {}",
              e.what());
@@ -919,7 +919,7 @@ bool IpcManager::LoadHostfile() {
   try {
     // Use HSHM to parse hostfile
     std::vector<std::string> host_ips =
-        hshm::ConfigParse::ParseHostfile(hostfile_path);
+        ctp::ConfigParse::ParseHostfile(hostfile_path);
 
     // Create Host structs and populate map using linear offset-based node IDs
     HLOG(kDebug, "=== Container to Node ID Mapping (Linear Offset) ===");
@@ -1321,9 +1321,9 @@ bool IpcManager::TryStartMainServer(const std::string &hostname) {
 
     HLOG(kDebug, "Attempting to start main server on {}:{}", hostname, port);
 
-    main_transport_ = hshm::lbm::TransportFactory::Get(
-        hostname, hshm::lbm::TransportType::kZeroMq,
-        hshm::lbm::TransportMode::kServer, protocol, port);
+    main_transport_ = ctp::lbm::TransportFactory::Get(
+        hostname, ctp::lbm::TransportType::kZeroMq,
+        ctp::lbm::TransportMode::kServer, protocol, port);
 
     if (!main_transport_) {
       HLOG(kDebug,
@@ -1348,11 +1348,11 @@ bool IpcManager::TryStartMainServer(const std::string &hostname) {
   }
 }
 
-hshm::lbm::Transport *IpcManager::GetMainTransport() const {
+ctp::lbm::Transport *IpcManager::GetMainTransport() const {
   return main_transport_.get();
 }
 
-hshm::lbm::Transport *IpcManager::GetClientTransport(IpcMode mode) const {
+ctp::lbm::Transport *IpcManager::GetClientTransport(IpcMode mode) const {
   if (mode == IpcMode::kTcp) return client_tcp_transport_.get();
   if (mode == IpcMode::kIpc) return client_ipc_transport_.get();
   return nullptr;
@@ -1361,26 +1361,26 @@ hshm::lbm::Transport *IpcManager::GetClientTransport(IpcMode mode) const {
 const Host &IpcManager::GetThisHost() const { return this_host_; }
 
 FullPtr<char> IpcManager::AllocateBuffer(size_t size) {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   // HOST-ONLY PATH: The device implementation is in ipc_manager.h
 
-  // RUNTIME PATH: Use private memory (HSHM_MALLOC) — runtime never uses
+  // RUNTIME PATH: Use private memory (CTP_MALLOC) — runtime never uses
   // per-process shared memory segments
   if (CHI_CHIMAERA_MANAGER && CHI_CHIMAERA_MANAGER->IsRuntime()) {
-    // Use HSHM_MALLOC allocator for private memory allocation
-    FullPtr<char> buffer = HSHM_MALLOC->AllocateObjs<char>(size);
+    // Use CTP_MALLOC allocator for private memory allocation
+    FullPtr<char> buffer = CTP_MALLOC->AllocateObjs<char>(size);
     if (buffer.IsNull()) {
-      HLOG(kError, "AllocateBuffer: HSHM_MALLOC failed for {} bytes", size);
+      HLOG(kError, "AllocateBuffer: CTP_MALLOC failed for {} bytes", size);
     }
     return buffer;
   }
 
   // CLIENT TCP/IPC PATH: Use private memory (no shared memory needed)
   if (ipc_mode_ != IpcMode::kShm) {
-    FullPtr<char> buffer = HSHM_MALLOC->AllocateObjs<char>(size);
+    FullPtr<char> buffer = CTP_MALLOC->AllocateObjs<char>(size);
     if (buffer.IsNull()) {
       HLOG(kError,
-           "AllocateBuffer: HSHM_MALLOC failed for {} bytes (client ZMQ mode)",
+           "AllocateBuffer: CTP_MALLOC failed for {} bytes (client ZMQ mode)",
            size);
     }
     return buffer;
@@ -1435,22 +1435,22 @@ FullPtr<char> IpcManager::AllocateBuffer(size_t size) {
 #else
   // GPU PATH: Implementation is in ipc_manager.h as inline function
   return FullPtr<char>::GetNull();
-#endif  // HSHM_IS_HOST
+#endif  // CTP_IS_HOST
 }
 
 void IpcManager::FreeBuffer(FullPtr<char> buffer_ptr) {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   // HOST PATH: Check various allocators
   if (buffer_ptr.IsNull()) {
     return;
   }
 
-  // Check if allocator ID is null (private memory allocated with HSHM_MALLOC)
+  // Check if allocator ID is null (private memory allocated with CTP_MALLOC)
   if (buffer_ptr.shm_.alloc_id_ == hipc::AllocatorId::GetNull()) {
-    // Private memory - use HSHM_MALLOC->Free() for RUNTIME-allocated buffers
-    // In RUNTIME mode, AllocateBuffer uses HSHM_MALLOC which adds MallocPage
+    // Private memory - use CTP_MALLOC->Free() for RUNTIME-allocated buffers
+    // In RUNTIME mode, AllocateBuffer uses CTP_MALLOC which adds MallocPage
     // header
-    HSHM_MALLOC->Free(buffer_ptr);
+    CTP_MALLOC->Free(buffer_ptr);
     return;
   }
 
@@ -1488,7 +1488,7 @@ void IpcManager::FreeBuffer(FullPtr<char> buffer_ptr) {
   // the host never frees them here (the client owns the device memory and
   // releases it through FreeGpuBackend / admin DeregisterMemory). Silently
   // skip the free for those allocator ids by checking gpu_ipc_ first.
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
   if (gpu_ipc_) {
     for (const auto &dev : gpu_ipc_->per_gpu_devices_) {
       if (dev.client_backends.find(alloc_key) != dev.client_backends.end()) {
@@ -1502,10 +1502,10 @@ void IpcManager::FreeBuffer(FullPtr<char> buffer_ptr) {
        buffer_ptr.shm_.alloc_id_.major_, buffer_ptr.shm_.alloc_id_.minor_);
 #else
   // GPU PATH: Implementation is in ipc_manager.h as inline function
-#endif  // HSHM_IS_HOST
+#endif  // CTP_IS_HOST
 }
 
-hshm::lbm::Transport *IpcManager::GetOrCreateClient(const std::string &addr,
+ctp::lbm::Transport *IpcManager::GetOrCreateClient(const std::string &addr,
                                                     int port) {
   // Create key for the pool map
   std::string key = addr + ":" + std::to_string(port);
@@ -1522,9 +1522,9 @@ hshm::lbm::Transport *IpcManager::GetOrCreateClient(const std::string &addr,
 
   // Create new persistent client connection
   HLOG(kInfo, "[ClientPool] Creating new persistent connection to {}", key);
-  auto transport = hshm::lbm::TransportFactory::Get(
-      addr, hshm::lbm::TransportType::kZeroMq,
-      hshm::lbm::TransportMode::kClient, "tcp", port);
+  auto transport = ctp::lbm::TransportFactory::Get(
+      addr, ctp::lbm::TransportType::kZeroMq,
+      ctp::lbm::TransportMode::kClient, "tcp", port);
 
   if (!transport) {
     HLOG(kError, "[ClientPool] Failed to create client for {}", key);
@@ -1532,7 +1532,7 @@ hshm::lbm::Transport *IpcManager::GetOrCreateClient(const std::string &addr,
   }
 
   // Store in pool and return raw pointer
-  hshm::lbm::Transport *raw_ptr = transport.get();
+  ctp::lbm::Transport *raw_ptr = transport.get();
   client_pool_[key] = std::move(transport);
 
   HLOG(kInfo, "[ClientPool] Connection established to {}", key);
@@ -1640,7 +1640,7 @@ bool IpcManager::IncreaseClientShm(size_t size) {
     hipc::AllocatorId alloc_id(static_cast<u32>(pid), index);
 
     // Initialize shared memory using backend's shm_init method
-    if (!backend->shm_init(alloc_id, hshm::Unit<size_t>::Bytes(total_size),
+    if (!backend->shm_init(alloc_id, ctp::Unit<size_t>::Bytes(total_size),
                            shm_name)) {
       HLOG(kError, "IpcManager::IncreaseClientShm: Failed to create shm for {}",
            shm_name);
@@ -1985,7 +1985,7 @@ size_t IpcManager::WreapAllIpcs() {
 
 size_t IpcManager::ClearUserIpcs() {
   size_t removed_count = 0;
-  std::string memfd_dir = hshm::SystemInfo::GetMemfdDir();
+  std::string memfd_dir = ctp::SystemInfo::GetMemfdDir();
 
   // Open per-user memfd symlink directory
   DIR *dir = opendir(memfd_dir.c_str());
@@ -2027,11 +2027,11 @@ size_t IpcManager::ClearUserIpcs() {
 
 void IpcManager::SetIsClientThread(bool is_client_thread) {
   // Create TLS key if not already created
-  HSHM_THREAD_MODEL->CreateTls<bool>(chi_is_client_thread_key_, nullptr);
+  CTP_THREAD_MODEL->CreateTls<bool>(chi_is_client_thread_key_, nullptr);
 
   // Set the flag for the current thread
   bool *flag = new bool(is_client_thread);
-  HSHM_THREAD_MODEL->SetTls(chi_is_client_thread_key_, flag);
+  CTP_THREAD_MODEL->SetTls(chi_is_client_thread_key_, flag);
 
   HLOG(kDebug, "SetIsClientThread: Set to {} for current thread",
        is_client_thread);
@@ -2039,7 +2039,7 @@ void IpcManager::SetIsClientThread(bool is_client_thread) {
 
 bool IpcManager::GetIsClientThread() const {
   // Get the TLS value, defaulting to false if not set
-  bool *flag = HSHM_THREAD_MODEL->GetTls<bool>(chi_is_client_thread_key_);
+  bool *flag = CTP_THREAD_MODEL->GetTls<bool>(chi_is_client_thread_key_);
   if (!flag) {
     return false;
   }
@@ -2056,7 +2056,7 @@ bool IpcManager::GetIsClientThread() const {
 
 bool IpcManager::IsServerAlive() const {
   if (!zmq_transport_) return false;
-  hshm::lbm::LbmContext ctx;
+  ctp::lbm::LbmContext ctx;
   if (ipc_mode_ == IpcMode::kShm) {
     ctx.server_pid_ = static_cast<int>(runtime_pid_);
   }
@@ -2077,10 +2077,10 @@ bool IpcManager::ReconnectToOriginalHost() {
     if (!ClientInitQueues()) return false;
 
     // Re-create SHM lightbeam transports
-    shm_send_transport_ = hshm::lbm::TransportFactory::Get(
-        "", hshm::lbm::TransportType::kShm, hshm::lbm::TransportMode::kClient);
-    shm_recv_transport_ = hshm::lbm::TransportFactory::Get(
-        "", hshm::lbm::TransportType::kShm, hshm::lbm::TransportMode::kServer);
+    shm_send_transport_ = ctp::lbm::TransportFactory::Get(
+        "", ctp::lbm::TransportType::kShm, ctp::lbm::TransportMode::kClient);
+    shm_recv_transport_ = ctp::lbm::TransportFactory::Get(
+        "", ctp::lbm::TransportType::kShm, ctp::lbm::TransportMode::kServer);
 
     // Re-register per-process shared memory segments with new server
     for (auto *alloc : alloc_vector_) {
@@ -2115,9 +2115,9 @@ bool IpcManager::ReconnectToOriginalHost() {
       pending_response_archives_.clear();
     }
     try {
-      zmq_transport_ = hshm::lbm::TransportFactory::Get(
-          config->GetServerAddr(), hshm::lbm::TransportType::kZeroMq,
-          hshm::lbm::TransportMode::kClient, "tcp", port + 3);
+      zmq_transport_ = ctp::lbm::TransportFactory::Get(
+          config->GetServerAddr(), ctp::lbm::TransportType::kZeroMq,
+          ctp::lbm::TransportMode::kClient, "tcp", port + 3);
     } catch (const std::exception &e) {
       HLOG(kError, "ReconnectToOriginalHost: TCP transport recreate failed: {}",
            e.what());
@@ -2168,9 +2168,9 @@ bool IpcManager::ReconnectToNewHost(const std::string &new_addr) {
 
   // Create new ZMQ DEALER transport
   try {
-    zmq_transport_ = hshm::lbm::TransportFactory::Get(
-        new_addr, hshm::lbm::TransportType::kZeroMq,
-        hshm::lbm::TransportMode::kClient, "tcp", port + 3);
+    zmq_transport_ = ctp::lbm::TransportFactory::Get(
+        new_addr, ctp::lbm::TransportType::kZeroMq,
+        ctp::lbm::TransportMode::kClient, "tcp", port + 3);
   } catch (const std::exception &e) {
     HLOG(kError, "ReconnectToNewHost: Transport to {} failed: {}",
          new_addr, e.what());
@@ -2282,7 +2282,7 @@ void IpcManager::RecvZmqClientThread() {
   }
 
   // Set up EventManager for ZMQ transport polling
-  hshm::lbm::EventManager em;
+  ctp::lbm::EventManager em;
   zmq_transport_->RegisterEventManager(em);
 
   // Instrumentation: count of responses this client has received and signaled
@@ -2385,7 +2385,7 @@ void IpcManager::CleanupResponseArchive(size_t net_key) {
 // RegisterMemory path, which calls
 // gpu::IpcManager::RegisterClientBackend directly.
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 hipc::AllocatorId IpcManager::AllocateAndRegisterGpuBackend(
     u32 gpu_id, gpu::IpcManager::MemKind kind, size_t bytes,
     char **out_base) {
@@ -2396,14 +2396,14 @@ hipc::AllocatorId IpcManager::AllocateAndRegisterGpuBackend(
   char *base = nullptr;
   switch (kind) {
     case gpu::IpcManager::MemKind::kPinnedHost:
-      base = hshm::GpuApi::MallocHost<char>(bytes);
+      base = ctp::GpuApi::MallocHost<char>(bytes);
       break;
     case gpu::IpcManager::MemKind::kManagedUvm:
-      base = hshm::GpuApi::MallocManaged<char>(bytes);
+      base = ctp::GpuApi::MallocManaged<char>(bytes);
       break;
     case gpu::IpcManager::MemKind::kDeviceMem:
-      hshm::GpuApi::SetDevice(static_cast<int>(gpu_id));
-      base = hshm::GpuApi::Malloc<char>(bytes);
+      ctp::GpuApi::SetDevice(static_cast<int>(gpu_id));
+      base = ctp::GpuApi::Malloc<char>(bytes);
       break;
   }
   if (!base) {
@@ -2469,12 +2469,12 @@ void IpcManager::FreeGpuBackend(u32 gpu_id,
   if (gpu_ipc_) {
     gpu_ipc_->UnregisterClientBackend(gpu_id, alloc_id);
   }
-  // The actual hshm::GpuApi::Free relies on caller-tracked metadata —
+  // The actual ctp::GpuApi::Free relies on caller-tracked metadata —
   // the host caller passes the base back (out_base from
   // AllocateAndRegisterGpuBackend) and frees through the same API. In a
   // future iteration we could fold that bookkeeping into ClientBackend.
 }
-#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#endif  // CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 
 void IpcManager::BeginTask(Future<Task> &future, Container *container,
                            TaskLane *lane) {
@@ -2483,7 +2483,7 @@ void IpcManager::BeginTask(Future<Task> &future, Container *container,
     HLOG(kError, "BeginTask: task_ptr is null!");
     return;
   }
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   Worker *worker = CHI_CUR_WORKER;
 
   // Initialize or reset the task's owned RunContext
@@ -2974,7 +2974,7 @@ std::vector<PoolQuery> IpcManager::ResolvePhysicalQuery(
 
 hipc::FullPtr<Task> IpcManager::RecvRuntime(
     Future<Task> &future, Container *container, u32 method_id,
-    hshm::lbm::Transport *recv_transport) {
+    ctp::lbm::Transport *recv_transport) {
   auto future_shm = future.GetFutureShm();
 
   // Self-send path: no deserialization needed
@@ -2985,7 +2985,7 @@ hipc::FullPtr<Task> IpcManager::RecvRuntime(
 
   u32 origin = future_shm->origin_;
   switch (origin) {
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
     case FutureShm::FUTURE_CLIENT_GPU2CPU:
       return IpcGpu2Cpu::RuntimeRecv(this, future, container,
                                       method_id, recv_transport);
@@ -2999,7 +2999,7 @@ hipc::FullPtr<Task> IpcManager::RecvRuntime(
 
 void IpcManager::SendRuntime(
     const FullPtr<Task> &task_ptr, RunContext *run_ctx,
-    Container *container, hshm::lbm::Transport *send_transport) {
+    Container *container, ctp::lbm::Transport *send_transport) {
   auto future_shm = run_ctx->future_.GetFutureShm();
   u32 origin = future_shm->origin_;
 
@@ -3013,7 +3013,7 @@ void IpcManager::SendRuntime(
     case FutureShm::FUTURE_CLIENT_IPC:
       IpcCpu2CpuZmq::EnqueueRuntimeSend(this, run_ctx, origin);
       break;
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
     case FutureShm::FUTURE_CLIENT_GPU2CPU:
       IpcGpu2Cpu::RuntimeSend(this, task_ptr, run_ctx, container);
       break;

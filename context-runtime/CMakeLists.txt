@@ -33,7 +33,7 @@ endif()
 #------------------------------------------------------------------------------
 # Verify that required dependencies were found by ChimaeraCommon.cmake
 # Check for both package and target availability (supports both installed and subdirectory modes)
-if(NOT HermesShm_FOUND AND NOT TARGET cxx AND NOT TARGET hshm::cxx)
+if(NOT HermesShm_FOUND AND NOT TARGET cxx AND NOT TARGET ctp::cxx)
   message(FATAL_ERROR "Hermes SHM (HSHM) not found")
 endif()
 

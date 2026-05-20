@@ -31,16 +31,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_BZIP2_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_BZIP2_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_BZIP2_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_BZIP2_H_
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
 
 #include <bzlib.h>
 
 #include "compress.h"
 
-namespace hshm {
+namespace ctp {
 
 class Bzip2 : public Compressor {
  public:
@@ -74,8 +74,8 @@ class Bzip2 : public Compressor {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_COMPRESS
+#endif  // CTP_ENABLE_COMPRESS
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_BZIP2_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_BZIP2_H_

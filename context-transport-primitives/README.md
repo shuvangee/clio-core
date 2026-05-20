@@ -41,7 +41,7 @@ HermesShm provides modular CMake targets for flexible dependency management. Lin
 ### Core Library (CPU-Only)
 ```cmake
 find_package(HermesShm CONFIG REQUIRED)
-target_link_libraries(your_target hshm::cxx)
+target_link_libraries(your_target ctp::cxx)
 ```
 
 ### Modular Dependency Targets
@@ -52,22 +52,22 @@ HermesShm provides fine-grained modular targets for optional dependencies:
 find_package(HermesShm CONFIG REQUIRED)
 
 target_link_libraries(your_target
-  hshm::cxx              # Core library (required)
-  hshm::configure        # YAML configuration parsing (instead of yaml-cpp directly)
-  hshm::serialize        # Object serialization (instead of cereal directly)
-  hshm::interceptor      # ELF interception for adapters
-  hshm::lightbeam        # Network transport (ZMQ, libfabric, Thallium)
-  hshm::thread_all       # Threading support (pthread, OpenMP)
-  hshm::mpi              # MPI support (use only where needed)
-  hshm::compress         # Compression utilities
-  hshm::encrypt          # Encryption utilities
+  ctp::cxx              # Core library (required)
+  ctp::configure        # YAML configuration parsing (instead of yaml-cpp directly)
+  ctp::serialize        # Object serialization (instead of cereal directly)
+  ctp::interceptor      # ELF interception for adapters
+  ctp::lightbeam        # Network transport (ZMQ, libfabric, Thallium)
+  ctp::thread_all       # Threading support (pthread, OpenMP)
+  ctp::mpi              # MPI support (use only where needed)
+  ctp::compress         # Compression utilities
+  ctp::encrypt          # Encryption utilities
 )
 ```
 
 **Key Guidelines:**
-- Always link `hshm::cxx` as the base
-- Use `hshm::configure` instead of linking to `yaml-cpp` directly
-- Use `hshm::serialize` instead of linking to `cereal` directly
+- Always link `ctp::cxx` as the base
+- Use `ctp::configure` instead of linking to `yaml-cpp` directly
+- Use `ctp::serialize` instead of linking to `cereal` directly
 - Link only the modular targets you actually need
 - Each modular target includes appropriate compile definitions
 
@@ -76,13 +76,13 @@ target_link_libraries(your_target
 **CUDA Version:**
 ```cmake
 find_package(HermesShm CONFIG REQUIRED)
-target_link_libraries(your_target hshm::cudacxx)
+target_link_libraries(your_target ctp::cudacxx)
 ```
 
 **ROCm Version:**
 ```cmake
 find_package(HermesShm CONFIG REQUIRED)
-target_link_libraries(your_target hshm::rocmcxx_gpu)
+target_link_libraries(your_target ctp::rocmcxx_gpu)
 ```
 
 ## Tests

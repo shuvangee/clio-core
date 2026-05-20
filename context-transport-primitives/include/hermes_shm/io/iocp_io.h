@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_IO_IOCP_IO_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_IO_IOCP_IO_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_IO_IOCP_IO_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_IO_IOCP_IO_H_
 
 #ifdef _WIN32
 
@@ -41,7 +41,7 @@
 // TODO: #include <windows.h>
 // TODO: Windows IOCP implementation
 
-namespace hshm {
+namespace ctp {
 
 class IocpAsyncIO : public AsyncIO {
  public:
@@ -97,8 +97,8 @@ class IocpAsyncIO : public AsyncIO {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
 #endif  // _WIN32
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_IO_IOCP_IO_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_IO_IOCP_IO_H_

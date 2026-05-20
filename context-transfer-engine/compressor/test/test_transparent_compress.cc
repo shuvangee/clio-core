@@ -80,7 +80,7 @@ TEST_CASE("Transparent PutBlob through compressor",
 
   // PutBlob — this should go through the compressor (512.0) transparently
   wrp_cte::core::Context ctx;
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
   ctx.dynamic_compress_ = 1;  // Enable static compression
   ctx.compress_lib_ = 4;      // LZ4
   ctx.compress_preset_ = 2;   // BALANCED

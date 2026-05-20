@@ -72,7 +72,7 @@ using ssize_t = SSIZE_T;
 #include <sys/epoll.h>
 #endif
 
-namespace hshm::lbm::sock {
+namespace ctp::lbm::sock {
 
 #ifdef _WIN32
 using socket_t = SOCKET;
@@ -88,35 +88,35 @@ struct IoBuffer {
   size_t len;
 };
 
-HSHM_DLL void Close(socket_t fd);
-HSHM_DLL int GetError();
-HSHM_DLL std::string GetErrorString();
-HSHM_DLL void SetNonBlocking(socket_t fd, bool enable);
-HSHM_DLL void SetTcpNoDelay(socket_t fd);
-HSHM_DLL void SetReuseAddr(socket_t fd);
-HSHM_DLL void SetSendBuf(socket_t fd, int size);
-HSHM_DLL void SetRecvBuf(socket_t fd, int size);
+CTP_DLL void Close(socket_t fd);
+CTP_DLL int GetError();
+CTP_DLL std::string GetErrorString();
+CTP_DLL void SetNonBlocking(socket_t fd, bool enable);
+CTP_DLL void SetTcpNoDelay(socket_t fd);
+CTP_DLL void SetReuseAddr(socket_t fd);
+CTP_DLL void SetSendBuf(socket_t fd, int size);
+CTP_DLL void SetRecvBuf(socket_t fd, int size);
 
 /** Initialize platform socket library (WSAStartup on Windows, no-op on POSIX) */
-HSHM_DLL void InitSocketLib();
+CTP_DLL void InitSocketLib();
 
 /** Cleanup platform socket library (WSACleanup on Windows, no-op on POSIX) */
-HSHM_DLL void CleanupSocketLib();
+CTP_DLL void CleanupSocketLib();
 
 /** Scatter-gather send. Returns total bytes sent or -1 on error. */
-HSHM_DLL ssize_t SendV(socket_t fd, const IoBuffer* iov, int count);
+CTP_DLL ssize_t SendV(socket_t fd, const IoBuffer* iov, int count);
 
 /** Receive exactly len bytes. Returns 0 on success, -1 on error/short read. */
-HSHM_DLL int RecvExact(socket_t fd, char* buf, size_t len);
+CTP_DLL int RecvExact(socket_t fd, char* buf, size_t len);
 
 /** Poll a single fd for readability. Returns >0 if ready, 0 on timeout, -1 on error. */
-HSHM_DLL int PollRead(socket_t fd, int timeout_ms);
+CTP_DLL int PollRead(socket_t fd, int timeout_ms);
 
 /** Poll multiple fds for readability. Returns index of first ready fd, -1 if none/error. */
-HSHM_DLL int PollReadMulti(const socket_t* fds, int count, int timeout_ms);
+CTP_DLL int PollReadMulti(const socket_t* fds, int count, int timeout_ms);
 
 /** Remove a file path (unlink on POSIX, DeleteFileA on Windows) */
-HSHM_DLL void UnlinkPath(const char* path);
+CTP_DLL void UnlinkPath(const char* path);
 
 #ifndef _WIN32
 /** Create an epoll file descriptor. Returns epoll fd or -1 on error. */
@@ -133,4 +133,4 @@ int EpollWait(int epoll_fd, struct epoll_event* events, int max_events,
 void EpollClose(int epoll_fd);
 #endif
 
-}  // namespace hshm::lbm::sock
+}  // namespace ctp::lbm::sock

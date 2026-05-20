@@ -49,7 +49,7 @@ using clio::cae::FsIoOptions;
 using clio::cae::IoStatus;
 using clio::cae::MetadataManager;
 using clio::cae::SeekMode;
-using hshm::u8;  // chimaera relocated u8/u16/... into hshm::; pull
+using ctp::u8;  // chimaera relocated u8/u16/... into ctp::; pull
                   // u8 in by name so the existing getc/putc bodies
                   // compile without rewriting every typed buffer.
 

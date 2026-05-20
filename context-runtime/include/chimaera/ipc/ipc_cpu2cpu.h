@@ -27,13 +27,13 @@ struct IpcCpu2Cpu {
   /** Deserialize task from SHM ring buffer on runtime side. */
   static hipc::FullPtr<Task> RuntimeRecv(
       IpcManager *ipc, Future<Task> &future, Container *container,
-      u32 method_id, hshm::lbm::Transport *recv_transport);
+      u32 method_id, ctp::lbm::Transport *recv_transport);
 
   /** Serialize outputs and set FUTURE_COMPLETE. */
   static void RuntimeSend(
       IpcManager *ipc, const FullPtr<Task> &task_ptr,
       RunContext *run_ctx, Container *container,
-      hshm::lbm::Transport *send_transport);
+      ctp::lbm::Transport *send_transport);
 
   /** Wait for COMPLETE, then deserialize outputs. */
   template <typename TaskT>

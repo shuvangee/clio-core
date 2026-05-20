@@ -42,7 +42,7 @@
 #include <filesystem>
 
 // Global pointer variable definition for Configuration manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::ConfigManager, g_config_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::ConfigManager, g_config_manager);
 
 namespace chi {
 
@@ -67,13 +67,13 @@ bool ConfigManager::ClientInit() {
   }
 
   // Check CHI_PORT env var (overrides YAML and default)
-  std::string port_env = hshm::SystemInfo::Getenv("CHI_PORT");
+  std::string port_env = ctp::SystemInfo::Getenv("CHI_PORT");
   if (!port_env.empty()) {
     port_ = std::stoul(port_env);
   }
 
   // Check CHI_SERVER_ADDR env var (overrides default 127.0.0.1)
-  std::string addr_env = hshm::SystemInfo::Getenv("CHI_SERVER_ADDR");
+  std::string addr_env = ctp::SystemInfo::Getenv("CHI_SERVER_ADDR");
   if (!addr_env.empty()) {
     server_addr_ = addr_env;
   }
@@ -106,7 +106,7 @@ std::string ConfigManager::GetServerConfigPath() const {
 
   // Fall back to ~/.chimaera/chimaera.yaml
   std::string home_config =
-      hshm::ConfigParse::ExpandPath("${HOME}/.chimaera/chimaera.yaml");
+      ctp::ConfigParse::ExpandPath("${HOME}/.chimaera/chimaera.yaml");
   if (std::filesystem::exists(home_config)) {
     return home_config;
   }
@@ -152,7 +152,7 @@ ConfigManager::GetSharedMemorySegmentName(MemorySegment segment) const {
   }
 
   // Use HSHM's ExpandPath to resolve environment variables
-  return hshm::ConfigParse::ExpandPath(segment_name);
+  return ctp::ConfigParse::ExpandPath(segment_name);
 }
 
 std::string ConfigManager::GetHostfilePath() const {
@@ -161,7 +161,7 @@ std::string ConfigManager::GetHostfilePath() const {
   }
 
   // Use HSHM's ExpandPath to resolve environment variables in hostfile path
-  return hshm::ConfigParse::ExpandPath(hostfile_path_);
+  return ctp::ConfigParse::ExpandPath(hostfile_path_);
 }
 
 bool ConfigManager::IsValid() const { return is_initialized_; }
@@ -355,7 +355,7 @@ size_t ConfigManager::CalculateMainSegmentSize() const {
 
   // Main segment holds task data (FutureShm, BuddyAllocator metadata) — no queues
   // Use 1 GB default for task/data allocations
-  return hshm::Unit<size_t>::Gigabytes(1);
+  return ctp::Unit<size_t>::Gigabytes(1);
 }
 
 size_t ConfigManager::CalculateQueueSegmentSize() const {

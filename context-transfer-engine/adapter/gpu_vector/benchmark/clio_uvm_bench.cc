@@ -7,24 +7,26 @@
  */
 
 /**
- * Traditional out-of-memory baseline benchmark.
+ * CUDA Unified Virtual Memory (UVM / cudaMallocManaged) baseline.
  *
- * Models the textbook "GPU produces data, host pages it out to storage"
- * pattern with NO async overlap and NO kernel-side IPC:
+ * Same shape as the traditional out-of-memory benchmark, but the per-block
+ * staging buffer lives in managed memory:
  *
  *   for each page-stripe index p in [0, per_block_pages):
- *     1. launch fill kernel that writes nblocks pages of u32s to dev_buf
+ *     1. launch fill kernel that writes nblocks pages of u32s to managed_buf
  *     2. cudaDeviceSynchronize
- *     3. cudaMemcpy device -> pinned host (synchronous)
- *     4. for each block b: cte.AsyncPutBlob(...).Wait()  (synchronous)
+ *     3. for each block b: cte.AsyncPutBlob(...).Wait()  with the managed
+ *        pointer (the runtime DeviceAwareMemcpy hook walks pages in/out
+ *        on demand, so no explicit cudaMemcpy is needed)
  *
- * The read mirror does AsyncGetBlob().Wait() then cudaMemcpy host->device.
+ * The read mirror does AsyncGetBlob().Wait() into the managed buffer, then
+ * a kernel touches the data so the read driver migrates pages to device.
  *
- * CLI is identical to wrp_cte_gpu_vector_bench so the two can be compared
- * apples-to-apples (same total I/O, same page geometry, same iters).
+ * CLI is identical to wrp_cte_gpu_vector_bench so the three benches can
+ * be compared apples-to-apples.
  */
 
-#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#if (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL
 
 #include <chimaera/bdev/bdev_client.h>
 #include <chimaera/chimaera.h>
@@ -50,7 +52,7 @@ namespace {
 
 struct BenchOpts {
   chi::u32 nblocks = 32;
-  chi::u32 pages_per_block = 2;     // accepted for CLI compat; unused here
+  chi::u32 pages_per_block = 2;     // accepted for CLI compat; sizing only
   chi::u64 page_size = 1ULL << 20;  // 1 MiB
   double ratio = 1.0;
   chi::u64 total_bytes = 0;
@@ -122,7 +124,7 @@ bool ParseOpts(int argc, char *argv[], BenchOpts &opts) {
   return true;
 }
 
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 void EnsureInit(const BenchOpts &opts, chi::u64 bdev_capacity_bytes) {
   std::fprintf(stderr, "[INIT] Starting Chimaera server\n");
   if (!chi::CHIMAERA_INIT(chi::ChimaeraMode::kServer)) {
@@ -150,7 +152,7 @@ void EnsureInit(const BenchOpts &opts, chi::u64 bdev_capacity_bytes) {
   chi::PoolId bdev_pool_id(951, 0);
   chimaera::bdev::Client bdev_client(bdev_pool_id);
   auto bdev_create = bdev_client.AsyncCreate(
-      chi::PoolQuery::Dynamic(), std::string("trad_bench_ram"),
+      chi::PoolQuery::Dynamic(), std::string("uvm_bench_ram"),
       bdev_pool_id, chimaera::bdev::BdevType::kRam, bdev_capacity_bytes);
   bdev_create.Wait();
   if (bdev_create->GetReturnCode() != 0) {
@@ -160,7 +162,7 @@ void EnsureInit(const BenchOpts &opts, chi::u64 bdev_capacity_bytes) {
   }
   std::this_thread::sleep_for(50ms);
   auto reg_task = cte_client->AsyncRegisterTarget(
-      "trad_bench_ram", chimaera::bdev::BdevType::kRam,
+      "uvm_bench_ram", chimaera::bdev::BdevType::kRam,
       bdev_capacity_bytes, chi::PoolQuery::Local(), bdev_pool_id);
   reg_task.Wait();
   if (reg_task->GetReturnCode() != 0) {
@@ -171,37 +173,38 @@ void EnsureInit(const BenchOpts &opts, chi::u64 bdev_capacity_bytes) {
   std::this_thread::sleep_for(50ms);
   (void)opts;
 }
-#endif  // !HSHM_IS_DEVICE_PASS
+#endif  // !CTP_IS_DEVICE_PASS
 
 }  // namespace
 
-/** Each block writes its slice of stripe page p into dev_buf[b*page_size]. */
-__global__ void TradFillPageKernel(chi::u32 *dev_buf,
-                                    chi::u64 elems_per_page,
-                                    chi::u64 page_idx,
-                                    chi::u64 per_block_pages) {
+/** Each block fills its slice of stripe page p directly into the UVM buffer.
+ *  cudaMallocManaged backs `managed_buf`, so the writes will demand-fault
+ *  pages onto device as the kernel runs. */
+__global__ void UvmFillPageKernel(chi::u32 *managed_buf,
+                                   chi::u64 elems_per_page,
+                                   chi::u64 page_idx,
+                                   chi::u64 per_block_pages) {
   chi::u32 b = blockIdx.x;
   chi::u64 base =
       (static_cast<chi::u64>(b) * per_block_pages + page_idx) * elems_per_page;
-  chi::u32 *slot = dev_buf + b * elems_per_page;
+  chi::u32 *slot = managed_buf + b * elems_per_page;
   for (chi::u64 j = threadIdx.x; j < elems_per_page; j += blockDim.x) {
     slot[j] = static_cast<chi::u32>(base + j);
   }
 }
 
-/** Touch the H2D-copied data so the H2D path is observable on profilers. */
-__global__ void TradConsumePageKernel(const chi::u32 *dev_buf,
-                                       chi::u64 elems_per_page,
-                                       chi::u32 *out_xor) {
+/** Touch the just-Get'd UVM data so pages migrate back to device on read. */
+__global__ void UvmConsumePageKernel(const chi::u32 *managed_buf,
+                                      chi::u64 elems_per_page,
+                                      chi::u32 *out_xor) {
   chi::u32 b = blockIdx.x;
-  const chi::u32 *slot = dev_buf + b * elems_per_page;
+  const chi::u32 *slot = managed_buf + b * elems_per_page;
   chi::u32 acc = 0;
   for (chi::u64 j = threadIdx.x; j < elems_per_page; j += blockDim.x) {
     acc ^= slot[j];
   }
-  // single-warp xor reduction
   for (int off = 16; off > 0; off >>= 1) {
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
     acc ^= __shfl_xor_sync(0xffffffff, acc, off);
 #else
     acc ^= __shfl_xor(acc, off);
@@ -210,7 +213,7 @@ __global__ void TradConsumePageKernel(const chi::u32 *dev_buf,
   if (threadIdx.x == 0) out_xor[b] = acc;
 }
 
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 
 namespace {
 std::string FmtBytes(chi::u64 b) {
@@ -273,14 +276,12 @@ int main(int argc, char *argv[]) {
         std::max<chi::u64>(64ULL << 20, opts.total_bytes * 4);
   }
 
-  // Per traditional pattern: 1 PutBlob per (block, page) on the write side
-  // and 1 GetBlob per (block, page) on the read side.
   chi::u64 expected_puts =
       static_cast<chi::u64>(opts.nblocks) * per_block_pages;
   chi::u64 expected_gets = expected_puts;
 
   std::fprintf(stderr,
-               "[BENCH] mode=traditional (sync D2H + sync PutBlob)\n"
+               "[BENCH] mode=uvm (cudaMallocManaged + sync PutBlob)\n"
                "[BENCH] blocks=%u pages_per_block=%u page_size=%s\n"
                "[BENCH] cache=%s total=%s ratio=%.2fx\n"
                "[BENCH] per_block=%llu pages (%s)\n"
@@ -301,27 +302,23 @@ int main(int argc, char *argv[]) {
 
   auto *cte_client = WRP_CTE_CLIENT;
 
-  // One-page-per-block working set on device, plus matching pinned host buf.
+  // One-page-per-block staging in UVM.
   chi::u64 workspace_bytes =
       static_cast<chi::u64>(opts.nblocks) * opts.page_size;
-  chi::u32 *dev_buf =
-      hshm::GpuApi::Malloc<chi::u32>(workspace_bytes);
-  chi::u32 *host_buf =
-      hshm::GpuApi::MallocHost<chi::u32>(workspace_bytes);
-  if (!dev_buf || !host_buf) {
+  chi::u32 *managed_buf =
+      ctp::GpuApi::MallocManaged<chi::u32>(workspace_bytes);
+  if (!managed_buf) {
     std::fprintf(stderr,
-                 "[BENCH] failed to allocate %s workspace (dev=%p host=%p)\n",
-                 FmtBytes(workspace_bytes).c_str(),
-                 (void *)dev_buf, (void *)host_buf);
+                 "[BENCH] cudaMallocManaged(%s) failed\n",
+                 FmtBytes(workspace_bytes).c_str());
     return 2;
   }
-  // Pre-fault host_buf so the first cudaMemcpy D2H + PutBlob memcpy in the
-  // timed loop don't pay ~3-5 us/page first-touch faults. cudaMallocHost
-  // reserves pinnable virtual address space; the kernel only commits
-  // physical pages on first write.
-  std::memset(host_buf, 0, workspace_bytes);
-  // Tiny xor-out buffer so the read kernel has somewhere to land its result.
-  chi::u32 *xor_out = hshm::GpuApi::Malloc<chi::u32>(
+  // Pre-fault managed_buf on the host so OS page faults land here, not
+  // in the timed write loop. The fill kernel will then migrate pages
+  // host->device on first GPU access — that migration is what we're
+  // measuring; the underlying OS page allocation isn't.
+  std::memset(managed_buf, 0, workspace_bytes);
+  chi::u32 *xor_out = ctp::GpuApi::Malloc<chi::u32>(
       static_cast<chi::u64>(opts.nblocks) * sizeof(chi::u32));
 
   using clock = std::chrono::steady_clock;
@@ -337,7 +334,7 @@ int main(int argc, char *argv[]) {
   read_us.reserve(opts.iters);
 
   for (chi::u32 it = 0; it < opts.iters; ++it) {
-    std::string tag_name = "trad_iter_" + std::to_string(it);
+    std::string tag_name = "uvm_iter_" + std::to_string(it);
     auto tag_fut = cte_client->AsyncGetOrCreateTag(tag_name);
     tag_fut.Wait();
     if (tag_fut->GetReturnCode() != 0) {
@@ -347,19 +344,19 @@ int main(int argc, char *argv[]) {
     }
     wrp_cte::core::TagId tag_id = tag_fut->tag_id_;
 
-    // ---- Write phase: per-page synchronous fill -> D2H -> PutBlob ----
+    // ---- Write phase: kernel fills UVM, host PutBlob from UVM pointer ----
     auto t0 = clock::now();
     for (chi::u64 p = 0; p < per_block_pages; ++p) {
-      TradFillPageKernel<<<opts.nblocks, 32>>>(
-          dev_buf, elems_per_page, p, per_block_pages);
-      hshm::GpuApi::Synchronize();
-      hshm::GpuApi::Memcpy<chi::u32>(host_buf, dev_buf, workspace_bytes);
+      UvmFillPageKernel<<<opts.nblocks, 32>>>(
+          managed_buf, elems_per_page, p, per_block_pages);
+      ctp::GpuApi::Synchronize();
       for (chi::u32 b = 0; b < opts.nblocks; ++b) {
-        std::string blob_name = "trad_b" + std::to_string(b) +
+        std::string blob_name = "uvm_b" + std::to_string(b) +
                                 "_pi" + std::to_string(p);
         hipc::ShmPtr<> ptr;
         ptr.alloc_id_.SetNull();
-        ptr.off_ = reinterpret_cast<chi::u64>(host_buf + b * elems_per_page);
+        ptr.off_ = reinterpret_cast<chi::u64>(
+            managed_buf + b * elems_per_page);
         auto fut = cte_client->AsyncPutBlob(
             tag_id, blob_name, /*offset=*/chi::u64(0),
             opts.page_size, ptr);
@@ -379,11 +376,12 @@ int main(int argc, char *argv[]) {
       auto t1 = clock::now();
       for (chi::u64 p = 0; p < per_block_pages; ++p) {
         for (chi::u32 b = 0; b < opts.nblocks; ++b) {
-          std::string blob_name = "trad_b" + std::to_string(b) +
+          std::string blob_name = "uvm_b" + std::to_string(b) +
                                   "_pi" + std::to_string(p);
           hipc::ShmPtr<> ptr;
           ptr.alloc_id_.SetNull();
-          ptr.off_ = reinterpret_cast<chi::u64>(host_buf + b * elems_per_page);
+          ptr.off_ = reinterpret_cast<chi::u64>(
+              managed_buf + b * elems_per_page);
           auto fut = cte_client->AsyncGetBlob(
               tag_id, blob_name, /*offset=*/chi::u64(0),
               opts.page_size, /*flags=*/chi::u32(0), ptr);
@@ -395,10 +393,9 @@ int main(int argc, char *argv[]) {
             return 2;
           }
         }
-        hshm::GpuApi::Memcpy<chi::u32>(dev_buf, host_buf, workspace_bytes);
-        TradConsumePageKernel<<<opts.nblocks, 32>>>(
-            dev_buf, elems_per_page, xor_out);
-        hshm::GpuApi::Synchronize();
+        UvmConsumePageKernel<<<opts.nblocks, 32>>>(
+            managed_buf, elems_per_page, xor_out);
+        ctp::GpuApi::Synchronize();
       }
       r = us_since(t1);
     }
@@ -419,9 +416,8 @@ int main(int argc, char *argv[]) {
                  r / 1e3, opts.do_read ? bw(r) : 0.0);
   }
 
-  hshm::GpuApi::Free<chi::u32>(dev_buf);
-  hshm::GpuApi::FreeHost<chi::u32>(host_buf);
-  hshm::GpuApi::Free<chi::u32>(xor_out);
+  ctp::GpuApi::Free<chi::u32>(managed_buf);
+  ctp::GpuApi::Free<chi::u32>(xor_out);
 
   // ----- Summary -----
   auto stat = [&](std::vector<long long> &v) {
@@ -464,10 +460,10 @@ int main(int argc, char *argv[]) {
 
 int main() { return 0; }
 
-#endif  // !HSHM_IS_DEVICE_PASS
+#endif  // !CTP_IS_DEVICE_PASS
 
 #else
 
 int main() { return 0; }
 
-#endif  // (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#endif  // (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL

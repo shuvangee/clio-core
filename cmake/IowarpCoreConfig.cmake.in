@@ -76,7 +76,7 @@ if(@WRP_CORE_ENABLE_CAE@)
 endif()
 
 # Include HermesShm (context-transport-primitives) export file directly
-# This provides all hshm::* modular targets
+# This provides all ctp::* modular targets
 include("${CMAKE_CURRENT_LIST_DIR}/../HermesShm/HermesShmCoreConfig.cmake")
 
 # Include Chimaera runtime export file directly
@@ -120,7 +120,7 @@ message(STATUS "  Version: ${IOWARP_CORE_VERSION}")
 message(STATUS "  Prefix: ${IOWARP_CORE_PREFIX}")
 message(STATUS "")
 message(STATUS "Core Components:")
-message(STATUS "  HermesShm: Available (hshm::cxx, hshm::configure, hshm::serialize, etc.)")
+message(STATUS "  HermesShm: Available (ctp::cxx, ctp::configure, ctp::serialize, etc.)")
 message(STATUS "  Chimaera Runtime: Available (chimaera::cxx)")
 message(STATUS "  IowarpCoreCommon: Available (ChiMod build utilities)")
 message(STATUS "")

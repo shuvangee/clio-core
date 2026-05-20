@@ -12,8 +12,8 @@ message(STATUS "  HermesShm (context-transport-primitives) included in IowarpCor
 # Build
 # ------------------------------------------------------------------------------
 add_executable(test test.cc)
-target_link_libraries(test hshm::cxx)
+target_link_libraries(test ctp::cxx)
 
 # hshm_enable_cuda(17)
 # add_cuda_executable(test_cuda FALSE test_cuda.cc)
-# target_link_libraries(test_cuda hshm::cudacxx)
+# target_link_libraries(test_cuda ctp::cudacxx)

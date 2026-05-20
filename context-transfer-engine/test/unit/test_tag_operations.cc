@@ -79,7 +79,7 @@ class TagTestFixture {
     INFO("=== Initializing Tag Test Environment ===");
 
     // Initialize test storage path
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
     REQUIRE(!home_dir.empty());
     test_storage_path_ = chi_test_data_dir() + "/cte_tag_test.dat";
 
@@ -283,7 +283,7 @@ TEST_CASE("Tag - PutBlob with Custom Score", "[cte][tag][putblob]") {
   REQUIRE(score == 0.9f);
 }
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
 TEST_CASE("Tag - PutBlob with Context", "[cte][tag][putblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();

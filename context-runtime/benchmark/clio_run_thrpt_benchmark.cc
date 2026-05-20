@@ -118,9 +118,9 @@ bool ParseArgs(int argc, char **argv, BenchmarkConfig &config) {
     } else if (arg == "--duration" && i + 1 < argc) {
       config.duration_seconds = std::stod(argv[++i]);
     } else if (arg == "--max-file-size" && i + 1 < argc) {
-      config.max_file_size = hshm::ConfigParse::ParseSize(argv[++i]);
+      config.max_file_size = ctp::ConfigParse::ParseSize(argv[++i]);
     } else if (arg == "--io-size" && i + 1 < argc) {
-      config.io_size = hshm::ConfigParse::ParseSize(argv[++i]);
+      config.io_size = ctp::ConfigParse::ParseSize(argv[++i]);
     } else if (arg == "--lane-policy" && i + 1 < argc) {
       config.lane_policy = argv[++i];
     } else if (arg == "--output-dir" && i + 1 < argc) {
@@ -331,7 +331,7 @@ void IOWorkerThread(size_t thread_id, const BenchmarkConfig &config,
       size_t bytes_to_write = std::min(bytes_remaining, block_capacity);
 
       // Create chi::priv::vector with single block for Write operation
-      chi::priv::vector<chimaera::bdev::Block> single_block(HSHM_MALLOC);
+      chi::priv::vector<chimaera::bdev::Block> single_block(CTP_MALLOC);
       single_block.push_back(blocks[block_idx]);
 
       auto write_task = bdev_client.AsyncWrite(chi::PoolQuery::Local(),

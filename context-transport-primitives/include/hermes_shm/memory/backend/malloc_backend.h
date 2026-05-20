@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_INCLUDE_HSHM_MEMORY_BACKEND_MALLOC_H
-#define HSHM_INCLUDE_HSHM_MEMORY_BACKEND_MALLOC_H
+#ifndef CTP_INCLUDE_HSHM_MEMORY_BACKEND_MALLOC_H
+#define CTP_INCLUDE_HSHM_MEMORY_BACKEND_MALLOC_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,16 +45,16 @@
 #include "hermes_shm/util/errors.h"
 #include "memory_backend.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 class MallocBackend : public MemoryBackend {
  public:
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   MallocBackend() = default;
 
   ~MallocBackend() { _Destroy(); }
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool shm_init(const MemoryBackendId &backend_id, size_t backend_size) {
     // Enforce minimum backend size of 1MB
     constexpr size_t kMinBackendSize = 1024 * 1024;  // 1MB
@@ -88,7 +88,7 @@ class MallocBackend : public MemoryBackend {
 
   bool shm_attach(const std::string &url) {
     (void)url;
-    HSHM_THROW_ERROR(SHMEM_NOT_SUPPORTED);
+    CTP_THROW_ERROR(SHMEM_NOT_SUPPORTED);
     return false;
   }
 
@@ -112,6 +112,6 @@ class MallocBackend : public MemoryBackend {
   }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_INCLUDE_HSHM_MEMORY_BACKEND_MALLOC_H
+#endif  // CTP_INCLUDE_HSHM_MEMORY_BACKEND_MALLOC_H

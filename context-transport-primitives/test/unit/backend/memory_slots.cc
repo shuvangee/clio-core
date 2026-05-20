@@ -38,7 +38,7 @@
 #include "basic_test.h"
 #include "hermes_shm/memory/backend/posix_shm_mmap.h"
 
-using hshm::ipc::PosixShmMmap;
+using ctp::ipc::PosixShmMmap;
 
 TEST_CASE("MemorySlot") {
   int rank;
@@ -46,14 +46,14 @@ TEST_CASE("MemorySlot") {
   std::string shm_url = "test_mem_backend";
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  HSHM_ERROR_HANDLE_START()
+  CTP_ERROR_HANDLE_START()
 
   PosixShmMmap backend;
   if (rank == 0) {
     {
       std::cout << "Creating SHMEM (rank 0)" << std::endl;
       if (!backend.shm_init(hipc::MemoryBackendId::GetRoot(),
-                            hshm::Unit<size_t>::Megabytes(1), shm_url)) {
+                            ctp::Unit<size_t>::Megabytes(1), shm_url)) {
         throw std::runtime_error("Couldn't create backend");
       }
       std::cout << "Backend data: " << (void *)backend.data_ << std::endl;
@@ -78,5 +78,5 @@ TEST_CASE("MemorySlot") {
     }
   }
 
-  HSHM_ERROR_HANDLE_END()
+  CTP_ERROR_HANDLE_END()
 }

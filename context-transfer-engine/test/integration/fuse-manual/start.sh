@@ -18,7 +18,7 @@ PID_DIR="$SCRIPT_DIR/.pids"
 export PATH="$BUILD_BIN:$PATH"
 export LD_LIBRARY_PATH="$BUILD_BIN:${LD_LIBRARY_PATH:-}"
 export CHI_SERVER_CONF="$SCRIPT_DIR/cte_config.yaml"
-export HSHM_LOG_LEVEL=info
+export CTP_LOG_LEVEL=info
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

@@ -50,27 +50,27 @@
 #include "hermes_shm/memory/allocator/malloc_allocator.h"
 #include "hermes_shm/types/bitfield.h"
 
-namespace hshm::lbm {
+namespace ctp::lbm {
 
 // Forward declaration — full definition in shm_transport.h
 struct ShmTransferInfo;
 
 // --- Bulk Flags ---
 #define BULK_EXPOSE \
-  BIT_OPT(hshm::u32, 0)                  // Bulk metadata sent, no data transfer
-#define BULK_XFER BIT_OPT(hshm::u32, 1)  // Bulk marked for data transmission
+  BIT_OPT(ctp::u32, 0)                  // Bulk metadata sent, no data transfer
+#define BULK_XFER BIT_OPT(ctp::u32, 1)  // Bulk marked for data transmission
 
 // --- Types ---
 struct Bulk {
   hipc::FullPtr<char> data;
   size_t size;
-  hshm::bitfield32_t flags;  // BULK_EXPOSE or BULK_XFER
+  ctp::bitfield32_t flags;  // BULK_EXPOSE or BULK_XFER
   void* desc = nullptr;      // For RDMA memory registration
   void* mr = nullptr;        // For RDMA memory region handle (fid_mr*)
 
   /** Serialize bulk descriptor metadata (size and flags only) */
   template <typename Ar>
-  HSHM_CROSS_FUN void serialize(Ar& ar) {
+  CTP_CROSS_FUN void serialize(Ar& ar) {
     ar(size, flags);
   }
 };
@@ -79,7 +79,7 @@ struct Bulk {
 struct ClientInfo {
   int rc = 0;               // Return code (0 = success, EAGAIN = no data, etc.)
   int fd_ = -1;             // Socket fd (SocketTransport server mode)
-#if !HSHM_IS_GPU
+#if !CTP_IS_GPU
   std::string identity_;    // ZMQ identity (ZeroMqTransport server mode)
 #endif
 };
@@ -87,17 +87,17 @@ struct ClientInfo {
 // --- Metadata Base Class ---
 /**
  * GPU-compatible metadata for lightbeam transports.
- * Uses hshm::priv::vector with a configurable allocator so that
+ * Uses ctp::priv::vector with a configurable allocator so that
  * bulk descriptor vectors can be managed in GPU-accessible memory.
  *
  * @tparam AllocT Allocator type for bulk descriptor vectors.
  *                Defaults to MallocAllocator for host-side usage.
  */
-template <typename AllocT = hshm::ipc::MallocAllocator>
+template <typename AllocT = ctp::ipc::MallocAllocator>
 class LbmMeta {
  public:
   using allocator_type = AllocT;
-  using BulkVector = hshm::priv::vector<Bulk, AllocT>;
+  using BulkVector = ctp::priv::vector<Bulk, AllocT>;
 
   BulkVector
       send;  // Sender's bulk descriptors (can have BULK_EXPOSE or BULK_XFER)
@@ -106,24 +106,24 @@ class LbmMeta {
   size_t send_bulks = 0;  // Count of BULK_XFER entries in send vector
   size_t recv_bulks = 0;  // Count of BULK_XFER entries in recv vector
   AllocT* alloc_;          // Allocator used for internal vectors
-#if !HSHM_IS_GPU
+#if !CTP_IS_GPU
   ClientInfo client_info_;  // Client routing info (not serialized, host-only)
 #endif
 
-  /** Default constructor (uses HSHM_MALLOC on host, nullptr on GPU) */
-  HSHM_CROSS_FUN LbmMeta()
-#if HSHM_IS_HOST
-      : send(HSHM_MALLOC), recv(HSHM_MALLOC), alloc_(HSHM_MALLOC) {}
+  /** Default constructor (uses CTP_MALLOC on host, nullptr on GPU) */
+  CTP_CROSS_FUN LbmMeta()
+#if CTP_IS_HOST
+      : send(CTP_MALLOC), recv(CTP_MALLOC), alloc_(CTP_MALLOC) {}
 #else
       : send(nullptr), recv(nullptr), alloc_(nullptr) {}
 #endif
 
   /** Constructor with custom allocator */
-  HSHM_CROSS_FUN explicit LbmMeta(AllocT* alloc)
+  CTP_CROSS_FUN explicit LbmMeta(AllocT* alloc)
       : send(alloc), recv(alloc), alloc_(alloc) {}
 
   /** Move constructor */
-  HSHM_CROSS_FUN LbmMeta(LbmMeta&& other) noexcept
+  CTP_CROSS_FUN LbmMeta(LbmMeta&& other) noexcept
       : send(std::move(other.send)),
         recv(std::move(other.recv)),
         send_bulks(other.send_bulks),
@@ -131,7 +131,7 @@ class LbmMeta {
         alloc_(other.alloc_) {}
 
   /** Move assignment operator */
-  HSHM_CROSS_FUN LbmMeta& operator=(LbmMeta&& other) noexcept {
+  CTP_CROSS_FUN LbmMeta& operator=(LbmMeta&& other) noexcept {
     if (this != &other) {
       send = std::move(other.send);
       recv = std::move(other.recv);
@@ -144,7 +144,7 @@ class LbmMeta {
 
   /** Serialize metadata for LocalSerialize/LocalDeserialize */
   template <typename Ar>
-  HSHM_CROSS_FUN void serialize(Ar& ar) {
+  CTP_CROSS_FUN void serialize(Ar& ar) {
     ar(send, recv, send_bulks, recv_bulks);
   }
 };
@@ -165,20 +165,20 @@ struct LbmContext {
   int dst_fd_ = -1;                                /**< Destination file descriptor for CPU→storage (-1 = none) */
   size_t dst_offset_ = 0;                          /**< Offset within destination file for CPU→storage */
 
-  HSHM_CROSS_FUN LbmContext() : flags(0), timeout_ms(0) {}
+  CTP_CROSS_FUN LbmContext() : flags(0), timeout_ms(0) {}
 
-  HSHM_CROSS_FUN explicit LbmContext(uint32_t f) : flags(f), timeout_ms(0) {}
+  CTP_CROSS_FUN explicit LbmContext(uint32_t f) : flags(f), timeout_ms(0) {}
 
-  HSHM_CROSS_FUN LbmContext(uint32_t f, int timeout) : flags(f), timeout_ms(timeout) {}
+  CTP_CROSS_FUN LbmContext(uint32_t f, int timeout) : flags(f), timeout_ms(timeout) {}
 
   /** Construct context for CPU→storage transfers via file descriptor. */
-  HSHM_CROSS_FUN LbmContext(uint32_t f, int timeout, int dst_fd, size_t dst_offset)
+  CTP_CROSS_FUN LbmContext(uint32_t f, int timeout, int dst_fd, size_t dst_offset)
       : flags(f), timeout_ms(timeout), dst_fd_(dst_fd), dst_offset_(dst_offset) {}
 
-  HSHM_CROSS_FUN bool IsSync() const { return (flags & LBM_SYNC) != 0; }
-  HSHM_CROSS_FUN bool HasTimeout() const { return timeout_ms > 0; }
+  CTP_CROSS_FUN bool IsSync() const { return (flags & LBM_SYNC) != 0; }
+  CTP_CROSS_FUN bool HasTimeout() const { return timeout_ms > 0; }
   /** Returns true if this context targets a file descriptor destination. */
-  HSHM_CROSS_FUN bool HasFileDst() const { return dst_fd_ >= 0; }
+  CTP_CROSS_FUN bool HasFileDst() const { return dst_fd_ >= 0; }
 };
 
 // --- Transport Type Enum ---
@@ -239,4 +239,4 @@ class TransportFactory {
                           const std::string& domain);
 };
 
-}  // namespace hshm::lbm
+}  // namespace ctp::lbm

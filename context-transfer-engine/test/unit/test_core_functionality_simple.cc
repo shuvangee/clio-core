@@ -84,7 +84,7 @@ public:
     INFO("=== Initializing CTE Core Test Environment ===");
 
     // Initialize test storage path in home directory
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
     REQUIRE(!home_dir.empty());
 
     test_storage_path_ = home_dir + "/cte_test_storage.dat";
@@ -182,7 +182,7 @@ private:
  */
 TEST_CASE("CTE Core Client Creation", "[cte][core][client][creation]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Client creation with pool ID") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Client creation with pool ID") {
     // Client should be successfully created in fixture
     REQUIRE(fixture->core_client_ != nullptr);
     
@@ -207,7 +207,7 @@ TEST_CASE("CTE Core Client Creation", "[cte][core][client][creation]") {
  */
 TEST_CASE("CTE CreateParams Configuration", "[cte][core][params]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Default CreateParams") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Default CreateParams") {
     wrp_cte::core::CreateParams params;
 
     // Check default values
@@ -241,7 +241,7 @@ TEST_CASE("CTE CreateParams Configuration", "[cte][core][params]") {
  */
 TEST_CASE("Target Configuration Validation", "[cte][core][target][config]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("File-based target configuration") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("File-based target configuration") {
     const std::string target_name = "test_target_validation";
     const chimaera::bdev::BdevType bdev_type = chimaera::bdev::BdevType::kFile;
     
@@ -284,7 +284,7 @@ TEST_CASE("Target Configuration Validation", "[cte][core][target][config]") {
  */
 TEST_CASE("Tag Information Structure", "[cte][core][tag][info]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("TagInfo structure validation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("TagInfo structure validation") {
     // NOTE: Allocator-based constructor tests are commented out due to HSHM memory manager 
     // initialization complexity. These tests validate that the constructor signatures 
     // are correct and the code compiles properly.
@@ -324,7 +324,7 @@ TEST_CASE("Tag Information Structure", "[cte][core][tag][info]") {
  */
 TEST_CASE("Blob Information Structure", "[cte][core][blob][info]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("BlobInfo parameter validation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("BlobInfo parameter validation") {
     // NOTE: Allocator-based constructor tests are commented out due to HSHM memory manager
     // initialization complexity. These tests validate parameter ranges and types.
     
@@ -375,7 +375,7 @@ TEST_CASE("Blob Information Structure", "[cte][core][blob][info]") {
  */
 TEST_CASE("Task Structure Validation", "[cte][core][tasks]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Task structure compilation validation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Task structure compilation validation") {
     // NOTE: Allocator-based task constructor tests are commented out due to HSHM memory 
     // manager initialization complexity. These tests validate that the task structures
     // compile correctly and have the expected member variables.
@@ -424,7 +424,7 @@ TEST_CASE("Task Structure Validation", "[cte][core][tasks]") {
  */
 TEST_CASE("Data Helper Functions", "[cte][core][helpers]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Test data creation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Test data creation") {
     const size_t test_size = 1024;
     const char test_pattern = 'X';
     
@@ -473,7 +473,7 @@ TEST_CASE("Data Helper Functions", "[cte][core][helpers]") {
  */
 TEST_CASE("CTE Core Workflow Validation", "[cte][core][workflow]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Component initialization validation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Component initialization validation") {
     // Verify all test components are properly initialized
     REQUIRE(fixture->core_client_ != nullptr);
     REQUIRE(!fixture->test_storage_path_.empty());
@@ -536,7 +536,7 @@ TEST_CASE("CTE Core Workflow Validation", "[cte][core][workflow]") {
  */
 TEST_CASE("Performance Test Structure", "[cte][core][performance]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Large data handling simulation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Large data handling simulation") {
     // Test with progressively larger data sizes
     std::vector<size_t> data_sizes = {
       1024,           // 1KB

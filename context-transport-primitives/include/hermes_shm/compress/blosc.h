@@ -31,24 +31,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_Blosc_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_Blosc_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_Blosc_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_Blosc_H_
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
 
 #include <blosc2.h>
 
 #include "compress.h"
 #include "hermes_shm/util/singleton.h"
 
-namespace hshm {
+namespace ctp {
 
 class BloscInit {
  public:
   BloscInit() { blosc2_init(); }
   ~BloscInit() { blosc2_destroy(); }
 };
-#define BLOSC_INIT hshm::Singleton<BloscInit>::GetInstance()
+#define BLOSC_INIT ctp::Singleton<BloscInit>::GetInstance()
 
 class Blosc : public Compressor {
  public:
@@ -90,8 +90,8 @@ class Blosc : public Compressor {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_COMPRESS
+#endif  // CTP_ENABLE_COMPRESS
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_Blosc_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_Blosc_H_

@@ -67,12 +67,12 @@ struct FutureShm {
   u32 task_size_;
 
   /** Atomic completion flag. */
-  hshm::abitfield32_t flags_;
+  ctp::abitfield32_t flags_;
 
-  HSHM_CROSS_FUN FutureShm() : task_size_(0) { flags_.Clear(); }
+  CTP_CROSS_FUN FutureShm() : task_size_(0) { flags_.Clear(); }
 
   /** Reset for reuse. Called by ClientSend before pushing onto gpu2cpu. */
-  HSHM_CROSS_FUN void Reset(u32 task_size) {
+  CTP_CROSS_FUN void Reset(u32 task_size) {
     task_size_ = task_size;
     flags_.Clear();
   }
@@ -99,27 +99,27 @@ class Future {
   hipc::ShmPtr<FutureT> future_shm_;
 
  public:
-  HSHM_CROSS_FUN Future() = default;
+  CTP_CROSS_FUN Future() = default;
 
-  HSHM_CROSS_FUN Future(hipc::ShmPtr<FutureT> future_shm,
+  CTP_CROSS_FUN Future(hipc::ShmPtr<FutureT> future_shm,
                         const hipc::FullPtr<TaskT> &task_ptr)
       : future_shm_(future_shm) {
     task_ptr_.shm_ = task_ptr.shm_;
     task_ptr_.ptr_ = task_ptr.ptr_;
   }
 
-  HSHM_CROSS_FUN explicit Future(const hipc::ShmPtr<FutureT> &future_shm_ptr)
+  CTP_CROSS_FUN explicit Future(const hipc::ShmPtr<FutureT> &future_shm_ptr)
       : future_shm_(future_shm_ptr) {
     task_ptr_.SetNull();
   }
 
-  HSHM_CROSS_FUN Future(const Future &other)
+  CTP_CROSS_FUN Future(const Future &other)
       : future_shm_(other.future_shm_) {
     task_ptr_.shm_ = other.task_ptr_.shm_;
     task_ptr_.ptr_ = other.task_ptr_.ptr_;
   }
 
-  HSHM_CROSS_FUN Future &operator=(const Future &other) {
+  CTP_CROSS_FUN Future &operator=(const Future &other) {
     if (this != &other) {
       task_ptr_.shm_ = other.task_ptr_.shm_;
       task_ptr_.ptr_ = other.task_ptr_.ptr_;
@@ -128,14 +128,14 @@ class Future {
     return *this;
   }
 
-  HSHM_CROSS_FUN Future(Future &&other) noexcept
+  CTP_CROSS_FUN Future(Future &&other) noexcept
       : future_shm_(std::move(other.future_shm_)) {
     task_ptr_.shm_ = other.task_ptr_.shm_;
     task_ptr_.ptr_ = other.task_ptr_.ptr_;
     other.task_ptr_.SetNull();
   }
 
-  HSHM_CROSS_FUN Future &operator=(Future &&other) noexcept {
+  CTP_CROSS_FUN Future &operator=(Future &&other) noexcept {
     if (this != &other) {
       task_ptr_.shm_ = other.task_ptr_.shm_;
       task_ptr_.ptr_ = other.task_ptr_.ptr_;
@@ -146,16 +146,16 @@ class Future {
     return *this;
   }
 
-  HSHM_CROSS_FUN ~Future() = default;
+  CTP_CROSS_FUN ~Future() = default;
 
-  HSHM_CROSS_FUN TaskT *get() const { return task_ptr_.ptr_; }
-  HSHM_CROSS_FUN TaskT &operator*() const { return *task_ptr_.ptr_; }
-  HSHM_CROSS_FUN TaskT *operator->() const { return task_ptr_.ptr_; }
-  HSHM_CROSS_FUN bool IsNull() const { return task_ptr_.IsNull(); }
+  CTP_CROSS_FUN TaskT *get() const { return task_ptr_.ptr_; }
+  CTP_CROSS_FUN TaskT &operator*() const { return *task_ptr_.ptr_; }
+  CTP_CROSS_FUN TaskT *operator->() const { return task_ptr_.ptr_; }
+  CTP_CROSS_FUN bool IsNull() const { return task_ptr_.IsNull(); }
 
   hipc::FullPtr<TaskT> &GetTaskPtr() { return task_ptr_; }
   const hipc::FullPtr<TaskT> &GetTaskPtr() const { return task_ptr_; }
-  HSHM_CROSS_FUN hipc::ShmPtr<FutureT> GetFutureShmPtr() const {
+  CTP_CROSS_FUN hipc::ShmPtr<FutureT> GetFutureShmPtr() const {
     return future_shm_;
   }
 
@@ -168,7 +168,7 @@ class Future {
    * the CPU worker side this is unused — the worker resolves via the
    * registered backend map instead.
    */
-  HSHM_CROSS_FUN FutureT *GetFutureShmPtrRaw() const {
+  CTP_CROSS_FUN FutureT *GetFutureShmPtrRaw() const {
     if (future_shm_.IsNull()) return nullptr;
     return reinterpret_cast<FutureT *>(future_shm_.off_.load());
   }
@@ -180,14 +180,14 @@ class Future {
    * lives in pinned host or UVM memory, so a volatile read on the device
    * side sees the CPU's system-scope write through PCIe cache snooping.
    */
-  HSHM_CROSS_FUN void Wait();
+  CTP_CROSS_FUN void Wait();
 
   /**
    * Conversion to chi::Future<TaskT> for host return-type compatibility.
    * Always produces an empty chi::Future on the host (host-side Send is
    * not GPU-aware in the producer-only model).
    */
-  HSHM_CROSS_FUN operator chi::Future<TaskT, AllocT>() const {
+  CTP_CROSS_FUN operator chi::Future<TaskT, AllocT>() const {
     return chi::Future<TaskT, AllocT>();
   }
 };

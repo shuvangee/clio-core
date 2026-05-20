@@ -12,7 +12,7 @@ if(WRP_CORE_ENABLE_CUDA)
     add_cuda_executable(wrp_memcpy_d2h_bench FALSE
         wrp_memcpy_d2h_bench.cc
         LINK_LIBS
-            hshm::cuda_cxx
+            ctp::cuda_cxx
             ${CMAKE_THREAD_LIBS_INIT}
     )
     set_target_properties(wrp_memcpy_d2h_bench PROPERTIES
@@ -29,7 +29,7 @@ if(WRP_CORE_ENABLE_CUDA)
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     )
     target_link_libraries(wrp_kernel_pinned_bench PUBLIC
-        hshm::cuda_cxx
+        ctp::cuda_cxx
     )
     install(TARGETS wrp_kernel_pinned_bench RUNTIME DESTINATION bin)
 
@@ -48,7 +48,7 @@ if(WRP_CORE_ENABLE_CUDA)
             wrp_cte_core_client
             wrp_cte_core_runtime
             wrp_cte::gpu_vector
-            hshm::cuda_cxx
+            ctp::cuda_cxx
             ${CMAKE_THREAD_LIBS_INIT}
     )
     set_target_properties(wrp_cte_gpu_vector_bench PROPERTIES
@@ -69,7 +69,7 @@ if(WRP_CORE_ENABLE_CUDA)
             chimaera_bdev_client
             wrp_cte_core_client
             wrp_cte_core_runtime
-            hshm::cuda_cxx
+            ctp::cuda_cxx
             ${CMAKE_THREAD_LIBS_INIT}
     )
     set_target_properties(wrp_traditional_oom_bench PROPERTIES
@@ -90,7 +90,7 @@ if(WRP_CORE_ENABLE_CUDA)
             chimaera_bdev_client
             wrp_cte_core_client
             wrp_cte_core_runtime
-            hshm::cuda_cxx
+            ctp::cuda_cxx
             ${CMAKE_THREAD_LIBS_INIT}
     )
     set_target_properties(wrp_uvm_bench PROPERTIES
@@ -113,7 +113,7 @@ if(WRP_CORE_ENABLE_ROCM)
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     )
     target_link_libraries(wrp_memcpy_d2h_bench PUBLIC
-        hshm::rocm_cxx
+        ctp::rocm_cxx
         ${CMAKE_THREAD_LIBS_INIT}
     )
     install(TARGETS wrp_memcpy_d2h_bench RUNTIME DESTINATION bin)
@@ -144,7 +144,7 @@ if(WRP_CORE_ENABLE_ROCM)
         wrp_cte_core_client
         wrp_cte_core_runtime
         wrp_cte::gpu_vector
-        hshm::rocm_cxx
+        ctp::rocm_cxx
         ${CMAKE_THREAD_LIBS_INIT}
     )
     install(TARGETS wrp_cte_gpu_vector_bench RUNTIME DESTINATION bin)
@@ -173,7 +173,7 @@ if(WRP_CORE_ENABLE_ROCM)
         chimaera_bdev_client
         wrp_cte_core_client
         wrp_cte_core_runtime
-        hshm::rocm_cxx
+        ctp::rocm_cxx
         ${CMAKE_THREAD_LIBS_INIT}
     )
     install(TARGETS wrp_traditional_oom_bench RUNTIME DESTINATION bin)
@@ -202,7 +202,7 @@ if(WRP_CORE_ENABLE_ROCM)
         chimaera_bdev_client
         wrp_cte_core_client
         wrp_cte_core_runtime
-        hshm::rocm_cxx
+        ctp::rocm_cxx
         ${CMAKE_THREAD_LIBS_INIT}
     )
     install(TARGETS wrp_uvm_bench RUNTIME DESTINATION bin)

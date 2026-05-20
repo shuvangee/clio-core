@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_GLOBAL_SERIALIZE_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_GLOBAL_SERIALIZE_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_GLOBAL_SERIALIZE_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_GLOBAL_SERIALIZE_H_
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/types/argpack.h"
@@ -45,7 +45,7 @@
 
 #include "serialize_common.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Architecture-portable binary serializer.
@@ -73,40 +73,40 @@ class GlobalSerialize {
   GlobalSerialize(DataT &data, bool) : data_(data), cur_off_(data.size()) {}
 
   /** Commit the local offset to the vector's size. */
-  HSHM_INLINE void Finalize() {
+  CTP_INLINE void Finalize() {
     data_.resize(cur_off_);
   }
 
   /** left shift operator */
   template <typename T>
-  HSHM_INLINE GlobalSerialize &operator<<(const T &obj) {
+  CTP_INLINE GlobalSerialize &operator<<(const T &obj) {
     return base(obj);
   }
 
   /** & operator */
   template <typename T>
-  HSHM_INLINE GlobalSerialize &operator&(const T &obj) {
+  CTP_INLINE GlobalSerialize &operator&(const T &obj) {
     return base(obj);
   }
 
   /** Call operator */
   template <typename... Args>
-  HSHM_INLINE GlobalSerialize &operator()(Args &&...args) {
-    hshm::ForwardIterateArgpack::Apply(
-        hshm::make_argpack(std::forward<Args>(args)...),
+  CTP_INLINE GlobalSerialize &operator()(Args &&...args) {
+    ctp::ForwardIterateArgpack::Apply(
+        ctp::make_argpack(std::forward<Args>(args)...),
         [this](auto i, auto &arg) { this->base(arg); });
     return *this;
   }
 
   /** range() — portable: serialize each field individually */
   template <typename... Args>
-  HSHM_INLINE GlobalSerialize &range(Args &&...args) {
+  CTP_INLINE GlobalSerialize &range(Args &&...args) {
     return (*this)(std::forward<Args>(args)...);
   }
 
   /** Save function */
   template <typename T>
-  HSHM_INLINE GlobalSerialize &base(const T &obj) {
+  CTP_INLINE GlobalSerialize &base(const T &obj) {
     if constexpr (std::is_arithmetic<T>::value) {
       write_binary(reinterpret_cast<const char *>(&obj), sizeof(T));
     } else if constexpr (std::is_enum<T>::value) {
@@ -128,7 +128,7 @@ class GlobalSerialize {
 
   /** write_range — portable: delegates to per-field range() */
   template <typename FirstT, typename LastT>
-  HSHM_INLINE void write_range(const FirstT *first, const LastT *last) {
+  CTP_INLINE void write_range(const FirstT *first, const LastT *last) {
     // GlobalSerialize does NOT batch — write_range should not be called
     // directly. Use range() instead which serializes per-field.
     // Fallback: treat as raw binary for backwards compatibility.
@@ -138,7 +138,7 @@ class GlobalSerialize {
   }
 
   /** Save function (binary data) */
-  HSHM_INLINE
+  CTP_INLINE
   GlobalSerialize &write_binary(const char *data, size_t size) {
     size_t new_off = cur_off_ + size;
     if (new_off > data_.size()) {
@@ -156,7 +156,7 @@ class GlobalSerialize {
 
   /** Fused string save: size prefix + character data in one capacity check.
    *  Uses direct store for size prefix to avoid memcpy overhead. */
-  HSHM_INLINE
+  CTP_INLINE
   void save_string_fused(const char *str_data, size_t len) {
     size_t total = sizeof(size_t) + len;
     size_t new_off = cur_off_ + total;
@@ -195,34 +195,34 @@ class GlobalDeserialize {
 
   /** right shift operator */
   template <typename T>
-  HSHM_INLINE GlobalDeserialize &operator>>(T &obj) {
+  CTP_INLINE GlobalDeserialize &operator>>(T &obj) {
     return base(obj);
   }
 
   /** & operator */
   template <typename T>
-  HSHM_INLINE GlobalDeserialize &operator&(T &obj) {
+  CTP_INLINE GlobalDeserialize &operator&(T &obj) {
     return base(obj);
   }
 
   /** Call operator */
   template <typename... Args>
-  HSHM_INLINE GlobalDeserialize &operator()(Args &&...args) {
-    hshm::ForwardIterateArgpack::Apply(
-        hshm::make_argpack(std::forward<Args>(args)...),
+  CTP_INLINE GlobalDeserialize &operator()(Args &&...args) {
+    ctp::ForwardIterateArgpack::Apply(
+        ctp::make_argpack(std::forward<Args>(args)...),
         [this](auto i, auto &arg) { this->base(arg); });
     return *this;
   }
 
   /** range() — portable: deserialize each field individually */
   template <typename... Args>
-  HSHM_INLINE GlobalDeserialize &range(Args &&...args) {
+  CTP_INLINE GlobalDeserialize &range(Args &&...args) {
     return (*this)(std::forward<Args>(args)...);
   }
 
   /** Load function */
   template <typename T>
-  HSHM_INLINE GlobalDeserialize &base(T &obj) {
+  CTP_INLINE GlobalDeserialize &base(T &obj) {
     if constexpr (std::is_arithmetic<T>::value) {
       read_binary(reinterpret_cast<char *>(&obj), sizeof(T));
     } else if constexpr (std::is_enum<T>::value) {
@@ -244,14 +244,14 @@ class GlobalDeserialize {
 
   /** read_range — portable: delegates to per-field range() */
   template <typename FirstT, typename LastT>
-  HSHM_INLINE void read_range(FirstT *first, LastT *last) {
+  CTP_INLINE void read_range(FirstT *first, LastT *last) {
     char *begin = reinterpret_cast<char *>(first);
     char *end = reinterpret_cast<char *>(last) + sizeof(LastT);
     read_binary(begin, static_cast<size_t>(end - begin));
   }
 
   /** Load function (binary data) */
-  HSHM_INLINE
+  CTP_INLINE
   GlobalDeserialize &read_binary(char *data, size_t size) {
     if (cur_off_ + size > data_.size()) {
       HLOG(kError,
@@ -269,54 +269,54 @@ class GlobalDeserialize {
 
 /** Save string */
 template <typename DataT>
-HSHM_INLINE void save(GlobalSerialize<DataT> &ar, const std::string &str) {
+CTP_INLINE void save(GlobalSerialize<DataT> &ar, const std::string &str) {
   save_string(ar, str);
 }
 
 /** Load string */
 template <typename DataT>
-HSHM_INLINE void load(GlobalDeserialize<DataT> &ar, std::string &str) {
+CTP_INLINE void load(GlobalDeserialize<DataT> &ar, std::string &str) {
   load_string(ar, str);
 }
 
 /** Save vector */
 template <typename DataT, typename T>
-HSHM_INLINE void save(GlobalSerialize<DataT> &ar, const std::vector<T> &data) {
+CTP_INLINE void save(GlobalSerialize<DataT> &ar, const std::vector<T> &data) {
   save_vec<GlobalSerialize<DataT>, std::vector<T>, T>(ar, data);
 }
 
 /** Load vector */
 template <typename DataT, typename T>
-HSHM_INLINE void load(GlobalDeserialize<DataT> &ar, std::vector<T> &data) {
+CTP_INLINE void load(GlobalDeserialize<DataT> &ar, std::vector<T> &data) {
   load_vec<GlobalDeserialize<DataT>, std::vector<T>, T>(ar, data);
 }
 
 /** Save list */
 template <typename DataT, typename T>
-HSHM_INLINE void save(GlobalSerialize<DataT> &ar, const std::list<T> &data) {
+CTP_INLINE void save(GlobalSerialize<DataT> &ar, const std::list<T> &data) {
   save_list<GlobalSerialize<DataT>, std::list<T>, T>(ar, data);
 }
 
 /** Load list */
 template <typename DataT, typename T>
-HSHM_INLINE void load(GlobalDeserialize<DataT> &ar, std::list<T> &data) {
+CTP_INLINE void load(GlobalDeserialize<DataT> &ar, std::list<T> &data) {
   load_list<GlobalDeserialize<DataT>, std::list<T>, T>(ar, data);
 }
 
 /** Save unordered_map */
 template <typename DataT, typename KeyT, typename T>
-HSHM_INLINE void save(GlobalSerialize<DataT> &ar,
+CTP_INLINE void save(GlobalSerialize<DataT> &ar,
                        const std::unordered_map<KeyT, T> &data) {
   save_map<GlobalSerialize<DataT>, std::unordered_map<KeyT, T>, KeyT, T>(ar, data);
 }
 
 /** Load unordered_map */
 template <typename DataT, typename KeyT, typename T>
-HSHM_INLINE void load(GlobalDeserialize<DataT> &ar,
+CTP_INLINE void load(GlobalDeserialize<DataT> &ar,
                        std::unordered_map<KeyT, T> &data) {
   load_map<GlobalDeserialize<DataT>, std::unordered_map<KeyT, T>, KeyT, T>(ar, data);
 }
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_GLOBAL_SERIALIZE_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_DATA_STRUCTURES_SERIALIZATION_GLOBAL_SERIALIZE_H_

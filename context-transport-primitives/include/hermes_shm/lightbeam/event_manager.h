@@ -37,7 +37,7 @@
 
 #include "hermes_shm/util/logging.h"
 
-namespace hshm::lbm {
+namespace ctp::lbm {
 
 /** Platform-neutral read-event constant */
 #ifdef _WIN32
@@ -65,7 +65,7 @@ struct EventInfo {
   EventAction *action_;
 };
 
-}  // namespace hshm::lbm
+}  // namespace ctp::lbm
 
 #ifdef _WIN32
 #include "hermes_shm/lightbeam/event_manager_win.h"

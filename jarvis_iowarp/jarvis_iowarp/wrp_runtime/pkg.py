@@ -217,7 +217,7 @@ class WrpRuntime(Service):
         self.config_file = f'{self.shared_dir}/chimaera_config.yaml'
 
         self.setenv('CHI_SERVER_CONF', self.config_file)
-        self.setenv('HSHM_LOG_LEVEL', self.config['log_level'])
+        self.setenv('CTP_LOG_LEVEL', self.config['log_level'])
         self.setenv('CHI_IPC_MODE', self.config['ipc_mode'].upper())
 
         self._generate_config()

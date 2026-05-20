@@ -14,7 +14,7 @@
 #include <wrp_cte/gpu_vector/gpu_vector_page.h>
 #include <wrp_cte/gpu_vector/gpu_vector_view.h>
 
-#if HSHM_IS_GPU_COMPILER
+#if CTP_IS_GPU_COMPILER
 
 namespace wrp_cte::gpu_vector {
 
@@ -23,17 +23,17 @@ namespace detail {
 /** Per-warp last-page cache. Lane 0 reads / writes; other lanes read after
  *  __syncwarp. The user kernel must provide a __shared__ array via
  *  WRP_GPU_VECTOR_KERNEL_INIT — this function just resolves the lane slot. */
-HSHM_GPU_FUN Page *&LaneLastPage(Page **last_page_array) {
+CTP_GPU_FUN Page *&LaneLastPage(Page **last_page_array) {
   return last_page_array[threadIdx.x & 31];
 }
 
 /** Atomically swap a 32-bit field to `new_val` and return the old value. */
-HSHM_GPU_FUN int32_t AtomicExchI32(int32_t *p, int32_t new_val) {
+CTP_GPU_FUN int32_t AtomicExchI32(int32_t *p, int32_t new_val) {
   return atomicExch(reinterpret_cast<int *>(p), static_cast<int>(new_val));
 }
 
 /** Atomic CAS for u32. */
-HSHM_GPU_FUN chi::u32 AtomicCasU32(chi::u32 *p, chi::u32 expected,
+CTP_GPU_FUN chi::u32 AtomicCasU32(chi::u32 *p, chi::u32 expected,
                                           chi::u32 desired) {
   return atomicCAS(reinterpret_cast<unsigned int *>(p),
                    static_cast<unsigned int>(expected),
@@ -41,45 +41,45 @@ HSHM_GPU_FUN chi::u32 AtomicCasU32(chi::u32 *p, chi::u32 expected,
 }
 
 /** Atomic OR on u32 — returns the old value. */
-HSHM_GPU_FUN chi::u32 AtomicOrU32(chi::u32 *p, chi::u32 mask) {
+CTP_GPU_FUN chi::u32 AtomicOrU32(chi::u32 *p, chi::u32 mask) {
   return atomicOr(reinterpret_cast<unsigned int *>(p),
                   static_cast<unsigned int>(mask));
 }
 
 /** Atomic AND-NOT on u32 (clears bits). */
-HSHM_GPU_FUN chi::u32 AtomicClearBitsU32(chi::u32 *p, chi::u32 mask) {
+CTP_GPU_FUN chi::u32 AtomicClearBitsU32(chi::u32 *p, chi::u32 mask) {
   return atomicAnd(reinterpret_cast<unsigned int *>(p),
                    static_cast<unsigned int>(~mask));
 }
 
 /** Atomic min for i32. */
-HSHM_GPU_FUN void AtomicMinI32(int32_t *p, int32_t v) {
+CTP_GPU_FUN void AtomicMinI32(int32_t *p, int32_t v) {
   atomicMin(reinterpret_cast<int *>(p), static_cast<int>(v));
 }
 
 /** Atomic max for i32. */
-HSHM_GPU_FUN void AtomicMaxI32(int32_t *p, int32_t v) {
+CTP_GPU_FUN void AtomicMaxI32(int32_t *p, int32_t v) {
   atomicMax(reinterpret_cast<int *>(p), static_cast<int>(v));
 }
 
 /** Atomic increment for u32. */
-HSHM_GPU_FUN chi::u32 AtomicIncU32(chi::u32 *p) {
+CTP_GPU_FUN chi::u32 AtomicIncU32(chi::u32 *p) {
   return atomicAdd(reinterpret_cast<unsigned int *>(p), 1u);
 }
 
 /** Atomic decrement for u32. */
-HSHM_GPU_FUN chi::u32 AtomicDecU32(chi::u32 *p) {
+CTP_GPU_FUN chi::u32 AtomicDecU32(chi::u32 *p) {
   return atomicSub(reinterpret_cast<unsigned int *>(p), 1u);
 }
 
 /** Attempt to acquire kPageBusy. Returns true on success. */
-HSHM_GPU_FUN bool TryAcquireBusy(Page *p) {
+CTP_GPU_FUN bool TryAcquireBusy(Page *p) {
   chi::u32 prev = AtomicOrU32(&p->flags, kPageBusy);
   return (prev & kPageBusy) == 0;
 }
 
 /** Release kPageBusy. */
-HSHM_GPU_FUN void ReleaseBusy(Page *p) {
+CTP_GPU_FUN void ReleaseBusy(Page *p) {
   AtomicClearBitsU32(&p->flags, kPageBusy);
 }
 
@@ -95,7 +95,7 @@ HSHM_GPU_FUN void ReleaseBusy(Page *p) {
  * the memory kind via pointer attributes and copies in the right
  * direction without staging.
  */
-HSHM_GPU_FUN hipc::ShmPtr<> MakeBlobShmPtr(void *device_addr,
+CTP_GPU_FUN hipc::ShmPtr<> MakeBlobShmPtr(void *device_addr,
                                                   hipc::AllocatorId alloc_id) {
   (void)alloc_id;
   hipc::ShmPtr<> p;
@@ -109,7 +109,7 @@ HSHM_GPU_FUN hipc::ShmPtr<> MakeBlobShmPtr(void *device_addr,
  * MPSC: bump tail atomically; drop if full. Returns true if the entry
  * was enqueued.
  */
-HSHM_GPU_FUN bool RescorePush(RescoreQueue *q, chi::u32 page_idx,
+CTP_GPU_FUN bool RescorePush(RescoreQueue *q, chi::u32 page_idx,
                               float score) {
   chi::u32 cur_tail = AtomicIncU32(&q->tail);
   chi::u32 head = q->head;
@@ -124,7 +124,7 @@ HSHM_GPU_FUN bool RescorePush(RescoreQueue *q, chi::u32 page_idx,
 }
 
 /** Remaining capacity in the rescore queue (lower bound — may be stale). */
-HSHM_GPU_FUN chi::u32 RescoreRemaining(const RescoreQueue *q) {
+CTP_GPU_FUN chi::u32 RescoreRemaining(const RescoreQueue *q) {
   chi::u32 used = q->tail - q->head;
   if (used > kRescoreQueueCap) used = kRescoreQueueCap;
   return kRescoreQueueCap - used;
@@ -141,7 +141,7 @@ HSHM_GPU_FUN chi::u32 RescoreRemaining(const RescoreQueue *q) {
  *  CHIMAERA_GPU_INIT — going through CHI_IPC in this device function
  *  trips the host-pass typing check (CHI_IPC expands to chi::IpcManager*
  *  on host pass, which returns chi::Future, not gpu::Future). */
-HSHM_GPU_FUN void FlushPageBase(::chi::gpu::IpcManager *ipc,
+CTP_GPU_FUN void FlushPageBase(::chi::gpu::IpcManager *ipc,
                                  const DeviceViewBase &v, chi::u32 block_idx,
                                  Page *page, chi::u32 slot) {
   if (page->page_idx < 0) return;
@@ -183,7 +183,7 @@ HSHM_GPU_FUN void FlushPageBase(::chi::gpu::IpcManager *ipc,
  * to pick which task slot in the put pool we use.
  */
 template <typename T>
-HSHM_GPU_FUN void FlushPage(::chi::gpu::IpcManager *ipc,
+CTP_GPU_FUN void FlushPage(::chi::gpu::IpcManager *ipc,
                             const DeviceView<T> &v, chi::u32 block_idx,
                             Page *page, chi::u32 slot) {
   if (page->page_idx < 0) return;
@@ -226,7 +226,7 @@ HSHM_GPU_FUN void FlushPage(::chi::gpu::IpcManager *ipc,
 
 /** Submit a GetBlob to fault `target_page_idx` into `page->device_ptr`. */
 template <typename T>
-HSHM_GPU_FUN void FaultPage(::chi::gpu::IpcManager *ipc,
+CTP_GPU_FUN void FaultPage(::chi::gpu::IpcManager *ipc,
                             const DeviceView<T> &v, chi::u32 block_idx,
                             Page *page, chi::u32 slot,
                             int32_t target_page_idx) {
@@ -249,7 +249,7 @@ HSHM_GPU_FUN void FaultPage(::chi::gpu::IpcManager *ipc,
 }
 
 /** Wait on any in-flight put for this page, then clear the slot. */
-HSHM_GPU_FUN void DrainPut(Page *page) {
+CTP_GPU_FUN void DrainPut(Page *page) {
   if (!page->active_put.IsNull()) {
     page->active_put.Wait();
     page->active_put = chi::gpu::Future<wrp_cte::core::PutBlobTask>();
@@ -258,7 +258,7 @@ HSHM_GPU_FUN void DrainPut(Page *page) {
 }
 
 /** Wait on any in-flight get for this page, then clear the slot. */
-HSHM_GPU_FUN void DrainGet(Page *page) {
+CTP_GPU_FUN void DrainGet(Page *page) {
   if (!page->active_get.IsNull()) {
     page->active_get.Wait();
     page->active_get = chi::gpu::Future<wrp_cte::core::GetBlobTask>();
@@ -268,7 +268,7 @@ HSHM_GPU_FUN void DrainGet(Page *page) {
 
 /** Flush every dirty page in the calling block across BOTH tiers. */
 template <typename T>
-HSHM_GPU_FUN void FlushAllInBlock(::chi::gpu::IpcManager *ipc,
+CTP_GPU_FUN void FlushAllInBlock(::chi::gpu::IpcManager *ipc,
                                   const DeviceView<T> &v,
                                   chi::u32 block_idx) {
   Block *b = GetBlock(v.base, block_idx);
@@ -289,7 +289,7 @@ HSHM_GPU_FUN void FlushAllInBlock(::chi::gpu::IpcManager *ipc,
  * reuse the slot freely. `tier_lo`/`tier_hi` bound the search range.
  */
 template <typename T>
-HSHM_GPU_FUN chi::u32 EvictSlotInRange(::chi::gpu::IpcManager *ipc,
+CTP_GPU_FUN chi::u32 EvictSlotInRange(::chi::gpu::IpcManager *ipc,
                                        const DeviceView<T> &v,
                                        chi::u32 block_idx,
                                        chi::u32 tier_lo, chi::u32 tier_hi) {
@@ -328,7 +328,7 @@ HSHM_GPU_FUN chi::u32 EvictSlotInRange(::chi::gpu::IpcManager *ipc,
 
 /** Pick a victim slot anywhere in the block, preferring HBM (tier 0). */
 template <typename T>
-HSHM_GPU_FUN chi::u32 EvictSlot(::chi::gpu::IpcManager *ipc,
+CTP_GPU_FUN chi::u32 EvictSlot(::chi::gpu::IpcManager *ipc,
                                 const DeviceView<T> &v,
                                 chi::u32 block_idx) {
   return EvictSlotInRange(ipc, v, block_idx, 0, v.base.gpu_pages_per_block);
@@ -341,7 +341,7 @@ HSHM_GPU_FUN chi::u32 EvictSlot(::chi::gpu::IpcManager *ipc,
  * the same pattern as Phase 2 swap but exposed as a building block for
  * eviction.
  */
-HSHM_GPU_FUN void WarpCopyUint4(void *dst, const void *src,
+CTP_GPU_FUN void WarpCopyUint4(void *dst, const void *src,
                                  chi::u64 bytes, chi::u32 lane) {
   chi::u64 n = bytes / sizeof(uint4);
   uint4 *d = static_cast<uint4 *>(dst);
@@ -364,7 +364,7 @@ HSHM_GPU_FUN void WarpCopyUint4(void *dst, const void *src,
  * held by the caller, ready for the warp-coop write that follows.
  */
 template <typename T>
-HSHM_GPU_FUN Page *WarpCoopAllocSlotForWrite(
+CTP_GPU_FUN Page *WarpCoopAllocSlotForWrite(
     ::chi::gpu::IpcManager *ipc, const DeviceView<T> &v,
     chi::u32 block_idx, int32_t target_page, chi::u32 lane) {
   __shared__ Page *s_dst;
@@ -472,7 +472,7 @@ HSHM_GPU_FUN Page *WarpCoopAllocSlotForWrite(
 
 // Back-compat alias for the previous name.
 template <typename T>
-HSHM_GPU_FUN Page *WarpCoopEvictHbmToDram(
+CTP_GPU_FUN Page *WarpCoopEvictHbmToDram(
     ::chi::gpu::IpcManager *ipc, const DeviceView<T> &v,
     chi::u32 block_idx, int32_t target_page, chi::u32 lane) {
   return WarpCoopAllocSlotForWrite(ipc, v, block_idx, target_page, lane);
@@ -487,7 +487,7 @@ HSHM_GPU_FUN Page *WarpCoopEvictHbmToDram(
  *  from CTE. In kAsync mode the caller also pushes a high-score hint
  *  into the rescore queue so neighboring pages get pulled in next tick. */
 template <typename T>
-HSHM_GPU_FUN T *Resolve(::chi::gpu::IpcManager *ipc, DeviceView<T> v,
+CTP_GPU_FUN T *Resolve(::chi::gpu::IpcManager *ipc, DeviceView<T> v,
                         Page **last_page_array, chi::u64 i, bool is_write) {
   chi::u32 block_idx = blockIdx.x;
   Block *b = GetBlock(v.base, block_idx);
@@ -647,7 +647,7 @@ class vector {
    * @param ipc  Kernel-scope `g_ipc_manager_ptr` declared by
    *             CHIMAERA_GPU_INIT.
    */
-  HSHM_GPU_FUN vector(const DeviceView &view,
+  CTP_GPU_FUN vector(const DeviceView &view,
                       ::chi::gpu::IpcManager *ipc) noexcept
       : view_(view), ipc_(ipc) {
     __shared__ ::wrp_cte::gpu_vector::Page *last_page_storage[32];
@@ -664,7 +664,7 @@ class vector {
    * stores in parallel.
    */
   template <typename F>
-  HSHM_GPU_FUN void write_range(chi::u64 lo, chi::u64 hi, F &&value_at) {
+  CTP_GPU_FUN void write_range(chi::u64 lo, chi::u64 hi, F &&value_at) {
     if (lo >= hi) return;
     chi::u32 lane = threadIdx.x & 31;
     chi::u64 cap = view_.page_capacity_t;
@@ -758,7 +758,7 @@ class vector {
    * consume is called from each lane as `void consume(chi::u64 i, T v)`.
    */
   template <typename F>
-  HSHM_GPU_FUN void read_range(chi::u64 lo, chi::u64 hi, F &&consume) {
+  CTP_GPU_FUN void read_range(chi::u64 lo, chi::u64 hi, F &&consume) {
     if (lo >= hi) return;
     chi::u32 lane = threadIdx.x & 31;
     chi::u64 cap = view_.page_capacity_t;
@@ -828,7 +828,7 @@ class vector {
    * the lane-fast-path makes consecutive same-page hits free.
    */
   template <typename NextI, typename V, typename R>
-  HSHM_GPU_FUN void write_range(NextI next_i, chi::u64 n,
+  CTP_GPU_FUN void write_range(NextI next_i, chi::u64 n,
                                  V value_at, R rescore,
                                  chi::u32 lookahead, chi::u32 lookbehind) {
     if (n == 0) return;
@@ -871,7 +871,7 @@ class vector {
 
   /** Iterator + rescore read form (lane-0 only). */
   template <typename NextI, typename C, typename R>
-  HSHM_GPU_FUN void read_range(NextI next_i, chi::u64 n,
+  CTP_GPU_FUN void read_range(NextI next_i, chi::u64 n,
                                 C consume, R rescore,
                                 chi::u32 lookahead, chi::u32 lookbehind) {
     if (n == 0) return;
@@ -906,13 +906,13 @@ class vector {
 
   /** Flush every dirty page in the calling block. Lane-0 only: the
    *  gpu2cpu Send producer contract requires threadIdx.x == 0. */
-  HSHM_GPU_FUN void FlushAll() {
+  CTP_GPU_FUN void FlushAll() {
     if ((threadIdx.x & 31) != 0) return;
     if (threadIdx.x != 0) return;
     ::wrp_cte::gpu_vector::FlushAllInBlock(ipc_, view_, blockIdx.x);
   }
 
-  HSHM_GPU_FUN const DeviceView &view() const { return view_; }
+  CTP_GPU_FUN const DeviceView &view() const { return view_; }
 
  private:
   DeviceView view_;
@@ -922,6 +922,6 @@ class vector {
 
 }  // namespace cte::gpu::dev
 
-#endif  // HSHM_IS_GPU_COMPILER
+#endif  // CTP_IS_GPU_COMPILER
 
 #endif  // WRP_CTE_GPU_VECTOR_KERNELS_H_

@@ -50,4 +50,4 @@ void CryptoTest() {
   REQUIRE(data == decoded);
 }
 
-TEST_CASE("TestAES") { CryptoTest<hshm::AES>(); }
+TEST_CASE("TestAES") { CryptoTest<ctp::AES>(); }

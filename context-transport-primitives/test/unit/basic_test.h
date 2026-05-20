@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_TEST_UNIT_BASIC_TEST_H_
-#define HSHM_TEST_UNIT_BASIC_TEST_H_
+#ifndef CTP_TEST_UNIT_BASIC_TEST_H_
+#define CTP_TEST_UNIT_BASIC_TEST_H_
 
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch_all.hpp>
@@ -57,8 +57,8 @@ static inline bool VerifyBuffer(char *ptr, size_t size, char nonce) {
 
 /** var = TYPE(val) */
 #define _CREATE_SET_VAR_TO_INT_OR_STRING(TYPE, VAR, TMP_VAR, VAL) \
-  if constexpr (std::is_same_v<TYPE, hshm::priv::string>) {             \
-    TMP_VAR = hshm::priv::string(std::to_string(VAL));                  \
+  if constexpr (std::is_same_v<TYPE, ctp::priv::string>) {             \
+    TMP_VAR = ctp::priv::string(std::to_string(VAL));                  \
   } else if constexpr (std::is_same_v<TYPE, std::string>) {       \
     TMP_VAR = std::string(std::to_string(VAL));                   \
   } else {                                                        \
@@ -74,7 +74,7 @@ static inline bool VerifyBuffer(char *ptr, size_t size, char nonce) {
 
 /** RET = int(TYPE(VAR)); */
 #define GET_INT_FROM_VAR(TYPE, RET, VAR)                    \
-  if constexpr (std::is_same_v<TYPE, hshm::priv::string>) {       \
+  if constexpr (std::is_same_v<TYPE, ctp::priv::string>) {       \
     RET = atoi((VAR).str().c_str());                        \
   } else if constexpr (std::is_same_v<TYPE, std::string>) { \
     RET = atoi((VAR).c_str());                              \
@@ -92,4 +92,4 @@ void MainPosttest();
 
 #define PAGE_DIVIDE(TEXT)
 
-#endif  // HSHM_TEST_UNIT_BASIC_TEST_H_
+#endif  // CTP_TEST_UNIT_BASIC_TEST_H_

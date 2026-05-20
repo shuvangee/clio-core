@@ -102,7 +102,7 @@ struct DeviceViewBase {
 };
 
 /** Total slots per block across both tiers. */
-HSHM_INLINE_CROSS_FUN chi::u32 TotalPagesPerBlock(const DeviceViewBase &v) {
+CTP_INLINE_CROSS_FUN chi::u32 TotalPagesPerBlock(const DeviceViewBase &v) {
   return v.gpu_pages_per_block + v.host_pages_per_block;
 }
 
@@ -122,7 +122,7 @@ struct DeviceView {
 };
 
 /** Per-block resolution helper — handles the variable-size Page array. */
-HSHM_INLINE_CROSS_FUN Block *GetBlock(const DeviceViewBase &v,
+CTP_INLINE_CROSS_FUN Block *GetBlock(const DeviceViewBase &v,
                                              chi::u32 block_idx) {
   return reinterpret_cast<Block *>(
       reinterpret_cast<char *>(v.blocks) +
@@ -131,7 +131,7 @@ HSHM_INLINE_CROSS_FUN Block *GetBlock(const DeviceViewBase &v,
 
 /** Resolve the i-th task in the put pool. `slot` indexes BOTH tiers
  *  (0..total_pages_per_block - 1). */
-HSHM_INLINE_CROSS_FUN wrp_cte::core::PutBlobTask *GetPutTask(
+CTP_INLINE_CROSS_FUN wrp_cte::core::PutBlobTask *GetPutTask(
     const DeviceViewBase &v, chi::u32 block_idx, chi::u32 slot) {
   chi::u64 off =
       (static_cast<chi::u64>(block_idx) * TotalPagesPerBlock(v) + slot) *
@@ -140,7 +140,7 @@ HSHM_INLINE_CROSS_FUN wrp_cte::core::PutBlobTask *GetPutTask(
 }
 
 /** Resolve the i-th task in the get pool. */
-HSHM_INLINE_CROSS_FUN wrp_cte::core::GetBlobTask *GetGetTask(
+CTP_INLINE_CROSS_FUN wrp_cte::core::GetBlobTask *GetGetTask(
     const DeviceViewBase &v, chi::u32 block_idx, chi::u32 slot) {
   chi::u64 off =
       (static_cast<chi::u64>(block_idx) * TotalPagesPerBlock(v) + slot) *
@@ -149,7 +149,7 @@ HSHM_INLINE_CROSS_FUN wrp_cte::core::GetBlobTask *GetGetTask(
 }
 
 /** Co-located gpu::FutureShm for a put task. */
-HSHM_INLINE_CROSS_FUN chi::gpu::FutureShm *GetPutFutureShm(
+CTP_INLINE_CROSS_FUN chi::gpu::FutureShm *GetPutFutureShm(
     const DeviceViewBase &v, chi::u32 block_idx, chi::u32 slot) {
   return reinterpret_cast<chi::gpu::FutureShm *>(
       reinterpret_cast<char *>(GetPutTask(v, block_idx, slot)) +
@@ -157,7 +157,7 @@ HSHM_INLINE_CROSS_FUN chi::gpu::FutureShm *GetPutFutureShm(
 }
 
 /** Co-located gpu::FutureShm for a get task. */
-HSHM_INLINE_CROSS_FUN chi::gpu::FutureShm *GetGetFutureShm(
+CTP_INLINE_CROSS_FUN chi::gpu::FutureShm *GetGetFutureShm(
     const DeviceViewBase &v, chi::u32 block_idx, chi::u32 slot) {
   return reinterpret_cast<chi::gpu::FutureShm *>(
       reinterpret_cast<char *>(GetGetTask(v, block_idx, slot)) +

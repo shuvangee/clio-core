@@ -101,7 +101,7 @@ fun:*ostreambuf_iterator*_M_put*
 fun:*char_traits*copy*
 fun:*basic_string*_S_copy*
 
-# hshm::Logger and hshm::Formatter use std::stringstream / std::ostream;
+# ctp::Logger and ctp::Formatter use std::stringstream / std::ostream;
 # the stringstream internal buffer is filled by uninstrumented libstdc++, causing
 # false-positive "uninitialized" reports on every log message
 fun:*hshm*Logger*Log*
@@ -121,7 +121,7 @@ fun:*zmq*tcp_address*
 fun:*zmq*resolve*
 fun:*zmq*get_socket_address*
 
-# hshm::ConfigParse::ExpandPath uses std::regex/std::locale (uninstrumented conda libstdc++)
+# ctp::ConfigParse::ExpandPath uses std::regex/std::locale (uninstrumented conda libstdc++)
 # - collate, char_traits::length, strxfrm_l are all false positives from uninstrumented .so
 fun:*ConfigParse*ExpandPath*
 fun:*regex_traits*transform*
@@ -151,12 +151,12 @@ fun:*zmq*mailbox*
 fun:*char_traits*compare*
 fun:*basic_string*compare*
 
-# hshm::ConfigParse::ParseHostNameString uses std::stringstream (uninstrumented
+# ctp::ConfigParse::ParseHostNameString uses std::stringstream (uninstrumented
 # libstdc++) which leaves internal state bytes uninitialized from MSan's view.
 # ss.good(), getline(ss, ...) etc. read those uninitialized state bits → false positives.
 fun:*ParseHostNameString*
 
-# hshm::SystemInfo::GetCpuFreqKhz opens /sys/devices/system/cpu/cpuN/.../cpuinfo_cur_freq
+# ctp::SystemInfo::GetCpuFreqKhz opens /sys/devices/system/cpu/cpuN/.../cpuinfo_cur_freq
 # using std::ifstream. The path string construction goes through uninstrumented libstdc++
 # string operations, and the basic_file::open → fopen interceptor fires on "uninitialized"
 # path bytes. All uninstrumented libstdc++ false positives.

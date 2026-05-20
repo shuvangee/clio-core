@@ -115,7 +115,7 @@ Every C/C++ source file (.h, .hpp, .cc, .cpp) MUST have the BSD 3-Clause license
 
 1. **NEVER hardcode absolute paths in CMakeLists.txt files.**
 2. **NEVER build outside `/workspace/build`.** No in-source builds. No `/tmp/build_*`.
-3. **NEVER use raw GPU macros** (`__CUDACC__`, `__HIPCC__`, etc.) — use `HSHM_IS_GPU`, `HSHM_IS_HOST`, `HSHM_IS_GPU_COMPILER`, etc. from `context-transport-primitives/include/hermes_shm/constants/macros.h`.
+3. **NEVER use raw GPU macros** (`__CUDACC__`, `__HIPCC__`, etc.) — use `CTP_IS_GPU`, `CTP_IS_HOST`, `CTP_IS_GPU_COMPILER`, etc. from `context-transport-primitives/include/hermes_shm/constants/macros.h`.
 4. **NEVER write mock/stub code** unless explicitly requested. All implementations must be real and working.
 5. **NEVER use Catch2 with Chimaera runtime.** Use `simple_test.h` for unit tests.
 6. **NEVER use null pool queries.** Always use `local` if unsure.
@@ -131,7 +131,7 @@ Every C/C++ source file (.h, .hpp, .cc, .cpp) MUST have the BSD 3-Clause license
 | Functions | PascalCase | `CreatePool()`, `GetNodeId()` |
 | Variables | snake_case with trailing `_` for members | `pool_id_`, `container_id_` |
 | Constants | kPascalCase | `kAdminPoolId`, `kCtePoolName` |
-| Macros | UPPER_SNAKE | `HSHM_IS_GPU`, `CHI_IPC` |
+| Macros | UPPER_SNAKE | `CTP_IS_GPU`, `CHI_IPC` |
 | CMake targets | namespace::component | `chimaera::admin_client` |
 | ChiMod names | lowercase underscore | `wrp_cte_core`, `chimaera_admin` |
 
@@ -144,7 +144,7 @@ Every C/C++ source file (.h, .hpp, .cc, .cpp) MUST have the BSD 3-Clause license
 ```
 clio-core/
 ├── context-transport-primitives/   # Shared memory data structures, IPC, GPU support
-│   ├── include/hermes_shm/         # Public headers (hshm:: namespace)
+│   ├── include/hermes_shm/         # Public headers (ctp:: namespace)
 │   ├── src/                        # Implementation
 │   └── docs/MODULE_DEVELOPMENT_GUIDE.md  # ChiMod dev guide
 │

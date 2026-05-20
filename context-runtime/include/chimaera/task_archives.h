@@ -89,7 +89,7 @@ struct TaskInfo {
  * - task_infos_: vector of TaskInfo for task metadata
  * - msg_type_: MsgType for message type (SerializeIn, SerializeOut, Heartbeat)
  */
-class NetTaskArchive : public hshm::lbm::LbmMeta<> {
+class NetTaskArchive : public ctp::lbm::LbmMeta<> {
 public:
   std::vector<TaskInfo> task_infos_; /**< Task metadata for each serialized task */
   MsgType msg_type_;                 /**< Message type: kSerializeIn, kSerializeOut, or kHeartbeat */
@@ -114,7 +114,7 @@ public:
    * Move constructor
    */
   NetTaskArchive(NetTaskArchive &&other) noexcept
-      : hshm::lbm::LbmMeta<>(std::move(other)),
+      : ctp::lbm::LbmMeta<>(std::move(other)),
         task_infos_(std::move(other.task_infos_)),
         msg_type_(other.msg_type_) {}
 
@@ -123,7 +123,7 @@ public:
    */
   NetTaskArchive &operator=(NetTaskArchive &&other) noexcept {
     if (this != &other) {
-      hshm::lbm::LbmMeta<>::operator=(std::move(other));
+      ctp::lbm::LbmMeta<>::operator=(std::move(other));
       task_infos_ = std::move(other.task_infos_);
       msg_type_ = other.msg_type_;
     }
@@ -173,8 +173,8 @@ public:
   using supports_range_ops = std::true_type;
 private:
   std::vector<char> buffer_;
-  hshm::ipc::GlobalSerialize<std::vector<char>> serializer_;
-  hshm::lbm::Transport *lbm_transport_;
+  ctp::ipc::GlobalSerialize<std::vector<char>> serializer_;
+  ctp::lbm::Transport *lbm_transport_;
   bool is_pod_ = false;
 
 public:
@@ -182,7 +182,7 @@ public:
   void PopPod() { is_pod_ = false; }
 
   explicit SaveTaskArchive(MsgType msg_type,
-                           hshm::lbm::Transport *lbm_transport = nullptr)
+                           ctp::lbm::Transport *lbm_transport = nullptr)
       : NetTaskArchive(msg_type),
         serializer_(buffer_),
         lbm_transport_(lbm_transport) {
@@ -256,7 +256,7 @@ public:
     return buffer_;
   }
 
-  void SetTransport(hshm::lbm::Transport *lbm_transport) { lbm_transport_ = lbm_transport; }
+  void SetTransport(ctp::lbm::Transport *lbm_transport) { lbm_transport_ = lbm_transport; }
 
   template <typename Ar>
   void serialize(Ar &ar) {
@@ -280,10 +280,10 @@ public:
   using supports_range_ops = std::true_type;
 private:
   std::vector<char> data_;
-  hshm::ipc::GlobalDeserialize<std::vector<char>> deserializer_;
+  ctp::ipc::GlobalDeserialize<std::vector<char>> deserializer_;
   size_t current_task_index_;
   size_t current_bulk_index_;
-  hshm::lbm::Transport *lbm_transport_;
+  ctp::lbm::Transport *lbm_transport_;
   bool is_pod_ = false;
 
 public:
@@ -406,7 +406,7 @@ public:
   void ResetTaskIndex() { current_task_index_ = 0; }
   void ResetBulkIndex() { current_bulk_index_ = 0; }
 
-  void SetTransport(hshm::lbm::Transport *lbm_transport) { lbm_transport_ = lbm_transport; }
+  void SetTransport(ctp::lbm::Transport *lbm_transport) { lbm_transport_ = lbm_transport; }
 
   void read_binary(char *data, size_t size) {
     deserializer_.read_binary(data, size);
@@ -425,7 +425,7 @@ public:
     ar(data_);
     // Reinitialize deserializer with new data
     new (&deserializer_)
-        hshm::ipc::GlobalDeserialize<std::vector<char>>(data_);
+        ctp::ipc::GlobalDeserialize<std::vector<char>>(data_);
   }
 
 };

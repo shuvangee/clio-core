@@ -71,7 +71,7 @@ void EnsureInitialized() {
 
 // Get test allocator
 hipc::Allocator* GetTestAllocator() {
-  return HSHM_MALLOC;
+  return CTP_MALLOC;
 }
 } // namespace
 
@@ -10622,14 +10622,14 @@ TEST_CASE("Autogen - Bdev PerfMetrics serialization", "[autogen][bdev][perfmetri
     // Use GlobalSerialize serialization
     std::vector<char> buf;
     {
-      hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+      ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
       orig_params.serialize(oar);
       oar.Finalize();
     }
 
     chimaera::bdev::CreateParams loaded_params;
     {
-      hshm::ipc::GlobalDeserialize<std::vector<char>> iar(buf);
+      ctp::ipc::GlobalDeserialize<std::vector<char>> iar(buf);
       loaded_params.serialize(iar);
     }
 
@@ -10742,12 +10742,12 @@ TEST_CASE("Autogen - Admin StopRuntimeTask full coverage", "[autogen][admin][sto
       // Test GlobalSerialize serialization
       std::vector<char> buf;
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeIn(oar);
         oar.Finalize();
       }
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeOut(oar);
         oar.Finalize();
       }
@@ -10790,12 +10790,12 @@ TEST_CASE("Autogen - Admin SendTask full coverage", "[autogen][admin][sendtask][
       // Test GlobalSerialize serialization
       std::vector<char> buf;
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeIn(oar);
         oar.Finalize();
       }
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeOut(oar);
         oar.Finalize();
       }
@@ -10838,12 +10838,12 @@ TEST_CASE("Autogen - Admin RecvTask full coverage", "[autogen][admin][recvtask][
       // Test GlobalSerialize serialization
       std::vector<char> buf;
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeIn(oar);
         oar.Finalize();
       }
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeOut(oar);
         oar.Finalize();
       }
@@ -10878,12 +10878,12 @@ TEST_CASE("Autogen - Admin WreapDeadIpcsTask full coverage", "[autogen][admin][w
       // Test GlobalSerialize serialization
       std::vector<char> buf;
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeIn(oar);
         oar.Finalize();
       }
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeOut(oar);
         oar.Finalize();
       }
@@ -10926,12 +10926,12 @@ TEST_CASE("Autogen - Admin SubmitBatchTask full coverage", "[autogen][admin][sub
       // Test GlobalSerialize serialization
       std::vector<char> buf;
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeIn(oar);
         oar.Finalize();
       }
       {
-        hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+        ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
         task->SerializeOut(oar);
         oar.Finalize();
       }
@@ -11427,54 +11427,54 @@ TEST_CASE("Autogen - CTE GetOrCreateTagTask methods", "[autogen][cte][methods][G
 
 TEST_CASE("Autogen - SystemInfo basic functions", "[autogen][systeminfo][basic]") {
   SECTION("GetCpuCount") {
-    int cpu_count = hshm::SystemInfo::GetCpuCount();
+    int cpu_count = ctp::SystemInfo::GetCpuCount();
     REQUIRE(cpu_count > 0);
     INFO("CPU count: " + std::to_string(cpu_count));
   }
 
   SECTION("GetPageSize") {
-    int page_size = hshm::SystemInfo::GetPageSize();
+    int page_size = ctp::SystemInfo::GetPageSize();
     REQUIRE(page_size > 0);
     INFO("Page size: " + std::to_string(page_size));
   }
 
   SECTION("GetTid") {
-    int tid = hshm::SystemInfo::GetTid();
+    int tid = ctp::SystemInfo::GetTid();
     REQUIRE(tid > 0);
     INFO("Thread ID: " + std::to_string(tid));
   }
 
   SECTION("GetPid") {
-    int pid = hshm::SystemInfo::GetPid();
+    int pid = ctp::SystemInfo::GetPid();
     REQUIRE(pid > 0);
     INFO("Process ID: " + std::to_string(pid));
   }
 
   SECTION("GetUid") {
-    int uid = hshm::SystemInfo::GetUid();
+    int uid = ctp::SystemInfo::GetUid();
     REQUIRE(uid >= 0);
     INFO("User ID: " + std::to_string(uid));
   }
 
   SECTION("GetGid") {
-    int gid = hshm::SystemInfo::GetGid();
+    int gid = ctp::SystemInfo::GetGid();
     REQUIRE(gid >= 0);
     INFO("Group ID: " + std::to_string(gid));
   }
 
   SECTION("GetRamCapacity") {
-    size_t ram = hshm::SystemInfo::GetRamCapacity();
+    size_t ram = ctp::SystemInfo::GetRamCapacity();
     REQUIRE(ram > 0);
     INFO("RAM capacity: " + std::to_string(ram));
   }
 
   SECTION("YieldThread") {
-    hshm::SystemInfo::YieldThread();
+    ctp::SystemInfo::YieldThread();
     INFO("YieldThread completed");
   }
 
   SECTION("AlignedAlloc") {
-    void* ptr = hshm::SystemInfo::AlignedAlloc(64, 256);
+    void* ptr = ctp::SystemInfo::AlignedAlloc(64, 256);
     REQUIRE(ptr != nullptr);
     REQUIRE(((uintptr_t)ptr % 64) == 0);
     free(ptr);
@@ -11483,7 +11483,7 @@ TEST_CASE("Autogen - SystemInfo basic functions", "[autogen][systeminfo][basic]"
 }
 
 TEST_CASE("Autogen - SystemInfo CPU freq", "[autogen][systeminfo][cpufreq]") {
-  auto* sys_info = HSHM_SYSTEM_INFO;
+  auto* sys_info = CTP_SYSTEM_INFO;
 
   SECTION("GetCpuFreqKhz") {
     size_t freq = sys_info->GetCpuFreqKhz(0);
@@ -11518,13 +11518,13 @@ TEST_CASE("Autogen - SystemInfo CPU freq", "[autogen][systeminfo][cpufreq]") {
 
 TEST_CASE("Autogen - SystemInfo TLS", "[autogen][systeminfo][tls]") {
   SECTION("CreateTls SetTls GetTls") {
-    hshm::ThreadLocalKey key;
+    ctp::ThreadLocalKey key;
     int test_data = 42;
-    bool created = hshm::SystemInfo::CreateTls(key, &test_data);
+    bool created = ctp::SystemInfo::CreateTls(key, &test_data);
     if (created) {
-      bool set_ok = hshm::SystemInfo::SetTls(key, &test_data);
+      bool set_ok = ctp::SystemInfo::SetTls(key, &test_data);
       REQUIRE(set_ok);
-      void* got = hshm::SystemInfo::GetTls(key);
+      void* got = ctp::SystemInfo::GetTls(key);
       REQUIRE(got == &test_data);
       INFO("TLS create/set/get completed");
     }
@@ -11533,22 +11533,22 @@ TEST_CASE("Autogen - SystemInfo TLS", "[autogen][systeminfo][tls]") {
 
 TEST_CASE("Autogen - SystemInfo env", "[autogen][systeminfo][env]") {
   SECTION("Getenv existing") {
-    std::string home = hshm::SystemInfo::Getenv("HOME");
+    std::string home = ctp::SystemInfo::Getenv("HOME");
     REQUIRE(!home.empty());
     INFO("HOME=" + home);
   }
 
   SECTION("Getenv nonexistent") {
-    std::string val = hshm::SystemInfo::Getenv("__HSHM_TEST_NONEXISTENT_VAR__");
+    std::string val = ctp::SystemInfo::Getenv("__HSHM_TEST_NONEXISTENT_VAR__");
     REQUIRE(val.empty());
   }
 
   SECTION("Setenv and Getenv") {
-    hshm::SystemInfo::Setenv("__HSHM_TEST_VAR__", "test_value_123", 1);
-    std::string val = hshm::SystemInfo::Getenv("__HSHM_TEST_VAR__");
+    ctp::SystemInfo::Setenv("__HSHM_TEST_VAR__", "test_value_123", 1);
+    std::string val = ctp::SystemInfo::Getenv("__HSHM_TEST_VAR__");
     REQUIRE(val == "test_value_123");
-    hshm::SystemInfo::Unsetenv("__HSHM_TEST_VAR__");
-    std::string val2 = hshm::SystemInfo::Getenv("__HSHM_TEST_VAR__");
+    ctp::SystemInfo::Unsetenv("__HSHM_TEST_VAR__");
+    std::string val2 = ctp::SystemInfo::Getenv("__HSHM_TEST_VAR__");
     REQUIRE(val2.empty());
     INFO("Setenv/Getenv/Unsetenv completed");
   }
@@ -11556,67 +11556,67 @@ TEST_CASE("Autogen - SystemInfo env", "[autogen][systeminfo][env]") {
 
 TEST_CASE("Autogen - SystemInfo SharedMemory", "[autogen][systeminfo][shm]") {
   SECTION("Create Open Map Unmap Close Destroy") {
-    std::string shm_name = "/hshm_test_coverage_shm";
+    std::string shm_name = "/ctp_test_coverage_shm";
     size_t shm_size = 4096;
 
     // Create
-    hshm::File fd;
-    bool created = hshm::SystemInfo::CreateNewSharedMemory(fd, shm_name, shm_size);
+    ctp::File fd;
+    bool created = ctp::SystemInfo::CreateNewSharedMemory(fd, shm_name, shm_size);
     REQUIRE(created);
 
     // Map
-    void* ptr = hshm::SystemInfo::MapSharedMemory(fd, shm_size, 0);
+    void* ptr = ctp::SystemInfo::MapSharedMemory(fd, shm_size, 0);
     REQUIRE(ptr != nullptr);
 
     // Write to it
     memset(ptr, 0xAB, shm_size);
 
     // Unmap
-    hshm::SystemInfo::UnmapMemory(ptr, shm_size);
+    ctp::SystemInfo::UnmapMemory(ptr, shm_size);
 
     // Open (re-open while original fd is still open)
-    hshm::File fd2;
-    bool opened = hshm::SystemInfo::OpenSharedMemory(fd2, shm_name);
+    ctp::File fd2;
+    bool opened = ctp::SystemInfo::OpenSharedMemory(fd2, shm_name);
     REQUIRE(opened);
-    hshm::SystemInfo::CloseSharedMemory(fd2);
+    ctp::SystemInfo::CloseSharedMemory(fd2);
 
     // Close original fd
-    hshm::SystemInfo::CloseSharedMemory(fd);
+    ctp::SystemInfo::CloseSharedMemory(fd);
 
     // Destroy
-    hshm::SystemInfo::DestroySharedMemory(shm_name);
+    ctp::SystemInfo::DestroySharedMemory(shm_name);
     INFO("SharedMemory lifecycle completed");
   }
 
   SECTION("MapPrivateMemory") {
     size_t size = 4096;
-    void* ptr = hshm::SystemInfo::MapPrivateMemory(size);
+    void* ptr = ctp::SystemInfo::MapPrivateMemory(size);
     REQUIRE(ptr != nullptr);
     memset(ptr, 0xCD, size);
-    hshm::SystemInfo::UnmapMemory(ptr, size);
+    ctp::SystemInfo::UnmapMemory(ptr, size);
     INFO("MapPrivateMemory completed");
   }
 }
 
 TEST_CASE("Autogen - SystemInfo SharedLibrary", "[autogen][systeminfo][sharedlib]") {
   SECTION("Load valid library") {
-    hshm::SharedLibrary lib("libm.so.6");
+    ctp::SharedLibrary lib("libm.so.6");
     void* sym = lib.GetSymbol("sin");
     REQUIRE(sym != nullptr);
     INFO("SharedLibrary load completed");
   }
 
   SECTION("Move constructor") {
-    hshm::SharedLibrary lib1("libm.so.6");
-    hshm::SharedLibrary lib2(std::move(lib1));
+    ctp::SharedLibrary lib1("libm.so.6");
+    ctp::SharedLibrary lib2(std::move(lib1));
     void* sym = lib2.GetSymbol("cos");
     REQUIRE(sym != nullptr);
     INFO("SharedLibrary move constructor completed");
   }
 
   SECTION("Move assignment") {
-    hshm::SharedLibrary lib1("libm.so.6");
-    hshm::SharedLibrary lib2("libm.so.6");
+    ctp::SharedLibrary lib1("libm.so.6");
+    ctp::SharedLibrary lib2("libm.so.6");
     lib2 = std::move(lib1);
     void* sym = lib2.GetSymbol("tan");
     REQUIRE(sym != nullptr);
@@ -11624,7 +11624,7 @@ TEST_CASE("Autogen - SystemInfo SharedLibrary", "[autogen][systeminfo][sharedlib
   }
 
   SECTION("GetError for invalid library") {
-    hshm::SharedLibrary lib("__nonexistent_library_12345.so");
+    ctp::SharedLibrary lib("__nonexistent_library_12345.so");
     std::string err = lib.GetError();
     REQUIRE(!err.empty());
     INFO("SharedLibrary GetError: " + err);
@@ -11640,14 +11640,14 @@ TEST_CASE("Autogen - SystemInfo SharedLibrary", "[autogen][systeminfo][sharedlib
 TEST_CASE("Autogen - ConfigParse ParseHostNameString", "[autogen][configparse][hostname]") {
   SECTION("Simple hostname no brackets") {
     std::vector<std::string> hosts;
-    hshm::ConfigParse::ParseHostNameString("myhost", hosts);
+    ctp::ConfigParse::ParseHostNameString("myhost", hosts);
     REQUIRE(hosts.size() == 1);
     REQUIRE(hosts[0] == "myhost");
   }
 
   SECTION("Hostname with range") {
     std::vector<std::string> hosts;
-    hshm::ConfigParse::ParseHostNameString("node[01-03]", hosts);
+    ctp::ConfigParse::ParseHostNameString("node[01-03]", hosts);
     REQUIRE(hosts.size() == 3);
     REQUIRE(hosts[0] == "node01");
     REQUIRE(hosts[1] == "node02");
@@ -11656,7 +11656,7 @@ TEST_CASE("Autogen - ConfigParse ParseHostNameString", "[autogen][configparse][h
 
   SECTION("Hostname with range and suffix") {
     std::vector<std::string> hosts;
-    hshm::ConfigParse::ParseHostNameString("hello[00-02]-40g", hosts);
+    ctp::ConfigParse::ParseHostNameString("hello[00-02]-40g", hosts);
     REQUIRE(hosts.size() == 3);
     REQUIRE(hosts[0] == "hello00-40g");
     REQUIRE(hosts[1] == "hello01-40g");
@@ -11665,7 +11665,7 @@ TEST_CASE("Autogen - ConfigParse ParseHostNameString", "[autogen][configparse][h
 
   SECTION("Multiple hostnames with semicolons") {
     std::vector<std::string> hosts;
-    hshm::ConfigParse::ParseHostNameString("host1;host2;host3", hosts);
+    ctp::ConfigParse::ParseHostNameString("host1;host2;host3", hosts);
     REQUIRE(hosts.size() == 3);
     REQUIRE(hosts[0] == "host1");
     REQUIRE(hosts[2] == "host3");
@@ -11673,7 +11673,7 @@ TEST_CASE("Autogen - ConfigParse ParseHostNameString", "[autogen][configparse][h
 
   SECTION("Hostname with comma-separated ranges") {
     std::vector<std::string> hosts;
-    hshm::ConfigParse::ParseHostNameString("node[01-02,05]", hosts);
+    ctp::ConfigParse::ParseHostNameString("node[01-02,05]", hosts);
     REQUIRE(hosts.size() == 3);
     REQUIRE(hosts[0] == "node01");
     REQUIRE(hosts[1] == "node02");
@@ -11682,13 +11682,13 @@ TEST_CASE("Autogen - ConfigParse ParseHostNameString", "[autogen][configparse][h
 
   SECTION("Empty string") {
     std::vector<std::string> hosts;
-    hshm::ConfigParse::ParseHostNameString("", hosts);
+    ctp::ConfigParse::ParseHostNameString("", hosts);
     REQUIRE(hosts.size() == 0);
   }
 
   SECTION("Whitespace handling") {
     std::vector<std::string> hosts;
-    hshm::ConfigParse::ParseHostNameString("  host1 ; host2  ", hosts);
+    ctp::ConfigParse::ParseHostNameString("  host1 ; host2  ", hosts);
     REQUIRE(hosts.size() == 2);
     REQUIRE(hosts[0] == "host1");
     REQUIRE(hosts[1] == "host2");
@@ -11696,7 +11696,7 @@ TEST_CASE("Autogen - ConfigParse ParseHostNameString", "[autogen][configparse][h
 
   SECTION("Complex example from docs") {
     std::vector<std::string> hosts;
-    hshm::ConfigParse::ParseHostNameString("hello[00-02,10]-40g;hello2[11-12]-40g", hosts);
+    ctp::ConfigParse::ParseHostNameString("hello[00-02,10]-40g;hello2[11-12]-40g", hosts);
     REQUIRE(hosts.size() == 6);
     REQUIRE(hosts[0] == "hello00-40g");
     REQUIRE(hosts[3] == "hello10-40g");
@@ -11707,121 +11707,121 @@ TEST_CASE("Autogen - ConfigParse ParseHostNameString", "[autogen][configparse][h
 
 TEST_CASE("Autogen - ConfigParse ParseNumberSuffix", "[autogen][configparse][numbersuffix]") {
   SECTION("No suffix") {
-    REQUIRE(hshm::ConfigParse::ParseNumberSuffix("1234") == "");
+    REQUIRE(ctp::ConfigParse::ParseNumberSuffix("1234") == "");
   }
 
   SECTION("KB suffix") {
-    REQUIRE(hshm::ConfigParse::ParseNumberSuffix("100KB") == "KB");
+    REQUIRE(ctp::ConfigParse::ParseNumberSuffix("100KB") == "KB");
   }
 
   SECTION("MB suffix") {
-    REQUIRE(hshm::ConfigParse::ParseNumberSuffix("50MB") == "MB");
+    REQUIRE(ctp::ConfigParse::ParseNumberSuffix("50MB") == "MB");
   }
 
   SECTION("Float with suffix") {
-    REQUIRE(hshm::ConfigParse::ParseNumberSuffix("1.5GB") == "GB");
+    REQUIRE(ctp::ConfigParse::ParseNumberSuffix("1.5GB") == "GB");
   }
 
   SECTION("Whitespace before suffix") {
-    REQUIRE(hshm::ConfigParse::ParseNumberSuffix("100 KB") == "KB");
+    REQUIRE(ctp::ConfigParse::ParseNumberSuffix("100 KB") == "KB");
   }
 }
 
 TEST_CASE("Autogen - ConfigParse ParseSize", "[autogen][configparse][parsesize]") {
   SECTION("Bytes") {
-    REQUIRE(hshm::ConfigParse::ParseSize("1024") == 1024);
+    REQUIRE(ctp::ConfigParse::ParseSize("1024") == 1024);
   }
 
   SECTION("Kilobytes lowercase") {
-    REQUIRE(hshm::ConfigParse::ParseSize("1k") == 1024);
+    REQUIRE(ctp::ConfigParse::ParseSize("1k") == 1024);
   }
 
   SECTION("Kilobytes uppercase") {
-    REQUIRE(hshm::ConfigParse::ParseSize("1K") == 1024);
+    REQUIRE(ctp::ConfigParse::ParseSize("1K") == 1024);
   }
 
   SECTION("Megabytes") {
-    REQUIRE(hshm::ConfigParse::ParseSize("1M") == 1024 * 1024);
+    REQUIRE(ctp::ConfigParse::ParseSize("1M") == 1024 * 1024);
   }
 
   SECTION("Gigabytes") {
-    REQUIRE(hshm::ConfigParse::ParseSize("1G") == (hshm::u64)1024 * 1024 * 1024);
+    REQUIRE(ctp::ConfigParse::ParseSize("1G") == (ctp::u64)1024 * 1024 * 1024);
   }
 
   SECTION("Terabytes") {
-    REQUIRE(hshm::ConfigParse::ParseSize("1T") == (hshm::u64)1024 * 1024 * 1024 * 1024);
+    REQUIRE(ctp::ConfigParse::ParseSize("1T") == (ctp::u64)1024 * 1024 * 1024 * 1024);
   }
 
   SECTION("Petabytes") {
-    REQUIRE(hshm::ConfigParse::ParseSize("1P") == (hshm::u64)1024 * 1024 * 1024 * 1024 * 1024);
+    REQUIRE(ctp::ConfigParse::ParseSize("1P") == (ctp::u64)1024 * 1024 * 1024 * 1024 * 1024);
   }
 
   SECTION("Infinity") {
-    REQUIRE(hshm::ConfigParse::ParseSize("inf") == std::numeric_limits<hshm::u64>::max());
+    REQUIRE(ctp::ConfigParse::ParseSize("inf") == std::numeric_limits<ctp::u64>::max());
   }
 }
 
 TEST_CASE("Autogen - ConfigParse ParseLatency", "[autogen][configparse][parselatency]") {
   SECTION("Nanoseconds") {
-    REQUIRE(hshm::ConfigParse::ParseLatency("100n") == 100);
+    REQUIRE(ctp::ConfigParse::ParseLatency("100n") == 100);
   }
 
   SECTION("Microseconds") {
-    REQUIRE(hshm::ConfigParse::ParseLatency("1u") == 1024);
+    REQUIRE(ctp::ConfigParse::ParseLatency("1u") == 1024);
   }
 
   SECTION("Milliseconds") {
-    REQUIRE(hshm::ConfigParse::ParseLatency("1m") == 1024 * 1024);
+    REQUIRE(ctp::ConfigParse::ParseLatency("1m") == 1024 * 1024);
   }
 
   SECTION("Seconds") {
-    REQUIRE(hshm::ConfigParse::ParseLatency("1s") == (hshm::u64)1024 * 1024 * 1024 * 1024);
+    REQUIRE(ctp::ConfigParse::ParseLatency("1s") == (ctp::u64)1024 * 1024 * 1024 * 1024);
   }
 
   SECTION("No suffix") {
-    REQUIRE(hshm::ConfigParse::ParseLatency("500") == 500);
+    REQUIRE(ctp::ConfigParse::ParseLatency("500") == 500);
   }
 }
 
 TEST_CASE("Autogen - ConfigParse ParseBandwidth", "[autogen][configparse][parsebandwidth]") {
   SECTION("Megabytes per second") {
-    REQUIRE(hshm::ConfigParse::ParseBandwidth("100M") == (hshm::u64)100 * 1024 * 1024);
+    REQUIRE(ctp::ConfigParse::ParseBandwidth("100M") == (ctp::u64)100 * 1024 * 1024);
   }
 
   SECTION("Gigabytes per second") {
-    REQUIRE(hshm::ConfigParse::ParseBandwidth("1G") == (hshm::u64)1024 * 1024 * 1024);
+    REQUIRE(ctp::ConfigParse::ParseBandwidth("1G") == (ctp::u64)1024 * 1024 * 1024);
   }
 }
 
 TEST_CASE("Autogen - ConfigParse ExpandPath", "[autogen][configparse][expandpath]") {
   SECTION("No env var") {
-    std::string path = hshm::ConfigParse::ExpandPath("/tmp/test");
+    std::string path = ctp::ConfigParse::ExpandPath("/tmp/test");
     REQUIRE(path == "/tmp/test");
   }
 
   SECTION("With HOME env var") {
-    std::string home = hshm::SystemInfo::Getenv("HOME");
-    std::string path = hshm::ConfigParse::ExpandPath("${HOME}/test");
+    std::string home = ctp::SystemInfo::Getenv("HOME");
+    std::string path = ctp::ConfigParse::ExpandPath("${HOME}/test");
     REQUIRE(path == home + "/test");
   }
 }
 
 TEST_CASE("Autogen - ConfigParse ParseNumber", "[autogen][configparse][parsenumber]") {
   SECTION("Integer") {
-    REQUIRE(hshm::ConfigParse::ParseNumber<int>("42") == 42);
+    REQUIRE(ctp::ConfigParse::ParseNumber<int>("42") == 42);
   }
 
   SECTION("Float") {
-    REQUIRE(hshm::ConfigParse::ParseNumber<double>("3.14") > 3.13);
-    REQUIRE(hshm::ConfigParse::ParseNumber<double>("3.14") < 3.15);
+    REQUIRE(ctp::ConfigParse::ParseNumber<double>("3.14") > 3.13);
+    REQUIRE(ctp::ConfigParse::ParseNumber<double>("3.14") < 3.15);
   }
 
   SECTION("Infinity int") {
-    REQUIRE(hshm::ConfigParse::ParseNumber<int>("inf") == std::numeric_limits<int>::max());
+    REQUIRE(ctp::ConfigParse::ParseNumber<int>("inf") == std::numeric_limits<int>::max());
   }
 
   SECTION("Infinity u64") {
-    REQUIRE(hshm::ConfigParse::ParseNumber<hshm::u64>("inf") == std::numeric_limits<hshm::u64>::max());
+    REQUIRE(ctp::ConfigParse::ParseNumber<ctp::u64>("inf") == std::numeric_limits<ctp::u64>::max());
   }
 }
 
@@ -11881,13 +11881,13 @@ TEST_CASE("Autogen - LocalTaskArchive operations", "[autogen][localtaskarchive]"
 
     // Save
     std::vector<char> buffer;
-    hshm::ipc::LocalSerialize<std::vector<char>> serializer(buffer);
-    hshm::ipc::save(serializer, info);
+    ctp::ipc::LocalSerialize<std::vector<char>> serializer(buffer);
+    ctp::ipc::save(serializer, info);
 
     // Load
     chi::LocalTaskInfo info2;
-    hshm::ipc::LocalDeserialize<std::vector<char>> deserializer(buffer);
-    hshm::ipc::load(deserializer, info2);
+    ctp::ipc::LocalDeserialize<std::vector<char>> deserializer(buffer);
+    ctp::ipc::load(deserializer, info2);
     REQUIRE(info2.method_id_ == 42);
     INFO("LocalTaskInfo serialization completed");
   }
@@ -12244,13 +12244,13 @@ TEST_CASE("Autogen - CTE Context struct GlobalSerialize", "[autogen][cte][contex
 
     std::vector<char> buf;
     {
-      hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+      ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
       oar(ctx);
       oar.Finalize();
     }
     wrp_cte::core::Context loaded;
     {
-      hshm::ipc::GlobalDeserialize<std::vector<char>> iar(buf);
+      ctp::ipc::GlobalDeserialize<std::vector<char>> iar(buf);
       iar(loaded);
     }
     REQUIRE(loaded.persistence_target_ == 1);
@@ -12276,13 +12276,13 @@ TEST_CASE("Autogen - CTE Context struct GlobalSerialize", "[autogen][cte][contex
 
     std::vector<char> buf;
     {
-      hshm::ipc::GlobalSerialize<std::vector<char>> oar(buf);
+      ctp::ipc::GlobalSerialize<std::vector<char>> oar(buf);
       oar(telem);
       oar.Finalize();
     }
     wrp_cte::core::CteTelemetry loaded;
     {
-      hshm::ipc::GlobalDeserialize<std::vector<char>> iar(buf);
+      ctp::ipc::GlobalDeserialize<std::vector<char>> iar(buf);
       iar(loaded);
     }
     REQUIRE(loaded.off_ == 100);

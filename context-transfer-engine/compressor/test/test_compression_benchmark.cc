@@ -116,15 +116,15 @@ inline double GetCpuTimeNs() {
   return 0.0;
 }
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
 #include <lzo/lzo1x.h>
 #endif
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
 #include "hermes_shm/compress/lossless_modes.h"
 #endif
 
-#if HSHM_ENABLE_COMPRESS && HSHM_ENABLE_LIBPRESSIO
+#if CTP_ENABLE_COMPRESS && CTP_ENABLE_LIBPRESSIO
 #include "hermes_shm/compress/libpressio.h"
 #include "hermes_shm/compress/libpressio_modes.h"
 #endif
@@ -183,19 +183,19 @@ struct BenchmarkResult {
 class DataGenerator {
  public:
   // Uniform random with configurable range (smaller range = more compressible)
-  static void GenerateUniformRandom(void* data, size_t num_elements, hshm::DataType dtype, int max_value = 256) {
+  static void GenerateUniformRandom(void* data, size_t num_elements, ctp::DataType dtype, int max_value = 256) {
     std::random_device rd;
     std::mt19937 gen(rd());
 
     switch (dtype) {
-      case hshm::DataType::UINT8: {
+      case ctp::DataType::UINT8: {
         uint8_t* bytes = static_cast<uint8_t*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           bytes[i] = gen() % max_value;
         }
         break;
       }
-      case hshm::DataType::INT32: {
+      case ctp::DataType::INT32: {
         int32_t* ints = static_cast<int32_t*>(data);
         std::uniform_int_distribution<int32_t> dist(-max_value * 1000, max_value * 1000);
         for (size_t i = 0; i < num_elements; i++) {
@@ -203,7 +203,7 @@ class DataGenerator {
         }
         break;
       }
-      case hshm::DataType::FLOAT32: {
+      case ctp::DataType::FLOAT32: {
         float* floats = static_cast<float*>(data);
         std::uniform_real_distribution<float> dist(0.0f, static_cast<float>(max_value));
         for (size_t i = 0; i < num_elements; i++) {
@@ -217,12 +217,12 @@ class DataGenerator {
   }
 
   // Gaussian with configurable stddev (smaller stddev = more compressible)
-  static void GenerateGaussian(void* data, size_t num_elements, hshm::DataType dtype, double stddev = 30.0) {
+  static void GenerateGaussian(void* data, size_t num_elements, ctp::DataType dtype, double stddev = 30.0) {
     std::random_device rd;
     std::mt19937 gen(rd());
 
     switch (dtype) {
-      case hshm::DataType::UINT8: {
+      case ctp::DataType::UINT8: {
         uint8_t* bytes = static_cast<uint8_t*>(data);
         std::normal_distribution<> dist(128.0, stddev);
         for (size_t i = 0; i < num_elements; i++) {
@@ -230,7 +230,7 @@ class DataGenerator {
         }
         break;
       }
-      case hshm::DataType::INT32: {
+      case ctp::DataType::INT32: {
         int32_t* ints = static_cast<int32_t*>(data);
         std::normal_distribution<double> dist(0.0, stddev * 100.0);
         for (size_t i = 0; i < num_elements; i++) {
@@ -238,7 +238,7 @@ class DataGenerator {
         }
         break;
       }
-      case hshm::DataType::FLOAT32: {
+      case ctp::DataType::FLOAT32: {
         float* floats = static_cast<float*>(data);
         std::normal_distribution<float> dist(0.0f, static_cast<float>(stddev));
         for (size_t i = 0; i < num_elements; i++) {
@@ -252,23 +252,23 @@ class DataGenerator {
   }
 
   // Constant (always maximally compressible)
-  static void GenerateConstant(void* data, size_t num_elements, hshm::DataType dtype) {
+  static void GenerateConstant(void* data, size_t num_elements, ctp::DataType dtype) {
     switch (dtype) {
-      case hshm::DataType::UINT8: {
+      case ctp::DataType::UINT8: {
         uint8_t* bytes = static_cast<uint8_t*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           bytes[i] = 0x42;
         }
         break;
       }
-      case hshm::DataType::INT32: {
+      case ctp::DataType::INT32: {
         int32_t* ints = static_cast<int32_t*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           ints[i] = 42424242;
         }
         break;
       }
-      case hshm::DataType::FLOAT32: {
+      case ctp::DataType::FLOAT32: {
         float* floats = static_cast<float*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           floats[i] = 42.42f;
@@ -281,16 +281,16 @@ class DataGenerator {
   }
 
   // Linear gradient with configurable step size (larger steps = more compressible)
-  static void GenerateLinearGradient(void* data, size_t num_elements, hshm::DataType dtype, int step_divisor = 1) {
+  static void GenerateLinearGradient(void* data, size_t num_elements, ctp::DataType dtype, int step_divisor = 1) {
     switch (dtype) {
-      case hshm::DataType::UINT8: {
+      case ctp::DataType::UINT8: {
         uint8_t* bytes = static_cast<uint8_t*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           bytes[i] = static_cast<uint8_t>(((i / step_divisor) * 256) / num_elements);
         }
         break;
       }
-      case hshm::DataType::INT32: {
+      case ctp::DataType::INT32: {
         int32_t* ints = static_cast<int32_t*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           int64_t val = static_cast<int64_t>(i / step_divisor) * 4000000000LL / num_elements - 2000000000LL;
@@ -298,7 +298,7 @@ class DataGenerator {
         }
         break;
       }
-      case hshm::DataType::FLOAT32: {
+      case ctp::DataType::FLOAT32: {
         float* floats = static_cast<float*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           floats[i] = static_cast<float>(i / step_divisor) / num_elements * 1000.0f;
@@ -311,9 +311,9 @@ class DataGenerator {
   }
 
   // Sinusoidal with configurable period (longer period = more compressible)
-  static void GenerateSinusoidal(void* data, size_t num_elements, hshm::DataType dtype, double period = 256.0) {
+  static void GenerateSinusoidal(void* data, size_t num_elements, ctp::DataType dtype, double period = 256.0) {
     switch (dtype) {
-      case hshm::DataType::UINT8: {
+      case ctp::DataType::UINT8: {
         uint8_t* bytes = static_cast<uint8_t*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           double val = 128.0 + 127.0 * std::sin(2.0 * M_PI * i / period);
@@ -321,14 +321,14 @@ class DataGenerator {
         }
         break;
       }
-      case hshm::DataType::INT32: {
+      case ctp::DataType::INT32: {
         int32_t* ints = static_cast<int32_t*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           ints[i] = static_cast<int32_t>(1000000.0 * std::sin(2.0 * M_PI * i / period));
         }
         break;
       }
-      case hshm::DataType::FLOAT32: {
+      case ctp::DataType::FLOAT32: {
         float* floats = static_cast<float*>(data);
         for (size_t i = 0; i < num_elements; i++) {
           floats[i] = 1000.0f * std::sin(2.0f * M_PI * i / static_cast<float>(period));
@@ -341,9 +341,9 @@ class DataGenerator {
   }
 
   // Repeating pattern with configurable pattern length (shorter = more compressible)
-  static void GenerateRepeating(void* data, size_t num_elements, hshm::DataType dtype, int pattern_len = 4) {
+  static void GenerateRepeating(void* data, size_t num_elements, ctp::DataType dtype, int pattern_len = 4) {
     switch (dtype) {
-      case hshm::DataType::UINT8: {
+      case ctp::DataType::UINT8: {
         std::vector<uint8_t> pattern(pattern_len);
         for (int i = 0; i < pattern_len; i++) {
           pattern[i] = (i % 2 == 0) ? 0xAA : 0x55;
@@ -354,7 +354,7 @@ class DataGenerator {
         }
         break;
       }
-      case hshm::DataType::INT32: {
+      case ctp::DataType::INT32: {
         std::vector<int32_t> pattern(pattern_len);
         for (int i = 0; i < pattern_len; i++) {
           pattern[i] = (i % 2 == 0) ? 0xAAAAAAAA : 0x55555555;
@@ -365,7 +365,7 @@ class DataGenerator {
         }
         break;
       }
-      case hshm::DataType::FLOAT32: {
+      case ctp::DataType::FLOAT32: {
         std::vector<float> pattern(pattern_len);
         for (int i = 0; i < pattern_len; i++) {
           pattern[i] = (i % 2 == 0) ? 123.456f : -789.012f;
@@ -387,7 +387,7 @@ class DataGenerator {
   //   - perturbation=0: sample entire bin quota at once (long runs, low entropy)
   //   - perturbation=1: sample 1 value at a time (maximum interleaving, high entropy)
   // When a bin is chosen, we sample burst_size = max(1, bin_quota * (1 - perturbation)) values consecutively
-  static void GenerateBinnedDistribution(void* data, size_t num_elements, hshm::DataType dtype,
+  static void GenerateBinnedDistribution(void* data, size_t num_elements, ctp::DataType dtype,
                                          const std::vector<BinConfig>& bins, double perturbation = 0.0) {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -434,7 +434,7 @@ class DataGenerator {
     size_t i = 0;
 
     switch (dtype) {
-      case hshm::DataType::UINT8: {
+      case ctp::DataType::UINT8: {
         uint8_t* bytes = static_cast<uint8_t*>(data);
         while (i < num_elements && !active_bins.empty()) {
           // Choose a random active bin
@@ -465,7 +465,7 @@ class DataGenerator {
         }
         break;
       }
-      case hshm::DataType::INT32: {
+      case ctp::DataType::INT32: {
         int32_t* ints = static_cast<int32_t*>(data);
         while (i < num_elements && !active_bins.empty()) {
           size_t current_bin = choose_random_bin();
@@ -489,7 +489,7 @@ class DataGenerator {
         }
         break;
       }
-      case hshm::DataType::FLOAT32: {
+      case ctp::DataType::FLOAT32: {
         float* floats = static_cast<float*>(data);
         while (i < num_elements && !active_bins.empty()) {
           size_t current_bin = choose_random_bin();
@@ -699,10 +699,10 @@ class DataGenerator {
 
 // Benchmark a single compression library
 BenchmarkResult BenchmarkCompressor(
-    hshm::Compressor* compressor, const std::string& lib_name,
+    ctp::Compressor* compressor, const std::string& lib_name,
     const std::string& configuration,
     const std::string& data_type, const DistributionConfig& dist_config,
-    size_t data_size, hshm::DataType dtype) {
+    size_t data_size, ctp::DataType dtype) {
   BenchmarkResult result;
   result.library = lib_name;
   result.configuration = configuration;
@@ -728,7 +728,7 @@ BenchmarkResult BenchmarkCompressor(
   result.classified_skewness = 0.0;
   result.classified_kurtosis = 0.0;
 
-  size_t type_size = hshm::DataStatisticsFactory::GetTypeSize(dtype);
+  size_t type_size = ctp::DataStatisticsFactory::GetTypeSize(dtype);
   size_t num_elements = data_size / type_size;
 
   // Allocate buffers
@@ -765,13 +765,13 @@ BenchmarkResult BenchmarkCompressor(
 
   // Calculate statistics using DataStatisticsFactory
   result.shannon_entropy =
-      hshm::DataStatisticsFactory::CalculateShannonEntropy(input_data.data(), num_elements, dtype);
+      ctp::DataStatisticsFactory::CalculateShannonEntropy(input_data.data(), num_elements, dtype);
   result.mean_absolute_deviation =
-      hshm::DataStatisticsFactory::CalculateMAD(input_data.data(), num_elements, dtype);
+      ctp::DataStatisticsFactory::CalculateMAD(input_data.data(), num_elements, dtype);
   result.first_order_derivative =
-      hshm::DataStatisticsFactory::CalculateFirstDerivative(input_data.data(), num_elements, dtype);
+      ctp::DataStatisticsFactory::CalculateFirstDerivative(input_data.data(), num_elements, dtype);
   result.second_order_derivative =
-      hshm::DataStatisticsFactory::CalculateSecondDerivative(input_data.data(), num_elements, dtype);
+      ctp::DataStatisticsFactory::CalculateSecondDerivative(input_data.data(), num_elements, dtype);
 
   // Block sampling for distribution classification
   // Use 16 blocks of 64 elements each for fast sampling
@@ -786,7 +786,7 @@ BenchmarkResult BenchmarkCompressor(
     num_sample_blocks = 1;
   }
 
-  auto block_stats = hshm::BlockSamplerFactory::Sample(
+  auto block_stats = ctp::BlockSamplerFactory::Sample(
       input_data.data(), num_elements, dtype,
       num_sample_blocks, block_sample_size, 42);  // Fixed seed for reproducibility
 
@@ -870,7 +870,7 @@ BenchmarkResult BenchmarkCompressor(
   }
 
   // Element-level comparison (for typed data)
-  if (dtype == hshm::DataType::FLOAT32) {
+  if (dtype == ctp::DataType::FLOAT32) {
     const float* input_floats = reinterpret_cast<const float*>(input_data.data());
     const float* output_floats = reinterpret_cast<const float*>(decompressed_data.data());
     for (size_t i = 0; i < num_elements; i++) {
@@ -880,7 +880,7 @@ BenchmarkResult BenchmarkCompressor(
         max_element_error = std::max(max_element_error, abs_error);
       }
     }
-  } else if (dtype == hshm::DataType::INT32) {
+  } else if (dtype == ctp::DataType::INT32) {
     const int32_t* input_ints = reinterpret_cast<const int32_t*>(input_data.data());
     const int32_t* output_ints = reinterpret_cast<const int32_t*>(decompressed_data.data());
     for (size_t i = 0; i < num_elements; i++) {
@@ -890,7 +890,7 @@ BenchmarkResult BenchmarkCompressor(
         max_element_error = std::max(max_element_error, abs_error);
       }
     }
-  } else if (dtype == hshm::DataType::UINT8) {
+  } else if (dtype == ctp::DataType::UINT8) {
     const uint8_t* input_bytes = input_data.data();
     const uint8_t* output_bytes = decompressed_data.data();
     for (size_t i = 0; i < num_elements; i++) {
@@ -926,16 +926,16 @@ BenchmarkResult BenchmarkCompressor(
   // Calculate PSNR (quality metric for both lossless and lossy compression)
   // PSNR = 0.0 for lossless/perfect match (represents infinity)
   // PSNR > 0.0 for lossy compression (quality in dB)
-  result.psnr_db = hshm::DataStatisticsFactory::CalculatePSNR(
+  result.psnr_db = ctp::DataStatisticsFactory::CalculatePSNR(
       input_data.data(), decompressed_data.data(), num_elements, dtype);
 
   // DEBUG: For lossy compressors on float data with PSNR=0.0, print diagnostics
-  if (result.psnr_db == 0.0 && dtype == hshm::DataType::FLOAT32 &&
+  if (result.psnr_db == 0.0 && dtype == ctp::DataType::FLOAT32 &&
       (lib_name == "SZ3" || lib_name == "FPZIP" || lib_name == "ZFP")) {
     const float* input_floats = reinterpret_cast<const float*>(input_data.data());
     const float* output_floats = reinterpret_cast<const float*>(decompressed_data.data());
 
-    double mse = hshm::DataStatisticsFactory::CalculateMSE(
+    double mse = ctp::DataStatisticsFactory::CalculateMSE(
         input_data.data(), decompressed_data.data(), num_elements, dtype);
 
     HLOG(kInfo, "  [DIAGNOSTIC] {} {} on float data has PSNR=0.0!", lib_name, configuration);
@@ -999,13 +999,13 @@ TEST_CASE("Unified Compression Benchmark") {
   // Parse command-line arguments from environment variables
   // MAX_SIZE: Maximum data size (default: 128KB) - supports semantic sizes like "128K", "16MB"
   // NUM_BINS: Number of logarithmic size bins (default: 12)
-  size_t max_size = hshm::Unit<size_t>::Kilobytes(128);  // Default 128KB
+  size_t max_size = ctp::Unit<size_t>::Kilobytes(128);  // Default 128KB
   size_t num_bins = 12;  // Default 12 bins
 
   const char* max_size_env = std::getenv("MAX_SIZE");
   if (max_size_env) {
     try {
-      max_size = hshm::ConfigParse::ParseSize(max_size_env);
+      max_size = ctp::ConfigParse::ParseSize(max_size_env);
       HLOG(kInfo, "Using MAX_SIZE={} ({} bytes)", max_size_env, max_size);
     } catch (...) {
       HLOG(kWarning, "Invalid MAX_SIZE value '{}', using default 16MB", max_size_env);
@@ -1164,10 +1164,10 @@ TEST_CASE("Unified Compression Benchmark") {
        "Generated {} binned distribution configurations ({} types × {} widths × {} perturbations)",
        distributions.size(), dist_types.size(), bin_widths.size(), perturbations.size());
 
-  const std::vector<std::pair<std::string, hshm::DataType>> data_types = {
-      {"char", hshm::DataType::UINT8},
-      {"int", hshm::DataType::INT32},
-      {"float", hshm::DataType::FLOAT32}};
+  const std::vector<std::pair<std::string, ctp::DataType>> data_types = {
+      {"char", ctp::DataType::UINT8},
+      {"int", ctp::DataType::INT32},
+      {"float", ctp::DataType::FLOAT32}};
 
   // Get number of threads from environment
   size_t num_threads = 1;  // Default to sequential
@@ -1204,7 +1204,7 @@ TEST_CASE("Unified Compression Benchmark") {
   PrintCSVHeader(outfile);
 
   // Initialize LZO library
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
   lzo_init();
 #endif
 
@@ -1212,7 +1212,7 @@ TEST_CASE("Unified Compression Benchmark") {
   struct CompressorTest {
     std::string name;
     std::string configuration;
-    std::unique_ptr<hshm::Compressor> compressor;
+    std::unique_ptr<ctp::Compressor> compressor;
   };
 
   std::vector<CompressorTest> compressors;
@@ -1232,61 +1232,61 @@ TEST_CASE("Unified Compression Benchmark") {
     HLOG(kInfo, "Compression modes: FAST, BALANCED, BEST");
 
     // BZIP2 - compression levels 1, 6, 9
-    compressors.push_back({"BZIP2", "fast", std::make_unique<hshm::Bzip2WithModes>(hshm::LosslessMode::FAST)});
-    compressors.push_back({"BZIP2", "balanced", std::make_unique<hshm::Bzip2WithModes>(hshm::LosslessMode::BALANCED)});
-    compressors.push_back({"BZIP2", "best", std::make_unique<hshm::Bzip2WithModes>(hshm::LosslessMode::BEST)});
+    compressors.push_back({"BZIP2", "fast", std::make_unique<ctp::Bzip2WithModes>(ctp::LosslessMode::FAST)});
+    compressors.push_back({"BZIP2", "balanced", std::make_unique<ctp::Bzip2WithModes>(ctp::LosslessMode::BALANCED)});
+    compressors.push_back({"BZIP2", "best", std::make_unique<ctp::Bzip2WithModes>(ctp::LosslessMode::BEST)});
 
     // ZSTD - compression levels 1, 3, 19
-    compressors.push_back({"ZSTD", "fast", std::make_unique<hshm::ZstdWithModes>(hshm::LosslessMode::FAST)});
-    compressors.push_back({"ZSTD", "balanced", std::make_unique<hshm::ZstdWithModes>(hshm::LosslessMode::BALANCED)});
-    compressors.push_back({"ZSTD", "best", std::make_unique<hshm::ZstdWithModes>(hshm::LosslessMode::BEST)});
+    compressors.push_back({"ZSTD", "fast", std::make_unique<ctp::ZstdWithModes>(ctp::LosslessMode::FAST)});
+    compressors.push_back({"ZSTD", "balanced", std::make_unique<ctp::ZstdWithModes>(ctp::LosslessMode::BALANCED)});
+    compressors.push_back({"ZSTD", "best", std::make_unique<ctp::ZstdWithModes>(ctp::LosslessMode::BEST)});
 
     // LZ4 - default vs HC mode
-    compressors.push_back({"LZ4", "fast", std::make_unique<hshm::Lz4WithModes>(hshm::LosslessMode::FAST)});
-    compressors.push_back({"LZ4", "balanced", std::make_unique<hshm::Lz4WithModes>(hshm::LosslessMode::BALANCED)});
-    compressors.push_back({"LZ4", "best", std::make_unique<hshm::Lz4WithModes>(hshm::LosslessMode::BEST)});
+    compressors.push_back({"LZ4", "fast", std::make_unique<ctp::Lz4WithModes>(ctp::LosslessMode::FAST)});
+    compressors.push_back({"LZ4", "balanced", std::make_unique<ctp::Lz4WithModes>(ctp::LosslessMode::BALANCED)});
+    compressors.push_back({"LZ4", "best", std::make_unique<ctp::Lz4WithModes>(ctp::LosslessMode::BEST)});
 
     // ZLIB - compression levels 1, 6, 9
-    compressors.push_back({"ZLIB", "fast", std::make_unique<hshm::ZlibWithModes>(hshm::LosslessMode::FAST)});
-    compressors.push_back({"ZLIB", "balanced", std::make_unique<hshm::ZlibWithModes>(hshm::LosslessMode::BALANCED)});
-    compressors.push_back({"ZLIB", "best", std::make_unique<hshm::ZlibWithModes>(hshm::LosslessMode::BEST)});
+    compressors.push_back({"ZLIB", "fast", std::make_unique<ctp::ZlibWithModes>(ctp::LosslessMode::FAST)});
+    compressors.push_back({"ZLIB", "balanced", std::make_unique<ctp::ZlibWithModes>(ctp::LosslessMode::BALANCED)});
+    compressors.push_back({"ZLIB", "best", std::make_unique<ctp::ZlibWithModes>(ctp::LosslessMode::BEST)});
 
     // LZMA - compression levels 0, 6, 9
-    compressors.push_back({"LZMA", "fast", std::make_unique<hshm::LzmaWithModes>(hshm::LosslessMode::FAST)});
-    compressors.push_back({"LZMA", "balanced", std::make_unique<hshm::LzmaWithModes>(hshm::LosslessMode::BALANCED)});
-    compressors.push_back({"LZMA", "best", std::make_unique<hshm::LzmaWithModes>(hshm::LosslessMode::BEST)});
+    compressors.push_back({"LZMA", "fast", std::make_unique<ctp::LzmaWithModes>(ctp::LosslessMode::FAST)});
+    compressors.push_back({"LZMA", "balanced", std::make_unique<ctp::LzmaWithModes>(ctp::LosslessMode::BALANCED)});
+    compressors.push_back({"LZMA", "best", std::make_unique<ctp::LzmaWithModes>(ctp::LosslessMode::BEST)});
 
     // BROTLI - quality levels 1, 6, 11
-    compressors.push_back({"BROTLI", "fast", std::make_unique<hshm::BrotliWithModes>(hshm::LosslessMode::FAST)});
-    compressors.push_back({"BROTLI", "balanced", std::make_unique<hshm::BrotliWithModes>(hshm::LosslessMode::BALANCED)});
-    compressors.push_back({"BROTLI", "best", std::make_unique<hshm::BrotliWithModes>(hshm::LosslessMode::BEST)});
+    compressors.push_back({"BROTLI", "fast", std::make_unique<ctp::BrotliWithModes>(ctp::LosslessMode::FAST)});
+    compressors.push_back({"BROTLI", "balanced", std::make_unique<ctp::BrotliWithModes>(ctp::LosslessMode::BALANCED)});
+    compressors.push_back({"BROTLI", "best", std::make_unique<ctp::BrotliWithModes>(ctp::LosslessMode::BEST)});
 
     // SNAPPY and Blosc2 - no compression level support, use default only
-    compressors.push_back({"SNAPPY", "default", std::make_unique<hshm::Snappy>()});
-    compressors.push_back({"Blosc2", "default", std::make_unique<hshm::Blosc>()});
+    compressors.push_back({"SNAPPY", "default", std::make_unique<ctp::Snappy>()});
+    compressors.push_back({"Blosc2", "default", std::make_unique<ctp::Blosc>()});
   }
   HLOG(kInfo, "Distribution variants: {} (varying compressibility)", distributions.size());
   HLOG(kInfo, "Data sizes: {} bins", data_sizes.size());
 
-#if HSHM_ENABLE_COMPRESS && HSHM_ENABLE_LIBPRESSIO
+#if CTP_ENABLE_COMPRESS && CTP_ENABLE_LIBPRESSIO
   // Add lossy compressors via LibPressio with multiple compression modes
   HLOG(kInfo, "Lossy libraries: ZFP, SZ3, FPZIP (LibPressio enabled)");
   HLOG(kInfo, "Compression modes: FAST, BALANCED, BEST");
 
   // ZFP - block transform compressor (best for floating-point data)
-  compressors.push_back({"ZFP", "fast", std::make_unique<hshm::LibPressioWithModes>("zfp", hshm::CompressionMode::FAST)});
-  compressors.push_back({"ZFP", "balanced", std::make_unique<hshm::LibPressioWithModes>("zfp", hshm::CompressionMode::BALANCED)});
-  compressors.push_back({"ZFP", "best", std::make_unique<hshm::LibPressioWithModes>("zfp", hshm::CompressionMode::BEST)});
+  compressors.push_back({"ZFP", "fast", std::make_unique<ctp::LibPressioWithModes>("zfp", ctp::CompressionMode::FAST)});
+  compressors.push_back({"ZFP", "balanced", std::make_unique<ctp::LibPressioWithModes>("zfp", ctp::CompressionMode::BALANCED)});
+  compressors.push_back({"ZFP", "best", std::make_unique<ctp::LibPressioWithModes>("zfp", ctp::CompressionMode::BEST)});
 
   // SZ3 - Lossy compressor for floating-point data only
-  compressors.push_back({"SZ3", "fast", std::make_unique<hshm::LibPressioWithModes>("sz3", hshm::CompressionMode::FAST)});
-  compressors.push_back({"SZ3", "balanced", std::make_unique<hshm::LibPressioWithModes>("sz3", hshm::CompressionMode::BALANCED)});
-  compressors.push_back({"SZ3", "best", std::make_unique<hshm::LibPressioWithModes>("sz3", hshm::CompressionMode::BEST)});
+  compressors.push_back({"SZ3", "fast", std::make_unique<ctp::LibPressioWithModes>("sz3", ctp::CompressionMode::FAST)});
+  compressors.push_back({"SZ3", "balanced", std::make_unique<ctp::LibPressioWithModes>("sz3", ctp::CompressionMode::BALANCED)});
+  compressors.push_back({"SZ3", "best", std::make_unique<ctp::LibPressioWithModes>("sz3", ctp::CompressionMode::BEST)});
 
   // FPZIP - Lossy compressor for floating-point data only
-  compressors.push_back({"FPZIP", "fast", std::make_unique<hshm::LibPressioWithModes>("fpzip", hshm::CompressionMode::FAST)});
-  compressors.push_back({"FPZIP", "balanced", std::make_unique<hshm::LibPressioWithModes>("fpzip", hshm::CompressionMode::BALANCED)});
-  compressors.push_back({"FPZIP", "best", std::make_unique<hshm::LibPressioWithModes>("fpzip", hshm::CompressionMode::BEST)});
+  compressors.push_back({"FPZIP", "fast", std::make_unique<ctp::LibPressioWithModes>("fpzip", ctp::CompressionMode::FAST)});
+  compressors.push_back({"FPZIP", "balanced", std::make_unique<ctp::LibPressioWithModes>("fpzip", ctp::CompressionMode::BALANCED)});
+  compressors.push_back({"FPZIP", "best", std::make_unique<ctp::LibPressioWithModes>("fpzip", ctp::CompressionMode::BEST)});
 #else
   HLOG(kInfo, "Lossy libraries: DISABLED (LibPressio not available)");
   HLOG(kInfo, "  To enable lossy compression: install LibPressio and rebuild");
@@ -1321,20 +1321,20 @@ TEST_CASE("Unified Compression Benchmark") {
     for (const auto& test : compressors) {
       const std::string& lib_name = test.name;
       const std::string& config_name = test.configuration;
-      hshm::Compressor* compressor = test.compressor.get();
+      ctp::Compressor* compressor = test.compressor.get();
 
       try {
         for (const auto& [data_type, dtype] : data_types) {
           // Skip lossy compressors for non-float data
           // ZFP, SZ3, and FPZIP are designed only for floating-point compression
           bool is_lossy = (lib_name == "ZFP" || lib_name == "SZ3" || lib_name == "FPZIP");
-          bool is_float_type = (dtype == hshm::DataType::FLOAT32);
+          bool is_float_type = (dtype == ctp::DataType::FLOAT32);
 
           if (is_lossy && !is_float_type) {
             continue;
           }
 
-          size_t type_size = hshm::DataStatisticsFactory::GetTypeSize(dtype);
+          size_t type_size = ctp::DataStatisticsFactory::GetTypeSize(dtype);
           for (const auto& dist_config : distributions) {
             for (size_t data_size : data_sizes) {
               // Skip if data size is not aligned with data type
@@ -1413,19 +1413,19 @@ TEST_CASE("Unified Compression Benchmark") {
           const auto& test = compressors[compressor_idx];
           const std::string& lib_name = test.name;
           const std::string& config_name = test.configuration;
-          hshm::Compressor* compressor = test.compressor.get();
+          ctp::Compressor* compressor = test.compressor.get();
 
           try {
             for (const auto& [data_type, dtype] : data_types) {
               // Skip lossy compressors for non-float data
               bool is_lossy = (lib_name == "ZFP" || lib_name == "SZ3" || lib_name == "FPZIP");
-              bool is_float_type = (dtype == hshm::DataType::FLOAT32);
+              bool is_float_type = (dtype == ctp::DataType::FLOAT32);
 
               if (is_lossy && !is_float_type) {
                 continue;
               }
 
-              size_t type_size = hshm::DataStatisticsFactory::GetTypeSize(dtype);
+              size_t type_size = ctp::DataStatisticsFactory::GetTypeSize(dtype);
               for (const auto& dist_config : distributions) {
                 for (size_t data_size : data_sizes) {
                   if (data_size % type_size != 0) {

@@ -25,7 +25,7 @@
  * WRP_CORE_ENABLE_CUDA=ON) or HIPCC (when WRP_CORE_ENABLE_ROCM=ON).
  */
 
-#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#if (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL
 
 #include "simple_test.h"
 #include "test_gpu_kernel_stress_common.h"
@@ -65,10 +65,10 @@ __global__ void ChiGpuKernelStress(chi::IpcManagerGpuInfo gpu_info,
 
 // NVCC parses every host TU in two passes; the host fixture below uses
 // chi::IpcManager APIs (GetGpuIpcManager, AllocateAndRegisterGpuBackend,
-// PlaceTaskSlots) that are HSHM_IS_HOST-only. Gate the TEST_CASE body so
+// PlaceTaskSlots) that are CTP_IS_HOST-only. Gate the TEST_CASE body so
 // only the host pass instantiates it. The __global__ kernel above remains
 // visible to both passes — NVCC needs the host stub for the launch glue.
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 
 TEST_CASE("GPU producer-only stress: kernel submits N tasks",
           "[gpu2cpu][stress]") {
@@ -91,7 +91,7 @@ TEST_CASE("GPU producer-only stress: kernel submits N tasks",
 
   // 3. Stage the FullPtr<TaskT> array in pinned host so the kernel sees it.
   hipc::FullPtr<TaskT> *task_handle_dev =
-      hshm::GpuApi::MallocHost<hipc::FullPtr<TaskT>>(kNumTasks);
+      ctp::GpuApi::MallocHost<hipc::FullPtr<TaskT>>(kNumTasks);
   REQUIRE(task_handle_dev != nullptr);
   for (chi::u32 i = 0; i < kNumTasks; ++i) task_handle_dev[i] = handles[i];
 
@@ -103,7 +103,7 @@ TEST_CASE("GPU producer-only stress: kernel submits N tasks",
                "[STRESS] launching grid=%u blocks, 32 threads/block\n",
                kNumTasks);
   ChiGpuKernelStress<<<kNumTasks, 32>>>(info, task_handle_dev, kNumTasks);
-  hshm::GpuApi::Synchronize();
+  ctp::GpuApi::Synchronize();
 
   // 5. Verify every slot saw the chimod's formula.
   chi::u32 first_bad = VerifyResults(handles, gpu_id);
@@ -112,11 +112,11 @@ TEST_CASE("GPU producer-only stress: kernel submits N tasks",
                kNumTasks);
 
   // 6. Cleanup.
-  hshm::GpuApi::FreeHost(reinterpret_cast<char *>(task_handle_dev));
+  ctp::GpuApi::FreeHost(reinterpret_cast<char *>(task_handle_dev));
   ipc->FreeGpuBackend(gpu_id, alloc_id);
 }
 
-#endif  // !HSHM_IS_DEVICE_PASS
+#endif  // !CTP_IS_DEVICE_PASS
 
 SIMPLE_TEST_MAIN()
 

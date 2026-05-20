@@ -31,10 +31,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_INCLUDE_MEMORY_BACKEND_GPU_SHM_MMAP_H
-#define HSHM_INCLUDE_MEMORY_BACKEND_GPU_SHM_MMAP_H
+#ifndef CTP_INCLUDE_MEMORY_BACKEND_GPU_SHM_MMAP_H
+#define CTP_INCLUDE_MEMORY_BACKEND_GPU_SHM_MMAP_H
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +49,7 @@
 #include "hermes_shm/util/logging.h"
 #include "memory_backend.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * GPU+CPU coherent shared memory backend using CUDA Unified Virtual Memory.
@@ -74,13 +74,13 @@ class GpuShmMmap : public MemoryBackend, public UrlMemoryBackend {
 
  public:
   /** Constructor */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   GpuShmMmap() {}
 
   /** Destructor */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ~GpuShmMmap() {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
     _Destroy();
 #endif
   }
@@ -195,8 +195,8 @@ class GpuShmMmap : public MemoryBackend, public UrlMemoryBackend {
   void _Destroy() { _Detach(); }
 };
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#endif  // CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 
-#endif  // HSHM_INCLUDE_MEMORY_BACKEND_GPU_SHM_MMAP_H
+#endif  // CTP_INCLUDE_MEMORY_BACKEND_GPU_SHM_MMAP_H

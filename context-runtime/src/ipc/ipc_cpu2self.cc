@@ -86,7 +86,7 @@ hipc::FullPtr<Task> IpcCpu2Self::RuntimeRecv(Future<Task> &future) {
 void IpcCpu2Self::RuntimeSend(const FullPtr<Task> &task_ptr,
                                RunContext *run_ctx,
                                Container *container,
-                               hshm::lbm::Transport *send_transport) {
+                               ctp::lbm::Transport *send_transport) {
   auto future_shm = run_ctx->future_.GetFutureShm();
   if (future_shm.IsNull()) {
     return;
@@ -107,7 +107,7 @@ void IpcCpu2Self::RuntimeSend(const FullPtr<Task> &task_ptr,
     // ProcessEventQueue on the parent's worker thread.
     auto *parent_event_queue =
         reinterpret_cast<hipc::mpsc_ring_buffer<Future<Task, CHI_QUEUE_ALLOC_T>,
-                                                hshm::ipc::MallocAllocator> *>(
+                                                ctp::ipc::MallocAllocator> *>(
             parent_task->event_queue_);
     parent_event_queue->Emplace(run_ctx->future_);
     if (parent_task->lane_) {

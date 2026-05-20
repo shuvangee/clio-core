@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_IPC_RING_BUFFER_H_
-#define HSHM_DATA_STRUCTURES_IPC_RING_BUFFER_H_
+#ifndef CTP_DATA_STRUCTURES_IPC_RING_BUFFER_H_
+#define CTP_DATA_STRUCTURES_IPC_RING_BUFFER_H_
 
 #ifdef _WIN32
 using pid_t = int;
@@ -47,7 +47,7 @@ using pid_t = int;
 #include "hermes_shm/types/atomic.h"
 #include "hermes_shm/types/bitfield.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Ring buffer configuration flags for compile-time customization.
@@ -85,7 +85,7 @@ struct RingBufferEntry {
   /**
    * Default constructor
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   RingBufferEntry() : flags_(0) {}
 
   /**
@@ -93,7 +93,7 @@ struct RingBufferEntry {
    *
    * @param data The data to store
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   explicit RingBufferEntry(const T& data) : flags_(0), data_(data) {}
 
   /**
@@ -101,7 +101,7 @@ struct RingBufferEntry {
    *
    * @return True if entry is ready
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool IsReady() const { return flags_.Any(1); }
 
   /**
@@ -111,10 +111,10 @@ struct RingBufferEntry {
    * @return True if entry is ready
    */
   /** Device-scope check: bypasses per-SM L1 cache for cross-SM visibility. */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool IsReadyDevice() const { return flags_.AnyDevice(1); }
 
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool IsReadySystem() const { return flags_.AnySystem(1); }
 
 
@@ -124,9 +124,9 @@ struct RingBufferEntry {
    * before the ready flag is set. SetBitsSystem uses atomicExch_system so
    * the flag itself is immediately visible across the CPU-GPU boundary.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void SetReady() {
-    hshm::ipc::threadfence_system();
+    ctp::ipc::threadfence_system();
     flags_.SetBitsSystem(1);
   }
 
@@ -136,13 +136,13 @@ struct RingBufferEntry {
    * prior GPU writes (entry.data_) are globally visible to the CPU
    * before the ready flag is observed.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void SetReadySystem() { flags_.SetBitsSystem(1); }
 
   /**
    * Clear ready flag
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void ClearReady() { flags_.UnsetBits(1); }
 
   /**
@@ -150,7 +150,7 @@ struct RingBufferEntry {
    *
    * @return Reference to the data
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& GetData() { return data_; }
 
   /**
@@ -158,7 +158,7 @@ struct RingBufferEntry {
    *
    * @return Const reference to the data
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& GetData() const { return data_; }
 };
 
@@ -246,7 +246,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * @param alloc The allocator to use for memory allocation
    * @param depth The initial capacity (number of entries)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   explicit ring_buffer(AllocT* alloc, size_t depth = 1024)
       : ShmContainer<AllocT>(alloc),
         queue_(alloc, depth + 1),
@@ -266,7 +266,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * another. Used when ring_buffers are stored in shared memory containers like
    * vector.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ring_buffer(const ring_buffer& other)
       : ShmContainer<AllocT>(other.GetAllocator()),
         queue_(other.GetAllocator(), other.queue_.size() - 1),
@@ -292,7 +292,7 @@ class ring_buffer : public ShmContainer<AllocT> {
   /**
    * Destructor
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ~ring_buffer() {
     // Vector destructor handles cleanup automatically
   }
@@ -302,7 +302,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @return The worker ID assigned to this lane
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   u32 GetAssignedWorkerId() const { return assigned_worker_id_; }
 
   /**
@@ -310,7 +310,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @param worker_id The worker ID to assign
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void SetAssignedWorkerId(u32 worker_id) { assigned_worker_id_ = worker_id; }
 
   /**
@@ -318,7 +318,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @return The signal file descriptor
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   int GetSignalFd() const { return signal_fd_; }
 
   /**
@@ -326,7 +326,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @param signal_fd The signal file descriptor to set
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void SetSignalFd(int signal_fd) { signal_fd_ = signal_fd; }
 
   /**
@@ -334,7 +334,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @return The thread ID
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   pid_t GetTid() const { return tid_; }
 
   /**
@@ -342,7 +342,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @param tid The thread ID to set
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void SetTid(pid_t tid) { tid_ = tid; }
 
   /**
@@ -350,7 +350,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @return true if worker is active, false if blocked
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool IsActive() const { return active_.load(); }
 
   /**
@@ -358,7 +358,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @param active true if worker is active, false if blocked in epoll_wait
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void SetActive(bool active) { active_.store(active); }
 
   /**
@@ -366,7 +366,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @return Number of items currently in the buffer
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_t Size() const {
     u64 head = head_.load();
     u64 tail = tail_.load();
@@ -381,7 +381,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @return Maximum number of items the buffer can hold
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_t Capacity() const {
     // Ring buffer capacity is one less than vector size (one slot reserved)
     // But we return capacity as the usable entries
@@ -394,7 +394,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @return Number of allocated slots in vector
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_t GetDepth() const { return queue_.size(); }
 
   /**
@@ -402,7 +402,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @return True if buffer contains no items
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool Empty() const { return head_.load() == tail_.load(); }
 
   /**
@@ -410,7 +410,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @return True if buffer has no more space
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool Full() const {
     u64 head = head_.load();
     u64 tail = tail_.load();
@@ -426,7 +426,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * @return True if push succeeded, false if buffer is full (when using
    * ErrorOnNoSpace)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool Push(const T& val) { return Emplace(val); }
 
   /**
@@ -442,7 +442,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * @param val The value to push
    * @return True if push succeeded, false if buffer is full
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool PushSystem(const T& val) {
     // System-scope fetch_add: CPU sees the tail increment immediately
     u64 head = head_.load_system();
@@ -481,7 +481,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * @param val The value to push
    * @return True if push succeeded, false if buffer is full
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool TryPush(const T& val) { return Push(val); }
 
   /**
@@ -491,7 +491,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * @return True if emplace succeeded, false if buffer is full
    */
   template <typename... Args>
-  HSHM_CROSS_FUN bool Emplace(Args&&... args) {
+  CTP_CROSS_FUN bool Emplace(Args&&... args) {
     // Load head and allocate a slot atomically.
     // fetch_add_system ensures the tail increment is immediately visible to
     // CPU threads polling the ring buffer without cudaDeviceSynchronize.
@@ -543,7 +543,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * @param val Reference to store the popped value
    * @return True if pop succeeded, false if buffer is empty
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool Pop(T& val) {
     // Use system-scope loads to bypass GPU L2 cache so that GPU consumers
     // observe CPU-written tail/entry updates in pinned host memory.
@@ -581,7 +581,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * Use when both producer and consumer are on the same GPU device.
    * Device-scope atomics are ~10x faster than system-scope.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool PopDevice(T& val) {
     // Use L2-direct loads (ld.global.cg) to bypass per-SM L1 cache.
     // The producer (client kernel on a different SM) writes tail via
@@ -616,7 +616,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * @param val Reference to store the popped value
    * @return True if pop succeeded, false if buffer is empty
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool TryPop(T& val) { return Pop(val); }
 
 
@@ -624,7 +624,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    * Peek at an element by absolute index (monotonic event ID).
    * Does NOT advance head. Returns false if idx is out of current range.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool Peek(u64 idx, T &val) const {
     u64 head = head_.load();
     u64 tail = tail_.load();
@@ -637,25 +637,25 @@ class ring_buffer : public ShmContainer<AllocT> {
   }
 
   /** Get monotonically increasing head (oldest valid event ID) */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   u64 GetHead() const { return head_.load(); }
 
   /** Get monotonically increasing tail (next event ID to be written) */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   u64 GetTail() const { return tail_.load(); }
 
   /** Get head via device-scope load (bypasses L1) */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   u64 GetHeadDevice() const { return head_.load_device(); }
 
   /** Get tail via device-scope load (bypasses L1) */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   u64 GetTailDevice() const { return tail_.load_device(); }
 
   /**
    * Clear the buffer
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Clear() {
     head_ = 0;
     tail_ = 0;
@@ -668,7 +668,7 @@ class ring_buffer : public ShmContainer<AllocT> {
   /**
    * Reset the buffer (alias for Clear)
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void Reset() { Clear(); }
 
   /**
@@ -676,7 +676,7 @@ class ring_buffer : public ShmContainer<AllocT> {
    *
    * @param new_depth The new capacity
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Resize(size_t new_depth) {
     ring_buffer new_queue(this->GetAllocator(), new_depth);
     T val;
@@ -737,6 +737,6 @@ template <typename T, typename AllocT = hipc::Allocator>
 using circular_mpsc_ring_buffer =
     ring_buffer<T, AllocT, (RING_BUFFER_MPSC_FLAGS | RING_BUFFER_FIXED_SIZE)>;
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_DATA_STRUCTURES_IPC_RING_BUFFER_H_
+#endif  // CTP_DATA_STRUCTURES_IPC_RING_BUFFER_H_

@@ -101,7 +101,7 @@ int g_test_counter = 0;
  */
 inline chi::priv::vector<chimaera::bdev::Block> WrapBlock(
     const chimaera::bdev::Block& block) {
-  chi::priv::vector<chimaera::bdev::Block> blocks(HSHM_MALLOC);
+  chi::priv::vector<chimaera::bdev::Block> blocks(CTP_MALLOC);
   blocks.push_back(block);
   return blocks;
 }
@@ -113,7 +113,7 @@ inline chi::priv::vector<chimaera::bdev::Block> WrapBlock(
  */
 inline chi::priv::vector<chimaera::bdev::Block> ConvertBlocks(
     const std::vector<chimaera::bdev::Block>& blocks_vec) {
-  chi::priv::vector<chimaera::bdev::Block> blocks(HSHM_MALLOC);
+  chi::priv::vector<chimaera::bdev::Block> blocks(CTP_MALLOC);
   for (const auto& block : blocks_vec) {
     blocks.push_back(block);
   }
@@ -193,13 +193,13 @@ class BdevChimodFixture {
   /**
    * Generate test data with specified pattern
    */
-  std::vector<hshm::u8> generateTestData(size_t size, hshm::u8 pattern = 0xAB) {
-    std::vector<hshm::u8> data;
+  std::vector<ctp::u8> generateTestData(size_t size, ctp::u8 pattern = 0xAB) {
+    std::vector<ctp::u8> data;
     data.reserve(size);
 
     // Create a repeating pattern
     for (size_t i = 0; i < size; ++i) {
-      data.push_back(static_cast<hshm::u8>((pattern + i) % 256));
+      data.push_back(static_cast<ctp::u8>((pattern + i) % 256));
     }
 
     return data;
@@ -460,7 +460,7 @@ TEST_CASE("bdev_write_read_basic", "[bdev][io][basic]") {
       REQUIRE(alloc_task->GetCompleter() == expected_completer);
 
       // Generate test data
-      std::vector<hshm::u8> write_data =
+      std::vector<ctp::u8> write_data =
           fixture.generateTestData(k4KB, 0xCD + i);
 
       // Write data - allocate buffer and copy data
@@ -498,7 +498,7 @@ TEST_CASE("bdev_write_read_basic", "[bdev][io][basic]") {
            i, read_task->GetCompleter(), expected_completer);
 
       // Convert read data back to vector for verification
-      std::vector<hshm::u8> read_data(read_task->bytes_read_);
+      std::vector<ctp::u8> read_data(read_task->bytes_read_);
       memcpy(read_data.data(), read_buffer.ptr_, read_task->bytes_read_);
 
       // Verify data matches
@@ -545,7 +545,7 @@ TEST_CASE("bdev_async_operations", "[bdev][async][io]") {
       chimaera::bdev::Block block = alloc_task->blocks_[0];
 
       // Prepare test data
-      std::vector<hshm::u8> write_data =
+      std::vector<ctp::u8> write_data =
           fixture.generateTestData(k64KB, 0xEF + i);
 
       // Async write - allocate buffer and copy data
@@ -574,7 +574,7 @@ TEST_CASE("bdev_async_operations", "[bdev][async][io]") {
       REQUIRE(read_task->bytes_read_ == write_data.size());
 
       // Verify data - copy from buffer to check
-      std::vector<hshm::u8> async_read_data(read_task->bytes_read_);
+      std::vector<ctp::u8> async_read_data(read_task->bytes_read_);
       memcpy(async_read_data.data(), async_read_buffer.ptr_,
              read_task->bytes_read_);
 
@@ -647,8 +647,8 @@ TEST_CASE("bdev_performance_metrics", "[bdev][performance][metrics]") {
       REQUIRE(alloc_task2->blocks_.size() > 0);
       chimaera::bdev::Block block2 = alloc_task2->blocks_[0];
 
-      std::vector<hshm::u8> data1 = fixture.generateTestData(k1MB, 0x12 + i);
-      std::vector<hshm::u8> data2 = fixture.generateTestData(k256KB, 0x34 + i);
+      std::vector<ctp::u8> data1 = fixture.generateTestData(k1MB, 0x12 + i);
+      std::vector<ctp::u8> data2 = fixture.generateTestData(k256KB, 0x34 + i);
 
       // Allocate buffers for data1 write
       auto data1_write_buffer = CHI_IPC->AllocateBuffer(data1.size());
@@ -818,9 +818,9 @@ TEST_CASE("bdev_ram_allocation_and_io", "[bdev][ram][io]") {
     HLOG(kInfo, "Iteration {}: Task completed by container {}", i, completer);
 
     // Prepare test data with pattern
-    std::vector<hshm::u8> write_data(k4KB);
+    std::vector<ctp::u8> write_data(k4KB);
     for (size_t j = 0; j < write_data.size(); ++j) {
-      write_data[j] = static_cast<hshm::u8>((j + 0xAB + i) % 256);
+      write_data[j] = static_cast<ctp::u8>((j + 0xAB + i) % 256);
     }
 
     // Write data to RAM - allocate buffer and copy data
@@ -848,7 +848,7 @@ TEST_CASE("bdev_ram_allocation_and_io", "[bdev][ram][io]") {
     REQUIRE(read_task->bytes_read_ == k4KB);
 
     // Convert read data back to vector for verification
-    std::vector<hshm::u8> read_data(read_task->bytes_read_);
+    std::vector<ctp::u8> read_data(read_task->bytes_read_);
     memcpy(read_data.data(), read_buffer.ptr_, read_task->bytes_read_);
 
     // Verify data integrity
@@ -920,9 +920,9 @@ TEST_CASE("bdev_ram_large_blocks", "[bdev][ram][large]") {
            block_size);
 
       // Create test pattern
-      std::vector<hshm::u8> test_data(block_size);
+      std::vector<ctp::u8> test_data(block_size);
       for (size_t j = 0; j < test_data.size(); j += 1024) {
-        test_data[j] = static_cast<hshm::u8>(((j / 1024) + i) % 256);
+        test_data[j] = static_cast<ctp::u8>(((j / 1024) + i) % 256);
       }
 
       // Write and read - allocate buffers
@@ -952,7 +952,7 @@ TEST_CASE("bdev_ram_large_blocks", "[bdev][ram][large]") {
       REQUIRE(read_task->bytes_read_ == block_size);
 
       // Convert read data back to vector for verification
-      std::vector<hshm::u8> read_data(read_task->bytes_read_);
+      std::vector<ctp::u8> read_data(read_task->bytes_read_);
       memcpy(read_data.data(), test_read_buffer.ptr_, read_task->bytes_read_);
 
       // Verify critical points in the data
@@ -1006,7 +1006,7 @@ TEST_CASE("bdev_ram_bounds_checking", "[bdev][ram][bounds]") {
     out_of_bounds_block.block_type_ = 0;
 
     // Prepare test data
-    std::vector<hshm::u8> test_data(2048, 0xEF + i);
+    std::vector<ctp::u8> test_data(2048, 0xEF + i);
 
     // Write should fail with bounds check - allocate buffer
     auto error_write_buffer = CHI_IPC->AllocateBuffer(test_data.size());
@@ -1032,7 +1032,7 @@ TEST_CASE("bdev_ram_bounds_checking", "[bdev][ram][bounds]") {
     REQUIRE(read_task->bytes_read_ == 0);  // Should fail
 
     // Convert read data back to vector (should be empty due to error)
-    std::vector<hshm::u8> read_data(read_task->bytes_read_);
+    std::vector<ctp::u8> read_data(read_task->bytes_read_);
     if (read_task->bytes_read_ > 0) {
       memcpy(read_data.data(), error_read_buffer.ptr_, read_task->bytes_read_);
     }
@@ -1106,13 +1106,13 @@ TEST_CASE("bdev_file_vs_ram_comparison", "[bdev][file][ram][comparison]") {
     REQUIRE(ram_block.size_ == test_size);
 
     // Create identical test data
-    std::vector<hshm::u8> test_data(test_size);
+    std::vector<ctp::u8> test_data(test_size);
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, 255);
 
     for (size_t j = 0; j < test_data.size(); ++j) {
-      test_data[j] = static_cast<hshm::u8>(dis(gen));
+      test_data[j] = static_cast<ctp::u8>(dis(gen));
     }
 
     // Allocate buffer for file write
@@ -1165,7 +1165,7 @@ TEST_CASE("bdev_file_vs_ram_comparison", "[bdev][file][ram][comparison]") {
     REQUIRE(file_read_task->bytes_read_ == test_size);
 
     // Convert read data back to vector
-    std::vector<hshm::u8> file_read_data(file_read_task->bytes_read_);
+    std::vector<ctp::u8> file_read_data(file_read_task->bytes_read_);
     memcpy(file_read_data.data(), file_read_buffer.ptr_,
            file_read_task->bytes_read_);
 
@@ -1185,7 +1185,7 @@ TEST_CASE("bdev_file_vs_ram_comparison", "[bdev][file][ram][comparison]") {
     REQUIRE(ram_read_task->bytes_read_ == test_size);
 
     // Convert read data back to vector
-    std::vector<hshm::u8> ram_read_data(ram_read_task->bytes_read_);
+    std::vector<ctp::u8> ram_read_data(ram_read_task->bytes_read_);
     memcpy(ram_read_data.data(), ram_read_buffer.ptr_,
            ram_read_task->bytes_read_);
 
@@ -1302,7 +1302,7 @@ void run_bdev_file_explicit_backend_test(const char *mode_name) {
     REQUIRE(block.size_ == k4KB);
 
     // Write data
-    std::vector<hshm::u8> test_data(k4KB, 0x42 + i);
+    std::vector<ctp::u8> test_data(k4KB, 0x42 + i);
     auto final_write_buffer = CHI_IPC->AllocateBuffer(test_data.size());
     REQUIRE_FALSE(final_write_buffer.IsNull());
     memcpy(final_write_buffer.ptr_, test_data.data(), test_data.size());
@@ -1328,7 +1328,7 @@ void run_bdev_file_explicit_backend_test(const char *mode_name) {
     REQUIRE(read_task->bytes_read_ == k4KB);
 
     // Verify data
-    std::vector<hshm::u8> read_data(read_task->bytes_read_);
+    std::vector<ctp::u8> read_data(read_task->bytes_read_);
     memcpy(read_data.data(), final_read_buffer.ptr_, read_task->bytes_read_);
     bool data_ok =
         std::equal(test_data.begin(), test_data.end(), read_data.begin());
@@ -1663,7 +1663,7 @@ TEST_CASE("bdev_force_net_flag", "[bdev][network][force_net]") {
       HLOG(kInfo, "[bdev_force_net_flag] Iteration {}: Deleted alloc_task", i);
 
       // Prepare test data
-      std::vector<hshm::u8> write_data =
+      std::vector<ctp::u8> write_data =
           fixture.generateTestData(k64KB, 0xAB + i);
       HLOG(kInfo,
            "[bdev_force_net_flag] Iteration {}: Generated test_data of size {}",
@@ -1790,7 +1790,7 @@ TEST_CASE("bdev_force_net_flag", "[bdev][network][force_net]") {
            i);
 
       // Verify data integrity
-      std::vector<hshm::u8> read_data(read_task->bytes_read_);
+      std::vector<ctp::u8> read_data(read_task->bytes_read_);
       memcpy(read_data.data(), read_buffer.ptr_, read_task->bytes_read_);
       REQUIRE(read_data.size() == write_data.size());
 

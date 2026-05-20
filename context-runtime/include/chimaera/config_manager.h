@@ -86,12 +86,12 @@ struct ComposeConfig {
 /**
  * Configuration manager singleton
  *
- * Inherits from hshm BaseConfig and manages YAML configuration parsing.
+ * Inherits from ctp BaseConfig and manages YAML configuration parsing.
  * Config lookup: CHI_SERVER_CONF env -> ~/.chimaera/chimaera.yaml ->
  * bare minimum defaults.
  * Uses HSHM global cross pointer variable singleton pattern.
  */
-class ConfigManager : public hshm::BaseConfig {
+class ConfigManager : public ctp::BaseConfig {
  public:
   /**
    * Initialize configuration manager (generic wrapper)
@@ -295,12 +295,12 @@ class ConfigManager : public hshm::BaseConfig {
 
  private:
   /**
-   * Set default configuration values (implements hshm::BaseConfig)
+   * Set default configuration values (implements ctp::BaseConfig)
    */
   void LoadDefault() override;
 
   /**
-   * Parse YAML configuration (implements hshm::BaseConfig)
+   * Parse YAML configuration (implements ctp::BaseConfig)
    */
   void ParseYAML(YAML::Node& yaml_conf) override;
 
@@ -311,8 +311,8 @@ class ConfigManager : public hshm::BaseConfig {
   u32 num_threads_ = 4;
   u32 queue_depth_ = 1024;
 
-  size_t main_segment_size_ = hshm::Unit<size_t>::Gigabytes(1);
-  size_t client_data_segment_size_ = hshm::Unit<size_t>::Megabytes(256);
+  size_t main_segment_size_ = ctp::Unit<size_t>::Gigabytes(1);
+  size_t client_data_segment_size_ = ctp::Unit<size_t>::Megabytes(256);
 
   u32 port_ = 9413;
   std::string server_addr_ = "127.0.0.1";
@@ -364,9 +364,9 @@ class ConfigManager : public hshm::BaseConfig {
 }  // namespace chi
 
 // Global pointer variable declaration for Configuration manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(chi::ConfigManager, g_config_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(chi::ConfigManager, g_config_manager);
 
 // Macro for accessing the Configuration manager singleton using global pointer variable
-#define CHI_CONFIG_MANAGER HSHM_GET_GLOBAL_PTR_VAR(::chi::ConfigManager, g_config_manager)
+#define CHI_CONFIG_MANAGER CTP_GET_GLOBAL_PTR_VAR(::chi::ConfigManager, g_config_manager)
 
 #endif  // CHIMAERA_INCLUDE_CHIMAERA_MANAGERS_CONFIG_MANAGER_H_

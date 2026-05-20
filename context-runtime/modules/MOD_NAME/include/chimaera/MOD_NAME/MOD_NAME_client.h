@@ -51,10 +51,10 @@ namespace chimaera::MOD_NAME {
 class Client : public chi::ContainerClient {
  public:
   /** Default constructor */
-  HSHM_CROSS_FUN Client() = default;
+  CTP_CROSS_FUN Client() = default;
 
   /** Constructor with pool ID */
-  HSHM_CROSS_FUN explicit Client(const chi::PoolId& pool_id) { Init(pool_id); }
+  CTP_CROSS_FUN explicit Client(const chi::PoolId& pool_id) { Init(pool_id); }
 
   /**
    * Create the container (asynchronous)

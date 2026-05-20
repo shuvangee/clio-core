@@ -32,36 +32,36 @@
  */
 
 #pragma once
-#if HSHM_ENABLE_LIGHTBEAM
+#if CTP_ENABLE_LIGHTBEAM
 #include "lightbeam.h"
 #include "shm_transport.h"
 #include "socket_transport.h"
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
 #include "zmq_transport.h"
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
 #include "thallium_transport.h"
 #endif
-#if HSHM_ENABLE_LIBFABRIC
+#if CTP_ENABLE_LIBFABRIC
 #include "libfabric_transport.h"
 #endif
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
 #include "nixl_transport.h"
 #endif
 
-namespace hshm::lbm {
+namespace ctp::lbm {
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
 // --- TransportDeleter implementation ---
 inline void TransportDeleter::operator()(Transport* t) const {
   if (!t) return;
   switch (t->type_) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       delete static_cast<ZeroMqTransport*>(t);
       break;
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       delete static_cast<ThalliumTransport*>(t);
       break;
@@ -72,7 +72,7 @@ inline void TransportDeleter::operator()(Transport* t) const {
     case TransportType::kShm:
       delete static_cast<ShmTransport*>(t);
       break;
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       delete static_cast<NixlTransport*>(t);
       break;
@@ -86,7 +86,7 @@ inline void TransportDeleter::operator()(Transport* t) const {
 // --- Unified Transport Non-Template Dispatch ---
 inline Bulk Transport::Expose(const hipc::FullPtr<char>& ptr, size_t data_size, u32 flags) {
   switch (type_) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       return static_cast<ZeroMqTransport*>(this)->Expose(ptr, data_size, flags);
 #endif
@@ -94,11 +94,11 @@ inline Bulk Transport::Expose(const hipc::FullPtr<char>& ptr, size_t data_size, 
       return static_cast<SocketTransport*>(this)->Expose(ptr, data_size, flags);
     case TransportType::kShm:
       return static_cast<ShmTransport*>(this)->Expose(ptr, data_size, flags);
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       return static_cast<NixlTransport*>(this)->Expose(ptr, data_size, flags);
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       return static_cast<ThalliumTransport*>(this)->Expose(ptr, data_size, flags);
 #endif
@@ -109,7 +109,7 @@ inline Bulk Transport::Expose(const hipc::FullPtr<char>& ptr, size_t data_size, 
 
 inline std::string Transport::GetAddress() const {
   switch (type_) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       return static_cast<const ZeroMqTransport*>(this)->GetAddress();
 #endif
@@ -117,11 +117,11 @@ inline std::string Transport::GetAddress() const {
       return static_cast<const SocketTransport*>(this)->GetAddress();
     case TransportType::kShm:
       return static_cast<const ShmTransport*>(this)->GetAddress();
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       return static_cast<const NixlTransport*>(this)->GetAddress();
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       return static_cast<const ThalliumTransport*>(this)->GetAddress();
 #endif
@@ -132,7 +132,7 @@ inline std::string Transport::GetAddress() const {
 
 inline void Transport::ClearRecvHandles(LbmMeta<>& meta) {
   switch (type_) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       static_cast<ZeroMqTransport*>(this)->ClearRecvHandles(meta);
       break;
@@ -143,12 +143,12 @@ inline void Transport::ClearRecvHandles(LbmMeta<>& meta) {
     case TransportType::kShm:
       static_cast<ShmTransport*>(this)->ClearRecvHandles(meta);
       break;
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       static_cast<NixlTransport*>(this)->ClearRecvHandles(meta);
       break;
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       static_cast<ThalliumTransport*>(this)->ClearRecvHandles(meta);
       break;
@@ -160,7 +160,7 @@ inline void Transport::ClearRecvHandles(LbmMeta<>& meta) {
 
 inline void Transport::RegisterEventManager(EventManager &em) {
   switch (type_) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       static_cast<ZeroMqTransport*>(this)->RegisterEventManager(em);
       break;
@@ -171,12 +171,12 @@ inline void Transport::RegisterEventManager(EventManager &em) {
     case TransportType::kShm:
       /* no-op for SHM */
       break;
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       static_cast<NixlTransport*>(this)->RegisterEventManager(em);
       break;
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       static_cast<ThalliumTransport*>(this)->RegisterEventManager(em);
       break;
@@ -188,7 +188,7 @@ inline void Transport::RegisterEventManager(EventManager &em) {
 
 inline bool Transport::IsServerAlive(const LbmContext& ctx) const {
   switch (type_) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       return static_cast<const ZeroMqTransport*>(this)->IsServerAlive(ctx);
 #endif
@@ -196,11 +196,11 @@ inline bool Transport::IsServerAlive(const LbmContext& ctx) const {
       return static_cast<const SocketTransport*>(this)->IsServerAlive(ctx);
     case TransportType::kShm:
       return static_cast<const ShmTransport*>(this)->IsServerAlive(ctx);
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       return static_cast<const NixlTransport*>(this)->IsServerAlive(ctx);
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       return static_cast<const ThalliumTransport*>(this)->IsServerAlive(ctx);
 #endif
@@ -208,14 +208,14 @@ inline bool Transport::IsServerAlive(const LbmContext& ctx) const {
       return false;
   }
 }
-#endif  // HSHM_IS_HOST
+#endif  // CTP_IS_HOST
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
 // --- Unified Transport Template Dispatch ---
 template <typename MetaT>
 int Transport::Send(MetaT& meta, const LbmContext& ctx) {
   switch (type_) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       return static_cast<ZeroMqTransport*>(this)->Send(meta, ctx);
 #endif
@@ -223,11 +223,11 @@ int Transport::Send(MetaT& meta, const LbmContext& ctx) {
       return static_cast<SocketTransport*>(this)->Send(meta, ctx);
     case TransportType::kShm:
       return static_cast<ShmTransport*>(this)->Send(meta, ctx);
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       return static_cast<NixlTransport*>(this)->Send(meta, ctx);
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       return static_cast<ThalliumTransport*>(this)->Send(meta, ctx);
 #endif
@@ -239,7 +239,7 @@ int Transport::Send(MetaT& meta, const LbmContext& ctx) {
 template <typename MetaT>
 ClientInfo Transport::Recv(MetaT& meta, const LbmContext& ctx) {
   switch (type_) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       return static_cast<ZeroMqTransport*>(this)->Recv(meta, ctx);
 #endif
@@ -247,11 +247,11 @@ ClientInfo Transport::Recv(MetaT& meta, const LbmContext& ctx) {
       return static_cast<SocketTransport*>(this)->Recv(meta, ctx);
     case TransportType::kShm:
       return static_cast<ShmTransport*>(this)->Recv(meta, ctx);
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       return static_cast<NixlTransport*>(this)->Recv(meta, ctx);
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       return static_cast<ThalliumTransport*>(this)->Recv(meta, ctx);
 #endif
@@ -265,7 +265,7 @@ inline TransportPtr TransportFactory::Get(
     const std::string& addr, TransportType t, TransportMode mode,
     const std::string& protocol, int port) {
   switch (t) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       return TransportPtr(new ZeroMqTransport(
           mode, addr, protocol.empty() ? "tcp" : protocol,
@@ -277,11 +277,11 @@ inline TransportPtr TransportFactory::Get(
           port == 0 ? 8193 : port));
     case TransportType::kShm:
       return TransportPtr(new ShmTransport(mode));
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       return TransportPtr(new NixlTransport(mode, addr));
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       return TransportPtr(new ThalliumTransport(
           mode, addr, protocol.empty() ? "tcp" : protocol, port));
@@ -296,7 +296,7 @@ inline TransportPtr TransportFactory::Get(
     const std::string& protocol, int port, const std::string& domain) {
   (void)domain;
   switch (t) {
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
     case TransportType::kZeroMq:
       return TransportPtr(new ZeroMqTransport(
           mode, addr, protocol.empty() ? "tcp" : protocol,
@@ -308,11 +308,11 @@ inline TransportPtr TransportFactory::Get(
           port == 0 ? 8193 : port));
     case TransportType::kShm:
       return TransportPtr(new ShmTransport(mode));
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
     case TransportType::kNixl:
       return TransportPtr(new NixlTransport(mode, addr));
 #endif
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
     case TransportType::kThallium:
       return TransportPtr(new ThalliumTransport(
           mode, addr, protocol.empty() ? "tcp" : protocol, port));
@@ -321,7 +321,7 @@ inline TransportPtr TransportFactory::Get(
       return nullptr;
   }
 }
-#endif  // HSHM_IS_HOST
+#endif  // CTP_IS_HOST
 
-}  // namespace hshm::lbm
-#endif  // HSHM_ENABLE_LIGHTBEAM
+}  // namespace ctp::lbm
+#endif  // CTP_ENABLE_LIGHTBEAM

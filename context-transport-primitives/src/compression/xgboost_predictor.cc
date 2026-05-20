@@ -43,7 +43,7 @@
 #include <cstring>
 #include <filesystem>
 
-namespace hshm {
+namespace ctp {
 namespace compress {
 
 namespace fs = std::filesystem;
@@ -676,4 +676,4 @@ void XGBoostPredictor::ClearExperiences() {
 }
 
 }  // namespace compress
-}  // namespace hshm
+}  // namespace ctp

@@ -15,7 +15,7 @@ if (WRP_CORE_ENABLE_OPENMP)
             hermes_shm_host
             $<$<BOOL:${WRP_CORE_ENABLE_THALLIUM}>:thallium>
             Catch2::Catch2
-            hshm::thread_all)
+            ctp::thread_all)
 
     #------------------------------------------------------------------------------
     # Test Cases

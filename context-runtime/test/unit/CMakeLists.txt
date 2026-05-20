@@ -105,7 +105,7 @@ target_include_directories(${TEST_TARGET} PRIVATE
 
 target_link_libraries(${TEST_TARGET}
   chimaera_cxx               # Main Chimaera library
-  hshm::cxx                  # HermesShm library
+  ctp::cxx                  # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
 )
 
@@ -128,7 +128,7 @@ target_include_directories(${IPC_ALLOCATE_BUFFER_TEST_TARGET} PRIVATE
 
 target_link_libraries(${IPC_ALLOCATE_BUFFER_TEST_TARGET}
   chimaera_cxx               # Main Chimaera library
-  hshm::cxx                  # HermesShm library
+  ctp::cxx                  # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
 )
 
@@ -173,7 +173,7 @@ target_link_libraries(${SAVE_LOAD_TASK_TEST_TARGET}
   chimaera_admin_client           # Admin module client
   chimaera_bdev_runtime           # Bdev module runtime
   chimaera_bdev_client            # Bdev module client
-  hshm::cxx                       # HermesShm library
+  ctp::cxx                       # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}       # Threading support
 )
 
@@ -201,7 +201,7 @@ target_link_libraries(${LOCAL_TASK_ARCHIVE_TEST_TARGET}
   chimaera_admin_client           # Admin module client
   chimaera_bdev_runtime           # Bdev module runtime
   chimaera_bdev_client            # Bdev module client
-  hshm::cxx                       # HermesShm library
+  ctp::cxx                       # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}       # Threading support
 )
 
@@ -224,7 +224,7 @@ target_include_directories(${PER_PROCESS_SHM_TEST_TARGET} PRIVATE
 
 target_link_libraries(${PER_PROCESS_SHM_TEST_TARGET}
   chimaera_cxx               # Main Chimaera library
-  hshm::cxx                  # HermesShm library
+  ctp::cxx                  # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
 )
 
@@ -261,7 +261,7 @@ add_executable(${AUTOGEN_COVERAGE_TEST_TARGET} ${AUTOGEN_COVERAGE_TEST_SOURCES})
     chimaera_bdev_client
     chimaera_admin_client
     chimaera_cxx
-    hshm::cxx
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
   )
 
@@ -288,7 +288,7 @@ target_link_libraries(${STREAMING_TEST_TARGET}
   chimaera_cxx               # Main Chimaera library
   chimaera_MOD_NAME_client   # MOD_NAME client
   chimaera_MOD_NAME_runtime  # MOD_NAME runtime
-  hshm::cxx                  # HermesShm library
+  ctp::cxx                  # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
 )
 
@@ -311,7 +311,7 @@ target_include_directories(${EXTERNAL_CLIENT_TEST_TARGET} PRIVATE
 
 target_link_libraries(${EXTERNAL_CLIENT_TEST_TARGET}
   chimaera_cxx               # Main Chimaera library
-  hshm::cxx                  # HermesShm library
+  ctp::cxx                  # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
 )
 
@@ -334,7 +334,7 @@ target_include_directories(${RUNTIME_CLEANUP_TEST_TARGET} PRIVATE
 
 target_link_libraries(${RUNTIME_CLEANUP_TEST_TARGET}
   chimaera_cxx               # Main Chimaera library
-  hshm::cxx                  # HermesShm library
+  ctp::cxx                  # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
 )
 
@@ -357,7 +357,7 @@ target_include_directories(${IPC_ERRORS_TEST_TARGET} PRIVATE
 
 target_link_libraries(${IPC_ERRORS_TEST_TARGET}
   chimaera_cxx               # Main Chimaera library
-  hshm::cxx                  # HermesShm library
+  ctp::cxx                  # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
 )
 
@@ -384,7 +384,7 @@ target_link_libraries(${IPC_TRANSPORT_MODES_TEST_TARGET}
   chimaera_cxx               # Main Chimaera library
   chimaera_bdev_client        # Bdev module client
   chimaera_admin_client       # Admin module client
-  hshm::cxx                  # HermesShm library
+  ctp::cxx                  # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
 )
 
@@ -411,7 +411,7 @@ target_link_libraries(${CLIENT_RETRY_TEST_TARGET}
   chimaera_cxx               # Main Chimaera library
   chimaera_bdev_client        # Bdev module client
   chimaera_admin_client       # Admin module client
-  hshm::cxx                  # HermesShm library
+  ctp::cxx                  # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
 )
 
@@ -432,7 +432,7 @@ if(FALSE)
     INCLUDE_DIRS
       ${CHIMAERA_ROOT}/test
       ${CHIMAERA_ROOT}/modules/MOD_NAME/include
-    LINK_LIBS chimaera_cxx hshm::cuda_cxx
+    LINK_LIBS chimaera_cxx ctp::cuda_cxx
   )
   target_include_directories(${IPC_ALLOCATE_BUFFER_GPU_TEST_TARGET} PRIVATE
     ${CHIMAERA_ROOT}/include
@@ -441,7 +441,7 @@ if(FALSE)
   )
   target_link_libraries(${IPC_ALLOCATE_BUFFER_GPU_TEST_TARGET}
     chimaera_cxx
-    hshm::cuda_cxx
+    ctp::cuda_cxx
     ${CMAKE_THREAD_LIBS_INIT}
   )
   set_target_properties(${IPC_ALLOCATE_BUFFER_GPU_TEST_TARGET} PROPERTIES
@@ -473,7 +473,7 @@ if(WRP_CORE_ENABLE_CUDA)
       chimaera_cxx_gpu
       chimaera_admin_client
       chimaera_MOD_NAME_client
-      hshm::cuda_cxx
+      ctp::cuda_cxx
       ${CMAKE_THREAD_LIBS_INIT}
   )
   set_target_properties(test_gpu_kernel_stress PROPERTIES
@@ -504,7 +504,7 @@ if(WRP_CORE_ENABLE_ROCM)
     chimaera_cxx_gpu
     chimaera_admin_client
     chimaera_MOD_NAME_client
-    hshm::rocm_cxx
+    ctp::rocm_cxx
     ${CMAKE_THREAD_LIBS_INIT}
   )
   set_target_properties(test_gpu_kernel_stress PROPERTIES
@@ -533,7 +533,7 @@ if(WRP_CORE_ENABLE_SYCL)
       chimaera_cxx_gpu
       chimaera_admin_client
       chimaera_MOD_NAME_client
-      hshm::cxx
+      ctp::cxx
       ${CMAKE_THREAD_LIBS_INIT}
   )
   set_target_properties(test_gpu_kernel_stress PROPERTIES
@@ -1039,8 +1039,8 @@ if(WRP_CORE_ENABLE_MPI)
     chimaera_cxx
     chimaera_bdev_client
     chimaera_admin_client
-    hshm::cxx
-    hshm::mpi
+    ctp::cxx
+    ctp::mpi
     ${CMAKE_THREAD_LIBS_INIT}
   )
 

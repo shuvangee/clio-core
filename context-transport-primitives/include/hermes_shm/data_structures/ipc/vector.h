@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_IPC_VECTOR_H_
-#define HSHM_DATA_STRUCTURES_IPC_VECTOR_H_
+#ifndef CTP_DATA_STRUCTURES_IPC_VECTOR_H_
+#define CTP_DATA_STRUCTURES_IPC_VECTOR_H_
 
 #include "hermes_shm/data_structures/ipc/shm_container.h"
 #include "hermes_shm/memory/allocator/allocator.h"
@@ -42,7 +42,7 @@
 #include <iterator>
 #include <type_traits>
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Shared-memory compatible vector container
@@ -86,7 +86,7 @@ class vector : public ShmContainer<AllocT> {
     /**
      * Default constructor
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator() : ptr_(nullptr) {}
 
     /**
@@ -94,7 +94,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @param ptr The element pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     explicit iterator(T *ptr) : ptr_(ptr) {}
 
     /**
@@ -102,7 +102,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Reference to the current element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T& operator*() const { return *ptr_; }
 
     /**
@@ -110,7 +110,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Pointer to the current element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T* operator->() const { return ptr_; }
 
     /**
@@ -118,7 +118,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator++() {
       ++ptr_;
       return *this;
@@ -129,7 +129,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Copy of this iterator before increment
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator++(int) {
       iterator tmp = *this;
       ++ptr_;
@@ -141,7 +141,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator--() {
       --ptr_;
       return *this;
@@ -152,7 +152,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Copy of this iterator before decrement
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator--(int) {
       iterator tmp = *this;
       --ptr_;
@@ -165,7 +165,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if pointing to same element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator==(const iterator &other) const {
       return ptr_ == other.ptr_;
     }
@@ -176,7 +176,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if pointing to different elements
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator!=(const iterator &other) const {
       return ptr_ != other.ptr_;
     }
@@ -187,7 +187,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if this points before other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<(const iterator &other) const {
       return ptr_ < other.ptr_;
     }
@@ -198,7 +198,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if this points before or at other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<=(const iterator &other) const {
       return ptr_ <= other.ptr_;
     }
@@ -209,7 +209,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if this points after other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>(const iterator &other) const {
       return ptr_ > other.ptr_;
     }
@@ -220,7 +220,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if this points after or at other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>=(const iterator &other) const {
       return ptr_ >= other.ptr_;
     }
@@ -231,7 +231,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The number of elements to advance
      * @return New iterator advanced by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator+(ptrdiff_t n) const {
       return iterator(ptr_ + n);
     }
@@ -242,7 +242,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The number of elements to retreat
      * @return New iterator retreated by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator-(ptrdiff_t n) const {
       return iterator(ptr_ - n);
     }
@@ -253,7 +253,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return Number of elements between iterators
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     ptrdiff_t operator-(const iterator &other) const {
       return ptr_ - other.ptr_;
     }
@@ -264,7 +264,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The index to access
      * @return Reference to the element at offset n
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T& operator[](ptrdiff_t n) const {
       return *(ptr_ + n);
     }
@@ -275,7 +275,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The number of elements to advance
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator+=(ptrdiff_t n) {
       ptr_ += n;
       return *this;
@@ -287,7 +287,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The number of elements to retreat
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator-=(ptrdiff_t n) {
       ptr_ -= n;
       return *this;
@@ -313,7 +313,7 @@ class vector : public ShmContainer<AllocT> {
     /**
      * Default constructor
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator() : ptr_(nullptr) {}
 
     /**
@@ -321,7 +321,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @param ptr The element pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     explicit const_iterator(const T *ptr) : ptr_(ptr) {}
 
     /**
@@ -329,7 +329,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @param iter The iterator to convert from
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator(const iterator &iter) : ptr_(&(*iter)) {}
 
     /**
@@ -337,7 +337,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Const reference to the current element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T& operator*() const { return *ptr_; }
 
     /**
@@ -345,7 +345,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Const pointer to the current element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T* operator->() const { return ptr_; }
 
     /**
@@ -353,7 +353,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator++() {
       ++ptr_;
       return *this;
@@ -364,7 +364,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Copy of this iterator before increment
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator++(int) {
       const_iterator tmp = *this;
       ++ptr_;
@@ -376,7 +376,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator--() {
       --ptr_;
       return *this;
@@ -387,7 +387,7 @@ class vector : public ShmContainer<AllocT> {
      *
      * @return Copy of this iterator before decrement
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator--(int) {
       const_iterator tmp = *this;
       --ptr_;
@@ -400,7 +400,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if pointing to same element
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator==(const const_iterator &other) const {
       return ptr_ == other.ptr_;
     }
@@ -411,7 +411,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if pointing to different elements
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator!=(const const_iterator &other) const {
       return ptr_ != other.ptr_;
     }
@@ -422,7 +422,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if this points before other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<(const const_iterator &other) const {
       return ptr_ < other.ptr_;
     }
@@ -433,7 +433,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if this points before or at other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<=(const const_iterator &other) const {
       return ptr_ <= other.ptr_;
     }
@@ -444,7 +444,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if this points after other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>(const const_iterator &other) const {
       return ptr_ > other.ptr_;
     }
@@ -455,7 +455,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return True if this points after or at other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>=(const const_iterator &other) const {
       return ptr_ >= other.ptr_;
     }
@@ -466,7 +466,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The number of elements to advance
      * @return New iterator advanced by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator+(ptrdiff_t n) const {
       return const_iterator(ptr_ + n);
     }
@@ -477,7 +477,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The number of elements to retreat
      * @return New iterator retreated by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator-(ptrdiff_t n) const {
       return const_iterator(ptr_ - n);
     }
@@ -488,7 +488,7 @@ class vector : public ShmContainer<AllocT> {
      * @param other The iterator to compare with
      * @return Number of elements between iterators
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     ptrdiff_t operator-(const const_iterator &other) const {
       return ptr_ - other.ptr_;
     }
@@ -499,7 +499,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The index to access
      * @return Const reference to the element at offset n
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T& operator[](ptrdiff_t n) const {
       return *(ptr_ + n);
     }
@@ -510,7 +510,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The number of elements to advance
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator+=(ptrdiff_t n) {
       ptr_ += n;
       return *this;
@@ -522,7 +522,7 @@ class vector : public ShmContainer<AllocT> {
      * @param n The number of elements to retreat
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator-=(ptrdiff_t n) {
       ptr_ -= n;
       return *this;
@@ -542,7 +542,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @param alloc The allocator to use
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   explicit vector(AllocT *alloc)
       : ShmContainer<AllocT>(alloc),
         size_(0),
@@ -560,7 +560,7 @@ class vector : public ShmContainer<AllocT> {
    * @param args Variable arguments passed to element constructor
    */
   template<typename... Args>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   vector(AllocT *alloc, size_t size, Args&&... args);
 
   /**
@@ -589,7 +589,7 @@ class vector : public ShmContainer<AllocT> {
    */
   template<typename IterT,
            typename = typename std::enable_if<!std::is_integral<IterT>::value>::type>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   vector(AllocT *alloc, IterT first, IterT last);
 
   /**
@@ -600,7 +600,7 @@ class vector : public ShmContainer<AllocT> {
    * @param alloc The allocator to use
    * @param init The initializer list
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   vector(AllocT *alloc, std::initializer_list<T> init);
 
   /**
@@ -608,7 +608,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * Destroys all elements and deallocates storage.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ~vector();
 
   /**
@@ -617,7 +617,7 @@ class vector : public ShmContainer<AllocT> {
    * @param other The vector to copy from
    * @return Reference to this vector
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   vector& operator=(const vector &other);
 
   /**
@@ -626,7 +626,7 @@ class vector : public ShmContainer<AllocT> {
    * @param other The vector to move from
    * @return Reference to this vector
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   vector& operator=(vector &&other) noexcept;
 
   /**
@@ -635,7 +635,7 @@ class vector : public ShmContainer<AllocT> {
    * @param other The vector to compare with
    * @return True if vectors have equal elements
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool operator==(const vector &other) const;
 
   /**
@@ -644,7 +644,7 @@ class vector : public ShmContainer<AllocT> {
    * @param other The vector to compare with
    * @return True if vectors have different elements
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool operator!=(const vector &other) const;
 
   /**
@@ -654,7 +654,7 @@ class vector : public ShmContainer<AllocT> {
    * @return Reference to the element at idx
    * @throws Bounds checking is asserted but not thrown
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& at(size_t idx) {
     auto fp = FullPtr(this->GetAllocator(), data_); T *ptr = fp.ptr_;
     return ptr[idx];
@@ -667,7 +667,7 @@ class vector : public ShmContainer<AllocT> {
    * @return Const reference to the element at idx
    * @throws Bounds checking is asserted but not thrown
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& at(size_t idx) const {
     const auto fp = FullPtr(this->GetAllocator(), data_); T *ptr = fp.ptr_;
     return ptr[idx];
@@ -679,7 +679,7 @@ class vector : public ShmContainer<AllocT> {
    * @param idx The index to access
    * @return Reference to the element at idx
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& operator[](size_t idx) {
     auto fp = FullPtr(this->GetAllocator(), data_); T *ptr = fp.ptr_;
     return ptr[idx];
@@ -691,7 +691,7 @@ class vector : public ShmContainer<AllocT> {
    * @param idx The index to access
    * @return Const reference to the element at idx
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& operator[](size_t idx) const {
     const auto fp = FullPtr(this->GetAllocator(), data_); T *ptr = fp.ptr_;
     return ptr[idx];
@@ -702,7 +702,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Reference to the first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& front() {
     auto fp = FullPtr(this->GetAllocator(), data_); T *ptr = fp.ptr_;
     return *ptr;
@@ -713,7 +713,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Const reference to the first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& front() const {
     const auto fp = FullPtr(this->GetAllocator(), data_); T *ptr = fp.ptr_;
     return *ptr;
@@ -724,7 +724,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Reference to the last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& back() {
     auto fp = FullPtr(this->GetAllocator(), data_); T *ptr = fp.ptr_;
     return ptr[size_ - 1];
@@ -735,7 +735,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Const reference to the last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& back() const {
     const auto fp = FullPtr(this->GetAllocator(), data_); T *ptr = fp.ptr_;
     return ptr[size_ - 1];
@@ -746,7 +746,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Pointer to the first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T* data() {
     if (data_.IsNull()) return nullptr;
     return FullPtr(this->GetAllocator(), data_).ptr_;
@@ -757,7 +757,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Const pointer to the first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T* data() const {
     if (data_.IsNull()) return nullptr;
     return FullPtr(this->GetAllocator(), data_).ptr_;
@@ -768,7 +768,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Iterator to the first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator begin() {
     T *ptr = data_.IsNull() ? nullptr : FullPtr(this->GetAllocator(), data_).ptr_;
     return iterator(ptr);
@@ -779,7 +779,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Const iterator to the first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator begin() const {
     const T *ptr = data_.IsNull() ? nullptr : FullPtr(this->GetAllocator(), data_).ptr_;
     return const_iterator(ptr);
@@ -790,7 +790,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Iterator past the last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator end() {
     T *ptr = data_.IsNull() ? nullptr : FullPtr(this->GetAllocator(), data_).ptr_;
     return iterator(ptr + size_);
@@ -801,7 +801,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Const iterator past the last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator end() const {
     const T *ptr = data_.IsNull() ? nullptr : FullPtr(this->GetAllocator(), data_).ptr_;
     return const_iterator(ptr + size_);
@@ -812,7 +812,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Const iterator to the first element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator cbegin() const {
     const T *ptr = data_.IsNull() ? nullptr : FullPtr(this->GetAllocator(), data_).ptr_;
     return const_iterator(ptr);
@@ -823,7 +823,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return Const iterator past the last element
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator cend() const {
     const T *ptr = data_.IsNull() ? nullptr : FullPtr(this->GetAllocator(), data_).ptr_;
     return const_iterator(ptr + size_);
@@ -834,7 +834,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @param value The value to add
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void push_back(const T &value);
 
   /**
@@ -842,7 +842,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @param value The value to add (will be moved)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void push_back(T &&value);
 
   /**
@@ -852,7 +852,7 @@ class vector : public ShmContainer<AllocT> {
    * @param args The arguments to forward to the constructor
    */
   template<typename... Args>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void emplace_back(Args&&... args);
 
   /**
@@ -862,7 +862,7 @@ class vector : public ShmContainer<AllocT> {
    * @param value The value to insert
    * @return Iterator to the inserted element
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   iterator insert(const_iterator pos, const T &value);
 
   /**
@@ -872,7 +872,7 @@ class vector : public ShmContainer<AllocT> {
    * @param value The value to insert (will be moved)
    * @return Iterator to the inserted element
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   iterator insert(const_iterator pos, T &&value);
 
   /**
@@ -884,7 +884,7 @@ class vector : public ShmContainer<AllocT> {
    * @return Iterator to the inserted element
    */
   template<typename... Args>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   iterator emplace(const_iterator pos, Args&&... args);
 
   /**
@@ -893,7 +893,7 @@ class vector : public ShmContainer<AllocT> {
    * @param pos The position to erase at
    * @return Iterator to the element following the erase
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   iterator erase(const_iterator pos);
 
   /**
@@ -903,7 +903,7 @@ class vector : public ShmContainer<AllocT> {
    * @param last Iterator past the last element to erase
    * @return Iterator to the element following the erase
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   iterator erase(const_iterator first, const_iterator last);
 
   /**
@@ -911,7 +911,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * Destroys all elements but does not deallocate storage.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void clear();
 
   /**
@@ -919,7 +919,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return The size of the vector
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_t size() const {
     return size_;
   }
@@ -929,7 +929,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return The capacity of the vector
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_t capacity() const {
     return capacity_;
   }
@@ -939,7 +939,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @return True if size is 0
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool empty() const {
     return size_ == 0;
   }
@@ -949,7 +949,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @param new_capacity The new minimum capacity
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void reserve(size_t new_capacity);
 
   /**
@@ -957,7 +957,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * Reallocates storage to exactly fit the current size.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void shrink_to_fit();
 
   /**
@@ -965,7 +965,7 @@ class vector : public ShmContainer<AllocT> {
    *
    * @param new_size The new size of the vector
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void resize(size_t new_size);
 
   /**
@@ -974,7 +974,7 @@ class vector : public ShmContainer<AllocT> {
    * @param new_size The new size of the vector
    * @param value The value to fill new elements with
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void resize(size_t new_size, const T &value);
 
  private:
@@ -983,19 +983,19 @@ class vector : public ShmContainer<AllocT> {
    *
    * @param capacity The new capacity
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void AllocateStorage(size_t capacity);
 
   /**
    * Helper to deallocate storage
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void DeallocateStorage();
 
   /**
    * Helper to destroy all elements
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void DestroyElements();
 
   /**
@@ -1004,7 +1004,7 @@ class vector : public ShmContainer<AllocT> {
    * @param src Source pointer
    * @param count Number of elements
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void CopyElements(const T *src, size_t count);
 
   /**
@@ -1013,7 +1013,7 @@ class vector : public ShmContainer<AllocT> {
    * @param src Source pointer
    * @param count Number of elements
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void MoveElements(T *src, size_t count);
 };
 
@@ -1032,7 +1032,7 @@ class vector : public ShmContainer<AllocT> {
  */
 template<typename T, typename AllocT>
 template<typename... Args>
-HSHM_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, size_t size, Args&&... args)
+CTP_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, size_t size, Args&&... args)
     : ShmContainer<AllocT>(alloc),
       size_(0),
       capacity_(0),
@@ -1056,7 +1056,7 @@ HSHM_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, size_t size, Args&&... a
 
 // Copy constructor implementation removed - declared as deleted
 // template<typename T, typename AllocT>
-// HSHM_CROSS_FUN vector<T, AllocT>::vector(const vector &other)
+// CTP_CROSS_FUN vector<T, AllocT>::vector(const vector &other)
 //     : ShmContainer<AllocT>(other.GetAllocator()),
 //       size_(0),
 //       capacity_(0),
@@ -1069,7 +1069,7 @@ HSHM_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, size_t size, Args&&... a
 
 // Move constructor implementation removed - declared as deleted
 // template<typename T, typename AllocT>
-// HSHM_CROSS_FUN vector<T, AllocT>::vector(vector &&other) noexcept
+// CTP_CROSS_FUN vector<T, AllocT>::vector(vector &&other) noexcept
 //     : ShmContainer<AllocT>(other.GetAllocator()),
 //       size_(other.size_),
 //       capacity_(other.capacity_),
@@ -1094,7 +1094,7 @@ HSHM_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, size_t size, Args&&... a
  */
 template<typename T, typename AllocT>
 template<typename IterT, typename>
-HSHM_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, IterT first, IterT last)
+CTP_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, IterT first, IterT last)
     : ShmContainer<AllocT>(alloc),
       size_(0),
       capacity_(0),
@@ -1125,7 +1125,7 @@ HSHM_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, IterT first, IterT last)
  * @param init The initializer list
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, std::initializer_list<T> init)
+CTP_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, std::initializer_list<T> init)
     : ShmContainer<AllocT>(alloc),
       size_(0),
       capacity_(0),
@@ -1146,7 +1146,7 @@ HSHM_CROSS_FUN vector<T, AllocT>::vector(AllocT *alloc, std::initializer_list<T>
  * @tparam AllocT Allocator type
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN vector<T, AllocT>::~vector() {
+CTP_CROSS_FUN vector<T, AllocT>::~vector() {
   DestroyElements();
   DeallocateStorage();
 }
@@ -1162,7 +1162,7 @@ HSHM_CROSS_FUN vector<T, AllocT>::~vector() {
  * @param capacity The number of elements to allocate space for
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::AllocateStorage(size_t capacity) {
+CTP_CROSS_FUN void vector<T, AllocT>::AllocateStorage(size_t capacity) {
   if (capacity == 0) {
     capacity_ = 0;
     data_ = OffsetPtr<T>::GetNull();
@@ -1200,7 +1200,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::AllocateStorage(size_t capacity) {
  * @tparam AllocT Allocator type
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::DeallocateStorage() {
+CTP_CROSS_FUN void vector<T, AllocT>::DeallocateStorage() {
   if (data_.IsNull()) {
     return;
   }
@@ -1234,7 +1234,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::DeallocateStorage() {
  * @tparam AllocT Allocator type
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::DestroyElements() {
+CTP_CROSS_FUN void vector<T, AllocT>::DestroyElements() {
   // Only call destructors for non-trivially destructible types
   if (std::is_trivially_destructible<T>::value || size_ == 0) {
     return;
@@ -1268,7 +1268,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::DestroyElements() {
  * @param count Number of elements to copy
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::CopyElements(const T *src, size_t count) {
+CTP_CROSS_FUN void vector<T, AllocT>::CopyElements(const T *src, size_t count) {
   if (!src || count == 0) {
     size_ = 0;
     return;
@@ -1311,7 +1311,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::CopyElements(const T *src, size_t count) 
  * @param count Number of elements to move
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::MoveElements(T *src, size_t count) {
+CTP_CROSS_FUN void vector<T, AllocT>::MoveElements(T *src, size_t count) {
   if (!src || count == 0) {
     size_ = 0;
     return;
@@ -1355,7 +1355,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::MoveElements(T *src, size_t count) {
  */
 template<typename T, typename AllocT>
 template<typename... Args>
-HSHM_CROSS_FUN void vector<T, AllocT>::emplace_back(Args&&... args) {
+CTP_CROSS_FUN void vector<T, AllocT>::emplace_back(Args&&... args) {
   if (size_ >= capacity_) {
     // Need to grow
     size_t new_capacity = (capacity_ == 0) ? 1 : (capacity_ * 2);
@@ -1383,7 +1383,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::emplace_back(Args&&... args) {
  * @param value The value to add
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::push_back(const T &value) {
+CTP_CROSS_FUN void vector<T, AllocT>::push_back(const T &value) {
   emplace_back(value);
 }
 
@@ -1395,7 +1395,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::push_back(const T &value) {
  * @param value The value to add (will be moved)
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::push_back(T &&value) {
+CTP_CROSS_FUN void vector<T, AllocT>::push_back(T &&value) {
   emplace_back(std::move(value));
 }
 
@@ -1414,7 +1414,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::push_back(T &&value) {
  */
 template<typename T, typename AllocT>
 template<typename... Args>
-HSHM_CROSS_FUN typename vector<T, AllocT>::iterator
+CTP_CROSS_FUN typename vector<T, AllocT>::iterator
 vector<T, AllocT>::emplace(const_iterator pos, Args&&... args) {
   AllocT *alloc = this->GetAllocator();
   if (!alloc) {
@@ -1459,7 +1459,7 @@ vector<T, AllocT>::emplace(const_iterator pos, Args&&... args) {
  * @return Iterator to the inserted element
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN typename vector<T, AllocT>::iterator
+CTP_CROSS_FUN typename vector<T, AllocT>::iterator
 vector<T, AllocT>::insert(const_iterator pos, const T &value) {
   return emplace(pos, value);
 }
@@ -1474,7 +1474,7 @@ vector<T, AllocT>::insert(const_iterator pos, const T &value) {
  * @return Iterator to the inserted element
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN typename vector<T, AllocT>::iterator
+CTP_CROSS_FUN typename vector<T, AllocT>::iterator
 vector<T, AllocT>::insert(const_iterator pos, T &&value) {
   return emplace(pos, std::move(value));
 }
@@ -1491,7 +1491,7 @@ vector<T, AllocT>::insert(const_iterator pos, T &&value) {
  * @return Iterator to the element following the erase
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN typename vector<T, AllocT>::iterator
+CTP_CROSS_FUN typename vector<T, AllocT>::iterator
 vector<T, AllocT>::erase(const_iterator pos) {
   AllocT *alloc = this->GetAllocator();
   if (!alloc || size_ == 0) {
@@ -1533,7 +1533,7 @@ vector<T, AllocT>::erase(const_iterator pos) {
  * @return Iterator to the element following the erase
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN typename vector<T, AllocT>::iterator
+CTP_CROSS_FUN typename vector<T, AllocT>::iterator
 vector<T, AllocT>::erase(const_iterator first, const_iterator last) {
   AllocT *alloc = this->GetAllocator();
   if (!alloc || size_ == 0) {
@@ -1579,7 +1579,7 @@ vector<T, AllocT>::erase(const_iterator first, const_iterator last) {
  * @tparam AllocT Allocator type
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::clear() {
+CTP_CROSS_FUN void vector<T, AllocT>::clear() {
   DestroyElements();
   size_ = 0;
 }
@@ -1595,7 +1595,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::clear() {
  * @param new_capacity The new minimum capacity
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::reserve(size_t new_capacity) {
+CTP_CROSS_FUN void vector<T, AllocT>::reserve(size_t new_capacity) {
   if (new_capacity <= capacity_) {
     return;
   }
@@ -1638,7 +1638,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::reserve(size_t new_capacity) {
  * @tparam AllocT Allocator type
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::shrink_to_fit() {
+CTP_CROSS_FUN void vector<T, AllocT>::shrink_to_fit() {
   if (capacity_ == size_ || size_ == 0) {
     if (size_ == 0) {
       DeallocateStorage();
@@ -1693,7 +1693,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::shrink_to_fit() {
  * @param new_size The new size of the vector
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::resize(size_t new_size) {
+CTP_CROSS_FUN void vector<T, AllocT>::resize(size_t new_size) {
   if (new_size == size_) {
     return;
   }
@@ -1753,7 +1753,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::resize(size_t new_size) {
  * @param value The value to fill new elements with
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN void vector<T, AllocT>::resize(size_t new_size, const T &value) {
+CTP_CROSS_FUN void vector<T, AllocT>::resize(size_t new_size, const T &value) {
   if (new_size == size_) {
     return;
   }
@@ -1800,7 +1800,7 @@ HSHM_CROSS_FUN void vector<T, AllocT>::resize(size_t new_size, const T &value) {
  * @return Reference to this vector
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN vector<T, AllocT>&
+CTP_CROSS_FUN vector<T, AllocT>&
 vector<T, AllocT>::operator=(const vector &other) {
   if (this == &other) {
     return *this;
@@ -1833,7 +1833,7 @@ vector<T, AllocT>::operator=(const vector &other) {
  * @return Reference to this vector
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN vector<T, AllocT>&
+CTP_CROSS_FUN vector<T, AllocT>&
 vector<T, AllocT>::operator=(vector &&other) noexcept {
   if (this == &other) {
     return *this;
@@ -1868,7 +1868,7 @@ vector<T, AllocT>::operator=(vector &&other) noexcept {
  * @return True if vectors have equal size and elements
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN bool
+CTP_CROSS_FUN bool
 vector<T, AllocT>::operator==(const vector &other) const {
   if (size_ != other.size_) {
     return false;
@@ -1911,11 +1911,11 @@ vector<T, AllocT>::operator==(const vector &other) const {
  * @return True if vectors have unequal size or elements
  */
 template<typename T, typename AllocT>
-HSHM_CROSS_FUN bool
+CTP_CROSS_FUN bool
 vector<T, AllocT>::operator!=(const vector &other) const {
   return !(*this == other);
 }
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_DATA_STRUCTURES_IPC_VECTOR_H_
+#endif  // CTP_DATA_STRUCTURES_IPC_VECTOR_H_

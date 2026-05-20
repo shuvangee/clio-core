@@ -19,21 +19,21 @@ target_compile_features(clio_cte_compression_benchmark PRIVATE cxx_std_17)
 
 # Link compression libraries
 target_link_libraries(clio_cte_compression_benchmark PRIVATE
-    hshm::compress
-    hshm::cxx
+    ctp::compress
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
 # Enable compression support
 target_compile_definitions(clio_cte_compression_benchmark PRIVATE
-    HSHM_ENABLE_COMPRESS=1
+    CTP_ENABLE_COMPRESS=1
 )
 
 # Add LibPressio support if available
 find_package(LibPressio QUIET)
 if(LibPressio_FOUND)
     target_link_libraries(clio_cte_compression_benchmark PRIVATE LibPressio::libpressio)
-    target_compile_definitions(clio_cte_compression_benchmark PRIVATE HSHM_ENABLE_LIBPRESSIO=1)
+    target_compile_definitions(clio_cte_compression_benchmark PRIVATE CTP_ENABLE_LIBPRESSIO=1)
     message(STATUS "LibPressio found - lossy compression enabled")
 else()
     message(STATUS "LibPressio not found - only lossless compression available")
@@ -78,22 +78,22 @@ if(ADIOS2_FOUND OR TARGET adios2::cxx11)
 
     target_link_libraries(gray_scott_analysis PRIVATE
         adios2::cxx
-        hshm::compress
-        hshm::cxx
+        ctp::compress
+        ctp::cxx
         ${CMAKE_THREAD_LIBS_INIT}
         curl
     )
 
     # Enable compression support
     target_compile_definitions(gray_scott_analysis PRIVATE
-        HSHM_ENABLE_COMPRESS=1
+        CTP_ENABLE_COMPRESS=1
     )
 
     # Add LibPressio support if available
     find_package(LibPressio QUIET)
     if(LibPressio_FOUND)
         target_link_libraries(gray_scott_analysis PRIVATE LibPressio::libpressio)
-        target_compile_definitions(gray_scott_analysis PRIVATE HSHM_ENABLE_LIBPRESSIO=1)
+        target_compile_definitions(gray_scott_analysis PRIVATE CTP_ENABLE_LIBPRESSIO=1)
         message(STATUS "Gray-Scott: LibPressio found - lossy compression enabled")
     else()
         message(STATUS "Gray-Scott: LibPressio not found - only lossless compression available")

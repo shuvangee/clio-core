@@ -94,7 +94,7 @@ leak:BlobQuery
 # ---------------------------------------------------------------------------
 # Chi runtime: per-thread TaskCounter in CreateTaskId()
 # chi::CreateTaskId() allocates a 4-byte TaskCounter via new and stores it
-# in thread-local storage using HSHM_THREAD_MODEL->SetTls(). Worker threads
+# in thread-local storage using CTP_THREAD_MODEL->SetTls(). Worker threads
 # created with std::thread may not invoke the TLS destructor on exit, leaving
 # the counter unreachable. This is an architectural TLS lifetime pattern;
 # the OS reclaims the allocation on process exit.
@@ -181,7 +181,7 @@ leak:context-assimilation-engine/core/src/autogen/core_lib_exec.cc
 
 # ---------------------------------------------------------------------------
 # bdev / ZMQ transport: block-data vectors allocated during RecvBulks
-# hshm::lbm::ZeroMqTransport::RecvBulks<chi::LoadTaskArchive>() receives a
+# ctp::lbm::ZeroMqTransport::RecvBulks<chi::LoadTaskArchive>() receives a
 # ZMQ multi-part message and deserialises bdev Block entries into heap vectors
 # (via cereal/msgpack) before passing them to LoadTask / AllocLoadTask.
 # If the server shuts down before the task completes, the interim heap buffer
@@ -189,14 +189,14 @@ leak:context-assimilation-engine/core/src/autogen/core_lib_exec.cc
 # The existing `leak:libzmq.so` rule does not cover this site because the
 # allocation is in our wrapper code, not in the ZMQ shared library itself.
 # ---------------------------------------------------------------------------
-leak:hshm::lbm::ZeroMqTransport::RecvBulks
+leak:ctp::lbm::ZeroMqTransport::RecvBulks
 
 # ---------------------------------------------------------------------------
 # bdev module: Block vector deserialized in LoadTask / AllocLoadTask
 # bdev::Runtime::LoadTask() and AllocLoadTask() (autogen bdev_lib_exec.cc)
 # deserialise incoming bdev tasks (WriteTask, ReadTask, etc.) from the
 # chi::LoadTaskArchive. This calls LoadTaskArchive::operator>> which resizes
-# a hshm::priv::vector<bdev::Block> on the malloc heap. If the server shuts
+# a ctp::priv::vector<bdev::Block> on the malloc heap. If the server shuts
 # down while bdev tasks are still in-flight, these block vectors are never
 # freed (the task is freed via IPC path that bypasses C++ destructors).
 # ---------------------------------------------------------------------------

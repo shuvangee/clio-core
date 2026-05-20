@@ -35,7 +35,7 @@ add_chimod_runtime(
   SOURCES
     ${COMPRESSOR_SOURCES}
   LINK_LIBRARIES
-    hshm::compress
+    ctp::compress
 )
 
 # Link optional dependencies if available

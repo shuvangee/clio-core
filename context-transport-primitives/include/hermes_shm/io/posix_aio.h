@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_IO_POSIX_AIO_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_IO_POSIX_AIO_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_IO_POSIX_AIO_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_IO_POSIX_AIO_H_
 
 #if !defined(_WIN32)
 
@@ -48,7 +48,7 @@
 #include <unordered_map>
 #include <memory>
 
-namespace hshm {
+namespace ctp {
 
 class PosixAsyncIO : public AsyncIO {
  public:
@@ -188,8 +188,8 @@ class PosixAsyncIO : public AsyncIO {
   std::unordered_map<IoToken, std::unique_ptr<struct aiocb>> pending_;
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
 #endif  // !defined(_WIN32)
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_IO_POSIX_AIO_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_IO_POSIX_AIO_H_

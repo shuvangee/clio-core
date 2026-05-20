@@ -14,8 +14,8 @@ target_link_libraries(clio_cte_stdio_unit_tests
     wrp_cte_posix       # for shared PosixFs::IsFdTracked used by stdio
     wrp_cte_fs_base
     wrp_cte_core_client
-    hshm::cxx
-    hshm::interceptor
+    ctp::cxx
+    ctp::interceptor
     Catch2::Catch2WithMain
 )
 

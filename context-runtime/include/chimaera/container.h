@@ -93,7 +93,7 @@ class Container {
   PoolId pool_id_;         ///< The unique ID of this pool
   std::string pool_name_;  ///< The semantic name of this pool
   u32 container_id_;       ///< The logical ID of this container instance
-  hshm::abitfield32_t flags_;  ///< Atomic bitfield for container state
+  ctp::abitfield32_t flags_;  ///< Atomic bitfield for container state
 
   /** Group affinity map: TaskGroup id -> pinned Worker* */
   std::unordered_map<int64_t, Worker*> task_group_map_;
@@ -473,7 +473,7 @@ class Container {
    * @param deep Whether to perform a deep copy
    * @return Full pointer to the newly created copy
    */
-  HSHM_DLL virtual hipc::FullPtr<Task> NewCopyTask(u32 method,
+  CTP_DLL virtual hipc::FullPtr<Task> NewCopyTask(u32 method,
                                                     hipc::FullPtr<Task> orig_task_ptr,
                                                     bool deep) = 0;
 
@@ -484,7 +484,7 @@ class Container {
    * @param method The method ID for the task type to create
    * @return Full pointer to the newly allocated task (cast to base Task type)
    */
-  HSHM_DLL virtual hipc::FullPtr<Task> NewTask(u32 method) = 0;
+  CTP_DLL virtual hipc::FullPtr<Task> NewTask(u32 method) = 0;
 
   /**
    * Aggregate replica results into origin task via Container dispatch
@@ -520,9 +520,9 @@ class ContainerClient {
   /**
    * Default constructor
    */
-  HSHM_CROSS_FUN ContainerClient() : pool_id_(), return_code_(0) {}
+  CTP_CROSS_FUN ContainerClient() : pool_id_(), return_code_(0) {}
 
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   /**
    * Initialize client with pool ID
    * @param pool_id Pool identifier to connect to
@@ -541,7 +541,7 @@ class ContainerClient {
    * Initialize client with pool ID (GPU version, non-virtual)
    * @param pool_id Pool identifier to connect to
    */
-  HSHM_GPU_FUN void Init(const PoolId& pool_id) {
+  CTP_GPU_FUN void Init(const PoolId& pool_id) {
     pool_id_ = pool_id;
     return_code_ = 0;
   }

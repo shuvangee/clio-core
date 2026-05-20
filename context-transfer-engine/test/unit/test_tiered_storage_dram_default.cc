@@ -210,7 +210,7 @@ static DramDefaultTieringFixture *g_fixture = nullptr;
  */
 TEST_CASE("DramDefault - 80% policy is sane and >= working set",
           "[tiered][dram-default][policy]") {
-  chi::u64 total_dram = hshm::SystemInfo::GetRamCapacity();
+  chi::u64 total_dram = ctp::SystemInfo::GetRamCapacity();
   chi::u64 defaulted = chimaera::bdev::DefaultRamCapacityBytes();
 
   INFO("Total system DRAM: " << total_dram << " bytes");

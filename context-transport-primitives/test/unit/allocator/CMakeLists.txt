@@ -28,10 +28,10 @@ add_dependencies(test_buddy_compaction_exec hermes_shm_host)
 target_link_libraries(test_buddy_compaction_exec
         hermes_shm_host Catch2::Catch2WithMain)
 
-add_executable(test_hshm_malloc_exec
-        test_hshm_malloc.cc)
-add_dependencies(test_hshm_malloc_exec hermes_shm_host)
-target_link_libraries(test_hshm_malloc_exec
+add_executable(test_ctp_malloc_exec
+        test_ctp_malloc.cc)
+add_dependencies(test_ctp_malloc_exec hermes_shm_host)
+target_link_libraries(test_ctp_malloc_exec
         hermes_shm_host)
 
 add_executable(test_thread_allocator_exec
@@ -89,8 +89,8 @@ add_test(NAME ctp_thread_allocator COMMAND
 add_test(NAME ctp_thread_allocator_multithread COMMAND
         ${CMAKE_BINARY_DIR}/bin/test_thread_allocator_exec "[multithread]")
 
-add_test(NAME ctp_hshm_malloc COMMAND
-        ${CMAKE_BINARY_DIR}/bin/test_hshm_malloc_exec)
+add_test(NAME ctp_ctp_malloc COMMAND
+        ${CMAKE_BINARY_DIR}/bin/test_ctp_malloc_exec)
 
 # Skip under MSan: buddy allocator, thread/partitioned allocator, and hshm
 # malloc all use raw mmap/brk memory that MSan cannot instrument (no
@@ -98,7 +98,7 @@ add_test(NAME ctp_hshm_malloc COMMAND
 set_tests_properties(
   ctp_buddy_allocator
   ctp_buddy_compaction
-  ctp_hshm_malloc
+  ctp_ctp_malloc
   ctp_thread_allocator
   ctp_thread_allocator_multithread
   PROPERTIES LABELS "msan_skip"
@@ -153,7 +153,7 @@ install(TARGETS
         test_arena_alloc_exec
         test_buddy_allocator_exec
         test_buddy_compaction_exec
-        test_hshm_malloc_exec
+        test_ctp_malloc_exec
         test_thread_allocator_exec
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib

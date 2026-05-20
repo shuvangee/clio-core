@@ -11,7 +11,7 @@ target_link_libraries(test_restart
     chimaera::admin_client
     chimaera::bdev_runtime
     chimaera::bdev_client
-    hshm::cxx
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
 )
 

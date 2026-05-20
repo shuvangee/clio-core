@@ -225,17 +225,17 @@ private:
   //                          returns exact live count)
   // The DPE consumes std::vector<TargetInfo>, so ExtendBlob hands it
   // target_list_ directly with no materialization step.
-  hshm::priv::unordered_map_ll<chi::PoolId, TargetInfo> registered_targets_;
+  ctp::priv::unordered_map_ll<chi::PoolId, TargetInfo> registered_targets_;
   std::vector<TargetInfo> target_list_;
-  hshm::priv::unordered_map_ll<std::string, chi::PoolId>
+  ctp::priv::unordered_map_ll<std::string, chi::PoolId>
       target_name_to_id_; // reverse lookup: target_name -> target_id
 
-  // Tag management data structures (using hshm::priv::unordered_map_ll for thread-safe
+  // Tag management data structures (using ctp::priv::unordered_map_ll for thread-safe
   // concurrent access)
-  hshm::priv::unordered_map_ll<std::string, TagId>
+  ctp::priv::unordered_map_ll<std::string, TagId>
       tag_name_to_id_;                                   // tag_name -> tag_id
-  hshm::priv::unordered_map_ll<TagId, TagInfo> tag_id_to_info_; // tag_id -> TagInfo
-  hshm::priv::unordered_map_ll<std::string, BlobInfo>
+  ctp::priv::unordered_map_ll<TagId, TagInfo> tag_id_to_info_; // tag_id -> TagInfo
+  ctp::priv::unordered_map_ll<std::string, BlobInfo>
       tag_blob_name_to_info_; // "tag_id.blob_name" -> BlobInfo
 
   // Atomic counters for thread-safe ID generation

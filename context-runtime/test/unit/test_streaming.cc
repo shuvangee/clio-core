@@ -185,7 +185,7 @@ TEST_CASE("FutureShm Bitfield Operations", "[streaming][bitfield]") {
   REQUIRE(future_shm->flags_.Any(FutureShm::FUTURE_COMPLETE));
 
   // Test manual flag operations on a separate bitfield
-  hshm::abitfield32_t test_flags;
+  ctp::abitfield32_t test_flags;
   test_flags.SetBits(0);  // Initialize
 
   INFO("Testing manual FUTURE_COMPLETE flag set");

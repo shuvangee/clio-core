@@ -89,7 +89,7 @@ typedef void (*cuFileBatchIODestroy_t)(CUfileBatchHandle_t);
 
 namespace clio::cae {
 
-using hshm::RealApi;
+using ctp::RealApi;
 
 /** CuFileApi class */
 class CuFileApi : public RealApi {
@@ -159,9 +159,9 @@ class CuFileApi : public RealApi {
 
 // Singleton macros
 #define WRP_CTE_CUFILE_API \
-  hshm::Singleton<::clio::cae::CuFileApi>::GetInstance()
+  ctp::Singleton<::clio::cae::CuFileApi>::GetInstance()
 #define WRP_CTE_STDIO_API \
-  hshm::Singleton<::clio::cae::StdioApi>::GetInstance()
+  ctp::Singleton<::clio::cae::StdioApi>::GetInstance()
 #define WRP_CTE_STDIO_API_T clio::cae::StdioApi *
 
 #endif  // WRP_CTE_ADAPTER_STDIO_H

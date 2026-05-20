@@ -551,8 +551,8 @@ int main(int argc, char** argv) {
 
   std::string alloc_type = argv[1];
   int num_threads = std::atoi(argv[2]);
-  size_t min_size = hshm::ConfigParse::ParseSize(argv[3]);
-  size_t max_size = hshm::ConfigParse::ParseSize(argv[4]);
+  size_t min_size = ctp::ConfigParse::ParseSize(argv[3]);
+  size_t max_size = ctp::ConfigParse::ParseSize(argv[4]);
   int duration_sec = (argc == 6) ? std::atoi(argv[5]) : 10;
 
   // Validate parameters

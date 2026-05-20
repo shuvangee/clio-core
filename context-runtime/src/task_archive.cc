@@ -51,7 +51,7 @@ namespace chi {
  */
 void SaveTaskArchive::bulk(hipc::ShmPtr<> ptr, size_t size, uint32_t flags) {
   hipc::FullPtr<char> full_ptr = CHI_IPC->ToFullPtr(ptr).template Cast<char>();
-  hshm::lbm::Bulk bulk;
+  ctp::lbm::Bulk bulk;
   bulk.data = full_ptr;
   bulk.size = size;
   bulk.flags.bits_ = flags;
@@ -154,7 +154,7 @@ void LoadTaskArchive::bulk(hipc::ShmPtr<> &ptr, size_t size, uint32_t flags) {
     } else if (lbm_transport_) {
       // Pre-receive: expose task's buffer for RecvBulks (existing RecvOut pattern)
       hipc::FullPtr<char> buffer = CHI_IPC->ToFullPtr(ptr).template Cast<char>();
-      hshm::lbm::Bulk bulk = lbm_transport_->Expose(buffer, size, flags);
+      ctp::lbm::Bulk bulk = lbm_transport_->Expose(buffer, size, flags);
       recv.push_back(bulk);
       if (flags & BULK_XFER) {
         recv_bulks++;

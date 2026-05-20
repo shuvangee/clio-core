@@ -426,7 +426,7 @@ class CTECoreFunctionalTestFixture {
  * 5. Real shared memory operations work correctly
  */
 TEST_CASE("FUNCTIONAL - Create CTE Core Pool", "[cte][core][pool][creation]") {
-  auto *fixture = hshm::Singleton<CTECoreFunctionalTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<CTECoreFunctionalTestFixture>::GetInstance();
   SECTION("FUNCTIONAL - Synchronous pool creation with real runtime") {
     INFO("=== Testing REAL fixture->CreateAsync() call ===");
 
@@ -486,7 +486,7 @@ TEST_CASE("FUNCTIONAL - Create CTE Core Pool", "[cte][core][pool][creation]") {
  * 5. Real file system operations work correctly
  */
 TEST_CASE("FUNCTIONAL - Register Target", "[cte][core][target][registration]") {
-  auto *fixture = hshm::Singleton<CTECoreFunctionalTestFixture>::
+  auto *fixture = ctp::Singleton<CTECoreFunctionalTestFixture>::
       GetInstance();  // First create the core pool using REAL API calls
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
   wrp_cte::core::CreateParams params;
@@ -609,7 +609,7 @@ TEST_CASE("FUNCTIONAL - Register Target", "[cte][core][target][registration]") {
  */
 TEST_CASE("FUNCTIONAL - PutBlob Operations",
           "[cte][core][blob][put][functional]") {
-  auto *fixture = hshm::Singleton<CTECoreFunctionalTestFixture>::
+  auto *fixture = ctp::Singleton<CTECoreFunctionalTestFixture>::
       GetInstance();  // Setup: Create core pool and register target
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
   wrp_cte::core::CreateParams params;
@@ -882,7 +882,7 @@ TEST_CASE("FUNCTIONAL - PutBlob Operations",
  */
 TEST_CASE("FUNCTIONAL - GetBlob Operations",
           "[cte][core][blob][get][functional]") {
-  auto *fixture = hshm::Singleton<CTECoreFunctionalTestFixture>::
+  auto *fixture = ctp::Singleton<CTECoreFunctionalTestFixture>::
       GetInstance();  // Setup: Create core pool, register target, create tag
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
   wrp_cte::core::CreateParams params;
@@ -1271,7 +1271,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
  */
 TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
           "[cte][core][blob][integration][put-get]") {
-  auto *fixture = hshm::Singleton<CTECoreFunctionalTestFixture>::
+  auto *fixture = ctp::Singleton<CTECoreFunctionalTestFixture>::
       GetInstance();  // Setup: Create core pool and register target
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
   wrp_cte::core::CreateParams params;
@@ -1785,7 +1785,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
  */
 TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Comprehensive Integration",
           "[cte][core][blob][integration][put-get][comprehensive]") {
-  auto *fixture = hshm::Singleton<CTECoreFunctionalTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<CTECoreFunctionalTestFixture>::GetInstance();
   INFO("=== COMPREHENSIVE PutBlob-GetBlob Integration Test ===");
 
   // Setup: Create core pool, register target, create tag
@@ -1945,7 +1945,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Comprehensive Integration",
  */
 TEST_CASE("FUNCTIONAL - ReorganizeBlob Operations",
           "[cte][core][blob][reorganize][functional]") {
-  auto *fixture = hshm::Singleton<CTECoreFunctionalTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<CTECoreFunctionalTestFixture>::GetInstance();
   INFO("=== FUNCTIONAL ReorganizeBlob Test ===");
 
   // Setup: Create core pool, register target, create tag
@@ -2220,7 +2220,7 @@ TEST_CASE("FUNCTIONAL - ReorganizeBlob Operations",
  * 6. Update target statistics
  */
 TEST_CASE("End-to-End CTE Core Workflow", "[cte][core][integration]") {
-  auto *fixture = hshm::Singleton<CTECoreFunctionalTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<CTECoreFunctionalTestFixture>::GetInstance();
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
   wrp_cte::core::CreateParams params;
 
@@ -2325,7 +2325,7 @@ TEST_CASE("End-to-End CTE Core Workflow", "[cte][core][integration]") {
  */
 TEST_CASE("FUNCTIONAL - Distributed Execution Validation",
           "[cte][core][distributed][validation]") {
-  auto *fixture = hshm::Singleton<CTECoreFunctionalTestFixture>::
+  auto *fixture = ctp::Singleton<CTECoreFunctionalTestFixture>::
       GetInstance();  // Parse number of nodes from environment variable
   int num_nodes = 1;
   const char *num_nodes_env = std::getenv("CTE_NUM_NODES");

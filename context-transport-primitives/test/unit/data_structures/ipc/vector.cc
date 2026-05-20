@@ -38,7 +38,7 @@
 #include <string>
 #include <vector>
 
-using namespace hshm::ipc;
+using namespace ctp::ipc;
 
 /**
  * Helper function to create an ArenaAllocator for testing

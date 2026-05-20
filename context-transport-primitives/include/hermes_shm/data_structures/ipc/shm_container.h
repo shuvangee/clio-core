@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_IPC_SHM_CONTAINER_H_
-#define HSHM_DATA_STRUCTURES_IPC_SHM_CONTAINER_H_
+#ifndef CTP_DATA_STRUCTURES_IPC_SHM_CONTAINER_H_
+#define CTP_DATA_STRUCTURES_IPC_SHM_CONTAINER_H_
 
 #include "hermes_shm/memory/allocator/allocator.h"
 #include "hermes_shm/constants/macros.h"
 #include <type_traits>
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Base class for shared-memory containers.
@@ -56,7 +56,7 @@ class ShmContainer {
   /**
    * Default constructor
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ShmContainer() : this_(OffsetPtr<void>::GetNull()) {}
 
   /**
@@ -64,7 +64,7 @@ class ShmContainer {
    *
    * @param alloc The allocator pointer to store
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   explicit ShmContainer(AllocT *alloc) {
     if (alloc) {
       this_ = OffsetPtr<void>((size_t)this - (size_t)alloc);
@@ -78,7 +78,7 @@ class ShmContainer {
    *
    * @return The allocator pointer
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   AllocT* GetAllocator() const {
     if (this_.IsNull()) {
       return nullptr;
@@ -116,6 +116,6 @@ namespace {
  */
 #define IS_SHM_CONTAINER(T) (IsShmContainerHelper<T>::value)
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_DATA_STRUCTURES_IPC_SHM_CONTAINER_H_
+#endif  // CTP_DATA_STRUCTURES_IPC_SHM_CONTAINER_H_

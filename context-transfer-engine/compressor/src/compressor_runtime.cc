@@ -105,7 +105,7 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   // preallocate here. The map is empty when tracking_enabled_=false.
 
   // Seed previous CPU times so PollNodeLoad's first delta is well-defined.
-  prev_cpu_times_ = hshm::SystemInfo::GetCpuTimes();
+  prev_cpu_times_ = ctp::SystemInfo::GetCpuTimes();
 
   // Load Q-table model if configured (primary prediction method)
   if (!config_.qtable_model_path_.empty()) {
@@ -299,9 +299,9 @@ std::vector<CompressionStats> Runtime::EstCompressionStats(
 
   // Determine data type from context
   // context.data_type_: 0 = char/uint8, 1 = float
-  hshm::DataType data_type = (context.data_type_ == 1) ? hshm::DataType::FLOAT32
-                                                       : hshm::DataType::UINT8;
-  size_t type_size = hshm::DataStatisticsFactory::GetTypeSize(data_type);
+  ctp::DataType data_type = (context.data_type_ == 1) ? ctp::DataType::FLOAT32
+                                                       : ctp::DataType::UINT8;
+  size_t type_size = ctp::DataStatisticsFactory::GetTypeSize(data_type);
 
   // Calculate number of elements (sample up to 64KB for efficiency)
   chi::u64 sample_bytes = std::min(chunk_size, static_cast<chi::u64>(65536));
@@ -311,12 +311,12 @@ std::vector<CompressionStats> Runtime::EstCompressionStats(
   }
 
   // Calculate compression features using DataStatisticsFactory
-  double entropy = hshm::DataStatisticsFactory::CalculateShannonEntropy(
+  double entropy = ctp::DataStatisticsFactory::CalculateShannonEntropy(
       chunk, num_elements, data_type);
   double mad =
-      hshm::DataStatisticsFactory::CalculateMAD(chunk, num_elements, data_type);
+      ctp::DataStatisticsFactory::CalculateMAD(chunk, num_elements, data_type);
   double second_derivative_mean =
-      hshm::DataStatisticsFactory::CalculateSecondDerivative(
+      ctp::DataStatisticsFactory::CalculateSecondDerivative(
           chunk, num_elements, data_type);
 
   // Determine candidate compression libraries and configs
@@ -703,15 +703,15 @@ chi::TaskResume Runtime::Compress(hipc::FullPtr<CompressTask> task,
             : "zstd";
 
     // Map preset integer to enum
-    hshm::CompressionPreset preset = hshm::CompressionPreset::BALANCED;
+    ctp::CompressionPreset preset = ctp::CompressionPreset::BALANCED;
     if (context.compress_preset_ == 1) {
-      preset = hshm::CompressionPreset::FAST;
+      preset = ctp::CompressionPreset::FAST;
     } else if (context.compress_preset_ == 3) {
-      preset = hshm::CompressionPreset::BEST;
+      preset = ctp::CompressionPreset::BEST;
     }
 
     // Create compressor with specified preset
-    auto compressor = hshm::CompressionFactory::GetPreset(library_name, preset);
+    auto compressor = ctp::CompressionFactory::GetPreset(library_name, preset);
 
     if (!compressor) {
       HLOG(kWarning, "Failed to create compressor for library: {}",
@@ -895,16 +895,16 @@ chi::TaskResume Runtime::Decompress(hipc::FullPtr<DecompressTask> task,
                                      : "zstd";
 
       // Map preset integer to enum
-      hshm::CompressionPreset preset = hshm::CompressionPreset::BALANCED;
+      ctp::CompressionPreset preset = ctp::CompressionPreset::BALANCED;
       if (compress_preset == 1) {
-        preset = hshm::CompressionPreset::FAST;
+        preset = ctp::CompressionPreset::FAST;
       } else if (compress_preset == 3) {
-        preset = hshm::CompressionPreset::BEST;
+        preset = ctp::CompressionPreset::BEST;
       }
 
       // Create decompressor
       auto decompressor =
-          hshm::CompressionFactory::GetPreset(library_name, preset);
+          ctp::CompressionFactory::GetPreset(library_name, preset);
       if (!decompressor) {
         CHI_IPC->FreeBuffer(temp_buffer);
         HLOG(kWarning, "Failed to create decompressor for library: {}",
@@ -1091,11 +1091,11 @@ chi::TaskResume Runtime::PollNodeLoad(hipc::FullPtr<PollNodeLoadTask> task,
 
   // CPU utilization since the last sample. Mutex protects prev_cpu_times_
   // because PollNodeLoad may run concurrently across workers.
-  hshm::CpuTimes cur = hshm::SystemInfo::GetCpuTimes();
+  ctp::CpuTimes cur = ctp::SystemInfo::GetCpuTimes();
   {
     std::lock_guard<std::mutex> lk(cpu_times_mutex_);
     sample.cpu_usage_pct_ =
-        hshm::SystemInfo::ComputeCpuUtilization(prev_cpu_times_, cur);
+        ctp::SystemInfo::ComputeCpuUtilization(prev_cpu_times_, cur);
     prev_cpu_times_ = cur;
   }
 

@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_LOGGING_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_LOGGING_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_UTIL_LOGGING_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_UTIL_LOGGING_H_
 
 #include <climits>
 #include <fstream>
@@ -70,26 +70,26 @@
  * Messages below this level will be compiled out entirely
  * Default: kInfo (1) - debug messages excluded in release builds
  */
-#ifndef HSHM_LOG_LEVEL
-#define HSHM_LOG_LEVEL kInfo
+#ifndef CTP_LOG_LEVEL
+#define CTP_LOG_LEVEL kInfo
 #endif
 
-namespace hshm {
+namespace ctp {
 
 /** Simplify access to Logger singleton */
-#define HSHM_LOG hshm::CrossSingleton<hshm::Logger>::GetInstance()
+#define CTP_LOG ctp::CrossSingleton<ctp::Logger>::GetInstance()
 
 /**
  * Hermes Print. Like printf, except types are inferred
  */
-#define HIPRINT(...) HSHM_LOG->Print(__VA_ARGS__)
+#define HIPRINT(...) CTP_LOG->Print(__VA_ARGS__)
 
 /**
  * Hermes SHM Log - Unified logging macro
  *
- * Messages with LOG_CODE < HSHM_LOG_LEVEL are compiled out entirely.
- * Messages with LOG_CODE >= HSHM_LOG_LEVEL are subject to runtime filtering
- * via the HSHM_LOG_LEVEL environment variable.
+ * Messages with LOG_CODE < CTP_LOG_LEVEL are compiled out entirely.
+ * Messages with LOG_CODE >= CTP_LOG_LEVEL are subject to runtime filtering
+ * via the CTP_LOG_LEVEL environment variable.
  *
  * @param LOG_CODE The log level (kDebug, kInfo, kWarning, kError, kFatal)
  * @param ... Format string and arguments
@@ -97,7 +97,7 @@ namespace hshm {
 // On the host pass, dispatch through the Logger singleton.
 //
 // On any device pass (CUDA/ROCm/SYCL), HLOG must be a no-op:
-//   - HSHM_LOG resolves through CrossSingleton<Logger>::GetInstance(),
+//   - CTP_LOG resolves through CrossSingleton<Logger>::GetInstance(),
 //     which holds a function-local static. DPC++ rejects non-const
 //     statics in SYCL kernels.
 //   - The arguments (cast to (void)) need to still be parsed so callers
@@ -106,11 +106,11 @@ namespace hshm {
 //     hipc::vector growth, deserialization paths) get traced by DPC++
 //     during kernel JIT even when not executed; making this a no-op
 //     stops that trace at the HLOG seam.
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 #define HLOG(LOG_CODE, ...)                                               \
   do {                                                                    \
-    if constexpr (LOG_CODE >= HSHM_LOG_LEVEL) {                           \
-      HSHM_LOG->Log<LOG_CODE>(__FILE__, __func__, __LINE__, __VA_ARGS__); \
+    if constexpr (LOG_CODE >= CTP_LOG_LEVEL) {                           \
+      CTP_LOG->Log<LOG_CODE>(__FILE__, __func__, __LINE__, __VA_ARGS__); \
     }                                                                     \
   } while (false)
 #else
@@ -121,8 +121,8 @@ namespace hshm {
  * Logger class for handling log output
  *
  * Supports:
- * - Runtime log level filtering via HSHM_LOG_LEVEL environment variable
- * - File output via HSHM_LOG_OUT environment variable
+ * - Runtime log level filtering via CTP_LOG_LEVEL environment variable
+ * - File output via CTP_LOG_OUT environment variable
  * - Routing to stdout (debug/info) or stderr (warning/error/fatal)
  */
 class Logger {
@@ -130,15 +130,15 @@ class Logger {
   FILE *fout_;
   int runtime_log_level_;  /**< Runtime log level threshold */
 
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   Logger() {
-#if HSHM_IS_HOST && !HSHM_IS_DEVICE_PASS
+#if CTP_IS_HOST && !CTP_IS_DEVICE_PASS
     fout_ = nullptr;
-    runtime_log_level_ = HSHM_LOG_LEVEL;  // Default to compile-time level
+    runtime_log_level_ = CTP_LOG_LEVEL;  // Default to compile-time level
 
     // Check for runtime log level override
-    std::string level_env = hshm::SystemInfo::Getenv(
-        "HSHM_LOG_LEVEL", hshm::Unit<size_t>::Megabytes(1));
+    std::string level_env = ctp::SystemInfo::Getenv(
+        "CTP_LOG_LEVEL", ctp::Unit<size_t>::Megabytes(1));
     if (!level_env.empty()) {
       // Parse log level - accept both numeric and string values
       if (level_env == "debug" || level_env == "DEBUG" || level_env == "0") {
@@ -164,8 +164,8 @@ class Logger {
     }
 
     // Check for file output
-    std::string env = hshm::SystemInfo::Getenv(
-        "HSHM_LOG_OUT", hshm::Unit<size_t>::Megabytes(1));
+    std::string env = ctp::SystemInfo::Getenv(
+        "CTP_LOG_OUT", ctp::Unit<size_t>::Megabytes(1));
     if (!env.empty()) {
       fout_ = fopen(env.c_str(), "w");
     }
@@ -177,7 +177,7 @@ class Logger {
    * @param level The log level
    * @return String name of the log level
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static const char* GetLevelString(int level) {
     switch (level) {
       case kDebug: return "DEBUG";
@@ -195,7 +195,7 @@ class Logger {
    * @param level The log level
    * @return ANSI escape sequence for the log level color
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static const char* GetLevelColor(int level) {
     switch (level) {
       case kDebug: return "\033[90m";    // Dark Grey
@@ -213,16 +213,16 @@ class Logger {
    * @param level The log level to check
    * @return true if the message should be logged
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool ShouldLog(int level) const {
     return level >= runtime_log_level_;
   }
 
   template <typename... Args>
-  HSHM_CROSS_FUN void Print(const char *fmt, Args &&...args) {
-#if HSHM_IS_HOST && !HSHM_IS_DEVICE_PASS
-    std::string msg = hshm::Formatter::format(fmt, std::forward<Args>(args)...);
-    std::string out = hshm::Formatter::format("{}\n", msg);
+  CTP_CROSS_FUN void Print(const char *fmt, Args &&...args) {
+#if CTP_IS_HOST && !CTP_IS_DEVICE_PASS
+    std::string msg = ctp::Formatter::format(fmt, std::forward<Args>(args)...);
+    std::string out = ctp::Formatter::format("{}\n", msg);
     std::cout << out;
     if (fout_) {
       fwrite(out.data(), 1, out.size(), fout_);
@@ -231,9 +231,9 @@ class Logger {
   }
 
   template <int LOG_CODE, typename... Args>
-  HSHM_CROSS_FUN void Log(const char *path, const char *func, int line,
+  CTP_CROSS_FUN void Log(const char *path, const char *func, int line,
                           const char *fmt, Args &&...args) {
-#if HSHM_IS_HOST && !HSHM_IS_DEVICE_PASS
+#if CTP_IS_HOST && !CTP_IS_DEVICE_PASS
     // Runtime log level check
     if (!ShouldLog(LOG_CODE)) {
       return;
@@ -242,9 +242,9 @@ class Logger {
     const char* level = GetLevelString(LOG_CODE);
     const char* color = GetLevelColor(LOG_CODE);
     const char* reset = "\033[0m";
-    std::string msg = hshm::Formatter::format(fmt, std::forward<Args>(args)...);
+    std::string msg = ctp::Formatter::format(fmt, std::forward<Args>(args)...);
     int tid = SystemInfo::GetTid();
-    std::string out = hshm::Formatter::format(
+    std::string out = ctp::Formatter::format(
         "{}{}:{} {} {} {} {}{}\n",
         color, path, line, level, tid, func, msg, reset);
 
@@ -260,7 +260,7 @@ class Logger {
 
     // Write to file without color codes
     if (fout_) {
-      std::string file_out = hshm::Formatter::format(
+      std::string file_out = ctp::Formatter::format(
           "{}:{} {} {} {} {}\n", path, line, level, tid, func, msg);
       fwrite(file_out.data(), 1, file_out.size(), fout_);
       fflush(fout_);
@@ -274,6 +274,6 @@ class Logger {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_LOGGING_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_UTIL_LOGGING_H_

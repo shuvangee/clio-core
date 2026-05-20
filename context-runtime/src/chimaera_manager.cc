@@ -43,7 +43,7 @@
 #include "chimaera/singletons.h"
 
 // Global pointer variable definition for Chimaera manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::Chimaera, g_chimaera_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::Chimaera, g_chimaera_manager);
 
 static void ChimaeraCleanupAtExit() {
   if (g_chimaera_manager) {
@@ -55,10 +55,10 @@ static void ChimaeraCleanupAtExit() {
 namespace chi {
 
 // HSHM Thread-local storage key definitions
-hshm::ThreadLocalKey chi_cur_worker_key_;
+ctp::ThreadLocalKey chi_cur_worker_key_;
 bool chi_cur_worker_key_created_ = false;
-hshm::ThreadLocalKey chi_task_counter_key_;
-hshm::ThreadLocalKey chi_is_client_thread_key_;
+ctp::ThreadLocalKey chi_task_counter_key_;
+ctp::ThreadLocalKey chi_is_client_thread_key_;
 
 /**
  * Create a new TaskId with current process/thread info and next major counter
@@ -66,11 +66,11 @@ hshm::ThreadLocalKey chi_is_client_thread_key_;
 TaskId CreateTaskId() {
   // Get thread-local task counter at the beginning
   TaskCounter *counter =
-      HSHM_THREAD_MODEL->GetTls<TaskCounter>(chi_task_counter_key_);
+      CTP_THREAD_MODEL->GetTls<TaskCounter>(chi_task_counter_key_);
   if (!counter) {
     // Initialize counter if not present
     counter = new TaskCounter();
-    HSHM_THREAD_MODEL->SetTls(chi_task_counter_key_, counter);
+    CTP_THREAD_MODEL->SetTls(chi_task_counter_key_, counter);
   }
 
   // Get node_id from IpcManager
@@ -96,11 +96,11 @@ TaskId CreateTaskId() {
 
   // Fallback: Create new TaskId using counter (client mode or no current task)
   // Get system information singleton (avoid direct dereferencing)
-  auto *system_info = HSHM_SYSTEM_INFO;
+  auto *system_info = CTP_SYSTEM_INFO;
   u32 pid = system_info ? system_info->pid_ : 0;
 
   // Get thread ID
-  u32 tid = static_cast<u32>(HSHM_THREAD_MODEL->GetTid().tid_);
+  u32 tid = static_cast<u32>(CTP_THREAD_MODEL->GetTid().tid_);
 
   // Get next counter value for both major and unique
   u32 major = counter->GetNext();

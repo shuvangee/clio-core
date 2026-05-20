@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_RANDOM_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_RANDOM_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_UTIL_RANDOM_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_UTIL_RANDOM_H_
 
 #include <chrono>
 #include <memory>
 #include <random>
 
-namespace hshm {
+namespace ctp {
 
 class Distribution {
  protected:
@@ -147,6 +147,6 @@ class UniformDistribution : public Distribution {
   double GetDouble() override { return distribution_(generator); }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_RANDOM_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_UTIL_RANDOM_H_

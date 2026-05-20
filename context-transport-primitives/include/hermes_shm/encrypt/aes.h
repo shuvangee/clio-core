@@ -31,10 +31,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_ENCRYPT_AES_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_ENCRYPT_AES_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_UTIL_ENCRYPT_AES_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_UTIL_ENCRYPT_AES_H_
 
-#if HSHM_ENABLE_ENCRYPT
+#if CTP_ENABLE_ENCRYPT
 
 #include <openssl/aes.h>
 #include <openssl/evp.h>
@@ -44,7 +44,7 @@
 
 #include "hermes_shm/data_structures/all.h"
 
-namespace hshm {
+namespace ctp {
 
 class AES {
  public:
@@ -128,8 +128,8 @@ class AES {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_ENCRYPT
+#endif  // CTP_ENABLE_ENCRYPT
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_UTIL_ENCRYPT_AES_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_UTIL_ENCRYPT_AES_H_

@@ -31,11 +31,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_THREAD_LOCK_H_
-#define HSHM_THREAD_LOCK_H_
+#ifndef CTP_THREAD_LOCK_H_
+#define CTP_THREAD_LOCK_H_
 
 #include "lock/mutex.h"
 #include "lock/rwlock.h"
 #include "thread_model_manager.h"
 
-#endif  // HSHM_THREAD_LOCK_H_
+#endif  // CTP_THREAD_LOCK_H_

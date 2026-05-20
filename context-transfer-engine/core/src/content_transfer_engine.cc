@@ -38,7 +38,7 @@
 #include <string>
 
 // Define global pointer variable in source file (outside namespace)
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(wrp_cte::core::ContentTransferEngine,
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(wrp_cte::core::ContentTransferEngine,
                               g_cte_manager);
 
 namespace wrp_cte::core {

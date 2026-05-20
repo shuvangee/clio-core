@@ -35,14 +35,14 @@
  *                                  stats (default 5)
  */
 
-#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#if (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL
 
 #include <hermes_shm/util/gpu_api.h>
 
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
 #include <cuda_runtime.h>
 #endif
-#if HSHM_ENABLE_ROCM
+#if CTP_ENABLE_ROCM
 #include <hip/hip_runtime.h>
 #endif
 
@@ -184,7 +184,7 @@ const char *DirName(Dir d) {
   return "?";
 }
 
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
 cudaMemcpyKind ToCudaKind(Dir d) {
   switch (d) {
     case Dir::D2H: return cudaMemcpyDeviceToHost;
@@ -194,7 +194,7 @@ cudaMemcpyKind ToCudaKind(Dir d) {
   }
   return cudaMemcpyDefault;
 }
-#elif HSHM_ENABLE_ROCM
+#elif CTP_ENABLE_ROCM
 hipMemcpyKind ToHipKind(Dir d) {
   switch (d) {
     case Dir::D2H: return hipMemcpyDeviceToHost;
@@ -219,14 +219,14 @@ BufPair AllocPair(Dir d, std::size_t bytes, bool pinned) {
   BufPair bp{};
   auto alloc_host = [&](void **out) {
     if (pinned) {
-      *out = hshm::GpuApi::MallocHost<char>(bytes);
+      *out = ctp::GpuApi::MallocHost<char>(bytes);
     } else {
       *out = std::malloc(bytes);
       if (*out) std::memset(*out, 0xA5, bytes);
     }
   };
   auto alloc_dev = [&](void **out) {
-    *out = hshm::GpuApi::Malloc<char>(bytes);
+    *out = ctp::GpuApi::Malloc<char>(bytes);
   };
   switch (d) {
     case Dir::D2H: alloc_dev(&bp.src); alloc_host(&bp.dst); break;
@@ -243,11 +243,11 @@ BufPair AllocPair(Dir d, std::size_t bytes, bool pinned) {
 
 void FreePair(Dir d, BufPair &bp, bool pinned) {
   auto free_host = [&](void *p) {
-    if (pinned) hshm::GpuApi::FreeHost(static_cast<char *>(p));
+    if (pinned) ctp::GpuApi::FreeHost(static_cast<char *>(p));
     else std::free(p);
   };
   auto free_dev = [&](void *p) {
-    hshm::GpuApi::Free(static_cast<char *>(p));
+    ctp::GpuApi::Free(static_cast<char *>(p));
   };
   switch (d) {
     case Dir::D2H: free_dev(bp.src); free_host(bp.dst); break;
@@ -262,7 +262,7 @@ double TimeOneCopy(Dir d, void *dst, const void *src, std::size_t bytes,
                     bool async, void *stream) {
   using clk = std::chrono::steady_clock;
   auto t0 = clk::now();
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
   if (async) {
     cudaMemcpyAsync(dst, src, bytes, ToCudaKind(d),
                     static_cast<cudaStream_t>(stream));
@@ -270,7 +270,7 @@ double TimeOneCopy(Dir d, void *dst, const void *src, std::size_t bytes,
   } else {
     cudaMemcpy(dst, src, bytes, ToCudaKind(d));
   }
-#elif HSHM_ENABLE_ROCM
+#elif CTP_ENABLE_ROCM
   if (async) {
     hipMemcpyAsync(dst, src, bytes, ToHipKind(d),
                    static_cast<hipStream_t>(stream));
@@ -341,10 +341,10 @@ int main(int argc, char *argv[]) {
   if (opts.single_size > 0) opts.sizes = {opts.single_size};
   else if (opts.sizes.empty()) opts.sizes = kDefaultSizes;
 
-  hshm::GpuApi::SetDevice(opts.gpu_id);
+  ctp::GpuApi::SetDevice(opts.gpu_id);
 
   void *stream = nullptr;
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
   if (opts.async) {
     cudaStream_t s = nullptr;
     if (opts.stream_nonblocking) {
@@ -355,7 +355,7 @@ int main(int argc, char *argv[]) {
     }
     stream = static_cast<void *>(s);
   }
-#elif HSHM_ENABLE_ROCM
+#elif CTP_ENABLE_ROCM
   if (opts.async) {
     hipStream_t s = nullptr;
     if (opts.stream_nonblocking) {
@@ -383,11 +383,11 @@ int main(int argc, char *argv[]) {
     RunOne(opts, bytes, stream);
   }
 
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
   if (opts.async && stream && opts.stream_nonblocking) {
     cudaStreamDestroy(static_cast<cudaStream_t>(stream));
   }
-#elif HSHM_ENABLE_ROCM
+#elif CTP_ENABLE_ROCM
   if (opts.async && stream && opts.stream_nonblocking) {
     hipStreamDestroy(static_cast<hipStream_t>(stream));
   }
@@ -399,4 +399,4 @@ int main(int argc, char *argv[]) {
 
 int main() { return 0; }
 
-#endif  // (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM) && !HSHM_ENABLE_SYCL
+#endif  // (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM) && !CTP_ENABLE_SYCL

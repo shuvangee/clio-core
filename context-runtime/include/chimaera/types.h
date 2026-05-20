@@ -54,10 +54,10 @@
 namespace chi {
 
 // Basic type aliases using HSHM types
-using u32 = hshm::u32;
-using u64 = hshm::u64;
-using i64 = hshm::i64;
-using ibitfield = hshm::ibitfield;
+using u32 = ctp::u32;
+using u64 = ctp::u64;
+using i64 = ctp::i64;
+using ibitfield = ctp::ibitfield;
 
 // Node state for SWIM-inspired failure detection
 enum class NodeState : u32 {
@@ -154,32 +154,32 @@ struct UniqueId {
   u32 major_;
   u32 minor_;
 
-  HSHM_CROSS_FUN constexpr UniqueId() : major_(0), minor_(0) {}
-  HSHM_CROSS_FUN constexpr UniqueId(u32 major, u32 minor)
+  CTP_CROSS_FUN constexpr UniqueId() : major_(0), minor_(0) {}
+  CTP_CROSS_FUN constexpr UniqueId(u32 major, u32 minor)
       : major_(major), minor_(minor) {}
 
   // Equality operators
-  HSHM_CROSS_FUN bool operator==(const UniqueId &other) const {
+  CTP_CROSS_FUN bool operator==(const UniqueId &other) const {
     return major_ == other.major_ && minor_ == other.minor_;
   }
 
-  HSHM_CROSS_FUN bool operator!=(const UniqueId &other) const {
+  CTP_CROSS_FUN bool operator!=(const UniqueId &other) const {
     return !(*this == other);
   }
 
   // Comparison operators for ordering
-  HSHM_CROSS_FUN bool operator<(const UniqueId &other) const {
+  CTP_CROSS_FUN bool operator<(const UniqueId &other) const {
     if (major_ != other.major_) return major_ < other.major_;
     return minor_ < other.minor_;
   }
 
   // Convert to u64 for compatibility and hashing
-  HSHM_CROSS_FUN u64 ToU64() const {
+  CTP_CROSS_FUN u64 ToU64() const {
     return (static_cast<u64>(major_) << 32) | static_cast<u64>(minor_);
   }
 
   // Create from u64
-  HSHM_CROSS_FUN static UniqueId FromU64(u64 value) {
+  CTP_CROSS_FUN static UniqueId FromU64(u64 value) {
     return UniqueId(static_cast<u32>(value >> 32),
                     static_cast<u32>(value & 0xFFFFFFFF));
   }
@@ -198,14 +198,14 @@ struct UniqueId {
   std::string ToString() const;
 
   // Get null/invalid instance
-  HSHM_CROSS_FUN static constexpr UniqueId GetNull() { return UniqueId(0, 0); }
+  CTP_CROSS_FUN static constexpr UniqueId GetNull() { return UniqueId(0, 0); }
 
   // Check if this is a null/invalid ID
-  HSHM_CROSS_FUN bool IsNull() const { return major_ == 0 && minor_ == 0; }
+  CTP_CROSS_FUN bool IsNull() const { return major_ == 0 && minor_ == 0; }
 
   // Serialization support
   template <typename Ar>
-  HSHM_CROSS_FUN void serialize(Ar &ar) {
+  CTP_CROSS_FUN void serialize(Ar &ar) {
     ar.range(major_, minor_);
   }
 };
@@ -235,7 +235,7 @@ struct TaskId {
   u32 node_id_;     ///< Node identifier for distributed execution
   size_t net_key_;  ///< Network key for send/recv map lookup (pointer-based)
 
-  HSHM_CROSS_FUN TaskId()
+  CTP_CROSS_FUN TaskId()
       : pid_(0),
         tid_(0),
         major_(0),
@@ -243,7 +243,7 @@ struct TaskId {
         unique_(0),
         node_id_(0),
         net_key_(0) {}
-  HSHM_CROSS_FUN TaskId(u32 pid, u32 tid, u32 major, u32 replica_id = 0,
+  CTP_CROSS_FUN TaskId(u32 pid, u32 tid, u32 major, u32 replica_id = 0,
                         u32 unique = 0, u64 node_id = 0, size_t net_key = 0)
       : pid_(pid),
         tid_(tid),
@@ -254,7 +254,7 @@ struct TaskId {
         net_key_(net_key) {}
 
   // Equality operators
-  HSHM_CROSS_FUN bool operator==(const TaskId &other) const {
+  CTP_CROSS_FUN bool operator==(const TaskId &other) const {
     return pid_ == other.pid_ && tid_ == other.tid_ && major_ == other.major_ &&
            replica_id_ == other.replica_id_ && unique_ == other.unique_ &&
            node_id_ == other.node_id_ && net_key_ == other.net_key_;
@@ -263,7 +263,7 @@ struct TaskId {
   bool operator!=(const TaskId &other) const { return !(*this == other); }
 
   // Convert to u64 for hashing (combine all fields)
-  HSHM_CROSS_FUN u64 ToU64() const {
+  CTP_CROSS_FUN u64 ToU64() const {
     // Combine multiple fields using XOR and shifts for better distribution
     u64 hash1 = (static_cast<u64>(pid_) << 32) | static_cast<u64>(tid_);
     u64 hash2 =
@@ -275,7 +275,7 @@ struct TaskId {
 
   // Serialization support
   template <typename Ar>
-  HSHM_CROSS_FUN void serialize(Ar &ar) {
+  CTP_CROSS_FUN void serialize(Ar &ar) {
     ar.range(pid_, tid_, major_, replica_id_, unique_, node_id_, net_key_);
   }
 };
@@ -301,10 +301,10 @@ struct LockOwnerId {
   u32 major_;
   u64 node_id_;
 
-  HSHM_CROSS_FUN LockOwnerId()
+  CTP_CROSS_FUN LockOwnerId()
       : worker_id_(0), pid_(0), tid_(0), major_(0), node_id_(0) {}
 
-  HSHM_CROSS_FUN LockOwnerId(u32 worker_id, u32 pid, u32 tid, u32 major,
+  CTP_CROSS_FUN LockOwnerId(u32 worker_id, u32 pid, u32 tid, u32 major,
                              u64 node_id)
       : worker_id_(worker_id),
         pid_(pid),
@@ -312,23 +312,23 @@ struct LockOwnerId {
         major_(major),
         node_id_(node_id) {}
 
-  HSHM_CROSS_FUN bool IsNull() const {
+  CTP_CROSS_FUN bool IsNull() const {
     return worker_id_ == 0 && pid_ == 0 && tid_ == 0 && major_ == 0 &&
            node_id_ == 0;
   }
 
-  HSHM_CROSS_FUN bool operator==(const LockOwnerId &other) const {
+  CTP_CROSS_FUN bool operator==(const LockOwnerId &other) const {
     if (IsNull() || other.IsNull()) return false;
     return worker_id_ == other.worker_id_ && pid_ == other.pid_ &&
            tid_ == other.tid_ && major_ == other.major_ &&
            node_id_ == other.node_id_;
   }
 
-  HSHM_CROSS_FUN bool operator!=(const LockOwnerId &other) const {
+  CTP_CROSS_FUN bool operator!=(const LockOwnerId &other) const {
     return !(*this == other);
   }
 
-  HSHM_CROSS_FUN void Clear() {
+  CTP_CROSS_FUN void Clear() {
     worker_id_ = 0;
     pid_ = 0;
     tid_ = 0;
@@ -341,10 +341,10 @@ struct LockOwnerId {
 // (CUDA/ROCm/SYCL) return a default-constructed sentinel — chimods that
 // would call this from device code (corwlock helpers traced by DPC++) get
 // a parseable inline body instead of an unresolved external reference.
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 LockOwnerId GetCurrentLockOwnerId();
 #else
-inline HSHM_CROSS_FUN LockOwnerId GetCurrentLockOwnerId() {
+inline CTP_CROSS_FUN LockOwnerId GetCurrentLockOwnerId() {
   return LockOwnerId{};
 }
 #endif
@@ -460,7 +460,7 @@ constexpr PoolId kAdminPoolId =
 //   GPU: BuddyAllocator       — per-thread GPU allocator
 //
 // CHI_PRIV_ALLOC_T / CHI_PRIV_ALLOC: private data allocator and instance
-//   CPU: MallocAllocator / HSHM_MALLOC
+//   CPU: MallocAllocator / CTP_MALLOC
 //   GPU: CHI_TASK_ALLOC_T   / CHI_IPC->GetMainAllocator()
 //        (task constructors are never called from GPU kernels, so the GPU
 //         CHI_PRIV_ALLOC is only used for dynamic chi::priv operations in kernels)
@@ -471,17 +471,17 @@ enum class AllocScope { kPrivate, kShared };
 
 // Use the host allocators when compiling host CPU code under any compiler;
 // any device pass (CUDA/ROCm/SYCL) takes the GPU branch below. Switching
-// from `HSHM_IS_HOST` to `!HSHM_IS_DEVICE_PASS` is what lets DPC++'s SYCL
-// device pass — where HSHM_IS_HOST=1 because no __CUDA_ARCH__ is set —
+// from `CTP_IS_HOST` to `!CTP_IS_DEVICE_PASS` is what lets DPC++'s SYCL
+// device pass — where CTP_IS_HOST=1 because no __CUDA_ARCH__ is set —
 // avoid the host-only MallocAllocatorSingleton (whose function-local
 // static is rejected by SYCL kernels).
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 #define CHI_TASK_ALLOC_T  hipc::MultiProcessAllocator
 #define CHI_PRIV_ALLOC_T  hipc::MallocAllocator
-#define CHI_PRIV_ALLOC    HSHM_MALLOC
+#define CHI_PRIV_ALLOC    CTP_MALLOC
 // On CPU, shared == private (single-threaded MallocAllocator)
 #define CHI_PRIV_SHARED_ALLOC_T hipc::MallocAllocator
-#define CHI_PRIV_SHARED_ALLOC   HSHM_MALLOC
+#define CHI_PRIV_SHARED_ALLOC   CTP_MALLOC
 #else
 #define CHI_TASK_ALLOC_T  hipc::BuddyAllocator
 // GPU: CHI_PRIV_ALLOC uses a cached PrivateBuddyAllocator* per warp.
@@ -495,14 +495,14 @@ enum class AllocScope { kPrivate, kShared };
  *
  * @return Pointer to the warp's cached BuddyAllocator
  */
-HSHM_GPU_FUN hipc::PrivateBuddyAllocator *GetPrivAllocGpu();
+CTP_GPU_FUN hipc::PrivateBuddyAllocator *GetPrivAllocGpu();
 #define CHI_PRIV_ALLOC    (::chi::GetPrivAllocGpu())
 // GPU: CHI_PRIV_SHARED_ALLOC returns the PartitionedAllocator (PartitionedAllocator)
 // which dispatches allocations to the calling warp's partition via GetAutoTid().
 // Use for cross-warp data structures (shared maps, vectors) where multiple warps
 // may allocate/free concurrently.
 #define CHI_PRIV_SHARED_ALLOC_T hipc::RoundRobinAllocator
-HSHM_GPU_FUN hipc::RoundRobinAllocator *GetSharedAllocGpu();
+CTP_GPU_FUN hipc::RoundRobinAllocator *GetSharedAllocGpu();
 #define CHI_PRIV_SHARED_ALLOC   (::chi::GetSharedAllocGpu())
 #endif
 
@@ -520,10 +520,10 @@ enum MemorySegment {
 #define TEMP
 
 // HSHM Thread-local storage keys
-extern hshm::ThreadLocalKey chi_cur_worker_key_;
+extern ctp::ThreadLocalKey chi_cur_worker_key_;
 extern bool chi_cur_worker_key_created_;
-extern hshm::ThreadLocalKey chi_task_counter_key_;
-extern hshm::ThreadLocalKey chi_is_client_thread_key_;
+extern ctp::ThreadLocalKey chi_task_counter_key_;
+extern ctp::ThreadLocalKey chi_is_client_thread_key_;
 
 /**
  * Thread-local task counter for generating unique TaskId major and unique
@@ -545,13 +545,13 @@ struct TaskCounter {
  * @return TaskId with pid, tid, major, replica_id_, unique, and node_id
  * populated
  */
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
 TaskId CreateTaskId();  // Host implementation in chimaera_manager.cc
 #else
 // Device-pass inline implementation — simplified version. Used under
-// CUDA/ROCm/SYCL device passes; HSHM_IS_DEVICE_PASS makes the SYCL pass
+// CUDA/ROCm/SYCL device passes; CTP_IS_DEVICE_PASS makes the SYCL pass
 // pick the inline body instead of the unresolved host declaration.
-inline HSHM_CROSS_FUN TaskId CreateTaskId() {
+inline CTP_CROSS_FUN TaskId CreateTaskId() {
   TaskId id;
   id.pid_ = 0;
   id.tid_ = 0;
@@ -616,26 +616,26 @@ enum class IpcMode : u32 {
 }  // namespace chi
 
 namespace chi::priv {
-typedef hshm::priv::string<CHI_PRIV_ALLOC_T> string;
+typedef ctp::priv::string<CHI_PRIV_ALLOC_T> string;
 
 template <typename T>
-using vector = hshm::priv::vector<T, CHI_PRIV_ALLOC_T>;
+using vector = ctp::priv::vector<T, CHI_PRIV_ALLOC_T>;
 
 template <typename Key, typename T>
-using unordered_map = hshm::priv::unordered_map_ll<Key, T, CHI_PRIV_ALLOC_T>;
+using unordered_map = ctp::priv::unordered_map_ll<Key, T, CHI_PRIV_ALLOC_T>;
 
 // Shared-scope types for cross-warp GPU data structures.
 // On CPU these are identical to the private types above.
 // On GPU, AllocT = PartitionedAllocator which dispatches to the correct
 // warp partition, avoiding concurrent access to a single BuddyAllocator.
-typedef hshm::priv::string<CHI_PRIV_SHARED_ALLOC_T> shared_string;
+typedef ctp::priv::string<CHI_PRIV_SHARED_ALLOC_T> shared_string;
 
 template <typename T>
-using shared_vector = hshm::priv::vector<T, CHI_PRIV_SHARED_ALLOC_T>;
+using shared_vector = ctp::priv::vector<T, CHI_PRIV_SHARED_ALLOC_T>;
 
 template <typename Key, typename T>
 using shared_unordered_map =
-    hshm::priv::unordered_map_ll<Key, T, CHI_PRIV_SHARED_ALLOC_T>;
+    ctp::priv::unordered_map_ll<Key, T, CHI_PRIV_SHARED_ALLOC_T>;
 }  // namespace chi::priv
 
 namespace chi::ipc {

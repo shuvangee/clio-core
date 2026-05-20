@@ -31,17 +31,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_Brotli_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_Brotli_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_Brotli_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_Brotli_H_
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
 
 #include <brotli/decode.h>
 #include <brotli/encode.h>
 
 #include "compress.h"
 
-namespace hshm {
+namespace ctp {
 
 class Brotli : public Compressor {
  public:
@@ -85,8 +85,8 @@ class Brotli : public Compressor {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_COMPRESS
+#endif  // CTP_ENABLE_COMPRESS
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_Brotli_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_Brotli_H_

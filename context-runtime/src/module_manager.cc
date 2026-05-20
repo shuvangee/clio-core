@@ -49,7 +49,7 @@
 #include "chimaera/container.h"
 
 // Global pointer variable definition for Module manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::ModuleManager, g_module_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::ModuleManager, g_module_manager);
 
 namespace chi {
 
@@ -303,7 +303,7 @@ bool ModuleManager::HasModuleNamingConvention(
   return file_path.find("_runtime.so") != std::string::npos;
 }
 
-bool ModuleManager::ValidateChiMod(hshm::SharedLibrary &lib) const {
+bool ModuleManager::ValidateChiMod(ctp::SharedLibrary &lib) const {
   // Check for required ChiMod functions
   void *alloc_func = lib.GetSymbol("alloc_chimod");
   void *new_func = lib.GetSymbol("new_chimod");

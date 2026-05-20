@@ -31,10 +31,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_SZ_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_SZ_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_SZ_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_SZ_H_
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
 
 #include <sz/sz.h>
 #include <cstring>
@@ -42,7 +42,7 @@
 
 #include "compress.h"
 
-namespace hshm {
+namespace ctp {
 
 /**
  * SZ (classic) error-bounded lossy compressor wrapper
@@ -253,8 +253,8 @@ class Sz : public Compressor {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_COMPRESS
+#endif  // CTP_ENABLE_COMPRESS
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_COMPRESS_SZ_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_COMPRESS_SZ_H_

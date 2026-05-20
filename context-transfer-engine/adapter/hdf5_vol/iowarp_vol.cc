@@ -23,7 +23,7 @@
 
 #include <chimaera/chimaera.h>
 /* transport_factory_impl.h provides the inline definitions of
-   hshm::lbm::Transport::ClearRecvHandles / Send<...>. They are required
+   ctp::lbm::Transport::ClearRecvHandles / Send<...>. They are required
    when AsyncPutBlob template-instantiates here (it doesn't fire from
    chimaera.h alone). Without this include the linker leaves the
    templated symbols undefined in our .so. */

@@ -77,7 +77,7 @@ class CoreClientConfigFixture {
     INFO("=== Initializing Core Client/Config Test Environment ===");
 
     // Initialize test paths
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
     REQUIRE(!home_dir.empty());
     test_storage_path_ = home_dir + "/cte_client_test.dat";
     test_config_path_ = home_dir + "/cte_test_config.yaml";

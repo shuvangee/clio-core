@@ -11,11 +11,11 @@
 #include "chimaera/ipc/ipc_gpu2cpu.h"
 #include "hermes_shm/util/gpu_intrinsics.h"
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 
 namespace chi {
 
-#if HSHM_IS_GPU_COMPILER || HSHM_IS_SYCL_COMPILER
+#if CTP_IS_GPU_COMPILER || CTP_IS_SYCL_COMPILER
 /**
  * GPU-side ClientSend.
  *
@@ -31,11 +31,11 @@ namespace chi {
  *   - SYCL: kernels are single_task by convention, so the full WI runs.
  */
 template <typename TaskT>
-HSHM_GPU_FUN gpu::Future<TaskT> IpcGpu2Cpu::ClientSend(
+CTP_GPU_FUN gpu::Future<TaskT> IpcGpu2Cpu::ClientSend(
     gpu::IpcManager *ipc, const hipc::FullPtr<TaskT> &task_ptr) {
   gpu::Future<TaskT> future;
 
-#if HSHM_IS_GPU_COMPILER
+#if CTP_IS_GPU_COMPILER
   if (threadIdx.x != 0) return future;
 #endif
 
@@ -69,14 +69,14 @@ HSHM_GPU_FUN gpu::Future<TaskT> IpcGpu2Cpu::ClientSend(
   future = gpu::Future<TaskT>(fshmptr, task_ptr);
 
   gpu::Future<Task> task_future(fshmptr, task_for_queue);
-  HSHM_DEVICE_FENCE_SYSTEM();
+  CTP_DEVICE_FENCE_SYSTEM();
   auto &qlane = ipc->gpu_info_.gpu2cpu_queue->GetLane(0, 0);
   qlane.Push(task_future);
   return future;
 }
-#endif  // HSHM_IS_GPU_COMPILER || HSHM_IS_SYCL_COMPILER
+#endif  // CTP_IS_GPU_COMPILER || CTP_IS_SYCL_COMPILER
 
-#if HSHM_IS_GPU_COMPILER || HSHM_IS_SYCL_COMPILER
+#if CTP_IS_GPU_COMPILER || CTP_IS_SYCL_COMPILER
 /**
  * GPU-side Wait.
  *
@@ -85,9 +85,9 @@ HSHM_GPU_FUN gpu::Future<TaskT> IpcGpu2Cpu::ClientSend(
  * visible to a device-side volatile read through PCIe cache snooping.
  */
 template <typename TaskT, typename AllocT>
-HSHM_CROSS_FUN void gpu::Future<TaskT, AllocT>::Wait() {
-#if HSHM_IS_GPU || HSHM_IS_SYCL_DEVICE
-#if HSHM_IS_GPU_COMPILER
+CTP_CROSS_FUN void gpu::Future<TaskT, AllocT>::Wait() {
+#if CTP_IS_GPU || CTP_IS_SYCL_DEVICE
+#if CTP_IS_GPU_COMPILER
   if (threadIdx.x != 0) return;
 #endif
   if (future_shm_.IsNull()) return;
@@ -96,12 +96,12 @@ HSHM_CROSS_FUN void gpu::Future<TaskT, AllocT>::Wait() {
   volatile unsigned int *fp =
       reinterpret_cast<volatile unsigned int *>(&fshm->flags_.bits_.x);
   while (!((*fp) & gpu::FutureShm::FUTURE_COMPLETE)) {}
-  HSHM_DEVICE_FENCE_SYSTEM();
+  CTP_DEVICE_FENCE_SYSTEM();
 #endif
 }
-#endif  // HSHM_IS_GPU_COMPILER || HSHM_IS_SYCL_COMPILER
+#endif  // CTP_IS_GPU_COMPILER || CTP_IS_SYCL_COMPILER
 
 }  // namespace chi
 
-#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#endif  // CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 #endif  // CHIMAERA_INCLUDE_CHIMAERA_IPC_GPU2CPU_IMPL_H_

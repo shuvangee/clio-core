@@ -157,7 +157,7 @@ static std::string chi_test_data_dir() {
 
    CTEQueryTestFixture() {
      // Initialize test storage path in home directory
-     std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+     std::string home_dir = ctp::SystemInfo::Getenv("HOME");
      if (home_dir.empty()) {
        throw std::runtime_error("HOME environment variable is not set");
      }
@@ -274,7 +274,7 @@ static std::string chi_test_data_dir() {
   * Test TagQuery with exact match pattern
   */
  TEST_CASE("TagQuery - Exact Match", "[query][tagquery][exact]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
 
    auto *cte_client = WRP_CTE_CLIENT;
@@ -297,7 +297,7 @@ static std::string chi_test_data_dir() {
   * Test TagQuery with wildcard pattern
   */
  TEST_CASE("TagQuery - Wildcard Pattern", "[query][tagquery][wildcard]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing TagQuery with wildcard pattern");
 
@@ -328,7 +328,7 @@ static std::string chi_test_data_dir() {
   * Test TagQuery with alternation pattern
   */
  TEST_CASE("TagQuery - Alternation Pattern", "[query][tagquery][alternation]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing TagQuery with alternation pattern");
 
@@ -359,7 +359,7 @@ static std::string chi_test_data_dir() {
   * Test TagQuery with match-all pattern
   */
  TEST_CASE("TagQuery - Match All Pattern", "[query][tagquery][matchall]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing TagQuery with match-all pattern");
 
@@ -390,7 +390,7 @@ static std::string chi_test_data_dir() {
   * Test TagQuery with no matches
   */
  TEST_CASE("TagQuery - No Matches", "[query][tagquery][nomatch]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing TagQuery with pattern that matches nothing");
 
@@ -406,7 +406,7 @@ static std::string chi_test_data_dir() {
   * Test BlobQuery with exact tag and blob match
   */
  TEST_CASE("BlobQuery - Exact Match", "[query][blobquery][exact]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with exact match patterns");
 
@@ -432,7 +432,7 @@ static std::string chi_test_data_dir() {
   * Test BlobQuery with wildcard patterns
   */
  TEST_CASE("BlobQuery - Wildcard Patterns", "[query][blobquery][wildcard]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with wildcard patterns");
 
@@ -459,7 +459,7 @@ static std::string chi_test_data_dir() {
   * Test BlobQuery with multiple tag matches
   */
  TEST_CASE("BlobQuery - Multiple Tags", "[query][blobquery][multitag]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with multiple tag matches");
 
@@ -484,7 +484,7 @@ static std::string chi_test_data_dir() {
   * Test BlobQuery with match-all patterns
   */
  TEST_CASE("BlobQuery - Match All", "[query][blobquery][matchall]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with match-all patterns");
 
@@ -500,7 +500,7 @@ static std::string chi_test_data_dir() {
   * Test BlobQuery with no blob matches
   */
  TEST_CASE("BlobQuery - No Blob Matches", "[query][blobquery][noblob]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with blob pattern that matches nothing");
 
@@ -516,7 +516,7 @@ static std::string chi_test_data_dir() {
   * Test BlobQuery with no tag matches
   */
  TEST_CASE("BlobQuery - No Tag Matches", "[query][blobquery][notag]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with tag pattern that matches nothing");
 
@@ -532,7 +532,7 @@ static std::string chi_test_data_dir() {
   * Test Query API with Local pool query
   */
  TEST_CASE("Query - Local Pool Query", "[query][poolquery][local]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing query APIs with Local pool query");
 

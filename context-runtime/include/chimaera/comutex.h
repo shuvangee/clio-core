@@ -46,7 +46,7 @@ namespace chi {
  */
 class CoMutex {
  public:
-  hshm::Mutex lock_;
+  ctp::Mutex lock_;
   LockOwnerId holder_;
   u32 depth_;
 

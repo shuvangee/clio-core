@@ -117,7 +117,7 @@ size_t FindJsonKey(const std::string& s, const std::string& key, size_t start = 
 
 }  // anonymous namespace
 
-namespace hshm {
+namespace ctp {
 namespace compress {
 
 LinRegTablePredictor::LinRegTablePredictor()
@@ -653,4 +653,4 @@ std::vector<std::string> LinRegTablePredictor::GetDistributions() const {
 }
 
 }  // namespace compress
-}  // namespace hshm
+}  // namespace ctp

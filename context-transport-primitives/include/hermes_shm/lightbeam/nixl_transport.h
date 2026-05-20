@@ -32,7 +32,7 @@
  */
 
 #pragma once
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
 
 #include <nixl.h>
 
@@ -45,7 +45,7 @@
 #include "hermes_shm/util/logging.h"
 #include "lightbeam.h"
 
-namespace hshm::lbm {
+namespace ctp::lbm {
 
 /**
  * @brief NIXL-backed lightbeam transport.
@@ -107,7 +107,7 @@ class NixlTransport : public Transport {
     Bulk bulk;
     bulk.data = ptr;
     bulk.size = data_size;
-    bulk.flags = hshm::bitfield32_t(flags);
+    bulk.flags = ctp::bitfield32_t(flags);
     return bulk;
   }
 
@@ -341,6 +341,6 @@ class NixlTransport : public Transport {
   }
 };
 
-}  // namespace hshm::lbm
+}  // namespace ctp::lbm
 
-#endif  // HSHM_ENABLE_NIXL
+#endif  // CTP_ENABLE_NIXL

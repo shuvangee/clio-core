@@ -74,9 +74,9 @@
 using namespace chi;
 
 namespace {
-// Helper allocator for tests - uses HSHM_MALLOC for non-IPC allocations
+// Helper allocator for tests - uses CTP_MALLOC for non-IPC allocations
 hipc::MallocAllocator* GetTestAllocator() {
-  return HSHM_MALLOC;
+  return CTP_MALLOC;
 }
 
 // Initialize Chimaera runtime for tests
@@ -161,10 +161,10 @@ TEST_CASE("SaveTask and LoadTask - Admin CreateTask full flow",
 
   // Create task manually (matching pattern from test_task_archive.cc)
   auto loaded_in_task = ipc_manager->NewTask<chimaera::admin::CreateTask>();
-  loaded_in_task->chimod_name_ = chi::priv::string(HSHM_MALLOC, std::string(""));
-  loaded_in_task->pool_name_ = chi::priv::string(HSHM_MALLOC, std::string(""));
-  loaded_in_task->chimod_params_ = chi::priv::string(HSHM_MALLOC, std::string(""));
-  loaded_in_task->error_message_ = chi::priv::string(HSHM_MALLOC, std::string(""));
+  loaded_in_task->chimod_name_ = chi::priv::string(CTP_MALLOC, std::string(""));
+  loaded_in_task->pool_name_ = chi::priv::string(CTP_MALLOC, std::string(""));
+  loaded_in_task->chimod_params_ = chi::priv::string(CTP_MALLOC, std::string(""));
+  loaded_in_task->error_message_ = chi::priv::string(CTP_MALLOC, std::string(""));
   load_in_archive >> *loaded_in_task;
 
   hipc::FullPtr<chi::Task> loaded_in_task_ptr = loaded_in_task.template Cast<chi::Task>();
@@ -189,7 +189,7 @@ TEST_CASE("SaveTask and LoadTask - Admin CreateTask full flow",
   // Step 5: Modify output parameters in loaded task
   loaded_in_task->new_pool_id_ = chi::PoolId(7000, 0);
   loaded_in_task->error_message_ =
-      chi::priv::string(HSHM_MALLOC, std::string("test error message from server"));
+      chi::priv::string(CTP_MALLOC, std::string("test error message from server"));
   loaded_in_task->SetReturnCode(42);
 
   // Step 6: SaveOut - serialize OUT/INOUT parameters
@@ -207,10 +207,10 @@ TEST_CASE("SaveTask and LoadTask - Admin CreateTask full flow",
 
   // Create task manually (matching pattern from test_task_archive.cc)
   auto loaded_out_task = ipc_manager->NewTask<chimaera::admin::CreateTask>();
-  loaded_out_task->chimod_name_ = chi::priv::string(HSHM_MALLOC, std::string(""));
-  loaded_out_task->pool_name_ = chi::priv::string(HSHM_MALLOC, std::string(""));
-  loaded_out_task->chimod_params_ = chi::priv::string(HSHM_MALLOC, std::string(""));
-  loaded_out_task->error_message_ = chi::priv::string(HSHM_MALLOC, std::string(""));
+  loaded_out_task->chimod_name_ = chi::priv::string(CTP_MALLOC, std::string(""));
+  loaded_out_task->pool_name_ = chi::priv::string(CTP_MALLOC, std::string(""));
+  loaded_out_task->chimod_params_ = chi::priv::string(CTP_MALLOC, std::string(""));
+  loaded_out_task->error_message_ = chi::priv::string(CTP_MALLOC, std::string(""));
   load_out_archive >> *loaded_out_task;
 
   REQUIRE(!loaded_out_task.IsNull());
@@ -364,7 +364,7 @@ TEST_CASE("SaveTask and LoadTask - Admin SendTask full flow",
 
   // Step 5: Modify output parameters
   loaded_in_task->error_message_ =
-      chi::priv::string(HSHM_MALLOC, std::string("send completed successfully"));
+      chi::priv::string(CTP_MALLOC, std::string("send completed successfully"));
 
   // Step 6: SaveOut
   chi::SaveTaskArchive save_out_archive(chi::MsgType::kSerializeOut);
@@ -447,7 +447,7 @@ TEST_CASE("SaveTask and LoadTask - Admin DestroyPoolTask full flow",
   }
 
   // Step 5: Modify output parameters
-  loaded_in_task->error_message_ = chi::priv::string(HSHM_MALLOC, std::string("pool destroyed"));
+  loaded_in_task->error_message_ = chi::priv::string(CTP_MALLOC, std::string("pool destroyed"));
 
   // Step 6: SaveOut
   chi::SaveTaskArchive save_out_archive(chi::MsgType::kSerializeOut);

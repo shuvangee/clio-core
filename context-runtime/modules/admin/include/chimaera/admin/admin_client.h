@@ -464,7 +464,7 @@ class Client : public chi::ContainerClient {
     // Serialize migrations using GlobalSerialize
     std::vector<char> buf;
     {
-      hshm::ipc::GlobalSerialize<std::vector<char>> ar(buf);
+      ctp::ipc::GlobalSerialize<std::vector<char>> ar(buf);
       ar(migrations);
       ar.Finalize();
     }
@@ -486,7 +486,7 @@ class Client : public chi::ContainerClient {
     auto* ipc_manager = CHI_IPC;
     std::vector<char> buf;
     {
-      hshm::ipc::GlobalSerialize<std::vector<char>> ar(buf);
+      ctp::ipc::GlobalSerialize<std::vector<char>> ar(buf);
       ar(assignments);
       ar.Finalize();
     }

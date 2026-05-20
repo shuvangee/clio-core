@@ -14,8 +14,8 @@ target_link_libraries(clio_cte_posix_unit_tests
     wrp_cte_posix
     wrp_cte_fs_base
     wrp_cte_core_client
-    hshm::cxx
-    hshm::interceptor
+    ctp::cxx
+    ctp::interceptor
     Catch2::Catch2WithMain
 )
 

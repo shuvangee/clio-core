@@ -53,7 +53,7 @@ static std::string GetTempDir() {
   return std::filesystem::temp_directory_path().string();
 }
 
-using hshm::ConfigParse;
+using ctp::ConfigParse;
 
 //------------------------------------------------------------------------------
 // ParseHostNameString Tests
@@ -197,11 +197,11 @@ TEST_CASE("ParseNumber - Float parsing") {
 
 TEST_CASE("ParseNumber - Infinity special value") {
   REQUIRE(ConfigParse::ParseNumber<int>("inf") == std::numeric_limits<int>::max());
-  REQUIRE(ConfigParse::ParseNumber<hshm::u64>("inf") == std::numeric_limits<hshm::u64>::max());
+  REQUIRE(ConfigParse::ParseNumber<ctp::u64>("inf") == std::numeric_limits<ctp::u64>::max());
 }
 
 TEST_CASE("ParseNumber - Large numbers") {
-  REQUIRE(ConfigParse::ParseNumber<hshm::u64>("1000000000") == 1000000000ULL);
+  REQUIRE(ConfigParse::ParseNumber<ctp::u64>("1000000000") == 1000000000ULL);
 }
 
 //------------------------------------------------------------------------------
@@ -242,12 +242,12 @@ TEST_CASE("ParseSize - Petabytes") {
 
 TEST_CASE("ParseSize - Decimal sizes") {
   // 2.5 gigabytes
-  hshm::u64 expected = (hshm::u64)(2.5 * 1024 * 1024 * 1024);
+  ctp::u64 expected = (ctp::u64)(2.5 * 1024 * 1024 * 1024);
   REQUIRE(ConfigParse::ParseSize("2.5G") == expected);
 }
 
 TEST_CASE("ParseSize - Infinity") {
-  REQUIRE(ConfigParse::ParseSize("inf") == std::numeric_limits<hshm::u64>::max());
+  REQUIRE(ConfigParse::ParseSize("inf") == std::numeric_limits<ctp::u64>::max());
 }
 
 //------------------------------------------------------------------------------

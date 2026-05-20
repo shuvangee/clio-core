@@ -16,7 +16,7 @@
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 class TestMeta : public LbmMeta<> {
  public:

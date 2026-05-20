@@ -25,7 +25,7 @@ target_link_libraries(${LEADER_ELECT_TEST_TARGET}
   chimaera_admin_client
   chimaera_MOD_NAME_runtime
   chimaera_MOD_NAME_client
-  hshm::cxx
+  ctp::cxx
   ${CMAKE_THREAD_LIBS_INIT}
 )
 

@@ -7,7 +7,7 @@
 
 #include "chimaera/ipc/ipc_gpu2cpu.h"
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 
 #include "chimaera/device_memcpy.h"
 #include "chimaera/gpu/future.h"
@@ -24,7 +24,7 @@ namespace chi {
  */
 hipc::FullPtr<Task> IpcGpu2Cpu::RuntimeRecv(
     IpcManager *ipc, Future<Task> &future, Container *container,
-    u32 method_id, hshm::lbm::Transport *recv_transport) {
+    u32 method_id, ctp::lbm::Transport *recv_transport) {
   (void)ipc; (void)container; (void)method_id; (void)recv_transport;
   return future.GetTaskPtr();
 }
@@ -95,4 +95,4 @@ void IpcGpu2Cpu::RuntimeSend(
 
 }  // namespace chi
 
-#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#endif  // CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL

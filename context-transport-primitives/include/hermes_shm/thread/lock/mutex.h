@@ -31,36 +31,36 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_THREAD_MUTEX_H_
-#define HSHM_THREAD_MUTEX_H_
+#ifndef CTP_THREAD_MUTEX_H_
+#define CTP_THREAD_MUTEX_H_
 
 #include "hermes_shm/thread/thread_model_manager.h"
 #include "hermes_shm/types/atomic.h"
 #include "hermes_shm/types/numbers.h"
 
-namespace hshm {
+namespace ctp {
 
 struct Mutex {
-  ipc::atomic<hshm::min_u64> lock_;
-  ipc::atomic<hshm::min_u64> head_;
-  ipc::atomic<hshm::min_u32> try_lock_;
+  ipc::atomic<ctp::min_u64> lock_;
+  ipc::atomic<ctp::min_u64> head_;
+  ipc::atomic<ctp::min_u32> try_lock_;
   /** Default constructor */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   Mutex() : lock_(0), head_(0), try_lock_(0) {}
 
   /** Copy constructor */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   Mutex(const Mutex &other) {}
 
   /** Explicit initialization */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void Init() {
     lock_ = 0;
     head_ = 0;
   }
 
   /** Acquire lock */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void Lock(u32 owner) {
     min_u64 tkt = lock_.fetch_add(1);
     u32 spin_count = 0;
@@ -73,7 +73,7 @@ struct Mutex {
           return;
         }
       }
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
       ++spin_count;
       if (spin_count == 5000000) {
         printf("[MUTEX] STUCK: tkt=%llu head=%llu this=%p\n",
@@ -87,14 +87,14 @@ struct Mutex {
       // device pass (CUDA, ROCm, SYCL) we busy-spin instead — the singleton
       // chain reaches a non-const static which DPC++ rejects in kernels,
       // and there's no host scheduler to yield to anyway.
-#if !HSHM_IS_DEVICE_PASS
-      HSHM_THREAD_MODEL->Yield();
+#if !CTP_IS_DEVICE_PASS
+      CTP_THREAD_MODEL->Yield();
 #endif
     } while (true);
   }
 
   /** Try to acquire the lock */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool TryLock(u32 owner) {
     if (try_lock_.fetch_add(1) > 0 || lock_.load_device() > head_.load_device()) {
       try_lock_.fetch_sub(1);
@@ -105,7 +105,7 @@ struct Mutex {
   }
 
   /** Unlock */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void Unlock() {
     head_.fetch_add(1);
   }
@@ -116,17 +116,17 @@ struct ScopedMutex {
   bool is_locked_;
 
   /** Acquire the mutex */
-  HSHM_INLINE_CROSS_FUN explicit ScopedMutex(Mutex &lock, u32 owner)
+  CTP_INLINE_CROSS_FUN explicit ScopedMutex(Mutex &lock, u32 owner)
       : lock_(lock), is_locked_(false) {
     Lock(owner);
   }
 
   /** Release the mutex */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   ~ScopedMutex() { Unlock(); }
 
   /** Explicitly acquire the mutex */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void Lock(u32 owner) {
     if (!is_locked_) {
       lock_.Lock(owner);
@@ -135,7 +135,7 @@ struct ScopedMutex {
   }
 
   /** Explicitly try to lock the mutex */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool TryLock(u32 owner) {
     if (!is_locked_) {
       is_locked_ = lock_.TryLock(owner);
@@ -144,7 +144,7 @@ struct ScopedMutex {
   }
 
   /** Explicitly unlock the mutex */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void Unlock() {
     if (is_locked_) {
       lock_.Unlock();
@@ -153,16 +153,16 @@ struct ScopedMutex {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
-using hshm::Mutex;
-using hshm::ScopedMutex;
+using ctp::Mutex;
+using ctp::ScopedMutex;
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
 #undef Mutex
 #undef ScopedMutex
 
-#endif  // HSHM_THREAD_MUTEX_H_
+#endif  // CTP_THREAD_MUTEX_H_

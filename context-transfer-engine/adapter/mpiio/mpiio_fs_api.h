@@ -720,7 +720,7 @@ public:
 
 /** Simplify access to the stateless StdioFs Singleton */
 #define WRP_CTE_MPIIO_FS                                                        \
-  hshm::Singleton<::clio::cae::MpiioFs>::GetInstance()
+  ctp::Singleton<::clio::cae::MpiioFs>::GetInstance()
 #define WRP_CTE_STDIO_FS_T clio::cae::MpiioFs *
 
 #endif // WRP_CTE_ADAPTER_MPIIO_MPIIO_FS_API_H_

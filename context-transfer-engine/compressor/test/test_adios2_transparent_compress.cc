@@ -84,7 +84,7 @@ TEST_CASE("ADIOS2 transparent compress - PutBlob float array",
   hipc::ShmPtr<> blob_data = buffer.shm_.template Cast<void>();
 
   wrp_cte::core::Context ctx;
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
   ctx.dynamic_compress_ = 1;  // Static compression
   ctx.compress_lib_ = 4;      // LZ4
   ctx.compress_preset_ = 2;   // BALANCED
@@ -157,7 +157,7 @@ TEST_CASE("ADIOS2 transparent compress - multi-step workflow",
     std::string blob_name = "pressure/step" + std::to_string(step);
 
     wrp_cte::core::Context ctx;
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
     ctx.dynamic_compress_ = 1;
     ctx.compress_lib_ = 10;   // ZSTD
     ctx.compress_preset_ = 1; // FAST

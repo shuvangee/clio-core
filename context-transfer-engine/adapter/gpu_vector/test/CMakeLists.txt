@@ -19,7 +19,7 @@ if(WRP_CORE_ENABLE_CUDA)
             wrp_cte_core_client
             wrp_cte_core_runtime
             wrp_cte::gpu_vector
-            hshm::cuda_cxx
+            ctp::cuda_cxx
             ${CMAKE_THREAD_LIBS_INIT}
     )
     set_target_properties(test_gpu_vector PROPERTIES
@@ -67,7 +67,7 @@ if(WRP_CORE_ENABLE_ROCM)
         wrp_cte_core_client
         wrp_cte_core_runtime
         wrp_cte::gpu_vector
-        hshm::rocm_cxx
+        ctp::rocm_cxx
         ${CMAKE_THREAD_LIBS_INIT}
     )
     set_target_properties(test_gpu_vector PROPERTIES

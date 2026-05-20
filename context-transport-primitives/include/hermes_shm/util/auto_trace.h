@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_INCLUDE_HSHM_UTIL_AUTO_TRACE_H_
-#define HSHM_INCLUDE_HSHM_UTIL_AUTO_TRACE_H_
+#ifndef CTP_INCLUDE_HSHM_UTIL_AUTO_TRACE_H_
+#define CTP_INCLUDE_HSHM_UTIL_AUTO_TRACE_H_
 
 #include <iostream>
 
@@ -40,11 +40,11 @@
 #include "logging.h"
 #include "timer.h"
 
-namespace hshm {
+namespace ctp {
 
-#define AUTO_TRACE(LOG_CODE) hshm::AutoTrace<LOG_CODE> _hshm_tracer_(__func__)
-#define TIMER_START(NAME) _hshm_tracer_.StartTimer(NAME)
-#define TIMER_END() _hshm_tracer_.EndTimer()
+#define AUTO_TRACE(LOG_CODE) ctp::AutoTrace<LOG_CODE> _ctp_tracer_(__func__)
+#define TIMER_START(NAME) _ctp_tracer_.StartTimer(NAME)
+#define TIMER_END() _ctp_tracer_.EndTimer()
 
 /** Trace function execution times */
 template <int LOG_CODE>
@@ -56,21 +56,21 @@ class AutoTrace {
   std::string internal_name_;
 
  public:
-  HSHM_INLINE AutoTrace(const char *fname) {
+  CTP_INLINE AutoTrace(const char *fname) {
     if constexpr (LOG_CODE >= 0) {
       fname_ = fname;
       _StartTimer(timer_);
     }
   }
 
-  HSHM_INLINE
+  CTP_INLINE
   ~AutoTrace() {
     if constexpr (LOG_CODE >= 0) {
       _EndTimer(timer_);
     }
   }
 
-  HSHM_INLINE
+  CTP_INLINE
   void StartTimer(const char *internal_name) {
     if constexpr (LOG_CODE >= 0) {
       internal_name_ = "/" + std::string(internal_name);
@@ -78,7 +78,7 @@ class AutoTrace {
     }
   }
 
-  HSHM_INLINE
+  CTP_INLINE
   void EndTimer() {
     if constexpr (LOG_CODE >= 0) {
       _EndTimer(timer2_);
@@ -87,12 +87,12 @@ class AutoTrace {
 
  private:
   template <typename... Args>
-  HSHM_INLINE void _StartTimer(HighResMonotonicTimer &timer) {
+  CTP_INLINE void _StartTimer(HighResMonotonicTimer &timer) {
     timer.Resume();
     HIPRINT("{}{}", fname_, internal_name_);
   }
 
-  HSHM_INLINE
+  CTP_INLINE
   void _EndTimer(HighResMonotonicTimer &timer) {
     timer.Pause();
     HIPRINT("{}{} {}ns", fname_, internal_name_, timer.GetNsec());
@@ -101,6 +101,6 @@ class AutoTrace {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_INCLUDE_HSHM_UTIL_AUTO_TRACE_H_
+#endif  // CTP_INCLUDE_HSHM_UTIL_AUTO_TRACE_H_

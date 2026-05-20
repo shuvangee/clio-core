@@ -15,10 +15,10 @@ add_executable(test_async_io_exec
 
 add_dependencies(test_async_io_exec hermes_shm_host)
 target_link_libraries(test_async_io_exec
-        hermes_shm_host hshm::aio Catch2::Catch2)
+        hermes_shm_host ctp::aio Catch2::Catch2)
 
 if(WRP_CORE_ENABLE_NIXL)
-  target_link_libraries(test_async_io_exec hshm::nixl)
+  target_link_libraries(test_async_io_exec ctp::nixl)
 endif()
 
 #------------------------------------------------------------------------------

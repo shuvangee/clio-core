@@ -117,7 +117,7 @@ public:
       }
 
       // Yield to allow other tasks to run
-      HSHM_THREAD_MODEL->Yield();
+      CTP_THREAD_MODEL->Yield();
     }
 
     return true; // Task completed

@@ -237,7 +237,7 @@ struct IngestedFile {
 
 TEST_CASE("FUSE Copy Workspace - Ingest and verify files",
           "[fuse][copy_workspace]") {
-  auto *fixture = hshm::Singleton<CopyWorkspaceFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<CopyWorkspaceFixture>::GetInstance();
   (void)fixture;
 
   auto files = CollectFiles();

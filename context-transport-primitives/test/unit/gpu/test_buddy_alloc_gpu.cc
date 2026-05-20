@@ -61,8 +61,8 @@
 #include "hermes_shm/util/gpu_api.h"
 
 using hipc::BuddyAllocator;
-using hshm::ipc::GpuShmMmap;
-using hshm::ipc::MemoryBackendId;
+using ctp::ipc::GpuShmMmap;
+using ctp::ipc::MemoryBackendId;
 
 // ─── Test struct ─────────────────────────────────────────────────────────────
 
@@ -72,12 +72,12 @@ using hshm::ipc::MemoryBackendId;
  * tail corruption are detected.  Init/Check are callable from GPU.
  */
 struct FakeBig408 {
-  hshm::u32 magic0_;  ///< = (tid << 16) | idx
+  ctp::u32 magic0_;  ///< = (tid << 16) | idx
   char      body_[400];
-  hshm::u32 magic1_;  ///< = ~magic0_
+  ctp::u32 magic1_;  ///< = ~magic0_
 
-  HSHM_INLINE_CROSS_FUN void Init(hshm::u32 tid, hshm::u32 idx) {
-    hshm::u32 m = (tid << 16) | (idx & 0xFFFFu);
+  CTP_INLINE_CROSS_FUN void Init(ctp::u32 tid, ctp::u32 idx) {
+    ctp::u32 m = (tid << 16) | (idx & 0xFFFFu);
     magic0_ = m;
     magic1_ = ~m;
     for (int i = 0; i < 400; ++i) {
@@ -85,8 +85,8 @@ struct FakeBig408 {
     }
   }
 
-  HSHM_INLINE_CROSS_FUN bool Check(hshm::u32 tid, hshm::u32 idx) const {
-    hshm::u32 m = (tid << 16) | (idx & 0xFFFFu);
+  CTP_INLINE_CROSS_FUN bool Check(ctp::u32 tid, ctp::u32 idx) const {
+    ctp::u32 m = (tid << 16) | (idx & 0xFFFFu);
     if (magic0_ != m) return false;
     if (magic1_ != ~m) return false;
     for (int i = 0; i < 400; ++i) {
@@ -148,11 +148,11 @@ __global__ void BuddyAllocKernel(
     auto fp = alloc->template AllocateObjs<FakeBig408>(1);
     if (fp.IsNull()) break;
 
-    fp.ptr_->Init(static_cast<hshm::u32>(tid),
-                  static_cast<hshm::u32>(count));
+    fp.ptr_->Init(static_cast<ctp::u32>(tid),
+                  static_cast<ctp::u32>(count));
 
-    if (!fp.ptr_->Check(static_cast<hshm::u32>(tid),
-                        static_cast<hshm::u32>(count))) {
+    if (!fp.ptr_->Check(static_cast<ctp::u32>(tid),
+                        static_cast<ctp::u32>(count))) {
       d_results[tid] = -2;  // corruption
       return;
     }

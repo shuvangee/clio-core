@@ -101,7 +101,7 @@ void Runtime::Destroy(hipc::FullPtr<DestroyTask> task, chi::RunContext &rctx) {
   } catch (const std::exception &e) {
     task->return_code_ = 99;
     task->error_message_ = chi::priv::string(
-        HSHM_MALLOC,
+        CTP_MALLOC,
         std::string("Exception during simple_mod destruction: ") + e.what());
     HLOG(kError, "SimpleMod: Destruction failed with exception: {}", e.what());
   }

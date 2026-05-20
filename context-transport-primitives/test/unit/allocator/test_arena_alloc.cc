@@ -36,7 +36,7 @@
 #include "hermes_shm/memory/backend/malloc_backend.h"
 #include "hermes_shm/memory/allocator/arena_allocator.h"
 
-using hshm::testing::AllocatorTest;
+using ctp::testing::AllocatorTest;
 
 TEST_CASE("ArenaAllocator<false> - Allocate and Free Immediate", "[ArenaAllocator<false>]") {
   hipc::MallocBackend backend;

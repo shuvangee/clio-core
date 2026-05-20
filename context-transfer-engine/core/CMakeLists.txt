@@ -13,11 +13,11 @@ add_chimod_runtime(
 )
 
 # Surface the GPU backend flags into the runtime library so the
-# GpuMetadataCache helpers (which reach hshm::GpuApi::MallocManaged etc.)
-# see the matching #if HSHM_ENABLE_{CUDA,ROCM,SYCL} branches. Without
+# GpuMetadataCache helpers (which reach ctp::GpuApi::MallocManaged etc.)
+# see the matching #if CTP_ENABLE_{CUDA,ROCM,SYCL} branches. Without
 # these the GPU code paths in core_runtime.cc are no-ops.
 if(WRP_CORE_ENABLE_SYCL)
-  target_compile_definitions(wrp_cte_core_runtime PRIVATE HSHM_ENABLE_SYCL=1)
+  target_compile_definitions(wrp_cte_core_runtime PRIVATE CTP_ENABLE_SYCL=1)
   if(EXISTS "/opt/intel/dpcpp/include/sycl/sycl.hpp")
     target_include_directories(wrp_cte_core_runtime PRIVATE
       /opt/intel/dpcpp/include
@@ -28,10 +28,10 @@ if(WRP_CORE_ENABLE_SYCL)
   endif()
 endif()
 if(WRP_CORE_ENABLE_CUDA)
-  target_compile_definitions(wrp_cte_core_runtime PRIVATE HSHM_ENABLE_CUDA=1)
+  target_compile_definitions(wrp_cte_core_runtime PRIVATE CTP_ENABLE_CUDA=1)
 endif()
 if(WRP_CORE_ENABLE_ROCM)
-  target_compile_definitions(wrp_cte_core_runtime PRIVATE HSHM_ENABLE_ROCM=1)
+  target_compile_definitions(wrp_cte_core_runtime PRIVATE CTP_ENABLE_ROCM=1)
 endif()
 
 # Create client library using modern ChiMod build functions

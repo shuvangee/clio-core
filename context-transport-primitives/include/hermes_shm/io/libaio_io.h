@@ -31,10 +31,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_INCLUDE_HSHM_SHM_IO_LIBAIO_IO_H_
-#define HSHM_SHM_INCLUDE_HSHM_SHM_IO_LIBAIO_IO_H_
+#ifndef CTP_SHM_INCLUDE_HSHM_SHM_IO_LIBAIO_IO_H_
+#define CTP_SHM_INCLUDE_HSHM_SHM_IO_LIBAIO_IO_H_
 
-#if HSHM_ENABLE_LIBAIO
+#if CTP_ENABLE_LIBAIO
 
 #include "async_io.h"
 #include <libaio.h>
@@ -49,7 +49,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace hshm {
+namespace ctp {
 
 class LinuxAioAsyncIO : public AsyncIO {
  public:
@@ -259,8 +259,8 @@ class LinuxAioAsyncIO : public AsyncIO {
   std::unordered_map<IoToken, IoResult> completed_;
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_ENABLE_LIBAIO
+#endif  // CTP_ENABLE_LIBAIO
 
-#endif  // HSHM_SHM_INCLUDE_HSHM_SHM_IO_LIBAIO_IO_H_
+#endif  // CTP_SHM_INCLUDE_HSHM_SHM_IO_LIBAIO_IO_H_

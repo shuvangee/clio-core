@@ -58,7 +58,7 @@ struct BlobPlacement {
   /** create a BLOB name from index. */
   static std::string CreateBlobName(size_t page) {
     std::string buf;
-    hshm::ipc::LocalSerialize<std::string> srl(buf);
+    ctp::ipc::LocalSerialize<std::string> srl(buf);
     srl << page;
     srl.Finalize();
     return buf;
@@ -67,7 +67,7 @@ struct BlobPlacement {
   /** create a BLOB name from index. */
   std::string CreateBlobName() const {
     std::string buf;
-    hshm::ipc::LocalSerialize<std::string> srl(buf);
+    ctp::ipc::LocalSerialize<std::string> srl(buf);
     srl << page_;
     srl.Finalize();
     return buf;

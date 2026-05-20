@@ -132,7 +132,7 @@ target_link_libraries(cte_core_unit_tests
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -144,7 +144,7 @@ target_link_libraries(test_core_functionality
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -156,7 +156,7 @@ target_link_libraries(test_cte_config_dpe
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -168,7 +168,7 @@ target_link_libraries(test_query
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -180,7 +180,7 @@ target_link_libraries(test_tag_operations
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -192,7 +192,7 @@ target_link_libraries(test_core_client_config
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -204,7 +204,7 @@ target_link_libraries(test_core_runtime_coverage
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -216,7 +216,7 @@ target_link_libraries(test_tiered_storage_stress
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -228,7 +228,7 @@ target_link_libraries(test_tiered_storage_dram_default
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum + policy helper
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -240,7 +240,7 @@ target_link_libraries(test_blob_block_reuse
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -252,7 +252,7 @@ target_link_libraries(test_reorganize_blob
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client for BdevType enum
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # HermesShm library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
 
@@ -713,7 +713,7 @@ if(WRP_CORE_ENABLE_CUDA)
       chimaera_bdev_client
       wrp_cte_core_client
       wrp_cte_core_runtime
-      hshm::cuda_cxx
+      ctp::cuda_cxx
       ${CMAKE_THREAD_LIBS_INIT}
   )
   set_target_properties(test_cte_devmem_putget PROPERTIES
@@ -755,7 +755,7 @@ if(WRP_CORE_ENABLE_ROCM)
     chimaera_bdev_client
     wrp_cte_core_client
     wrp_cte_core_runtime
-    hshm::rocm_cxx
+    ctp::rocm_cxx
     ${CMAKE_THREAD_LIBS_INIT}
   )
   add_test(NAME cte_devmem_putget_rocm COMMAND test_cte_devmem_putget

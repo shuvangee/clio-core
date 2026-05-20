@@ -183,8 +183,8 @@ class WorkOrchestrator {
   std::atomic<u32> next_worker_index_for_scheduling_;
 
   // HSHM threads (will be filled during initialization)
-  std::vector<hshm::thread::Thread> worker_threads_;
-  hshm::thread::ThreadGroup thread_group_;
+  std::vector<ctp::thread::Thread> worker_threads_;
+  ctp::thread::ThreadGroup thread_group_;
 
   // Scheduler pointer (owned by IpcManager, not WorkOrchestrator)
   Scheduler *scheduler_;
@@ -194,9 +194,9 @@ class WorkOrchestrator {
 }  // namespace chi
 
 // Global pointer variable declaration for Work Orchestrator singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(chi::WorkOrchestrator, g_work_orchestrator);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(chi::WorkOrchestrator, g_work_orchestrator);
 
 // Macro for accessing the Work Orchestrator singleton using global pointer variable
-#define CHI_WORK_ORCHESTRATOR HSHM_GET_GLOBAL_PTR_VAR(::chi::WorkOrchestrator, g_work_orchestrator)
+#define CHI_WORK_ORCHESTRATOR CTP_GET_GLOBAL_PTR_VAR(::chi::WorkOrchestrator, g_work_orchestrator)
 
 #endif  // CHIMAERA_INCLUDE_CHIMAERA_WORKERS_WORK_ORCHESTRATOR_H_

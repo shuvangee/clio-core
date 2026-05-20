@@ -616,7 +616,7 @@ class ChiModGenerator {
     // Template helpers (LoadTaskTmpl, SaveTaskTmpl)
     // ====================================================================
     oss << "template <typename ArchiveT>\n";
-    oss << "HSHM_GPU_FUN void LoadTaskTmpl(\n";
+    oss << "CTP_GPU_FUN void LoadTaskTmpl(\n";
     oss << "    chi::u32 method, ArchiveT &archive,\n";
     oss << "    const hipc::FullPtr<chi::Task> &task) {\n";
     if (!gpu_methods.empty()) {
@@ -640,7 +640,7 @@ class ChiModGenerator {
     oss << "}\n\n";
 
     oss << "template <typename ArchiveT>\n";
-    oss << "HSHM_GPU_FUN void SaveTaskTmpl(\n";
+    oss << "CTP_GPU_FUN void SaveTaskTmpl(\n";
     oss << "    chi::u32 method, ArchiveT &archive,\n";
     oss << "    const hipc::FullPtr<chi::Task> &task) {\n";
     if (!gpu_methods.empty()) {
@@ -662,11 +662,11 @@ class ChiModGenerator {
     // Static dispatch functions (called via function pointers)
     // ====================================================================
 
-    // RunImpl — address taken by GpuRuntime ctor below. HSHM_INDIRECTLY_CALLABLE
+    // RunImpl — address taken by GpuRuntime ctor below. CTP_INDIRECTLY_CALLABLE
     // is required by DPC++'s sycl_ext_oneapi_virtual_functions extension when
     // -fsycl-allow-func-ptr is unavailable; under CUDA/ROCm and the default
     // SYCL flag set it expands to nothing.
-    oss << "HSHM_INDIRECTLY_CALLABLE static HSHM_GPU_FUN chi::gpu::TaskResume RunImpl(\n";
+    oss << "CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN chi::gpu::TaskResume RunImpl(\n";
     oss << "    chi::gpu::Container *self_, chi::u32 method,\n";
     oss << "    hipc::FullPtr<chi::Task> task_ptr, chi::gpu::RunContext &rctx) {\n";
     oss << "  auto *self = static_cast<GpuRuntime *>(self_);\n";
@@ -687,7 +687,7 @@ class ChiModGenerator {
     oss << "}\n\n";
 
     // AllocTaskImpl — uses NewTaskExec: [Task | RunContext | stack]
-    oss << "HSHM_INDIRECTLY_CALLABLE static HSHM_GPU_FUN chi::gpu::TaskContextBlock AllocTaskImpl(\n";
+    oss << "CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN chi::gpu::TaskContextBlock AllocTaskImpl(\n";
     oss << "    chi::gpu::Container *self_, chi::u32 method, size_t stack_size) {\n";
     if (!gpu_methods.empty()) {
       // Phase 10: bind g_ipc_manager_ptr from self_->ipc_mgr_ so CHI_IPC\n
@@ -718,7 +718,7 @@ class ChiModGenerator {
     oss << "}\n\n";
 
     // AllocLoadTaskDefaultImpl
-    oss << "HSHM_INDIRECTLY_CALLABLE static HSHM_GPU_FUN hipc::FullPtr<chi::Task> AllocLoadTaskDefaultImpl(\n";
+    oss << "CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN hipc::FullPtr<chi::Task> AllocLoadTaskDefaultImpl(\n";
     oss << "    chi::gpu::Container *self_, chi::u32 method, chi::GpuLoadTaskArchive &ar) {\n";
     oss << "  auto *self = static_cast<GpuRuntime *>(self_);\n";
     oss << "  auto block = self->alloc_task_(self_, method, 0);\n";
@@ -729,7 +729,7 @@ class ChiModGenerator {
     oss << "}\n\n";
 
     // AllocLoadDeserImpl — single dispatch: alloc + deserialize from WrapLoadArchive
-    oss << "HSHM_INDIRECTLY_CALLABLE static HSHM_GPU_FUN chi::gpu::TaskContextBlock AllocLoadDeserImpl(\n";
+    oss << "CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN chi::gpu::TaskContextBlock AllocLoadDeserImpl(\n";
     oss << "    chi::gpu::Container *self_, chi::u32 method,\n";
     oss << "    size_t stack_size, chi::GpuLoadTaskArchive &ar) {\n";
     oss << "  auto *self = static_cast<GpuRuntime *>(self_);\n";
@@ -742,7 +742,7 @@ class ChiModGenerator {
     oss << "}\n\n";
 
     // LoadTaskDefaultImpl
-    oss << "HSHM_INDIRECTLY_CALLABLE static HSHM_GPU_FUN void LoadTaskDefaultImpl(\n";
+    oss << "CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN void LoadTaskDefaultImpl(\n";
     oss << "    chi::gpu::Container *self_, chi::u32 method,\n";
     oss << "    chi::GpuLoadTaskArchive &ar, const hipc::FullPtr<chi::Task> &task) {\n";
     oss << "  ar.SetMsgType(chi::LocalMsgType::kSerializeIn);\n";
@@ -750,14 +750,14 @@ class ChiModGenerator {
     oss << "}\n\n";
 
     // SaveTaskDefaultImpl
-    oss << "HSHM_INDIRECTLY_CALLABLE static HSHM_GPU_FUN void SaveTaskDefaultImpl(\n";
+    oss << "CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN void SaveTaskDefaultImpl(\n";
     oss << "    chi::gpu::Container *self_, chi::u32 method,\n";
     oss << "    chi::GpuSaveTaskArchive &ar, const hipc::FullPtr<chi::Task> &task) {\n";
     oss << "  static_cast<GpuRuntime *>(self_)->SaveTaskTmpl(method, ar, task);\n";
     oss << "}\n\n";
 
     // LoadTaskOutputImpl
-    oss << "HSHM_INDIRECTLY_CALLABLE static HSHM_GPU_FUN void LoadTaskOutputImpl(\n";
+    oss << "CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN void LoadTaskOutputImpl(\n";
     oss << "    chi::gpu::Container *self_, chi::u32 method,\n";
     oss << "    chi::GpuLoadTaskArchive &ar, const hipc::FullPtr<chi::Task> &task) {\n";
     oss << "  ar.SetMsgType(chi::LocalMsgType::kSerializeOut);\n";
@@ -765,7 +765,7 @@ class ChiModGenerator {
     oss << "}\n\n";
 
     // DestroyTaskImpl
-    oss << "HSHM_INDIRECTLY_CALLABLE static HSHM_GPU_FUN void DestroyTaskImpl(\n";
+    oss << "CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN void DestroyTaskImpl(\n";
     oss << "    chi::gpu::Container *self_, chi::u32 method,\n";
     oss << "    hipc::FullPtr<chi::Task> &task) {\n";
     oss << "  if (task.IsNull()) return;\n";
@@ -795,7 +795,7 @@ class ChiModGenerator {
     // ====================================================================
     // Constructor: wire up function pointer table
     // ====================================================================
-    oss << "HSHM_GPU_FUN GpuRuntime() {\n";
+    oss << "CTP_GPU_FUN GpuRuntime() {\n";
     oss << "  run_ = &RunImpl;\n";
     oss << "  alloc_task_ = &AllocTaskImpl;\n";
     oss << "  alloc_load_deser_ = &AllocLoadDeserImpl;\n";
@@ -840,7 +840,7 @@ class ChiModGenerator {
     oss << "#include \"hermes_shm/util/gpu_api.h\"\n";
     oss << "#include <cstring>\n";
     oss << "\n";
-    oss << "#if HSHM_ENABLE_SYCL\n";
+    oss << "#if CTP_ENABLE_SYCL\n";
     oss << "#include <sycl/sycl.hpp>\n";
     oss << "#endif\n";
     oss << "\n";
@@ -849,7 +849,7 @@ class ChiModGenerator {
     oss << "\n";
 
     // ----- CUDA / ROCm allocation kernel ----------------------------------
-    oss << "#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM\n";
+    oss << "#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM\n";
     oss << "/**\n";
     oss << " * Kernel to allocate a GPU container by module index.\n";
     oss << " * Runs in the orchestrator's CUDA/HIP module context so vtables\n";
@@ -868,7 +868,7 @@ class ChiModGenerator {
     oss << "  if (obj) obj->Init(*pid, cid);\n";
     oss << "  *out = obj;\n";
     oss << "}\n";
-    oss << "#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM\n";
+    oss << "#endif  // CTP_ENABLE_CUDA || CTP_ENABLE_ROCM\n";
     oss << "\n";
 
     // ----- Module-id table -------------------------------------------------
@@ -914,28 +914,28 @@ class ChiModGenerator {
     oss << "  u32 module_id = GetGpuModuleId(chimod_name);\n";
     oss << "  if (module_id == 0xFFFFFFFF) return nullptr;\n";
     oss << "\n";
-    oss << "#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM\n";
-    oss << "  void *stream = hshm::GpuApi::CreateStream();\n";
-    oss << "  Container **d_out = hshm::GpuApi::Malloc<Container *>(sizeof(Container *));\n";
-    oss << "  PoolId *d_pid = hshm::GpuApi::Malloc<PoolId>(sizeof(PoolId));\n";
-    oss << "  hshm::GpuApi::Memcpy(d_pid, &pool_id, sizeof(PoolId));\n";
+    oss << "#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM\n";
+    oss << "  void *stream = ctp::GpuApi::CreateStream();\n";
+    oss << "  Container **d_out = ctp::GpuApi::Malloc<Container *>(sizeof(Container *));\n";
+    oss << "  PoolId *d_pid = ctp::GpuApi::Malloc<PoolId>(sizeof(PoolId));\n";
+    oss << "  ctp::GpuApi::Memcpy(d_pid, &pool_id, sizeof(PoolId));\n";
     oss << "  _gpu_alloc_container<<<1, 1, 0,\n";
     oss << "      static_cast<cudaStream_t>(stream)>>>(d_out, module_id, d_pid, container_id);\n";
-    oss << "  hshm::GpuApi::Synchronize(stream);\n";
+    oss << "  ctp::GpuApi::Synchronize(stream);\n";
     oss << "  Container *h_ptr = nullptr;\n";
-    oss << "  hshm::GpuApi::Memcpy(&h_ptr, d_out, sizeof(Container *));\n";
-    oss << "  hshm::GpuApi::Free(d_out);\n";
-    oss << "  hshm::GpuApi::Free(d_pid);\n";
-    oss << "  hshm::GpuApi::DestroyStream(stream);\n";
+    oss << "  ctp::GpuApi::Memcpy(&h_ptr, d_out, sizeof(Container *));\n";
+    oss << "  ctp::GpuApi::Free(d_out);\n";
+    oss << "  ctp::GpuApi::Free(d_pid);\n";
+    oss << "  ctp::GpuApi::DestroyStream(stream);\n";
     oss << "  return static_cast<void *>(h_ptr);\n";
-    oss << "#elif HSHM_ENABLE_SYCL\n";
+    oss << "#elif CTP_ENABLE_SYCL\n";
     oss << "  // SYCL path: size the USM region from GetGpuModuleSize, then\n";
     oss << "  // submit a single_task that placement-news the right concrete\n";
     oss << "  // GpuRuntime subclass (placement new is allowed in SYCL device\n";
     oss << "  // code; ::operator new for arbitrary types is not).\n";
     oss << "  size_t obj_size = GetGpuModuleSize(module_id);\n";
     oss << "  if (obj_size == 0) return nullptr;\n";
-    oss << "  auto &q = hshm::GpuApi::SyclQueue();\n";
+    oss << "  auto &q = ctp::GpuApi::SyclQueue();\n";
     oss << "  void *d_obj = sycl::malloc_device(obj_size, q);\n";
     oss << "  PoolId *d_pid = sycl::malloc_device<PoolId>(1, q);\n";
     oss << "  q.memcpy(d_pid, &pool_id, sizeof(PoolId)).wait();\n";

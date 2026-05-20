@@ -64,10 +64,10 @@
 #include "hermes_shm/memory/backend/posix_shm_mmap.h"
 #include "chimaera/gpu/gpu_info.h"
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 #include "chimaera/gpu/gpu_ipc_manager.h"
 #endif
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
 #include "hermes_shm/memory/allocator/arena_allocator.h"
 #include "hermes_shm/memory/backend/gpu_malloc.h"
 #include "hermes_shm/memory/backend/gpu_shm_mmap.h"
@@ -132,8 +132,8 @@ using WorkQueue = chi::ipc::mpsc_ring_buffer<hipc::ShmPtr<TaskLane>>;
  * (has send, recv, send_bulks, recv_bulks fields)
  */
 struct ClientTaskMeta {
-  std::vector<hshm::lbm::Bulk> send;
-  std::vector<hshm::lbm::Bulk> recv;
+  std::vector<ctp::lbm::Bulk> send;
+  std::vector<ctp::lbm::Bulk> recv;
   size_t send_bulks = 0;
   size_t recv_bulks = 0;
   std::vector<char> wire_data;
@@ -187,7 +187,7 @@ class IpcManager {
   friend struct IpcCpu2Self;
   friend struct IpcCpu2Cpu;
   friend struct IpcCpu2CpuZmq;
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
   friend struct IpcGpu2Cpu;
 #endif
 
@@ -323,7 +323,7 @@ class IpcManager {
   // GPU runtime concept. Kernel-side buffer allocation now goes
   // through chi::gpu::IpcManager::AllocateBuffer (carved out of the
   // gpu2cpu_copy_backend), and host-side device allocation uses
-  // hshm::GpuApi::Malloc directly.
+  // ctp::GpuApi::Malloc directly.
 
   /**
    * Free buffer from appropriate memory segment
@@ -335,10 +335,10 @@ class IpcManager {
    * sites in chimod ~Task destructors (traced via the autogen alloc kernel)
    * without an unresolved external reference.
    */
-#if !HSHM_IS_DEVICE_PASS
+#if !CTP_IS_DEVICE_PASS
   void FreeBuffer(FullPtr<char> buffer_ptr);
 #else
-  HSHM_INLINE_CROSS_FUN void FreeBuffer(FullPtr<char> /*buffer_ptr*/) {}
+  CTP_INLINE_CROSS_FUN void FreeBuffer(FullPtr<char> /*buffer_ptr*/) {}
 #endif
 
   /**
@@ -531,7 +531,7 @@ class IpcManager {
    */
   hipc::FullPtr<Task> RecvRuntime(
       Future<Task> &future, Container *container, u32 method_id,
-      hshm::lbm::Transport *recv_transport);
+      ctp::lbm::Transport *recv_transport);
 
   /**
    * Send the runtime response back to the client after task execution.
@@ -545,7 +545,7 @@ class IpcManager {
    */
   void SendRuntime(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
                    Container *container,
-                   hshm::lbm::Transport *send_transport);
+                   ctp::lbm::Transport *send_transport);
 
   /**
    * Initialize RunContext for a task before routing.
@@ -850,7 +850,7 @@ class IpcManager {
    * Get the main ZeroMQ server for network communication
    * @return Pointer to main server or nullptr if not initialized
    */
-  hshm::lbm::Transport *GetMainTransport() const;
+  ctp::lbm::Transport *GetMainTransport() const;
 
   /**
    * Get this host identified during host identification
@@ -863,7 +863,7 @@ class IpcManager {
    * @param mode IPC mode (kTcp or kIpc)
    * @return Lightbeam Server pointer, or nullptr
    */
-  hshm::lbm::Transport *GetClientTransport(IpcMode mode) const;
+  ctp::lbm::Transport *GetClientTransport(IpcMode mode) const;
 
   /**
    * Client-side thread that receives completed task outputs via lightbeam
@@ -939,7 +939,7 @@ class IpcManager {
     // through cudaMemcpyDefault / hipMemcpyDefault / sycl::queue::memcpy)
     // can copy from kDeviceMem pointers without first staging through
     // the host.
-#if (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL) && HSHM_IS_HOST
+#if (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL) && CTP_IS_HOST
     if (gpu_ipc_) {
       size_t ngpu = gpu_ipc_->GetGpuQueueCount();
       for (size_t g = 0; g < ngpu; ++g) {
@@ -1007,7 +1007,7 @@ class IpcManager {
    * @param port Port number to connect to
    * @return Pointer to the ZeroMQ client (owned by the pool)
    */
-  hshm::lbm::Transport *GetOrCreateClient(const std::string &addr, int port);
+  ctp::lbm::Transport *GetOrCreateClient(const std::string &addr, int port);
 
   /**
    * Clear all cached client connections
@@ -1081,7 +1081,7 @@ class IpcManager {
    * separate gpu_queues_ vector on chi::IpcManager.
    */
   size_t GetGpuQueueCount() const {
-#if HSHM_IS_HOST && (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL)
+#if CTP_IS_HOST && (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL)
     if (gpu_ipc_) return gpu_ipc_->GetGpuQueueCount();
 #endif
     return 0;
@@ -1091,18 +1091,18 @@ class IpcManager {
    * Get GPU→CPU queue by index (CPU worker polls this).
    */
   GpuTaskQueue *GetGpuQueue(size_t gpu_id) {
-#if HSHM_IS_HOST && (HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL)
+#if CTP_IS_HOST && (CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL)
     if (gpu_ipc_) return gpu_ipc_->GetGpuQueue(static_cast<u32>(gpu_id));
 #endif
     (void)gpu_id;
     return nullptr;
   }
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
   /** Get the GPU IPC manager for direct access to GPU operations. */
   gpu::IpcManager *GetGpuIpcManager() { return gpu_ipc_.get(); }
   const gpu::IpcManager *GetGpuIpcManager() const { return gpu_ipc_.get(); }
-#endif  // HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#endif  // CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
 
   /**
    * Assign every per-device gpu2cpu_queue lane to the GPU worker so it
@@ -1161,7 +1161,7 @@ class IpcManager {
    */
   size_t WreapAllIpcs();
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
   /**
    * Allocate a client-owned device-memory backend and register it with the
    * runtime so the CPU GPU worker can resolve task ShmPtrs popped off
@@ -1321,27 +1321,27 @@ class IpcManager {
   // GPU per-device queues now live on gpu::IpcManager::per_gpu_devices_.
 
   // Local ZeroMQ transport (server mode, using lightbeam)
-  hshm::lbm::TransportPtr local_transport_;
+  ctp::lbm::TransportPtr local_transport_;
 
   // Main ZeroMQ transport (server mode) for distributed communication
-  hshm::lbm::TransportPtr main_transport_;
+  ctp::lbm::TransportPtr main_transport_;
 
   // IPC transport mode (TCP default, configurable via CHI_IPC_MODE)
   IpcMode ipc_mode_ = IpcMode::kTcp;
 
   // SHM lightbeam transport (for SendShm / RecvShm)
-  hshm::lbm::TransportPtr shm_send_transport_;
-  hshm::lbm::TransportPtr shm_recv_transport_;
+  ctp::lbm::TransportPtr shm_send_transport_;
+  ctp::lbm::TransportPtr shm_recv_transport_;
 
   // Client-side: DEALER transport for sending tasks and receiving responses
-  hshm::lbm::TransportPtr zmq_transport_;
+  ctp::lbm::TransportPtr zmq_transport_;
   std::mutex zmq_client_send_mutex_;
 
   // Server-side: ROUTER transport for receiving client tasks and sending
   // responses
-  hshm::lbm::TransportPtr client_tcp_transport_;
+  ctp::lbm::TransportPtr client_tcp_transport_;
   // Server-side: Socket transport for IPC client communication
-  hshm::lbm::TransportPtr client_ipc_transport_;
+  ctp::lbm::TransportPtr client_ipc_transport_;
 
   // Client recv thread (receives completed task outputs via lightbeam)
   std::thread zmq_recv_thread_;
@@ -1392,7 +1392,7 @@ class IpcManager {
 
   // Persistent ZeroMQ transport connection pool
   // Key format: "ip_address:port"
-  std::unordered_map<std::string, hshm::lbm::TransportPtr> client_pool_;
+  std::unordered_map<std::string, ctp::lbm::TransportPtr> client_pool_;
   mutable std::mutex client_pool_mutex_;  // Mutex for thread-safe pool access
 
   // Scheduler for task routing
@@ -1438,7 +1438,7 @@ class IpcManager {
   chi::CoRwLock allocator_map_lock_;
 
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM || HSHM_ENABLE_SYCL
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM || CTP_ENABLE_SYCL
   /** GPU IPC manager: owns the per-device gpu2cpu_queues and the
    *  AllocatorId → ClientBackend registry. Producer-only design: GPU
    *  kernels just push, CPU worker pops and resolves. */
@@ -1451,7 +1451,7 @@ class IpcManager {
 #endif
 
  private:
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
   /**
    * Create a new per-process shared memory segment and register it with the
    * runtime Client-only: sends Admin::RegisterMemory and waits for the server
@@ -1493,9 +1493,9 @@ class IpcManager {
 }  // namespace chi
 
 // Global pointer variable declaration for IPC manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(chi::IpcManager, g_ipc_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(chi::IpcManager, g_ipc_manager);
 
-#define CHI_IPC HSHM_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
+#define CHI_IPC CTP_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
 #define CHI_CPU_IPC CHI_IPC
 
 // Include local_task_archives after CHI_IPC is defined, since on GPU
@@ -1505,12 +1505,12 @@ HSHM_DEFINE_GLOBAL_PTR_VAR_H(chi::IpcManager, g_ipc_manager);
 // ================================================================
 // GPU translation unit support: override CHI_IPC for device code
 // ================================================================
-#if HSHM_IS_GPU_COMPILER
+#if CTP_IS_GPU_COMPILER
 
 namespace chi {
 namespace gpu {
-HSHM_CROSS_FUN inline IpcManager *GetGpuIpcManager() {
-#if HSHM_IS_GPU
+CTP_CROSS_FUN inline IpcManager *GetGpuIpcManager() {
+#if CTP_IS_GPU
   return IpcManager::GetBlockIpcManager();
 #else
   return nullptr;
@@ -1520,21 +1520,21 @@ HSHM_CROSS_FUN inline IpcManager *GetGpuIpcManager() {
 }  // namespace chi
 
 // CHI_IPC needs different expansions in nvcc/hipcc's two passes:
-//   - Device pass (HSHM_IS_GPU=1): GetBlockIpcManager() — the per-block
+//   - Device pass (CTP_IS_GPU=1): GetBlockIpcManager() — the per-block
 //     `__shared__` singleton initialized by CHIMAERA_GPU_INIT.
-//   - Host pass (HSHM_IS_GPU=0): the global host pointer accessor —
+//   - Host pass (CTP_IS_GPU=0): the global host pointer accessor —
 //     same as the non-GPU-compiler default. Host-only client code
 //     (bdev_client::AsyncCreate, etc.) gets compiled in this pass too
 //     when the test .cc lives in an nvcc TU; it must reach the real
 //     host IpcManager, not nullptr. Mirrors the SYCL two-form override.
 #undef CHI_IPC
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
 #define CHI_IPC (::chi::gpu::GetGpuIpcManager())
 #else
-#define CHI_IPC HSHM_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
+#define CHI_IPC CTP_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
 #endif
 #undef CHI_CPU_IPC
-#define CHI_CPU_IPC HSHM_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
+#define CHI_CPU_IPC CTP_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
 
 namespace chi {
 // Producer-only model: kernels do not allocate. The legacy
@@ -1543,19 +1543,19 @@ namespace chi {
 // gpu_alloc_ respectively; both are gone with the GPU runtime concept.
 // Any device-pass code that still calls these gets a nullptr stub so it
 // links cleanly while we excise the call sites.
-#if !HSHM_IS_HOST
-HSHM_GPU_FUN inline hipc::PrivateBuddyAllocator *GetPrivAllocGpu() {
+#if !CTP_IS_HOST
+CTP_GPU_FUN inline hipc::PrivateBuddyAllocator *GetPrivAllocGpu() {
   return nullptr;
 }
-HSHM_GPU_FUN inline hipc::RoundRobinAllocator *GetSharedAllocGpu() {
+CTP_GPU_FUN inline hipc::RoundRobinAllocator *GetSharedAllocGpu() {
   return nullptr;
 }
 #endif
 }  // namespace chi
 
-#endif  // HSHM_IS_GPU_COMPILER
+#endif  // CTP_IS_GPU_COMPILER
 
-#if HSHM_IS_SYCL_COMPILER
+#if CTP_IS_SYCL_COMPILER
 
 // SYCL has no analogue of CUDA's __shared__-backed GetBlockIpcManager(),
 // and DPC++ rejects function-local static variables in device code. The
@@ -1606,7 +1606,7 @@ inline ::chi::gpu::IpcManager *g_ipc_manager_ptr = nullptr;
 // CHI_IPC under SYCL needs different expansions in the two compilation
 // passes that DPC++ runs over a SYCL TU:
 //
-//   - Device pass (HSHM_IS_SYCL_DEVICE=1): resolve to the kernel-scope
+//   - Device pass (CTP_IS_SYCL_DEVICE=1): resolve to the kernel-scope
 //     local `g_ipc_manager_ptr` established by CHIMAERA_GPU_*_INIT, picked
 //     up via unqualified C++ name lookup from the enclosing function.
 //   - Host pass: keep using the global pointer accessor — host-only
@@ -1614,18 +1614,18 @@ inline ::chi::gpu::IpcManager *g_ipc_manager_ptr = nullptr;
 //     pass too even when they're never called from device, and they
 //     legitimately want the host singleton.
 //
-// The two-form expansion lets HSHM_CROSS_FUN-tagged code (compiled in
+// The two-form expansion lets CTP_CROSS_FUN-tagged code (compiled in
 // both passes) get the right pointer in each.
 #undef CHI_IPC
-#if HSHM_IS_SYCL_DEVICE
+#if CTP_IS_SYCL_DEVICE
 #define CHI_IPC (g_ipc_manager_ptr)
 #else
-#define CHI_IPC HSHM_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
+#define CHI_IPC CTP_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
 #endif
 #undef CHI_CPU_IPC
-#define CHI_CPU_IPC HSHM_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
+#define CHI_CPU_IPC CTP_GET_GLOBAL_PTR_VAR(::chi::IpcManager, g_ipc_manager)
 
-#endif  // HSHM_IS_SYCL_COMPILER
+#endif  // CTP_IS_SYCL_COMPILER
 
 // ================================================================
 // Future method implementations (unified for CPU and GPU TUs)
@@ -1634,11 +1634,11 @@ namespace chi {
 
 // ~Future() - frees resources if consumed (via Wait/await_resume)
 template <typename TaskT, typename AllocT>
-HSHM_CROSS_FUN Future<TaskT, AllocT>::~Future() {
+CTP_CROSS_FUN Future<TaskT, AllocT>::~Future() {
   if (consumed_) {
     // Clean up zero-copy response archive (TCP/IPC only, never used on GPU)
     if (!future_shm_.IsNull()) {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
       hipc::FullPtr<FutureShm> fs = CHI_CPU_IPC->ToFullPtr(future_shm_);
       if (!fs.IsNull() && (fs->origin_ == FutureShm::FUTURE_CLIENT_TCP ||
                            fs->origin_ == FutureShm::FUTURE_CLIENT_IPC)) {
@@ -1658,12 +1658,12 @@ HSHM_CROSS_FUN Future<TaskT, AllocT>::~Future() {
 
 // GetFutureShm() - converts internal ShmPtr to FullPtr
 template <typename TaskT, typename AllocT>
-HSHM_CROSS_FUN hipc::FullPtr<typename Future<TaskT, AllocT>::FutureT>
+CTP_CROSS_FUN hipc::FullPtr<typename Future<TaskT, AllocT>::FutureT>
 Future<TaskT, AllocT>::GetFutureShm() const {
   if (future_shm_.IsNull()) {
     return hipc::FullPtr<FutureT>();
   }
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
   return CHI_IPC->ToFullPtr(future_shm_);
 #else
   return CHI_CPU_IPC->ToFullPtr(future_shm_);
@@ -1675,14 +1675,14 @@ Future<TaskT, AllocT>::GetFutureShm() const {
 // ----------------------------------------------------------------
 
 template <typename TaskT, typename AllocT>
-HSHM_CROSS_FUN bool Future<TaskT, AllocT>::IsComplete() const {
+CTP_CROSS_FUN bool Future<TaskT, AllocT>::IsComplete() const {
   if (future_shm_.IsNull()) {
     return false;
   }
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
   return IsCompleteGpu2Gpu();
 #else
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
   if (future_shm_.alloc_id_ == FutureShm::GetCpu2GpuAllocId()) {
     return IsCompleteCpu2Gpu();
   }
@@ -1702,7 +1702,7 @@ HSHM_CROSS_FUN bool Future<TaskT, AllocT>::IsComplete() const {
 }
 
 template <typename TaskT, typename AllocT>
-HSHM_HOST_FUN bool Future<TaskT, AllocT>::IsCompleteCpu2Cpu() const {
+CTP_HOST_FUN bool Future<TaskT, AllocT>::IsCompleteCpu2Cpu() const {
   auto future_shm = GetFutureShm();
   if (future_shm.IsNull()) {
     return false;
@@ -1711,7 +1711,7 @@ HSHM_HOST_FUN bool Future<TaskT, AllocT>::IsCompleteCpu2Cpu() const {
 }
 
 template <typename TaskT, typename AllocT>
-HSHM_HOST_FUN bool Future<TaskT, AllocT>::IsCompleteGpu2Cpu() const {
+CTP_HOST_FUN bool Future<TaskT, AllocT>::IsCompleteGpu2Cpu() const {
   auto future_shm = GetFutureShm();
   if (future_shm.IsNull()) {
     return false;
@@ -1720,13 +1720,13 @@ HSHM_HOST_FUN bool Future<TaskT, AllocT>::IsCompleteGpu2Cpu() const {
 }
 
 template <typename TaskT, typename AllocT>
-HSHM_HOST_FUN bool Future<TaskT, AllocT>::IsCompleteCpu2Gpu() const {
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+CTP_HOST_FUN bool Future<TaskT, AllocT>::IsCompleteCpu2Gpu() const {
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
   // ShmPtr offset points to pinned-host gpu::FutureShm
   void *host_fshm = reinterpret_cast<void *>(future_shm_.off_.load());
   u32 flags_val = 0;
   size_t flags_offset = offsetof(gpu::FutureShm, flags_);
-  hshm::GpuApi::Memcpy(
+  ctp::GpuApi::Memcpy(
       &flags_val,
       reinterpret_cast<u32 *>(
           static_cast<char *>(host_fshm) + flags_offset),
@@ -1737,9 +1737,9 @@ HSHM_HOST_FUN bool Future<TaskT, AllocT>::IsCompleteCpu2Gpu() const {
 #endif
 }
 
-#if HSHM_IS_GPU_COMPILER
+#if CTP_IS_GPU_COMPILER
 template <typename TaskT, typename AllocT>
-HSHM_GPU_FUN bool Future<TaskT, AllocT>::IsCompleteGpu2Gpu() const {
+CTP_GPU_FUN bool Future<TaskT, AllocT>::IsCompleteGpu2Gpu() const {
   auto future_shm = GetFutureShm();
   if (future_shm.IsNull()) {
     return false;
@@ -1753,9 +1753,9 @@ HSHM_GPU_FUN bool Future<TaskT, AllocT>::IsCompleteGpu2Gpu() const {
 // ----------------------------------------------------------------
 
 template <typename TaskT, typename AllocT>
-HSHM_CROSS_FUN bool Future<TaskT, AllocT>::Wait(float max_sec,
+CTP_CROSS_FUN bool Future<TaskT, AllocT>::Wait(float max_sec,
                                                  bool reuse_task) {
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
   return WaitGpu2Gpu(max_sec, reuse_task);
 #else
   if (task_ptr_.IsNull() || future_shm_.IsNull()) {
@@ -1787,7 +1787,7 @@ HSHM_CROSS_FUN bool Future<TaskT, AllocT>::Wait(float max_sec,
 
   bool is_runtime = CHI_CHIMAERA_MANAGER->IsRuntime();
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
   // CPU→GPU POD path: sentinel allocator ID marks device pointers.
   if (is_runtime &&
       future_shm_.alloc_id_ == FutureShm::GetCpu2GpuAllocId()) {
@@ -1818,12 +1818,12 @@ HSHM_CROSS_FUN bool Future<TaskT, AllocT>::Wait(float max_sec,
 }
 
 // ----------------------------------------------------------------
-// GPU Wait paths (HSHM_GPU_FUN)
+// GPU Wait paths (CTP_GPU_FUN)
 // ----------------------------------------------------------------
 
-#if HSHM_IS_GPU_COMPILER
+#if CTP_IS_GPU_COMPILER
 template <typename TaskT, typename AllocT>
-HSHM_GPU_FUN bool Future<TaskT, AllocT>::WaitGpu2Gpu(float max_sec,
+CTP_GPU_FUN bool Future<TaskT, AllocT>::WaitGpu2Gpu(float max_sec,
                                                       bool reuse_task) {
   // chi::Future should not be used for GPU-to-GPU paths.
   // Use gpu::Future::WaitGpu2Gpu instead.
@@ -1833,11 +1833,11 @@ HSHM_GPU_FUN bool Future<TaskT, AllocT>::WaitGpu2Gpu(float max_sec,
 #endif
 
 // ----------------------------------------------------------------
-// Host Wait paths (HSHM_HOST_FUN)
+// Host Wait paths (CTP_HOST_FUN)
 // ----------------------------------------------------------------
 
 template <typename TaskT, typename AllocT>
-HSHM_HOST_FUN bool Future<TaskT, AllocT>::WaitCpu2Gpu(float max_sec,
+CTP_HOST_FUN bool Future<TaskT, AllocT>::WaitCpu2Gpu(float max_sec,
                                                        bool reuse_task) {
   // CPU->GPU transport was deleted with the GPU runtime concept; only the
   // signature is kept so existing dispatch tables compile. Producer-only
@@ -1847,7 +1847,7 @@ HSHM_HOST_FUN bool Future<TaskT, AllocT>::WaitCpu2Gpu(float max_sec,
 }
 
 template <typename TaskT, typename AllocT>
-HSHM_HOST_FUN bool Future<TaskT, AllocT>::WaitCpu2Cpu(float max_sec,
+CTP_HOST_FUN bool Future<TaskT, AllocT>::WaitCpu2Cpu(float max_sec,
                                                        bool reuse_task) {
   bool is_runtime = CHI_CHIMAERA_MANAGER->IsRuntime();
   if (is_runtime) {
@@ -1870,9 +1870,9 @@ HSHM_HOST_FUN bool Future<TaskT, AllocT>::WaitCpu2Cpu(float max_sec,
 }
 
 template <typename TaskT, typename AllocT>
-HSHM_HOST_FUN bool Future<TaskT, AllocT>::WaitGpu2Cpu(float max_sec,
+CTP_HOST_FUN bool Future<TaskT, AllocT>::WaitGpu2Cpu(float max_sec,
                                                        bool reuse_task) {
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
+#if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
   // Host-side polling path (test harness): polls chi::FutureShm with
   // system-scope atomics. The GPU kernel uses IpcGpu2Cpu::ClientRecv
   // (device-side) which polls gpu::FutureShm instead.
@@ -1882,10 +1882,10 @@ HSHM_HOST_FUN bool Future<TaskT, AllocT>::WaitGpu2Cpu(float max_sec,
     HLOG(kError, "Future::WaitGpu2Cpu: ToFullPtr returned null");
     return false;
   }
-  hshm::abitfield32_t &flags = future_full->flags_;
+  ctp::abitfield32_t &flags = future_full->flags_;
   auto start = std::chrono::steady_clock::now();
   while (!flags.AnySystem(FutureShm::FUTURE_COMPLETE)) {
-    HSHM_THREAD_MODEL->Yield();
+    CTP_THREAD_MODEL->Yield();
     if (max_sec > 0) {
       float elapsed = std::chrono::duration<float>(
                           std::chrono::steady_clock::now() - start)
@@ -1899,14 +1899,14 @@ HSHM_HOST_FUN bool Future<TaskT, AllocT>::WaitGpu2Cpu(float max_sec,
 
   // Deserialize output from ring buffer if present
   if (future_full->output_.total_written_.load() > 0) {
-    hshm::lbm::LbmContext ctx;
+    ctp::lbm::LbmContext ctx;
     ctx.copy_space = future_full->copy_space;
     ctx.shm_info_ = &future_full->output_;
     chi::priv::vector<char> load_buf(CHI_PRIV_ALLOC);
     load_buf.reserve(256);
     DefaultLoadArchive load_ar(load_buf);
     load_ar.SetMsgType(LocalMsgType::kSerializeOut);
-    hshm::lbm::ShmTransport::Recv(load_ar, ctx);
+    ctp::lbm::ShmTransport::Recv(load_ar, ctx);
     task_ptr_->SerializeOut(load_ar);
   }
 
@@ -1920,11 +1920,11 @@ HSHM_HOST_FUN bool Future<TaskT, AllocT>::WaitGpu2Cpu(float max_sec,
 }
 
 // ----------------------------------------------------------------
-// Shared helpers (HSHM_CROSS_FUN)
+// Shared helpers (CTP_CROSS_FUN)
 // ----------------------------------------------------------------
 
 template <typename TaskT, typename AllocT>
-HSHM_CROSS_FUN void Future<TaskT, AllocT>::Destroy(bool post_wait) {
+CTP_CROSS_FUN void Future<TaskT, AllocT>::Destroy(bool post_wait) {
   if (post_wait && !task_ptr_.IsNull()) {
     task_ptr_->PostWait();
   }
@@ -1932,8 +1932,8 @@ HSHM_CROSS_FUN void Future<TaskT, AllocT>::Destroy(bool post_wait) {
 }
 
 template <typename TaskT, typename AllocT>
-HSHM_CROSS_FUN void Future<TaskT, AllocT>::DelTask() {
-#if HSHM_IS_GPU
+CTP_CROSS_FUN void Future<TaskT, AllocT>::DelTask() {
+#if CTP_IS_GPU
   // Producer-only model: kernels do not own/free tasks. The host owns
   // the registered device-memory backend; just clear our handle.
   task_ptr_.SetNull();
@@ -1950,10 +1950,10 @@ HSHM_CROSS_FUN void Future<TaskT, AllocT>::DelTask() {
 // ----------------------------------------------------------------
 
 template <typename TaskT, typename AllocT>
-HSHM_CROSS_FUN void Future<TaskT, AllocT>::WaitPoll(float max_sec,
+CTP_CROSS_FUN void Future<TaskT, AllocT>::WaitPoll(float max_sec,
                                                      bool reuse_task) {
   (void)max_sec; (void)reuse_task;
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
   if (threadIdx.x != 0) return;
   auto fshm_full = GetFutureShm();
   if (fshm_full.IsNull()) return;
@@ -1961,17 +1961,17 @@ HSHM_CROSS_FUN void Future<TaskT, AllocT>::WaitPoll(float max_sec,
 
   // Spin-wait on FUTURE_COMPLETE (device-scope atomics)
   while (!fshm->flags_.AnyDevice(FutureShm::FUTURE_COMPLETE)) {
-    HSHM_THREAD_MODEL->Yield();
+    CTP_THREAD_MODEL->Yield();
   }
   hipc::threadfence();
 #endif
 }
 
 template <typename TaskT, typename AllocT>
-HSHM_CROSS_FUN void Future<TaskT, AllocT>::WaitRecv(float max_sec,
+CTP_CROSS_FUN void Future<TaskT, AllocT>::WaitRecv(float max_sec,
                                                      bool reuse_task) {
   (void)max_sec; (void)reuse_task;
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
   if (threadIdx.x != 0) return;
   auto fshm_full = GetFutureShm();
   if (fshm_full.IsNull()) return;
@@ -1987,7 +1987,7 @@ HSHM_CROSS_FUN void Future<TaskT, AllocT>::WaitRecv(float max_sec,
     fp.ptr_ = fshm->copy_space;
     fp.shm_.alloc_id_.SetNull();
     fp.shm_.off_ = reinterpret_cast<size_t>(fp.ptr_);
-    hshm::priv::wrap_vector buffer;
+    ctp::priv::wrap_vector buffer;
     buffer.set(fp, output_written);
     buffer.resize(output_written);
     GpuLoadTaskArchive load_ar(buffer);

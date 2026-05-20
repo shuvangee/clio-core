@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_SHM_AFFINITY_H
-#define HSHM_SHM_AFFINITY_H
+#ifndef CTP_SHM_AFFINITY_H
+#define CTP_SHM_AFFINITY_H
 
 #ifndef _WIN32
 
@@ -47,7 +47,7 @@
 #include <string>
 #include <vector>
 
-namespace hshm {
+namespace ctp {
 
 class ProcessAffiner {
  public:
@@ -189,8 +189,8 @@ class ProcessAffiner {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
 #endif  // _WIN32
 
-#endif  // HSHM_SHM_AFFINITY_H
+#endif  // CTP_SHM_AFFINITY_H

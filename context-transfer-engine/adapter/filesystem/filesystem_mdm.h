@@ -66,7 +66,7 @@ private:
       path_to_hermes_file_; /**< Map to determine if path is buffered. */
   std::unordered_map<File, std::shared_ptr<AdapterStat>>
       hermes_file_to_stat_; /**< Map for metadata */
-  hshm::RwLock lock_;             /**< Lock to synchronize MD updates*/
+  ctp::RwLock lock_;             /**< Lock to synchronize MD updates*/
 
 public:
   std::unordered_map<uint64_t, FsAsyncTask *>
@@ -78,14 +78,14 @@ public:
 
   /** Get the current adapter mode */
   AdapterMode GetBaseAdapterMode() {
-    hshm::ScopedRwReadLock md_lock(lock_, 1);
+    ctp::ScopedRwReadLock md_lock(lock_, 1);
     return AdapterMode::kDefault;
   }
 
   /** Get the adapter mode for a particular file */
   AdapterMode GetAdapterMode(const std::string &path) {
     (void)path;
-    hshm::ScopedRwReadLock md_lock(lock_, 2);
+    ctp::ScopedRwReadLock md_lock(lock_, 2);
     return AdapterMode::kDefault;
   }
 
@@ -105,7 +105,7 @@ public:
    */
   bool Create(const File &f, std::shared_ptr<AdapterStat> &stat) {
     HLOG(kDebug, "Create metadata for file handler");
-    hshm::ScopedRwWriteLock md_lock(lock_, kMDM_Create);
+    ctp::ScopedRwWriteLock md_lock(lock_, kMDM_Create);
     if (path_to_hermes_file_.find(stat->path_) == path_to_hermes_file_.end()) {
       path_to_hermes_file_.emplace(stat->path_, std::list<File>());
     }
@@ -123,7 +123,7 @@ public:
    */
   bool Update(const File &f, const AdapterStat &stat) {
     HLOG(kDebug, "Update metadata for file handler");
-    hshm::ScopedRwWriteLock md_lock(lock_, kMDM_Update);
+    ctp::ScopedRwWriteLock md_lock(lock_, kMDM_Update);
     auto iter = hermes_file_to_stat_.find(f);
     if (iter != hermes_file_to_stat_.end()) {
       *(*iter).second = stat;
@@ -141,7 +141,7 @@ public:
    */
   bool Delete(const std::string &path, const File &f) {
     HLOG(kDebug, "Delete metadata for file handler");
-    hshm::ScopedRwWriteLock md_lock(lock_, kMDM_Delete);
+    ctp::ScopedRwWriteLock md_lock(lock_, kMDM_Delete);
     auto iter = hermes_file_to_stat_.find(f);
     if (iter != hermes_file_to_stat_.end()) {
       hermes_file_to_stat_.erase(iter);
@@ -164,7 +164,7 @@ public:
    * */
   std::list<File> *Find(const std::string &path) {
     std::string canon_path = stdfs::absolute(path).string();
-    hshm::ScopedRwReadLock md_lock(lock_, kMDM_Find);
+    ctp::ScopedRwReadLock md_lock(lock_, kMDM_Find);
     auto iter = path_to_hermes_file_.find(canon_path);
     if (iter == path_to_hermes_file_.end())
       return nullptr;
@@ -179,7 +179,7 @@ public:
    *            The bool in pair indicated whether metadata entry exists.
    */
   std::shared_ptr<AdapterStat> Find(const File &f) {
-    hshm::ScopedRwReadLock md_lock(lock_, kMDM_Find2);
+    ctp::ScopedRwReadLock md_lock(lock_, kMDM_Find2);
     auto iter = hermes_file_to_stat_.find(f);
     if (iter == hermes_file_to_stat_.end())
       return nullptr;
@@ -191,7 +191,7 @@ public:
    * Add a request to the request map.
    * */
   void EmplaceTask(uint64_t id, FsAsyncTask *task) {
-    hshm::ScopedRwWriteLock md_lock(lock_, 0);
+    ctp::ScopedRwWriteLock md_lock(lock_, 0);
     request_map_.emplace(id, task);
   }
 
@@ -199,7 +199,7 @@ public:
    * Find a request in the request map.
    * */
   FsAsyncTask *FindTask(uint64_t id) {
-    hshm::ScopedRwReadLock md_lock(lock_, 0);
+    ctp::ScopedRwReadLock md_lock(lock_, 0);
     auto iter = request_map_.find(id);
     if (iter == request_map_.end()) {
       return nullptr;
@@ -212,7 +212,7 @@ public:
    * Delete a request in the request map.
    * */
   void DeleteTask(uint64_t id) {
-    hshm::ScopedRwWriteLock md_lock(lock_, 0);
+    ctp::ScopedRwWriteLock md_lock(lock_, 0);
     auto iter = request_map_.find(id);
     if (iter != request_map_.end()) {
       request_map_.erase(iter);
@@ -226,10 +226,10 @@ public:
 #include "hermes_shm/util/singleton.h"
 
 namespace clio::cae {
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(MetadataManager, g_fs_metadata_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(MetadataManager, g_fs_metadata_manager);
 }
 
-#define WRP_CTE_FS_METADATA_MANAGER (HSHM_GET_GLOBAL_PTR_VAR(clio::cae::MetadataManager, clio::cae::g_fs_metadata_manager))
+#define WRP_CTE_FS_METADATA_MANAGER (CTP_GET_GLOBAL_PTR_VAR(clio::cae::MetadataManager, clio::cae::g_fs_metadata_manager))
 #define WRP_CTE_FS_METADATA_MANAGER_T clio::cae::MetadataManager *
 
 #endif // WRP_CTE_ADAPTER_METADATA_MANAGER_H

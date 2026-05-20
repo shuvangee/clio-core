@@ -57,7 +57,7 @@ namespace chi {
 
 // Forward declaration to avoid circular dependency
 using WorkQueue =
-    hshm::ipc::mpsc_ring_buffer<hipc::ShmPtr<TaskLane>, CHI_QUEUE_ALLOC_T>;
+    ctp::ipc::mpsc_ring_buffer<hipc::ShmPtr<TaskLane>, CHI_QUEUE_ALLOC_T>;
 
 // Forward declarations
 class Task;
@@ -117,7 +117,7 @@ struct WorkerStats {
 //   FullPtr<Task> current_task = worker->GetCurrentTask();
 //   RunContext* run_ctx = worker->GetCurrentRunContext();
 #define CHI_CUR_WORKER \
-  (HSHM_THREAD_MODEL->GetTls<chi::Worker>(chi::chi_cur_worker_key_))
+  (CTP_THREAD_MODEL->GetTls<chi::Worker>(chi::chi_cur_worker_key_))
 
 /**
  * Worker class for executing tasks
@@ -240,7 +240,7 @@ class Worker {
    * Get the EventManager for this worker
    * @return Reference to this worker's EventManager
    */
-  hshm::lbm::EventManager& GetEventManager();
+  ctp::lbm::EventManager& GetEventManager();
 
   /**
    * Add run context to blocked queue based on block count
@@ -459,7 +459,7 @@ class Worker {
   // Stores Future<Task> objects to set FUTURE_COMPLETE, avoiding stale RunContext* pointers
   // Allocated from malloc allocator (temporary runtime data, not IPC)
   static constexpr u32 EVENT_QUEUE_DEPTH = 1024;
-  hshm::ipc::mpsc_ring_buffer<Future<Task, CHI_QUEUE_ALLOC_T>, hshm::ipc::MallocAllocator> *event_queue_;
+  ctp::ipc::mpsc_ring_buffer<Future<Task, CHI_QUEUE_ALLOC_T>, ctp::ipc::MallocAllocator> *event_queue_;
 
   // Periodic queue system for time-based periodic tasks:
   // - Queue[0]: Tasks with yield_time_us_ <= 50us (checked every 16 iterations)
@@ -474,7 +474,7 @@ class Worker {
   std::queue<RunContext *> periodic_queues_[NUM_PERIODIC_QUEUES];
 
   // Worker spawn time
-  hshm::Timepoint spawn_time_;  // Time when worker was spawned
+  ctp::Timepoint spawn_time_;  // Time when worker was spawned
 
   // Task completion counter (incremented in EndTask)
   u64 num_tasks_processed_;  // Total tasks completed by this worker
@@ -486,14 +486,14 @@ class Worker {
   u64 idle_iterations_;   // Number of consecutive iterations with no work
   u32 current_sleep_us_;  // Current sleep duration in microseconds
   u64 sleep_count_;  // Number of times sleep was called in current idle period
-  hshm::Timepoint idle_start_;  // Time when worker became idle
+  ctp::Timepoint idle_start_;  // Time when worker became idle
 
   // EventManager for efficient worker suspension and event monitoring
-  hshm::lbm::EventManager event_manager_;
+  ctp::lbm::EventManager event_manager_;
 
   // SHM lightbeam transport (worker-side)
-  hshm::lbm::TransportPtr shm_send_transport_;  // For IpcManager::SendRuntime
-  hshm::lbm::TransportPtr shm_recv_transport_;  // For ProcessNewTask
+  ctp::lbm::TransportPtr shm_send_transport_;  // For IpcManager::SendRuntime
+  ctp::lbm::TransportPtr shm_recv_transport_;  // For ProcessNewTask
 
   // Scheduler pointer (owned by IpcManager, not Worker)
   Scheduler *scheduler_;

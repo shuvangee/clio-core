@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_PRIV_ARRAY_VECTOR_H_
-#define HSHM_DATA_STRUCTURES_PRIV_ARRAY_VECTOR_H_
+#ifndef CTP_DATA_STRUCTURES_PRIV_ARRAY_VECTOR_H_
+#define CTP_DATA_STRUCTURES_PRIV_ARRAY_VECTOR_H_
 
 #include "hermes_shm/constants/macros.h"
 #include <cstring>
 
-namespace hshm::priv {
+namespace ctp::priv {
 
 /**
  * Fixed-capacity char vector backed by an inline buffer.
@@ -52,29 +52,29 @@ class alignas(8) array_vector {
   alignas(8) char data_[N];
   size_t size_ = 0;
 
-  HSHM_CROSS_FUN array_vector() : size_(0) {}
+  CTP_CROSS_FUN array_vector() : size_(0) {}
 
-  HSHM_CROSS_FUN char *data() { return data_; }
-  HSHM_CROSS_FUN const char *data() const { return data_; }
-  HSHM_CROSS_FUN size_t size() const { return size_; }
-  HSHM_CROSS_FUN static constexpr size_t capacity() { return N; }
-  HSHM_CROSS_FUN bool empty() const { return size_ == 0; }
+  CTP_CROSS_FUN char *data() { return data_; }
+  CTP_CROSS_FUN const char *data() const { return data_; }
+  CTP_CROSS_FUN size_t size() const { return size_; }
+  CTP_CROSS_FUN static constexpr size_t capacity() { return N; }
+  CTP_CROSS_FUN bool empty() const { return size_ == 0; }
 
-  HSHM_CROSS_FUN bool reserve(size_t n) { return n <= N; }
-  HSHM_CROSS_FUN bool resize(size_t n) { size_ = n; return n <= N; }
-  HSHM_CROSS_FUN bool resize_no_init(size_t n) { size_ = n; return n <= N; }
-  HSHM_CROSS_FUN void clear() { size_ = 0; }
+  CTP_CROSS_FUN bool reserve(size_t n) { return n <= N; }
+  CTP_CROSS_FUN bool resize(size_t n) { size_ = n; return n <= N; }
+  CTP_CROSS_FUN bool resize_no_init(size_t n) { size_ = n; return n <= N; }
+  CTP_CROSS_FUN void clear() { size_ = 0; }
 
-  HSHM_CROSS_FUN void push_back(char c) { data_[size_++] = c; }
-  HSHM_CROSS_FUN char &operator[](size_t i) { return data_[i]; }
-  HSHM_CROSS_FUN const char &operator[](size_t i) const { return data_[i]; }
+  CTP_CROSS_FUN void push_back(char c) { data_[size_++] = c; }
+  CTP_CROSS_FUN char &operator[](size_t i) { return data_[i]; }
+  CTP_CROSS_FUN const char &operator[](size_t i) const { return data_[i]; }
 
-  HSHM_CROSS_FUN char *begin() { return data_; }
-  HSHM_CROSS_FUN char *end() { return data_ + size_; }
-  HSHM_CROSS_FUN const char *begin() const { return data_; }
-  HSHM_CROSS_FUN const char *end() const { return data_ + size_; }
+  CTP_CROSS_FUN char *begin() { return data_; }
+  CTP_CROSS_FUN char *end() { return data_ + size_; }
+  CTP_CROSS_FUN const char *begin() const { return data_; }
+  CTP_CROSS_FUN const char *end() const { return data_ + size_; }
 };
 
-}  // namespace hshm::priv
+}  // namespace ctp::priv
 
-#endif  // HSHM_DATA_STRUCTURES_PRIV_ARRAY_VECTOR_H_
+#endif  // CTP_DATA_STRUCTURES_PRIV_ARRAY_VECTOR_H_

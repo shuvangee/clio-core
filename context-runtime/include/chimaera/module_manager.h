@@ -59,7 +59,7 @@ typedef void (*destroy_chimod_t)(Container* container);
 struct ChiModInfo {
   std::string name;
   std::string lib_path;
-  hshm::SharedLibrary lib;
+  ctp::SharedLibrary lib;
 
   // Function pointers
   alloc_chimod_t alloc_func;
@@ -206,7 +206,7 @@ class ModuleManager {
    * @param lib Shared library to validate
    * @return true if library has required functions
    */
-  bool ValidateChiMod(hshm::SharedLibrary& lib) const;
+  bool ValidateChiMod(ctp::SharedLibrary& lib) const;
 
   bool is_initialized_ = false;
   
@@ -217,9 +217,9 @@ class ModuleManager {
 }  // namespace chi
 
 // Global pointer variable declaration for Module manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(chi::ModuleManager, g_module_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_H(chi::ModuleManager, g_module_manager);
 
 // Macro for accessing the Module manager singleton using global pointer variable
-#define CHI_MODULE_MANAGER HSHM_GET_GLOBAL_PTR_VAR(::chi::ModuleManager, g_module_manager)
+#define CHI_MODULE_MANAGER CTP_GET_GLOBAL_PTR_VAR(::chi::ModuleManager, g_module_manager)
 
 #endif  // CHIMAERA_INCLUDE_CHIMAERA_MANAGERS_MODULE_MANAGER_H_

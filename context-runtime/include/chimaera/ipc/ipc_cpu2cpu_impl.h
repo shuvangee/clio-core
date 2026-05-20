@@ -38,7 +38,7 @@ Future<TaskT> IpcCpu2Cpu::ClientSend(IpcManager *ipc,
   Future<TaskT> future(future_shm_shmptr, task_ptr);
 
   // Build SHM context for transfer
-  hshm::lbm::LbmContext ctx;
+  ctp::lbm::LbmContext ctx;
   ctx.copy_space = future_shm->copy_space;
   ctx.shm_info_ = &future_shm->input_;
 
@@ -71,7 +71,7 @@ bool IpcCpu2Cpu::ClientRecv(IpcManager *ipc,
   TaskT *task_ptr = future.get();
 
   // Normal SHM path: server is alive, use ring buffer recv
-  hshm::lbm::LbmContext ctx;
+  ctp::lbm::LbmContext ctx;
   ctx.copy_space = future_shm->copy_space;
   ctx.shm_info_ = &future_shm->output_;
 
@@ -79,10 +79,10 @@ bool IpcCpu2Cpu::ClientRecv(IpcManager *ipc,
   ipc->shm_recv_transport_->Recv(archive, ctx);
 
   // Wait for FUTURE_COMPLETE, but bail if the server dies or times out
-  hshm::abitfield32_t &flags = future_shm->flags_;
+  ctp::abitfield32_t &flags = future_shm->flags_;
   auto shm_start = std::chrono::steady_clock::now();
   while (!flags.Any(FutureShm::FUTURE_COMPLETE)) {
-    HSHM_THREAD_MODEL->Yield();
+    CTP_THREAD_MODEL->Yield();
     if (!ipc->server_alive_.load()) {
       HLOG(kWarning, "Recv(SHM): Server died while waiting for response");
       // Fall through to ZMQ reconnect path

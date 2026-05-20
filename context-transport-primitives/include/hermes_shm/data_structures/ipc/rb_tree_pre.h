@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_IPC_RB_TREE_PRE_H_
-#define HSHM_DATA_STRUCTURES_IPC_RB_TREE_PRE_H_
+#ifndef CTP_DATA_STRUCTURES_IPC_RB_TREE_PRE_H_
+#define CTP_DATA_STRUCTURES_IPC_RB_TREE_PRE_H_
 
 #include "hermes_shm/memory/allocator/allocator.h"
 #include "hermes_shm/types/atomic.h"
 
-namespace hshm::ipc::pre {
+namespace ctp::ipc::pre {
 
 /**
  * Color enumeration for Red-Black tree nodes
@@ -66,7 +66,7 @@ class rb_node {
   /**
    * Default constructor
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   rb_node() : left_(OffsetPtr<>::GetNull()),
               right_(OffsetPtr<>::GetNull()),
               parent_(OffsetPtr<>::GetNull()),
@@ -75,7 +75,7 @@ class rb_node {
   /**
    * Check if this is a null node
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool IsNull() const {
     return left_.IsNull() && right_.IsNull() && parent_.IsNull();
   }
@@ -112,13 +112,13 @@ class rb_tree {
   /**
    * Default constructor
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   rb_tree() : size_(0), root_(OffsetPtr<NodeT>::GetNull()) {}
 
   /**
    * Initialize the tree
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Init() {
     size_.store(0);
     root_ = OffsetPtr<NodeT>::GetNull();
@@ -127,7 +127,7 @@ class rb_tree {
   /**
    * Get the number of nodes in the tree
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t size() const {
     return size_.load();
   }
@@ -135,7 +135,7 @@ class rb_tree {
   /**
    * Check if the tree is empty
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool empty() const {
     return size_.load() == 0;
   }
@@ -143,7 +143,7 @@ class rb_tree {
   /**
    * Get the root pointer (for debugging/inspection)
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<NodeT> GetRoot() const {
     return root_;
   }
@@ -155,7 +155,7 @@ class rb_tree {
    * @param node Preallocated node to insert
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void emplace(AllocT *alloc, FullPtr<NodeT> node) {
     node.ptr_->color_ = RBColor::RED;
     node.ptr_->left_ = OffsetPtr<>::GetNull();
@@ -212,7 +212,7 @@ class rb_tree {
    * @return FullPtr to the removed node, or null if not found
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   FullPtr<NodeT> pop(AllocT *alloc, const KeyT &key) {
     if (root_.IsNull()) {
       return FullPtr<NodeT>::GetNull();
@@ -331,7 +331,7 @@ class rb_tree {
    * @return FullPtr to the node, or null if not found
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   FullPtr<NodeT> find(AllocT *alloc, const KeyT &key) const {
     OffsetPtr<NodeT> node_off = FindNode(alloc, key);
     if (node_off.IsNull()) {
@@ -345,7 +345,7 @@ class rb_tree {
    * Find node by key (internal helper)
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<NodeT> FindNode(AllocT *alloc, const KeyT &key) const {
     OffsetPtr<NodeT> curr_off = root_;
 
@@ -368,7 +368,7 @@ class rb_tree {
    * Find minimum node in subtree
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<NodeT> Minimum(AllocT *alloc, OffsetPtr<> node_off) const {
     OffsetPtr<NodeT> curr_off(node_off);
     while (!curr_off.IsNull()) {
@@ -385,7 +385,7 @@ class rb_tree {
    * Replace subtree rooted at u with subtree rooted at v
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Transplant(AllocT *alloc, OffsetPtr<NodeT> u_off, OffsetPtr<> v_off) {
     FullPtr<NodeT> u(alloc, u_off);
 
@@ -410,7 +410,7 @@ class rb_tree {
    * Left rotation
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void RotateLeft(AllocT *alloc, OffsetPtr<NodeT> x_off) {
     FullPtr<NodeT> x(alloc, x_off);
     OffsetPtr<NodeT> y_off(x.ptr_->right_);
@@ -442,7 +442,7 @@ class rb_tree {
    * Right rotation
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void RotateRight(AllocT *alloc, OffsetPtr<NodeT> y_off) {
     FullPtr<NodeT> y(alloc, y_off);
     OffsetPtr<NodeT> x_off(y.ptr_->left_);
@@ -474,7 +474,7 @@ class rb_tree {
    * Fix RB tree properties after insertion
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FixInsert(AllocT *alloc, FullPtr<NodeT> node) {
     OffsetPtr<NodeT> node_off = node.shm_.off_;
 
@@ -561,7 +561,7 @@ class rb_tree {
    * Fix RB tree properties after deletion
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FixDelete(AllocT *alloc, OffsetPtr<> node_off_raw) {
     OffsetPtr<NodeT> node_off(node_off_raw);
     while (node_off.load() != root_.load()) {
@@ -697,7 +697,7 @@ class rb_tree {
    * This is called with the parent of the deleted node
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void FixDeleteFromParent(AllocT *alloc, OffsetPtr<NodeT> parent_off, bool deleted_was_left) {
     while (true) {
       FullPtr<NodeT> parent(alloc, parent_off);
@@ -840,6 +840,6 @@ class rb_tree {
 
 };
 
-}  // namespace hshm::ipc::pre
+}  // namespace ctp::ipc::pre
 
-#endif  // HSHM_DATA_STRUCTURES_IPC_RB_TREE_PRE_H_
+#endif  // CTP_DATA_STRUCTURES_IPC_RB_TREE_PRE_H_

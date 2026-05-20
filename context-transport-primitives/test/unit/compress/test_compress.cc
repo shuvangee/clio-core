@@ -41,7 +41,7 @@ TEST_CASE("TestCompress") {
   std::vector<char> decompressed(1024);
 
   PAGE_DIVIDE("BZIP2") {
-    hshm::Bzip2 bzip;
+    ctp::Bzip2 bzip;
     size_t cmpr_size = 1024, raw_size = 1024;
     bzip.Compress(compressed.data(), cmpr_size,
                   raw.data(), raw.size());
@@ -51,7 +51,7 @@ TEST_CASE("TestCompress") {
   }
 
   PAGE_DIVIDE("LZO") {
-    hshm::Lzo lzo;
+    ctp::Lzo lzo;
     size_t cmpr_size = 1024, raw_size = 1024;
     lzo.Compress(compressed.data(), cmpr_size,
                  raw.data(), raw.size());
@@ -61,7 +61,7 @@ TEST_CASE("TestCompress") {
   }
 
   PAGE_DIVIDE("Zstd") {
-    hshm::Zstd zstd;
+    ctp::Zstd zstd;
     size_t cmpr_size = 1024, raw_size = 1024;
     zstd.Compress(compressed.data(), cmpr_size,
                   raw.data(), raw.size());
@@ -71,7 +71,7 @@ TEST_CASE("TestCompress") {
   }
 
   PAGE_DIVIDE("LZ4") {
-    hshm::Lz4 lz4;
+    ctp::Lz4 lz4;
     size_t cmpr_size = 1024, raw_size = 1024;
     lz4.Compress(compressed.data(), cmpr_size,
                  raw.data(), raw.size());
@@ -81,7 +81,7 @@ TEST_CASE("TestCompress") {
   }
 
   PAGE_DIVIDE("Zlib") {
-    hshm::Zlib zlib;
+    ctp::Zlib zlib;
     size_t cmpr_size = 1024, raw_size = 1024;
     zlib.Compress(compressed.data(), cmpr_size,
                   raw.data(), raw.size());
@@ -91,7 +91,7 @@ TEST_CASE("TestCompress") {
   }
 
   PAGE_DIVIDE("Lzma") {
-    hshm::Lzma lzma;
+    ctp::Lzma lzma;
     size_t cmpr_size = 1024, raw_size = 1024;
     lzma.Compress(compressed.data(), cmpr_size,
                   raw.data(), raw.size());
@@ -101,7 +101,7 @@ TEST_CASE("TestCompress") {
   }
 
   PAGE_DIVIDE("Brotli") {
-    hshm::Brotli brotli;
+    ctp::Brotli brotli;
     size_t cmpr_size = 1024, raw_size = 1024;
     brotli.Compress(compressed.data(), cmpr_size,
                     raw.data(), raw.size());
@@ -111,7 +111,7 @@ TEST_CASE("TestCompress") {
   }
 
   PAGE_DIVIDE("Snappy") {
-    hshm::Snappy snappy;
+    ctp::Snappy snappy;
     size_t cmpr_size = 1024, raw_size = 1024;
     snappy.Compress(compressed.data(), cmpr_size,
                     raw.data(), raw.size());
@@ -121,7 +121,7 @@ TEST_CASE("TestCompress") {
   }
 
   PAGE_DIVIDE("Blosc2") {
-    hshm::Blosc blosc;
+    ctp::Blosc blosc;
     size_t cmpr_size = 1024, raw_size = 1024;
     blosc.Compress(compressed.data(), cmpr_size,
                    raw.data(), raw.size());

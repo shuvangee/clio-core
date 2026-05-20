@@ -47,7 +47,7 @@
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 // Helper context for tests
 template <size_t N>
@@ -98,7 +98,7 @@ static LbmMeta<> MakeSendMeta(std::vector<char>& data) {
   bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
   bulk.data.shm_.off_ = 0;
   bulk.size = data.size();
-  bulk.flags = hshm::bitfield32_t(BULK_XFER);
+  bulk.flags = ctp::bitfield32_t(BULK_XFER);
   meta.send.push_back(bulk);
   meta.send_bulks = 1;
   return meta;
@@ -347,7 +347,7 @@ TEST_CASE("ShmTransfer - Send/Recv Basic", "[shm_transfer][sendrecv]") {
   bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
   bulk.data.shm_.off_ = 0;
   bulk.size = DATA_SIZE;
-  bulk.flags = hshm::bitfield32_t(BULK_XFER);
+  bulk.flags = ctp::bitfield32_t(BULK_XFER);
   send_meta.send.push_back(bulk);
   send_meta.send_bulks = 1;
 
@@ -402,7 +402,7 @@ TEST_CASE("ShmTransfer - Send/Recv Large Multi-Chunk", "[shm_transfer][sendrecv]
   bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
   bulk.data.shm_.off_ = 0;
   bulk.size = DATA_SIZE;
-  bulk.flags = hshm::bitfield32_t(BULK_XFER);
+  bulk.flags = ctp::bitfield32_t(BULK_XFER);
   send_meta.send.push_back(bulk);
   send_meta.send_bulks = 1;
 

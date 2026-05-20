@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_IPC_SLIST_PRE_H_
-#define HSHM_DATA_STRUCTURES_IPC_SLIST_PRE_H_
+#ifndef CTP_DATA_STRUCTURES_IPC_SLIST_PRE_H_
+#define CTP_DATA_STRUCTURES_IPC_SLIST_PRE_H_
 
 #include "hermes_shm/memory/allocator/allocator.h"
 #include "hermes_shm/types/atomic.h"
 
-namespace hshm::ipc::pre {
+namespace ctp::ipc::pre {
 
 /**
  * Singly-linked list node for preallocated list
@@ -52,13 +52,13 @@ class slist_node {
   /**
    * Default constructor
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   slist_node() : next_(OffsetPtr<>::GetNull()) {}
 
   /**
    * Get the next pointer
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<>GetNext() const {
     return next_;
   }
@@ -66,7 +66,7 @@ class slist_node {
   /**
    * Set the next pointer
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void SetNext(const OffsetPtr<> &next) {
     next_ = next;
   }
@@ -107,7 +107,7 @@ class slist {
     /**
      * Construct a null iterator
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     Iterator() : current_(OffsetPtr<NodeT>::GetNull()), prev_(OffsetPtr<NodeT>::GetNull()), alloc_(nullptr) {}
 
     /**
@@ -117,7 +117,7 @@ class slist {
      * @param prev Offset pointer to previous node (or null for head)
      * @param alloc Allocator pointer for node traversal
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     Iterator(const OffsetPtr<NodeT> &current, const OffsetPtr<NodeT> &prev, void *alloc = nullptr)
         : current_(current), prev_(prev), alloc_(alloc) {}
 
@@ -126,7 +126,7 @@ class slist {
      *
      * @return OffsetPtr to current node
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     OffsetPtr<NodeT> GetCurrent() const {
       return current_;
     }
@@ -136,7 +136,7 @@ class slist {
      *
      * @return OffsetPtr to previous node (or null if at head)
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     OffsetPtr<NodeT> GetPrev() const {
       return prev_;
     }
@@ -146,7 +146,7 @@ class slist {
      *
      * @return true if previous node is null
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     bool IsAtHead() const {
       return prev_.IsNull();
     }
@@ -156,7 +156,7 @@ class slist {
      *
      * @return true if current is null
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     bool IsNull() const {
       return current_.IsNull();
     }
@@ -167,7 +167,7 @@ class slist {
      * Makes this iterator equivalent to the end marker by setting
      * both current and previous pointers to null.
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     void SetNull() {
       current_ = OffsetPtr<NodeT>::GetNull();
       prev_ = OffsetPtr<NodeT>::GetNull();
@@ -179,7 +179,7 @@ class slist {
      * @param other Iterator to compare with
      * @return true if both point to the same node
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     bool operator==(const Iterator &other) const {
       return current_.load() == other.current_.load();
     }
@@ -190,7 +190,7 @@ class slist {
      * @param other Iterator to compare with
      * @return true if they point to different nodes
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     bool operator!=(const Iterator &other) const {
       return current_.load() != other.current_.load();
     }
@@ -203,7 +203,7 @@ class slist {
      *
      * @return Reference to this iterator after advancement
      */
-    HSHM_CROSS_FUN
+    CTP_CROSS_FUN
     Iterator& operator++() {
       if (IsNull() || alloc_ == nullptr) {
         // Already at end, remain null
@@ -238,13 +238,13 @@ class slist {
   /**
    * Default constructor
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   slist() : size_(0), head_(OffsetPtr<NodeT>::GetNull()) {}
 
   /**
    * Initialize the list
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void Init() {
     size_.store(0);
     head_ = OffsetPtr<NodeT>::GetNull();
@@ -257,7 +257,7 @@ class slist {
    * @param node Preallocated node to add to the list
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void emplace(AllocT *alloc, FullPtr<NodeT> node) {
     // Set node's next to current head
     node.ptr_->next_ = head_.template Cast<void>();
@@ -276,7 +276,7 @@ class slist {
    * @return FullPtr to the popped node, or null if list is empty
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   FullPtr<NodeT> pop(AllocT *alloc) {
     // Check if list is empty
     if (size_.load() == 0) {
@@ -317,7 +317,7 @@ class slist {
    *
    * @return Number of elements
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_t size() const {
     return size_.load();
   }
@@ -327,7 +327,7 @@ class slist {
    *
    * @return true if the list is empty, false otherwise
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool empty() const {
     return size_.load() == 0;
   }
@@ -337,7 +337,7 @@ class slist {
    *
    * @return Offset pointer to the head node
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   OffsetPtr<NodeT> GetHead() const {
     return head_;
   }
@@ -349,7 +349,7 @@ class slist {
    * @return FullPtr to the head node, or null if list is empty
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   FullPtr<NodeT> peek(AllocT *alloc) const {
     if (size_.load() == 0) {
       return FullPtr<NodeT>::GetNull();
@@ -364,7 +364,7 @@ class slist {
    * @return Iterator pointing to the head node, or null iterator if list is empty
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   Iterator begin(AllocT *alloc) {
     return Iterator(head_, OffsetPtr<NodeT>::GetNull(), alloc);
   }
@@ -374,7 +374,7 @@ class slist {
    *
    * @return Null iterator
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   Iterator end() const {
     return Iterator();
   }
@@ -390,7 +390,7 @@ class slist {
    * @return FullPtr to the removed node, or null if iterator is invalid
    */
   template<typename AllocT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   FullPtr<NodeT> PopAt(AllocT *alloc, const Iterator &it) {
     // Check if iterator is valid
     if (it.IsNull()) {
@@ -431,7 +431,7 @@ class priv_slist_node {
  public:
   priv_slist_node *next_;
 
-  HSHM_CROSS_FUN priv_slist_node() : next_(nullptr) {}
+  CTP_CROSS_FUN priv_slist_node() : next_(nullptr) {}
 };
 
 /**
@@ -448,23 +448,23 @@ class priv_slist {
     NodeT *prev_;
 
    public:
-    HSHM_CROSS_FUN Iterator() : current_(nullptr), prev_(nullptr) {}
-    HSHM_CROSS_FUN Iterator(NodeT *current, NodeT *prev)
+    CTP_CROSS_FUN Iterator() : current_(nullptr), prev_(nullptr) {}
+    CTP_CROSS_FUN Iterator(NodeT *current, NodeT *prev)
         : current_(current), prev_(prev) {}
 
-    HSHM_CROSS_FUN NodeT *Get() const { return current_; }
-    HSHM_CROSS_FUN NodeT *GetPrev() const { return prev_; }
-    HSHM_CROSS_FUN bool IsAtHead() const { return prev_ == nullptr; }
-    HSHM_CROSS_FUN bool IsNull() const { return current_ == nullptr; }
+    CTP_CROSS_FUN NodeT *Get() const { return current_; }
+    CTP_CROSS_FUN NodeT *GetPrev() const { return prev_; }
+    CTP_CROSS_FUN bool IsAtHead() const { return prev_ == nullptr; }
+    CTP_CROSS_FUN bool IsNull() const { return current_ == nullptr; }
 
-    HSHM_CROSS_FUN bool operator==(const Iterator &o) const {
+    CTP_CROSS_FUN bool operator==(const Iterator &o) const {
       return current_ == o.current_;
     }
-    HSHM_CROSS_FUN bool operator!=(const Iterator &o) const {
+    CTP_CROSS_FUN bool operator!=(const Iterator &o) const {
       return current_ != o.current_;
     }
 
-    HSHM_CROSS_FUN Iterator &operator++() {
+    CTP_CROSS_FUN Iterator &operator++() {
       if (!current_) return *this;
       prev_ = current_;
       current_ = static_cast<NodeT *>(current_->next_);
@@ -477,23 +477,23 @@ class priv_slist {
   NodeT *head_;
 
  public:
-  HSHM_CROSS_FUN priv_slist() : size_(0), head_(nullptr) {}
+  CTP_CROSS_FUN priv_slist() : size_(0), head_(nullptr) {}
 
-  HSHM_CROSS_FUN void Init() {
+  CTP_CROSS_FUN void Init() {
     size_ = 0;
     head_ = nullptr;
   }
 
-  HSHM_CROSS_FUN bool empty() const { return size_ == 0; }
-  HSHM_CROSS_FUN size_t size() const { return size_; }
+  CTP_CROSS_FUN bool empty() const { return size_ == 0; }
+  CTP_CROSS_FUN size_t size() const { return size_; }
 
-  HSHM_CROSS_FUN void emplace(NodeT *node) {
+  CTP_CROSS_FUN void emplace(NodeT *node) {
     node->next_ = head_;
     head_ = node;
     ++size_;
   }
 
-  HSHM_CROSS_FUN NodeT *pop() {
+  CTP_CROSS_FUN NodeT *pop() {
     if (size_ == 0 || !head_) return nullptr;
     NodeT *h = head_;
     head_ = static_cast<NodeT *>(h->next_);
@@ -501,10 +501,10 @@ class priv_slist {
     return h;
   }
 
-  HSHM_CROSS_FUN Iterator begin() { return Iterator(head_, nullptr); }
-  HSHM_CROSS_FUN Iterator end() const { return Iterator(); }
+  CTP_CROSS_FUN Iterator begin() { return Iterator(head_, nullptr); }
+  CTP_CROSS_FUN Iterator end() const { return Iterator(); }
 
-  HSHM_CROSS_FUN NodeT *PopAt(const Iterator &it) {
+  CTP_CROSS_FUN NodeT *PopAt(const Iterator &it) {
     if (it.IsNull() || size_ == 0) return nullptr;
     NodeT *cur = it.Get();
     if (it.IsAtHead()) {
@@ -517,6 +517,6 @@ class priv_slist {
   }
 };
 
-}  // namespace hshm::ipc::pre
+}  // namespace ctp::ipc::pre
 
-#endif  // HSHM_DATA_STRUCTURES_IPC_SLIST_PRE_H_
+#endif  // CTP_DATA_STRUCTURES_IPC_SLIST_PRE_H_

@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_DATA_STRUCTURES_PRIV_STRING_H_
-#define HSHM_DATA_STRUCTURES_PRIV_STRING_H_
+#ifndef CTP_DATA_STRUCTURES_PRIV_STRING_H_
+#define CTP_DATA_STRUCTURES_PRIV_STRING_H_
 
 #include "hermes_shm/constants/macros.h"
 #include "hermes_shm/types/numbers.h"
@@ -45,11 +45,11 @@
 #include <stdexcept>
 #include <algorithm>
 
-namespace hshm::priv {
+namespace ctp::priv {
 
-/** GPU-compatible hshm_memcmp: character-by-character on GPU, memcmp on CPU */
-HSHM_INLINE_CROSS_FUN int hshm_memcmp(const void *a, const void *b, size_t n) {
-#if HSHM_IS_HOST
+/** GPU-compatible ctp_memcmp: character-by-character on GPU, memcmp on CPU */
+CTP_INLINE_CROSS_FUN int ctp_memcmp(const void *a, const void *b, size_t n) {
+#if CTP_IS_HOST
   return ::memcmp(a, b, n);
 #else
   const unsigned char *pa = static_cast<const unsigned char*>(a);
@@ -67,7 +67,7 @@ HSHM_INLINE_CROSS_FUN int hshm_memcmp(const void *a, const void *b, size_t n) {
  * This string class provides std::string-like functionality for private memory,
  * using the library's allocator API with FullPtr for proper memory management.
  * It implements Short String Optimization (SSO) to avoid allocation for small strings.
- * The string uses hshm::priv::vector internally for large string storage,
+ * The string uses ctp::priv::vector internally for large string storage,
  * minimizing code duplication.
  *
  * @tparam T The character type (default: char)
@@ -104,7 +104,7 @@ class basic_string {
     /**
      * Default constructor
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator() : ptr_(nullptr) {}
 
     /**
@@ -112,7 +112,7 @@ class basic_string {
      *
      * @param ptr The character pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     explicit iterator(T *ptr) : ptr_(ptr) {}
 
     /**
@@ -120,7 +120,7 @@ class basic_string {
      *
      * @return Reference to the current character
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T& operator*() const { return *ptr_; }
 
     /**
@@ -128,7 +128,7 @@ class basic_string {
      *
      * @return Pointer to the current character
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T* operator->() const { return ptr_; }
 
     /**
@@ -136,7 +136,7 @@ class basic_string {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator++() {
       ++ptr_;
       return *this;
@@ -147,7 +147,7 @@ class basic_string {
      *
      * @return Copy of this iterator before incrementing
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator++(int) {
       iterator temp = *this;
       ++ptr_;
@@ -159,7 +159,7 @@ class basic_string {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator--() {
       --ptr_;
       return *this;
@@ -170,7 +170,7 @@ class basic_string {
      *
      * @return Copy of this iterator before decrementing
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator--(int) {
       iterator temp = *this;
       --ptr_;
@@ -183,7 +183,7 @@ class basic_string {
      * @param n Number of characters to advance
      * @return New iterator advanced by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator+(difference_type n) const {
       return iterator(ptr_ + n);
     }
@@ -194,7 +194,7 @@ class basic_string {
      * @param n Number of characters to go back
      * @return New iterator moved back by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator operator-(difference_type n) const {
       return iterator(ptr_ - n);
     }
@@ -205,7 +205,7 @@ class basic_string {
      * @param n Number of characters to advance
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator+=(difference_type n) {
       ptr_ += n;
       return *this;
@@ -217,7 +217,7 @@ class basic_string {
      * @param n Number of characters to go back
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     iterator& operator-=(difference_type n) {
       ptr_ -= n;
       return *this;
@@ -229,7 +229,7 @@ class basic_string {
      * @param other Another iterator
      * @return The number of characters between this and other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     difference_type operator-(const iterator& other) const {
       return ptr_ - other.ptr_;
     }
@@ -240,7 +240,7 @@ class basic_string {
      * @param n Index offset from current position
      * @return Reference to the character at offset n
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T& operator[](difference_type n) const {
       return ptr_[n];
     }
@@ -251,7 +251,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if both iterators point to the same character
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator==(const iterator& other) const {
       return ptr_ == other.ptr_;
     }
@@ -262,7 +262,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if iterators point to different characters
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator!=(const iterator& other) const {
       return ptr_ != other.ptr_;
     }
@@ -273,7 +273,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if this iterator comes before other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<(const iterator& other) const {
       return ptr_ < other.ptr_;
     }
@@ -284,7 +284,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if this iterator comes before or equals other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<=(const iterator& other) const {
       return ptr_ <= other.ptr_;
     }
@@ -295,7 +295,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if this iterator comes after other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>(const iterator& other) const {
       return ptr_ > other.ptr_;
     }
@@ -306,7 +306,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if this iterator comes after or equals other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>=(const iterator& other) const {
       return ptr_ >= other.ptr_;
     }
@@ -316,7 +316,7 @@ class basic_string {
      *
      * @return The underlying pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     T* get() const { return ptr_; }
   };
 
@@ -337,7 +337,7 @@ class basic_string {
     /**
      * Default constructor
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator() : ptr_(nullptr) {}
 
     /**
@@ -345,7 +345,7 @@ class basic_string {
      *
      * @param ptr The character pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     explicit const_iterator(const T *ptr) : ptr_(ptr) {}
 
     /**
@@ -353,7 +353,7 @@ class basic_string {
      *
      * @param it The iterator to convert
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator(const iterator& it) : ptr_(it.get()) {}
 
     /**
@@ -361,7 +361,7 @@ class basic_string {
      *
      * @return Const reference to the current character
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T& operator*() const { return *ptr_; }
 
     /**
@@ -369,7 +369,7 @@ class basic_string {
      *
      * @return Const pointer to the current character
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T* operator->() const { return ptr_; }
 
     /**
@@ -377,7 +377,7 @@ class basic_string {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator++() {
       ++ptr_;
       return *this;
@@ -388,7 +388,7 @@ class basic_string {
      *
      * @return Copy of this iterator before incrementing
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator++(int) {
       const_iterator temp = *this;
       ++ptr_;
@@ -400,7 +400,7 @@ class basic_string {
      *
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator--() {
       --ptr_;
       return *this;
@@ -411,7 +411,7 @@ class basic_string {
      *
      * @return Copy of this iterator before decrementing
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator--(int) {
       const_iterator temp = *this;
       --ptr_;
@@ -424,7 +424,7 @@ class basic_string {
      * @param n Number of characters to advance
      * @return New iterator advanced by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator+(difference_type n) const {
       return const_iterator(ptr_ + n);
     }
@@ -435,7 +435,7 @@ class basic_string {
      * @param n Number of characters to go back
      * @return New iterator moved back by n positions
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator operator-(difference_type n) const {
       return const_iterator(ptr_ - n);
     }
@@ -446,7 +446,7 @@ class basic_string {
      * @param n Number of characters to advance
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator+=(difference_type n) {
       ptr_ += n;
       return *this;
@@ -458,7 +458,7 @@ class basic_string {
      * @param n Number of characters to go back
      * @return Reference to this iterator
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const_iterator& operator-=(difference_type n) {
       ptr_ -= n;
       return *this;
@@ -470,7 +470,7 @@ class basic_string {
      * @param other Another iterator
      * @return The number of characters between this and other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     difference_type operator-(const const_iterator& other) const {
       return ptr_ - other.ptr_;
     }
@@ -481,7 +481,7 @@ class basic_string {
      * @param n Index offset from current position
      * @return Const reference to the character at offset n
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T& operator[](difference_type n) const {
       return ptr_[n];
     }
@@ -492,7 +492,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if both iterators point to the same character
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator==(const const_iterator& other) const {
       return ptr_ == other.ptr_;
     }
@@ -503,7 +503,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if iterators point to different characters
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator!=(const const_iterator& other) const {
       return ptr_ != other.ptr_;
     }
@@ -514,7 +514,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if this iterator comes before other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<(const const_iterator& other) const {
       return ptr_ < other.ptr_;
     }
@@ -525,7 +525,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if this iterator comes before or equals other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator<=(const const_iterator& other) const {
       return ptr_ <= other.ptr_;
     }
@@ -536,7 +536,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if this iterator comes after other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>(const const_iterator& other) const {
       return ptr_ > other.ptr_;
     }
@@ -547,7 +547,7 @@ class basic_string {
      * @param other Another iterator
      * @return True if this iterator comes after or equals other
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     bool operator>=(const const_iterator& other) const {
       return ptr_ >= other.ptr_;
     }
@@ -557,7 +557,7 @@ class basic_string {
      *
      * @return The underlying pointer
      */
-    HSHM_INLINE_CROSS_FUN
+    CTP_INLINE_CROSS_FUN
     const T* get() const { return ptr_; }
   };
 
@@ -601,7 +601,7 @@ class basic_string {
    *
    * @return True if string data is in SSO buffer
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool UsingSso() const {
     return using_sso_;
   }
@@ -612,7 +612,7 @@ class basic_string {
    * This repoints it to this object's own SSO buffer.
    * Only valid when UsingSso() is true.
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void FixupSsoPointer() {
     data_ = storage_.buffer_;
   }
@@ -622,7 +622,7 @@ class basic_string {
    * No allocator needed — copies the inline buffer directly.
    * Only valid when the source is using SSO (size <= SSOSize).
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   void InitFromSso(const basic_string &other) {
     size_ = other.size_;
     using_sso_ = true;
@@ -643,7 +643,7 @@ class basic_string {
   };
 
   /** Export SSO state for bulk serialization. */
-  HSHM_INLINE_CROSS_FUN SsoState GetSsoState() const {
+  CTP_INLINE_CROSS_FUN SsoState GetSsoState() const {
     SsoState s;
     memcpy(s.buffer_, storage_.buffer_, SSOSize * sizeof(T));
     s.size_ = size_;
@@ -651,7 +651,7 @@ class basic_string {
   }
 
   /** Import SSO state after bulk deserialization. */
-  HSHM_INLINE_CROSS_FUN void SetSsoState(const SsoState &s) {
+  CTP_INLINE_CROSS_FUN void SetSsoState(const SsoState &s) {
     memcpy(storage_.buffer_, s.buffer_, SSOSize * sizeof(T));
     size_ = s.size_;
     using_sso_ = true;
@@ -666,7 +666,7 @@ class basic_string {
    *
    * @return Pointer to string data
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T* GetData() {
     return data_;
   }
@@ -676,7 +676,7 @@ class basic_string {
    *
    * @return Const pointer to string data
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T* GetData() const {
     return data_;
   }
@@ -686,7 +686,7 @@ class basic_string {
    * custom allocator. Sets data_, storage_.heap_.capacity_, and
    * storage_.heap_.off_. Does NOT set using_sso_ or size_.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void HeapAlloc(size_type capacity) {
     auto p = alloc_->template AllocateObjs<T>(capacity);
     data_ = p.ptr_;
@@ -697,9 +697,9 @@ class basic_string {
   /**
    * Build a FullPtr from the current heap state for freeing.
    */
-  HSHM_INLINE_CROSS_FUN
-  hshm::ipc::FullPtr<T> HeapFullPtr() const {
-    hshm::ipc::FullPtr<T> p;
+  CTP_INLINE_CROSS_FUN
+  ctp::ipc::FullPtr<T> HeapFullPtr() const {
+    ctp::ipc::FullPtr<T> p;
     p.ptr_ = data_;
     p.shm_.off_ = storage_.heap_.off_;
     return p;
@@ -709,7 +709,7 @@ class basic_string {
    * Free the current heap buffer via the custom allocator.
    * Caller must ensure using_sso_ == false.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void HeapFree() {
     auto p = HeapFullPtr();
     alloc_->Free(p);
@@ -720,7 +720,7 @@ class basic_string {
    * If already large enough, does nothing. Otherwise reallocates and
    * copies existing data.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void HeapReserve(size_type new_cap) {
     if (new_cap <= storage_.heap_.capacity_) {
       return;
@@ -740,7 +740,7 @@ class basic_string {
    * Transition from SSO to heap, copying existing SSO data and
    * allocating for total_capacity elements.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void TransitionToHeap(size_type total_capacity) {
     T sso_copy[SSOSize];
     memcpy(sso_copy, storage_.buffer_, size_ * sizeof(T));
@@ -778,7 +778,7 @@ class basic_string {
    * Default constructor (no allocator).
    * Creates an empty SSO string. Allocator is set via copy/move assignment.
    */
-  HSHM_CROSS_FUN basic_string()
+  CTP_CROSS_FUN basic_string()
     : size_(0), using_sso_(true), alloc_(nullptr), data_(storage_.buffer_) {
     storage_.buffer_[0] = T();
   }
@@ -789,7 +789,7 @@ class basic_string {
    *
    * @param alloc Pointer to allocator instance for memory management
    */
-  HSHM_CROSS_FUN explicit basic_string(AllocT* alloc)
+  CTP_CROSS_FUN explicit basic_string(AllocT* alloc)
     : size_(0), using_sso_(true), alloc_(alloc), data_(storage_.buffer_) {
     storage_.buffer_[0] = T();
   }
@@ -798,7 +798,7 @@ class basic_string {
    * Destructor.
    * Frees heap memory if not using SSO. Does not deallocate the allocator.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   ~basic_string() {
     if (!UsingSso()) {
       HeapFree();
@@ -812,7 +812,7 @@ class basic_string {
    * @param alloc Pointer to allocator instance
    * @param s The C-style string (null-terminated)
    */
-  HSHM_CROSS_FUN basic_string(AllocT* alloc, const T* s)
+  CTP_CROSS_FUN basic_string(AllocT* alloc, const T* s)
     : size_(0), using_sso_(true), alloc_(alloc), data_(storage_.buffer_) {
     if (s != nullptr) {
       size_type len = 0;
@@ -901,7 +901,7 @@ class basic_string {
    *
    * @param other String to copy from
    */
-  HSHM_CROSS_FUN basic_string(const basic_string& other)
+  CTP_CROSS_FUN basic_string(const basic_string& other)
     : size_(0), using_sso_(true), alloc_(other.alloc_), data_(storage_.buffer_) {
     const T* other_data = other.GetData();
     if (other.size_ < SSOSize - 1) {
@@ -909,7 +909,7 @@ class basic_string {
       storage_.buffer_[other.size_] = T();
       size_ = other.size_;
     } else {
-#if HSHM_IS_HOST
+#if CTP_IS_HOST
       HeapAlloc(other.size_ + 1);
       memcpy(data_, other_data, other.size_ * sizeof(T));
       size_ = other.size_;
@@ -931,7 +931,7 @@ class basic_string {
    *
    * @param other String to move from
    */
-  HSHM_CROSS_FUN basic_string(basic_string&& other) noexcept
+  CTP_CROSS_FUN basic_string(basic_string&& other) noexcept
     : size_(other.size_), using_sso_(other.using_sso_), alloc_(other.alloc_) {
     if (other.UsingSso()) {
       memcpy(storage_.buffer_, other.storage_.buffer_,
@@ -1006,7 +1006,7 @@ class basic_string {
    * @param other String to copy from
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& operator=(const basic_string& other) {
     if (this != &other) {
       if (!UsingSso()) {
@@ -1039,7 +1039,7 @@ class basic_string {
    * @param other String to move from
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& operator=(basic_string&& other) noexcept {
     if (this != &other) {
       if (!UsingSso()) {
@@ -1073,7 +1073,7 @@ class basic_string {
    * @param s Null-terminated C-style string
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& operator=(const T* s) {
     if (s == nullptr) {
       clear();
@@ -1109,7 +1109,7 @@ class basic_string {
    * @param init Initializer list of characters
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& operator=(std::initializer_list<T> init) {
     if (!UsingSso()) {
       HeapFree();
@@ -1145,7 +1145,7 @@ class basic_string {
    * @return Reference to this string
    */
   template<typename U>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& operator=(const std::basic_string<T, U>& str) {
     if (!UsingSso()) {
       HeapFree();
@@ -1176,7 +1176,7 @@ class basic_string {
    * @return Reference to character at position
    * @throws std::out_of_range if position is out of bounds
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   T& at(size_type pos) {
     if (pos >= size_) {
       throw std::out_of_range("String index out of bounds");
@@ -1191,7 +1191,7 @@ class basic_string {
    * @return Const reference to character at position
    * @throws std::out_of_range if position is out of bounds
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   const T& at(size_type pos) const {
     if (pos >= size_) {
       throw std::out_of_range("String index out of bounds");
@@ -1206,7 +1206,7 @@ class basic_string {
    * @param pos Position to access
    * @return Reference to character at position
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& operator[](size_type pos) {
     return GetData()[pos];
   }
@@ -1217,7 +1217,7 @@ class basic_string {
    * @param pos Position to access
    * @return Const reference to character at position
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& operator[](size_type pos) const {
     return GetData()[pos];
   }
@@ -1228,7 +1228,7 @@ class basic_string {
    *
    * @return Reference to first character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& front() {
     return GetData()[0];
   }
@@ -1238,7 +1238,7 @@ class basic_string {
    *
    * @return Const reference to first character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& front() const {
     return GetData()[0];
   }
@@ -1249,7 +1249,7 @@ class basic_string {
    *
    * @return Reference to last character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T& back() {
     return GetData()[size_ - 1];
   }
@@ -1259,7 +1259,7 @@ class basic_string {
    *
    * @return Const reference to last character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T& back() const {
     return GetData()[size_ - 1];
   }
@@ -1270,7 +1270,7 @@ class basic_string {
    *
    * @return Pointer to underlying data array
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   T* data() {
     return GetData();
   }
@@ -1280,7 +1280,7 @@ class basic_string {
    *
    * @return Const pointer to underlying data array
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const T* data() const {
     return GetData();
   }
@@ -1291,7 +1291,7 @@ class basic_string {
    *
    * @return Pointer to null-terminated string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   const T* c_str() const {
     if (!UsingSso() && storage_.heap_.capacity_ <= size_) {
       const_cast<basic_string*>(this)->HeapReserve(size_ + 1);
@@ -1306,7 +1306,7 @@ class basic_string {
    *
    * @return Iterator to first character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator begin() {
     return iterator(GetData());
   }
@@ -1316,7 +1316,7 @@ class basic_string {
    *
    * @return Const iterator to first character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator begin() const {
     return const_iterator(GetData());
   }
@@ -1326,7 +1326,7 @@ class basic_string {
    *
    * @return Const iterator to first character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator cbegin() const {
     return const_iterator(GetData());
   }
@@ -1336,7 +1336,7 @@ class basic_string {
    *
    * @return Iterator to one past last character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   iterator end() {
     return iterator(GetData() + size_);
   }
@@ -1346,7 +1346,7 @@ class basic_string {
    *
    * @return Const iterator to one past last character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator end() const {
     return const_iterator(GetData() + size_);
   }
@@ -1356,7 +1356,7 @@ class basic_string {
    *
    * @return Const iterator to one past last character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_iterator cend() const {
     return const_iterator(GetData() + size_);
   }
@@ -1366,7 +1366,7 @@ class basic_string {
    *
    * @return Reverse iterator to last character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   reverse_iterator rbegin() {
     return reverse_iterator(end());
   }
@@ -1376,7 +1376,7 @@ class basic_string {
    *
    * @return Const reverse iterator to last character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_reverse_iterator rbegin() const {
     return const_reverse_iterator(end());
   }
@@ -1386,7 +1386,7 @@ class basic_string {
    *
    * @return Const reverse iterator to last character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_reverse_iterator crbegin() const {
     return const_reverse_iterator(end());
   }
@@ -1396,7 +1396,7 @@ class basic_string {
    *
    * @return Reverse iterator to one before first character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   reverse_iterator rend() {
     return reverse_iterator(begin());
   }
@@ -1406,7 +1406,7 @@ class basic_string {
    *
    * @return Const reverse iterator to one before first character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_reverse_iterator rend() const {
     return const_reverse_iterator(begin());
   }
@@ -1416,7 +1416,7 @@ class basic_string {
    *
    * @return Const reverse iterator to one before first character
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   const_reverse_iterator crend() const {
     return const_reverse_iterator(begin());
   }
@@ -1426,7 +1426,7 @@ class basic_string {
    *
    * @return True if size is zero
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool empty() const {
     return size_ == 0;
   }
@@ -1436,7 +1436,7 @@ class basic_string {
    *
    * @return Current size (not including null terminator)
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type size() const {
     return size_;
   }
@@ -1446,7 +1446,7 @@ class basic_string {
    *
    * @return Current length
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type length() const {
     return size_;
   }
@@ -1456,7 +1456,7 @@ class basic_string {
    *
    * @return Current capacity
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   size_type capacity() const {
     if (UsingSso()) {
       return SSOSize;
@@ -1471,7 +1471,7 @@ class basic_string {
    *
    * @param new_capacity Desired capacity
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void reserve(size_type new_capacity) {
     if (new_capacity <= capacity()) {
       return;
@@ -1488,7 +1488,7 @@ class basic_string {
    * Shrink capacity to match size.
    * Reduces capacity to match current size, freeing unused memory.
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void shrink_to_fit() {
     if (!UsingSso() && size_ < SSOSize - 1) {
       // Can transition back to SSO
@@ -1513,7 +1513,7 @@ class basic_string {
    *
    * @param c Character to add
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void push_back(T c) {
     if (UsingSso()) {
       if (size_ + 1 <= SSOSize - 1) {
@@ -1535,7 +1535,7 @@ class basic_string {
   /**
    * Remove last character from string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void pop_back() {
     if (size_ > 0) {
       --size_;
@@ -1548,7 +1548,7 @@ class basic_string {
   /**
    * Clear all characters from string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void clear() {
     if (!UsingSso()) {
       HeapFree();
@@ -1566,7 +1566,7 @@ class basic_string {
    *
    * @param count New size of the string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void resize(size_type count) {
     if (count < size_) {
       // Truncate
@@ -1588,7 +1588,7 @@ class basic_string {
    *
    * @param count New size of the string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void resize_no_init(size_type count) {
     reserve(count + 1);
     size_ = count;
@@ -1600,7 +1600,7 @@ class basic_string {
    * @param str String to append
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& append(const basic_string& str) {
     AppendCStr(str.GetData(), str.size_);
     return *this;
@@ -1614,7 +1614,7 @@ class basic_string {
    * @param count Number of characters to append (or npos for remainder)
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& append(const basic_string& str, size_type pos,
                        size_type count = npos) {
     if (pos > str.size_) {
@@ -1632,7 +1632,7 @@ class basic_string {
    * @param s Null-terminated C-style string
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& append(const T* s) {
     if (s != nullptr) {
       size_type len = 0;
@@ -1649,7 +1649,7 @@ class basic_string {
    * @param count Number of characters to append
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& append(const T* s, size_type count) {
     AppendCStr(s, count);
     return *this;
@@ -1662,7 +1662,7 @@ class basic_string {
    * @param c Character to append
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& append(size_type count, T c) {
     if (count == 0) return *this;
     size_type new_size = size_ + count;
@@ -1688,7 +1688,7 @@ class basic_string {
    * @param init Initializer list of characters
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& append(std::initializer_list<T> init) {
     AppendCStr(init.begin(), init.size());
     return *this;
@@ -1700,7 +1700,7 @@ class basic_string {
    * @param str String to append
    * @return Reference to this string
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   basic_string& operator+=(const basic_string& str) {
     return append(str);
   }
@@ -1711,7 +1711,7 @@ class basic_string {
    * @param s C-style string to append
    * @return Reference to this string
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   basic_string& operator+=(const T* s) {
     return append(s);
   }
@@ -1722,7 +1722,7 @@ class basic_string {
    * @param c Character to append
    * @return Reference to this string
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   basic_string& operator+=(T c) {
     push_back(c);
     return *this;
@@ -1734,7 +1734,7 @@ class basic_string {
    * @param init Initializer list of characters
    * @return Reference to this string
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   basic_string& operator+=(std::initializer_list<T> init) {
     return append(init);
   }
@@ -1745,12 +1745,12 @@ class basic_string {
    * @param str String to compare with
    * @return True if strings are equal
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool operator==(const basic_string& str) const {
     if (size_ != str.size_) {
       return false;
     }
-    return hshm_memcmp(GetData(), str.GetData(), size_ * sizeof(T)) == 0;
+    return ctp_memcmp(GetData(), str.GetData(), size_ * sizeof(T)) == 0;
   }
 
   /**
@@ -1759,7 +1759,7 @@ class basic_string {
    * @param s C-style string to compare with
    * @return True if strings are equal
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool operator==(const T* s) const {
     if (s == nullptr) {
       return size_ == 0;
@@ -1769,7 +1769,7 @@ class basic_string {
     if (size_ != s_len) {
       return false;
     }
-    return hshm_memcmp(GetData(), s, size_ * sizeof(T)) == 0;
+    return ctp_memcmp(GetData(), s, size_ * sizeof(T)) == 0;
   }
 
   /**
@@ -1778,7 +1778,7 @@ class basic_string {
    * @param str String to compare with
    * @return True if strings are not equal
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool operator!=(const basic_string& str) const {
     return !operator==(str);
   }
@@ -1789,7 +1789,7 @@ class basic_string {
    * @param s C-style string to compare with
    * @return True if strings are not equal
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool operator!=(const T* s) const {
     return !operator==(s);
   }
@@ -1800,10 +1800,10 @@ class basic_string {
    * @param str String to compare with
    * @return 0 if equal, <0 if this < str, >0 if this > str
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   int compare(const basic_string& str) const {
     size_type cmp_len = std::min(size_, str.size_);
-    int result = hshm_memcmp(GetData(), str.GetData(), cmp_len * sizeof(T));
+    int result = ctp_memcmp(GetData(), str.GetData(), cmp_len * sizeof(T));
     if (result != 0) {
       return result;
     }
@@ -1821,7 +1821,7 @@ class basic_string {
    * @param s C-style string to compare with
    * @return 0 if equal, <0 if this < s, >0 if this > s
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   int compare(const T* s) const {
     if (s == nullptr) {
       return size_ > 0 ? 1 : 0;
@@ -1830,7 +1830,7 @@ class basic_string {
     while (s[s_len] != T()) ++s_len;
 
     size_type cmp_len = std::min(size_, s_len);
-    int result = hshm_memcmp(GetData(), s, cmp_len * sizeof(T));
+    int result = ctp_memcmp(GetData(), s, cmp_len * sizeof(T));
     if (result != 0) {
       return result;
     }
@@ -1848,12 +1848,12 @@ class basic_string {
    * @param str String to check
    * @return True if string starts with str
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool starts_with(const basic_string& str) const {
     if (str.size_ > size_) {
       return false;
     }
-    return hshm_memcmp(GetData(), str.GetData(), str.size_ * sizeof(T)) == 0;
+    return ctp_memcmp(GetData(), str.GetData(), str.size_ * sizeof(T)) == 0;
   }
 
   /**
@@ -1862,7 +1862,7 @@ class basic_string {
    * @param c Character to check
    * @return True if string starts with c
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool starts_with(T c) const {
     return size_ > 0 && GetData()[0] == c;
   }
@@ -1873,7 +1873,7 @@ class basic_string {
    * @param s C-style string to check
    * @return True if string starts with s
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool starts_with(const T* s) const {
     if (s == nullptr) {
       return true;
@@ -1883,7 +1883,7 @@ class basic_string {
     if (s_len > size_) {
       return false;
     }
-    return hshm_memcmp(GetData(), s, s_len * sizeof(T)) == 0;
+    return ctp_memcmp(GetData(), s, s_len * sizeof(T)) == 0;
   }
 
   /**
@@ -1892,12 +1892,12 @@ class basic_string {
    * @param str String to check
    * @return True if string ends with str
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool ends_with(const basic_string& str) const {
     if (str.size_ > size_) {
       return false;
     }
-    return hshm_memcmp(&GetData()[size_ - str.size_], str.GetData(),
+    return ctp_memcmp(&GetData()[size_ - str.size_], str.GetData(),
                       str.size_ * sizeof(T)) == 0;
   }
 
@@ -1907,7 +1907,7 @@ class basic_string {
    * @param c Character to check
    * @return True if string ends with c
    */
-  HSHM_INLINE_CROSS_FUN
+  CTP_INLINE_CROSS_FUN
   bool ends_with(T c) const {
     return size_ > 0 && GetData()[size_ - 1] == c;
   }
@@ -1918,7 +1918,7 @@ class basic_string {
    * @param s C-style string to check
    * @return True if string ends with s
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   bool ends_with(const T* s) const {
     if (s == nullptr) {
       return true;
@@ -1928,7 +1928,7 @@ class basic_string {
     if (s_len > size_) {
       return false;
     }
-    return hshm_memcmp(&GetData()[size_ - s_len], s, s_len * sizeof(T)) == 0;
+    return ctp_memcmp(&GetData()[size_ - s_len], s, s_len * sizeof(T)) == 0;
   }
 
   /**
@@ -1938,7 +1938,7 @@ class basic_string {
    * @param pos Starting position (default: 0)
    * @return Position of substring, or npos if not found
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_type find(const basic_string& str, size_type pos = 0) const {
     if (str.size_ == 0) {
       return pos <= size_ ? pos : npos;
@@ -1949,7 +1949,7 @@ class basic_string {
 
     const T* data = GetData();
     for (size_type i = pos; i <= size_ - str.size_; ++i) {
-      if (hshm_memcmp(&data[i], str.GetData(), str.size_ * sizeof(T)) == 0) {
+      if (ctp_memcmp(&data[i], str.GetData(), str.size_ * sizeof(T)) == 0) {
         return i;
       }
     }
@@ -1963,7 +1963,7 @@ class basic_string {
    * @param pos Starting position (default: 0)
    * @return Position of character, or npos if not found
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_type find(T c, size_type pos = 0) const {
     if (pos >= size_) {
       return npos;
@@ -1985,7 +1985,7 @@ class basic_string {
    * @param pos Starting position (default: 0)
    * @return Position of substring, or npos if not found
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   size_type find(const T* s, size_type pos = 0) const {
     if (s == nullptr) {
       return pos <= size_ ? pos : npos;
@@ -2001,7 +2001,7 @@ class basic_string {
 
     const T* data = GetData();
     for (size_type i = pos; i <= size_ - s_len; ++i) {
-      if (hshm_memcmp(&data[i], s, s_len * sizeof(T)) == 0) {
+      if (ctp_memcmp(&data[i], s, s_len * sizeof(T)) == 0) {
         return i;
       }
     }
@@ -2015,7 +2015,7 @@ class basic_string {
    * @param count Number of characters (or npos for remainder)
    * @return New string with substring
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string substr(size_type pos = 0, size_type count = npos) const {
     if (pos > size_) {
       throw std::out_of_range("Substring position out of range");
@@ -2033,7 +2033,7 @@ class basic_string {
    * @param str String to replace with
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& replace(size_type pos, size_type count,
                        const basic_string& str) {
     if (pos > size_) {
@@ -2076,7 +2076,7 @@ class basic_string {
    * @param s C-style string to replace with
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& replace(size_type pos, size_type count, const T* s) {
     if (s == nullptr) {
       erase(pos, count);
@@ -2096,7 +2096,7 @@ class basic_string {
    * @param count Number of characters to erase (or npos for remainder)
    * @return Reference to this string
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   basic_string& erase(size_type pos = 0, size_type count = npos) {
     if (pos > size_) {
       throw std::out_of_range("Erase position out of range");
@@ -2125,7 +2125,7 @@ class basic_string {
    *
    * @param other String to swap with
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   void swap(basic_string& other) noexcept {
     std::swap(storage_, other.storage_);
     std::swap(size_, other.size_);
@@ -2142,7 +2142,7 @@ class basic_string {
    *
    * @return std::basic_string with same content
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   operator std::basic_string<T>() const {
     return std::basic_string<T>(GetData(), size_);
   }
@@ -2153,7 +2153,7 @@ class basic_string {
    * @return std::string with same content
    */
   template<typename U = T, typename = std::enable_if_t<std::is_same_v<U, char>>>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   operator std::string() const {
     return std::string(GetData(), size_);
   }
@@ -2164,7 +2164,7 @@ class basic_string {
    *
    * @return std::string with same content
    */
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   std::string str() const {
     return std::string(GetData(), size_);
   }
@@ -2177,8 +2177,8 @@ class basic_string {
    * @param ar Archive to save to
    */
   template<class Archive>
-  HSHM_INLINE_CROSS_FUN void save(Archive& ar) const {
-    hshm::ipc::save_string(ar, *this);
+  CTP_INLINE_CROSS_FUN void save(Archive& ar) const {
+    ctp::ipc::save_string(ar, *this);
   }
 
   /**
@@ -2189,8 +2189,8 @@ class basic_string {
    * @param ar Archive to load from
    */
   template<class Archive>
-  HSHM_INLINE_CROSS_FUN void load(Archive& ar) {
-    hshm::ipc::load_string(ar, *this);
+  CTP_INLINE_CROSS_FUN void load(Archive& ar) {
+    ctp::ipc::load_string(ar, *this);
   }
   /**
    * Convert an integer to a string.
@@ -2201,7 +2201,7 @@ class basic_string {
    */
   template <typename IntT,
             typename = std::enable_if_t<std::is_integral_v<IntT>>>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static basic_string FromNumber(AllocT *alloc, IntT val) {
     T buf[32];
     size_type len = NumberToStr(buf, sizeof(buf), val);
@@ -2219,7 +2219,7 @@ class basic_string {
   template <typename FloatT,
             typename = std::enable_if_t<std::is_floating_point_v<FloatT>>,
             typename = void>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static basic_string FromNumber(AllocT *alloc, FloatT val,
                                  int precision = 6) {
     T buf[64];
@@ -2233,7 +2233,7 @@ class basic_string {
    * Returns the number of characters written (excluding null terminator).
    */
   template <typename UIntT>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static size_type UintToStr(T *buf, size_type buf_size, UIntT val) {
     if (buf_size == 0) return 0;
     if (val == 0) {
@@ -2268,7 +2268,7 @@ class basic_string {
    */
   template <typename IntT,
             typename = std::enable_if_t<std::is_integral_v<IntT>>>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static size_type NumberToStr(T *buf, size_type buf_size, IntT val) {
     if (buf_size == 0) return 0;
     if constexpr (std::is_signed_v<IntT>) {
@@ -2297,7 +2297,7 @@ class basic_string {
   template <typename FloatT,
             typename = std::enable_if_t<std::is_floating_point_v<FloatT>>,
             typename = void>
-  HSHM_CROSS_FUN
+  CTP_CROSS_FUN
   static size_type NumberToStr(T *buf, size_type buf_size, FloatT val,
                                int precision = 6) {
     if (buf_size == 0) return 0;
@@ -2338,18 +2338,18 @@ class basic_string {
 template<typename AllocT, size_t SSOSize = 32>
 using string = basic_string<char, AllocT, SSOSize>;
 
-}  // namespace hshm::priv
+}  // namespace ctp::priv
 
 #include "hermes_shm/types/hash.h"
 
-namespace hshm {
+namespace ctp {
 
 /** FNV-1a hash specialization for priv::string */
 template <typename AllocT, size_t SSOSize>
-struct hash<hshm::priv::basic_string<char, AllocT, SSOSize>> {
-  HSHM_INLINE_CROSS_FUN
+struct hash<ctp::priv::basic_string<char, AllocT, SSOSize>> {
+  CTP_INLINE_CROSS_FUN
   std::size_t operator()(
-      const hshm::priv::basic_string<char, AllocT, SSOSize> &s) const {
+      const ctp::priv::basic_string<char, AllocT, SSOSize> &s) const {
     std::size_t h = 14695981039346656037ULL;
     const char *data = s.data();
     for (std::size_t i = 0; i < s.size(); ++i) {
@@ -2360,6 +2360,6 @@ struct hash<hshm::priv::basic_string<char, AllocT, SSOSize>> {
   }
 };
 
-}  // namespace hshm
+}  // namespace ctp
 
-#endif  // HSHM_DATA_STRUCTURES_PRIV_STRING_H_
+#endif  // CTP_DATA_STRUCTURES_PRIV_STRING_H_

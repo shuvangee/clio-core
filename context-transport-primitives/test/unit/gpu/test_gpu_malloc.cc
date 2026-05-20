@@ -39,11 +39,11 @@
 #include "hermes_shm/memory/backend/gpu_malloc.h"
 #include "hermes_shm/util/gpu_api.h"
 
-using hshm::ipc::ArenaAllocator;
-using hshm::ipc::GpuMalloc;
-using hshm::ipc::MemoryBackend;
-using hshm::ipc::MemoryBackendId;
-using hshm::ipc::mpsc_ring_buffer;
+using ctp::ipc::ArenaAllocator;
+using ctp::ipc::GpuMalloc;
+using ctp::ipc::MemoryBackend;
+using ctp::ipc::MemoryBackendId;
+using ctp::ipc::mpsc_ring_buffer;
 
 /**
  * GPU kernel to create and initialize an allocator

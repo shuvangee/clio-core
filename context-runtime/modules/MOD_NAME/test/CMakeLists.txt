@@ -44,7 +44,7 @@ target_link_libraries(${FLUSH_TEST_TARGET}
   chimaera_admin_client           # Admin module client
   chimaera_MOD_NAME_runtime       # MOD_NAME module runtime for work tracking
   chimaera_MOD_NAME_client        # MOD_NAME module client
-  hshm::cxx                       # HermesShm library
+  ctp::cxx                       # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}       # Threading support
 )
 
@@ -74,7 +74,7 @@ target_link_libraries(${COMUTEX_TEST_TARGET}
   chimaera_admin_client           # Admin module client
   chimaera_MOD_NAME_runtime       # MOD_NAME module runtime for CoMutex/CoRwLock
   chimaera_MOD_NAME_client        # MOD_NAME module client
-  hshm::cxx                       # HermesShm library
+  ctp::cxx                       # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}       # Threading support
 )
 
@@ -102,7 +102,7 @@ target_link_libraries(${WAIT_FUNCTIONALITY_TEST_TARGET}
   chimaera_admin_client           # Admin module client
   chimaera_MOD_NAME_runtime       # MOD_NAME module runtime for WaitTest tasks
   chimaera_MOD_NAME_client        # MOD_NAME module client
-  hshm::cxx                       # HermesShm library
+  ctp::cxx                       # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}       # Threading support
 )
 
@@ -130,7 +130,7 @@ target_link_libraries(${STREAMING_TEST_TARGET}
   chimaera_admin_client           # Admin module client
   chimaera_MOD_NAME_runtime       # MOD_NAME module runtime for streaming tasks
   chimaera_MOD_NAME_client        # MOD_NAME module client
-  hshm::cxx                       # HermesShm library
+  ctp::cxx                       # HermesShm library
   ${CMAKE_THREAD_LIBS_INIT}       # Threading support
 )
 
@@ -300,7 +300,7 @@ target_link_libraries(${MIGRATE_TEST_TARGET}
   chimaera_admin_client
   chimaera_MOD_NAME_runtime
   chimaera_MOD_NAME_client
-  hshm::cxx
+  ctp::cxx
   ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -330,7 +330,7 @@ target_link_libraries(${RECOVERY_TEST_TARGET}
   chimaera_admin_client
   chimaera_MOD_NAME_runtime
   chimaera_MOD_NAME_client
-  hshm::cxx
+  ctp::cxx
   ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -360,7 +360,7 @@ target_link_libraries(${RECONNECT_TEST_TARGET}
   chimaera_admin_client
   chimaera_MOD_NAME_runtime
   chimaera_MOD_NAME_client
-  hshm::cxx
+  ctp::cxx
   ${CMAKE_THREAD_LIBS_INIT}
 )
 

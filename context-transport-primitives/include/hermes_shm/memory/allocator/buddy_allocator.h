@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HSHM_MEMORY_ALLOCATOR_BUDDY_ALLOCATOR_H_
-#define HSHM_MEMORY_ALLOCATOR_BUDDY_ALLOCATOR_H_
+#ifndef CTP_MEMORY_ALLOCATOR_BUDDY_ALLOCATOR_H_
+#define CTP_MEMORY_ALLOCATOR_BUDDY_ALLOCATOR_H_
 
 #include "hermes_shm/memory/allocator/allocator.h"
 #include "hermes_shm/memory/allocator/heap.h"
@@ -41,7 +41,7 @@
 #include <cmath>
 #include <vector>
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 /**
  * Metadata stored after each allocation
@@ -69,13 +69,13 @@ struct BuddyPage : public std::conditional_t<MODE == MemMode::kPrivate,
 
   static constexpr size_t kFreeMask = (size_t)1 << (sizeof(size_t) * 8 - 1);
 
-  HSHM_INLINE_CROSS_FUN BuddyPage() : BaseNodeT(), size_(0) {}
-  HSHM_INLINE_CROSS_FUN explicit BuddyPage(size_t size) : BaseNodeT(), size_(size) {}
+  CTP_INLINE_CROSS_FUN BuddyPage() : BaseNodeT(), size_(0) {}
+  CTP_INLINE_CROSS_FUN explicit BuddyPage(size_t size) : BaseNodeT(), size_(size) {}
 
-  HSHM_INLINE_CROSS_FUN void MarkFree()      { size_ |=  kFreeMask; }
-  HSHM_INLINE_CROSS_FUN void MarkAllocated() { size_ &= ~kFreeMask; }
-  HSHM_INLINE_CROSS_FUN bool IsFree()  const { return (size_ & kFreeMask) != 0; }
-  HSHM_INLINE_CROSS_FUN size_t GetSize() const { return size_ & ~kFreeMask; }
+  CTP_INLINE_CROSS_FUN void MarkFree()      { size_ |=  kFreeMask; }
+  CTP_INLINE_CROSS_FUN void MarkAllocated() { size_ &= ~kFreeMask; }
+  CTP_INLINE_CROSS_FUN bool IsFree()  const { return (size_ & kFreeMask) != 0; }
+  CTP_INLINE_CROSS_FUN size_t GetSize() const { return size_ & ~kFreeMask; }
 };
 
 /** Type aliases for readability */
@@ -200,7 +200,7 @@ class _BuddyAllocator : public Allocator {
 
   ArenaState cur_arena_;  /**< Current bump arena (if active) */
 
-#ifdef HSHM_BUDDY_ALLOC_DEBUG
+#ifdef CTP_BUDDY_ALLOC_DEBUG
   size_t dbg_alloc_count_;
   size_t dbg_free_count_;
   size_t dbg_net_bytes_;
@@ -211,28 +211,28 @@ class _BuddyAllocator : public Allocator {
   friend class _MultiProcessAllocator;
 
  public:
-#ifdef HSHM_BUDDY_ALLOC_DEBUG
-  HSHM_CROSS_FUN size_t DbgAllocCount() const { return dbg_alloc_count_; }
-  HSHM_CROSS_FUN size_t DbgFreeCount() const { return dbg_free_count_; }
-  HSHM_CROSS_FUN size_t DbgNetBytes() const { return dbg_net_bytes_; }
-  HSHM_CROSS_FUN size_t DbgBigHeapOffset() const { return big_heap_.GetOffset(); }
-  HSHM_CROSS_FUN size_t DbgBigHeapMax() const { return big_heap_.GetMaxOffset(); }
+#ifdef CTP_BUDDY_ALLOC_DEBUG
+  CTP_CROSS_FUN size_t DbgAllocCount() const { return dbg_alloc_count_; }
+  CTP_CROSS_FUN size_t DbgFreeCount() const { return dbg_free_count_; }
+  CTP_CROSS_FUN size_t DbgNetBytes() const { return dbg_net_bytes_; }
+  CTP_CROSS_FUN size_t DbgBigHeapOffset() const { return big_heap_.GetOffset(); }
+  CTP_CROSS_FUN size_t DbgBigHeapMax() const { return big_heap_.GetMaxOffset(); }
 #endif
 
   /** Convert offset to raw pointer (position-independent, safe for multi-process) */
-  HSHM_INLINE_CROSS_FUN PageT *OffsetToPage(size_t offset) {
+  CTP_INLINE_CROSS_FUN PageT *OffsetToPage(size_t offset) {
     return reinterpret_cast<PageT *>(GetBackendData() + offset);
   }
 
   /** Convert raw pointer back to offset (position-independent, safe for multi-process) */
-  HSHM_INLINE_CROSS_FUN size_t PageToOffset(PageT *ptr) {
+  CTP_INLINE_CROSS_FUN size_t PageToOffset(PageT *ptr) {
     return reinterpret_cast<char *>(ptr) - GetBackendData();
   }
 
   /**
    * Initialize the buddy allocator
    */
-  HSHM_CROSS_FUN bool shm_init(const MemoryBackend &backend,
+  CTP_CROSS_FUN bool shm_init(const MemoryBackend &backend,
                                size_t region_size = 0,
                                bool shifted = false) {
     SetBackend(backend);
@@ -270,7 +270,7 @@ class _BuddyAllocator : public Allocator {
     }
 
     Expand(OffsetPtr<>(GetAllocatorDataOff()), GetAllocatorDataSize());
-#ifdef HSHM_BUDDY_ALLOC_DEBUG
+#ifdef CTP_BUDDY_ALLOC_DEBUG
     dbg_alloc_count_ = 0;
     dbg_free_count_ = 0;
     dbg_net_bytes_ = 0;
@@ -290,11 +290,11 @@ class _BuddyAllocator : public Allocator {
   /**
    * Allocate memory of specified size
    */
-  HSHM_CROSS_FUN OffsetPtr<> AllocateOffset(size_t requested_size) {
+  CTP_CROSS_FUN OffsetPtr<> AllocateOffset(size_t requested_size) {
     // Fast path: bump-allocate from active arena
     if (cur_arena_.IsActive()) {
       constexpr size_t kAlign = 16;
-#if HSHM_IS_GPU
+#if CTP_IS_GPU
       // GPU: multiple threads in a warp may share this allocator partition.
       // Use atomicCAS loop for thread-safe bump allocation.
       while (true) {
@@ -335,7 +335,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Reallocate previously allocated memory to a new size
    */
-  HSHM_CROSS_FUN OffsetPtr<> ReallocateOffset(OffsetPtr<> offset, size_t new_size) {
+  CTP_CROSS_FUN OffsetPtr<> ReallocateOffset(OffsetPtr<> offset, size_t new_size) {
     if (offset.IsNull()) {
       return AllocateOffset(new_size);
     }
@@ -362,7 +362,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Free previously allocated memory
    */
-  HSHM_CROSS_FUN void FreeOffset(OffsetPtr<> offset) {
+  CTP_CROSS_FUN void FreeOffset(OffsetPtr<> offset) {
     if (offset.IsNull()) {
       return;
     }
@@ -372,7 +372,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Free previously allocated memory (without null check)
    */
-  HSHM_CROSS_FUN void FreeOffsetNoNullCheck(OffsetPtr<> offset) {
+  CTP_CROSS_FUN void FreeOffsetNoNullCheck(OffsetPtr<> offset) {
     size_t off = offset.load();
     // No-op for arena allocations
     if (cur_arena_.IsActive() &&
@@ -385,7 +385,7 @@ class _BuddyAllocator : public Allocator {
     size_t data_size = page->GetSize();
     page->MarkFree();
 
-#ifdef HSHM_BUDDY_ALLOC_DEBUG
+#ifdef CTP_BUDDY_ALLOC_DEBUG
     dbg_free_count_++;
     dbg_net_bytes_ -= data_size;
 #endif
@@ -401,7 +401,7 @@ class _BuddyAllocator : public Allocator {
   }
 
   /** Push a new bump arena */
-  HSHM_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block, size_t size) {
+  CTP_CROSS_FUN bool PushArenaState(ArenaState &prior, OffsetPtr<> &block, size_t size) {
     prior = cur_arena_;
     cur_arena_ = ArenaState{};
     block = AllocateOffset(size);
@@ -416,7 +416,7 @@ class _BuddyAllocator : public Allocator {
   }
 
   /** Pop a bump arena */
-  HSHM_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
+  CTP_CROSS_FUN void PopArenaState(const ArenaState &prior, OffsetPtr<> block) {
     cur_arena_ = prior;
     if (!block.IsNull()) {
       FreeOffset(block);
@@ -426,7 +426,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Expand the allocator with new memory region
    */
-  HSHM_CROSS_FUN void Expand(OffsetPtr<> region, size_t region_size) {
+  CTP_CROSS_FUN void Expand(OffsetPtr<> region, size_t region_size) {
     if (region.IsNull() || region_size == 0) {
       return;
     }
@@ -493,7 +493,7 @@ class _BuddyAllocator : public Allocator {
    * Add a page to a free list. In private mode, uses raw pointers.
    * In shared mode, uses FullPtr + offset-based slist.
    */
-  HSHM_INLINE_CROSS_FUN void EmplaceToList(PageListT &list, size_t page_offset) {
+  CTP_INLINE_CROSS_FUN void EmplaceToList(PageListT &list, size_t page_offset) {
     PageT *page = OffsetToPage(page_offset);
     if constexpr (MODE == MemMode::kPrivate) {
       page->next_ = nullptr;
@@ -508,7 +508,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Pop from a free list. Returns offset of popped page, or 0 if empty.
    */
-  HSHM_INLINE_CROSS_FUN size_t PopFromList(PageListT &list) {
+  CTP_INLINE_CROSS_FUN size_t PopFromList(PageListT &list) {
     if (list.empty()) {
       return 0;
     }
@@ -526,7 +526,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Allocate small memory (<16KB) using round-up sizing
    */
-  HSHM_CROSS_FUN OffsetPtr<> AllocateSmall(size_t size) {
+  CTP_CROSS_FUN OffsetPtr<> AllocateSmall(size_t size) {
     size_t list_idx = GetSmallPageListIndexForAlloc(size);
 
     // Check free lists from this size class upward
@@ -572,7 +572,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Allocate large memory (>16KB) using round-down sizing with best-fit
    */
-  HSHM_CROSS_FUN OffsetPtr<> AllocateLarge(size_t size) {
+  CTP_CROSS_FUN OffsetPtr<> AllocateLarge(size_t size) {
     size_t total_size = size + sizeof(PageT);
     size_t list_idx = GetLargePageListIndexForAlloc(size);
 
@@ -605,7 +605,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Find the first fit in a large page free list
    */
-  HSHM_CROSS_FUN size_t FindFirstFit(size_t list_idx, size_t required_size) {
+  CTP_CROSS_FUN size_t FindFirstFit(size_t list_idx, size_t required_size) {
     if (large_pages_[list_idx].empty()) {
       return 0;
     }
@@ -639,7 +639,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Repopulate small arena with more space
    */
-  HSHM_CROSS_FUN bool RepopulateSmallArena() {
+  CTP_CROSS_FUN bool RepopulateSmallArena() {
     size_t arena_size = kSmallArenaSize + kSmallArenaPages * sizeof(PageT);
 
     DivideArenaIntoPages(small_arena_);
@@ -672,7 +672,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Divide the current small_arena_ into pages using greedy algorithm
    */
-  HSHM_CROSS_FUN void DivideArenaIntoPages(Heap<false> &heap) {
+  CTP_CROSS_FUN void DivideArenaIntoPages(Heap<false> &heap) {
     size_t arena_begin = heap.GetOffset();
     size_t arena_end = heap.GetMaxOffset();
     size_t remaining_offset = arena_begin;
@@ -702,7 +702,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Add a remainder page back to the appropriate free list
    */
-  HSHM_CROSS_FUN void AddRemainderToFreeList(size_t page_offset,
+  CTP_CROSS_FUN void AddRemainderToFreeList(size_t page_offset,
                                                size_t total_size) {
     if (total_size <= sizeof(PageT)) {
       return;
@@ -725,12 +725,12 @@ class _BuddyAllocator : public Allocator {
   /**
    * Finalize allocation by setting page header and returning user offset
    */
-  HSHM_CROSS_FUN OffsetPtr<> FinalizeAllocation(size_t page_offset,
+  CTP_CROSS_FUN OffsetPtr<> FinalizeAllocation(size_t page_offset,
                                                   size_t user_size) {
     PageT *bp = OffsetToPage(page_offset);
     bp->size_ = user_size;
     bp->MarkAllocated();
-#ifdef HSHM_BUDDY_ALLOC_DEBUG
+#ifdef CTP_BUDDY_ALLOC_DEBUG
     dbg_alloc_count_++;
     dbg_net_bytes_ += user_size;
 #endif
@@ -740,12 +740,12 @@ class _BuddyAllocator : public Allocator {
   /**
    * Get free list index for small allocations (round up)
    */
-  static HSHM_CROSS_FUN size_t GetSmallPageListIndexForAlloc(size_t &alloc_size) {
+  static CTP_CROSS_FUN size_t GetSmallPageListIndexForAlloc(size_t &alloc_size) {
     if (alloc_size <= kMinSize) {
       alloc_size = kMinSize;
       return 0;
     }
-    size_t log2 = hshm::CeilLog2(alloc_size);
+    size_t log2 = ctp::CeilLog2(alloc_size);
     if (log2 < kMinLog2) {
       alloc_size = kMinSize;
       return 0;
@@ -761,11 +761,11 @@ class _BuddyAllocator : public Allocator {
   /**
    * Get free list index for small pages when freeing (round down)
    */
-  static HSHM_CROSS_FUN size_t GetSmallPageListIndexForFree(size_t size) {
+  static CTP_CROSS_FUN size_t GetSmallPageListIndexForFree(size_t size) {
     if (size <= kMinSize) {
       return 0;
     }
-    size_t log2 = hshm::FloorLog2(size);
+    size_t log2 = ctp::FloorLog2(size);
     if (log2 < kMinLog2) {
       return 0;
     }
@@ -778,11 +778,11 @@ class _BuddyAllocator : public Allocator {
   /**
    * Get free list index for large allocations (round down)
    */
-  static HSHM_CROSS_FUN size_t GetLargePageListIndexForAlloc(size_t size) {
+  static CTP_CROSS_FUN size_t GetLargePageListIndexForAlloc(size_t size) {
     if (size <= kSmallThreshold) {
       return 0;
     }
-    size_t log2 = hshm::FloorLog2(size);
+    size_t log2 = ctp::FloorLog2(size);
     if (log2 <= kSmallLog2) {
       return 0;
     }
@@ -795,7 +795,7 @@ class _BuddyAllocator : public Allocator {
   /**
    * Get free list index for large pages when freeing
    */
-  HSHM_CROSS_FUN size_t GetLargePageListIndexForFree(size_t size) {
+  CTP_CROSS_FUN size_t GetLargePageListIndexForFree(size_t size) {
     return GetLargePageListIndexForAlloc(size);
   }
 };
@@ -806,6 +806,6 @@ using BuddyAllocator = BaseAllocator<_BuddyAllocator<>>;
 /** Private-mode BuddyAllocator (raw pointers, cached base, for PartitionedAllocator) */
 using PrivateBuddyAllocator = BaseAllocator<_BuddyAllocator<MemMode::kPrivate>>;
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc
 
-#endif  // HSHM_MEMORY_ALLOCATOR_BUDDY_ALLOCATOR_H_
+#endif  // CTP_MEMORY_ALLOCATOR_BUDDY_ALLOCATOR_H_

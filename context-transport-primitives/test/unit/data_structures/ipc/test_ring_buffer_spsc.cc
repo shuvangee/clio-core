@@ -36,7 +36,7 @@
 #include "hermes_shm/memory/backend/malloc_backend.h"
 #include "hermes_shm/memory/allocator/arena_allocator.h"
 
-using namespace hshm::ipc;
+using namespace ctp::ipc;
 
 /**
  * Helper function to create an ArenaAllocator for testing

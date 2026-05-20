@@ -48,7 +48,7 @@
 #include <fstream>
 
 // Global pointer variable definition for Pool manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::PoolManager, g_pool_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::PoolManager, g_pool_manager);
 
 namespace chi {
 
@@ -270,7 +270,7 @@ void PoolManager::PlugContainer(PoolId pool_id, ContainerId container_id) {
   }
   container->SetPlugged();
   while (container->GetWorkRemaining() > 0) {
-    HSHM_THREAD_MODEL->Yield();
+    CTP_THREAD_MODEL->Yield();
   }
 }
 
