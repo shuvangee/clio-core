@@ -21,8 +21,8 @@ class ClioCompress(Service):
     """
     Compressor Service for the CTE I/O stack.
 
-    deploy_mode='default':   runs `chimaera compose` on the host.
-    deploy_mode='container': runs `chimaera compose` inside the deploy
+    deploy_mode='default':   runs `clio_run compose` on the host.
+    deploy_mode='container': runs `clio_run compose` inside the deploy
                              container (shares clio_runtime's image).
     """
 
@@ -128,7 +128,7 @@ class ClioCompress(Service):
 
     @staticmethod
     def _format_pool_id(pool_id) -> str:
-        # chimaera compose expects "<major>.<minor>" — coerce 512 -> "512.0"
+        # clio_run compose expects "<major>.<minor>" — coerce 512 -> "512.0"
         # but preserve user-supplied 513.7 etc.
         if isinstance(pool_id, str):
             return pool_id
@@ -215,7 +215,7 @@ class ClioCompress(Service):
     # ------------------------------------------------------------------
 
     def start(self):
-        self.log("Starting clio_compress via chimaera compose...")
+        self.log("Starting clio_compress via clio_run compose...")
 
         if not os.path.exists(self.compose_config_path):
             self.log(f"Error: Compose config not found: {self.compose_config_path}")
@@ -224,11 +224,11 @@ class ClioCompress(Service):
         # Single-shot compose. The jarvis-cd SSH layer prepends
         # ``KEY=VAL`` env vars to the command string; bash only attaches
         # those to a *simple* command, so a wrapping ``for ... do ...
-        # done`` retry loop strips the env (notably CHI_SERVER_CONF) and
-        # the chimaera compose client falls back to ~/.chimaera, picking
+        # done`` retry loop strips the env (notably CLIO_SERVER_CONF) and
+        # the clio_run compose client falls back to ~/.chimaera, picking
         # up unrelated compose entries that occupy our target pool ID.
         # Keep this a single command so the env prefix reaches chimaera.
-        cmd = f'chimaera compose {self.compose_config_path}'
+        cmd = f'clio_run compose {self.compose_config_path}'
 
         Exec(cmd, PsshExecInfo(
             env=self.mod_env,

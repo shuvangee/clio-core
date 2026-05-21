@@ -36,8 +36,8 @@ RUN sudo chmod +x /benchmarks/clio_cte_bench.sh
 WORKDIR /benchmarks
 
 # Set default environment variables for CTE runtime
-ENV CHI_WITH_RUNTIME=0
-ENV CHI_SERVER_CONF=/benchmarks/cte_config.yaml
+ENV CLIO_WITH_RUNTIME=0
+ENV CLIO_SERVER_CONF=/benchmarks/cte_config.yaml
 
 # Default benchmark parameters (can be overridden with environment variables)
 ENV TEST_CASE=Put
@@ -53,7 +53,7 @@ RUN echo '#!/bin/bash' > /benchmarks/run_bench.sh && \
     echo '/benchmarks/clio_cte_bench.sh "$TEST_CASE" "$NUM_PROCS" "$DEPTH" "$IO_SIZE" "$IO_COUNT"' >> /benchmarks/run_bench.sh && \
     echo 'BENCH_EXIT=$?' >> /benchmarks/run_bench.sh && \
     echo '# Stop Chimaera runtime after benchmark completes' >> /benchmarks/run_bench.sh && \
-    echo 'chimaera runtime stop' >> /benchmarks/run_bench.sh && \
+    echo 'clio_run runtime stop' >> /benchmarks/run_bench.sh && \
     echo 'exit $BENCH_EXIT' >> /benchmarks/run_bench.sh && \
     sudo chmod +x /benchmarks/run_bench.sh
 

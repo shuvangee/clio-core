@@ -78,7 +78,7 @@ fi
 
 # Start Chimaera runtime
 info "Starting Chimaera runtime..."
-export CHI_SERVER_CONF="$CONFIG_FILE"
+export CLIO_SERVER_CONF="$CONFIG_FILE"
 "$RUNTIME_BIN" runtime start &
 RUNTIME_PID=$!
 sleep 3

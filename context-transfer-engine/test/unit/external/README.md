@@ -24,7 +24,7 @@ This test serves multiple purposes:
    ```
 
 2. **Dependencies**: Ensure all CTE Core dependencies are available:
-   - Chimaera framework (chimaera-core, chimaera-admin)
+   - Clio framework (chimaera-core, chimaera-admin)
    - CTP (Clio Shared Memory)
    - yaml-cpp
 
@@ -59,7 +59,7 @@ make run_external_test
 The test performs a comprehensive validation of CTE Core functionality:
 
 ### 1. Initialization Sequence
-- Initializes Chimaera runtime and client
+- Initializes Clio runtime and client
 - Initializes CTE subsystem
 - Creates CTE container with configuration
 
@@ -96,7 +96,7 @@ When successful, the test produces output like:
 ```
 === External CTE Core Integration Test ===
 Initializing CTE Core system...
-1. Initializing Chimaera runtime...
+1. Initializing Clio runtime...
 2. Initializing Chimaera client...
 3. Initializing CTE subsystem...
 4. Getting CTE client instance...
@@ -147,18 +147,18 @@ The `CMakeLists.txt` in this directory demonstrates the **proper MODULE_DEVELOPM
 
 1. **Package Discovery** (Modern Pattern):
    ```cmake
-   # Find required Chimaera framework packages
+   # Find required Clio framework packages
    find_package(chimaera REQUIRED)              # Core library
-   find_package(chimaera_admin REQUIRED)        # Admin ChiMod
+   find_package(chimaera_admin REQUIRED)        # Admin Module
    
-   # Find CTE Core ChiMod package
-   find_package(clio_cte_core REQUIRED)          # CTE Core ChiMod
+   # Find CTE Core Module package
+   find_package(clio_cte_core REQUIRED)          # CTE Core Module
    ```
 
 2. **Library Linking** (Modern Target Names):
    ```cmake
    target_link_libraries(your_app
-       # CTE Core ChiMod libraries (recommended aliases)
+       # CTE Core Module libraries (recommended aliases)
        clio_cte::core_client                     # CTE Core client
        clio_cte::core_runtime                    # CTE Core runtime (optional)
        
@@ -174,7 +174,7 @@ The `CMakeLists.txt` in this directory demonstrates the **proper MODULE_DEVELOPM
    - **Actual Targets**: `clio_cte_core_client`, `clio_cte_core_runtime`
 
 4. **Automatic Dependencies**:
-   - ChiMod targets automatically include `chimaera::cxx` framework
+   - Module targets automatically include `chimaera::cxx` framework
    - No need to manually link core framework libraries
    - `add_chimod_both()` handles all standard dependencies
 
@@ -207,7 +207,7 @@ export LD_LIBRARY_PATH=/path/to/chimaera/lib:$LD_LIBRARY_PATH
 
 This test demonstrates several important patterns for external CTE Core integration:
 
-1. **Proper Initialization Order**: Chimaera runtime → Chimaera client → CTE subsystem
+1. **Proper Initialization Order**: Clio runtime → Chimaera client → CTE subsystem
 2. **Memory Management**: Using CTP allocators for shared data
 3. **Error Handling**: Checking return codes and handling exceptions
 4. **Resource Cleanup**: Proper cleanup of tags, blobs, and resources

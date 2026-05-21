@@ -229,14 +229,14 @@ cmake --build build --target test_context_bundle test_context_query test_context
 
 #### Starting the Chimaera Runtime
 
-**IMPORTANT**: Tests require the Chimaera runtime to be running. Start it before running tests:
+**IMPORTANT**: Tests require the Clio runtime to be running. Start it before running tests:
 
 ```bash
-# Terminal 1: Start the Chimaera runtime
+# Terminal 1: Start the Clio runtime
 cd build
 LD_LIBRARY_PATH=/workspace/build/bin:$LD_LIBRARY_PATH \
 CLIO_CTE_CONF=/workspace/context-assimilation-engine/test/unit/clio_config.yaml \
-./bin/chimaera runtime start
+./bin/clio_run runtime start
 
 # Wait for message: "Successfully started local server at 127.0.0.1:9129"
 ```
@@ -259,7 +259,7 @@ LD_LIBRARY_PATH=/workspace/build/bin:$LD_LIBRARY_PATH ./bin/test_context_destroy
 ```bash
 # When done testing
 cd build
-./bin/chimaera runtime stop
+./bin/clio_run runtime stop
 ```
 
 ## Unit Tests
@@ -303,7 +303,7 @@ api/
 ## Dependencies
 
 **Required**:
-- Chimaera runtime (chimaera::cxx)
+- Clio runtime (chimaera::cxx)
 - Context Transfer Engine (clio_cte_core_client)
 - Context Assimilation Engine (clio_cae_core_client)
 

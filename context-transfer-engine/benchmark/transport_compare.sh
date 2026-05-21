@@ -2,7 +2,7 @@
 # Comparison: IOWarp TCP / IPC / SHM transports vs Redis
 # Sweeps thread/client counts: 1, 4, 8, 16
 #
-# IOWarp transport is selected via CHI_IPC_MODE={TCP,IPC,SHM} on both
+# IOWarp transport is selected via CLIO_IPC_MODE={TCP,IPC,SHM} on both
 # the runtime and the client; the clio_cte_bench Put/Get/PutGet workload
 # is the IOWarp counterpart to redis-benchmark's SET/GET/SETGET.
 
@@ -33,8 +33,8 @@ fail() { echo "[compare][ERROR] $*" | tee -a "$LOG"; }
 
 # ----- IOWarp setup --------------------------------------------------------
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:$BUILD_BIN"
-export CHI_REPO_PATH="${CHI_REPO_PATH:-$BUILD_BIN}"
-export CHI_SERVER_CONF="$CTE_CONFIG"
+export CLIO_REPO_PATH="${CLIO_REPO_PATH:-$BUILD_BIN}"
+export CLIO_SERVER_CONF="$CTE_CONFIG"
 
 # Kill any leftover servers
 pkill -9 -f "$CHIMAERA runtime start" >/dev/null 2>&1 || true
@@ -43,16 +43,16 @@ sleep 1
 
 start_chimaera() {
   local mode="$1"
-  log "Starting Chimaera runtime (CHI_IPC_MODE=$mode)"
-  CHI_IPC_MODE="$mode" \
+  log "Starting Chimaera runtime (CLIO_IPC_MODE=$mode)"
+  CLIO_IPC_MODE="$mode" \
     "$CHIMAERA" runtime start > "$RESULTS_DIR/chimaera_${mode}.log" 2>&1 &
-  CHI_PID=$!
+  CLIO_PID=$!
   # Wait for server to be listening (matches "Successfully started local server"
   # in the chimaera log)
   for i in $(seq 1 30); do
     if grep -q "Successfully started local server" \
          "$RESULTS_DIR/chimaera_${mode}.log" 2>/dev/null; then
-      log "Chimaera up (pid=$CHI_PID, mode=$mode)"
+      log "Chimaera up (pid=$CLIO_PID, mode=$mode)"
       return 0
     fi
     sleep 0.5
@@ -62,10 +62,10 @@ start_chimaera() {
 }
 
 stop_chimaera() {
-  if [ -n "${CHI_PID:-}" ]; then
-    kill "$CHI_PID" 2>/dev/null || true
-    wait "$CHI_PID" 2>/dev/null || true
-    CHI_PID=""
+  if [ -n "${CLIO_PID:-}" ]; then
+    kill "$CLIO_PID" 2>/dev/null || true
+    wait "$CLIO_PID" 2>/dev/null || true
+    CLIO_PID=""
   fi
   pkill -9 -f "$CHIMAERA runtime start" >/dev/null 2>&1 || true
   pkill -9 chimaera >/dev/null 2>&1 || true
@@ -78,7 +78,7 @@ run_iowarp() {
   for op in "${OPS[@]}"; do
     for nt in "${THREAD_COUNTS[@]}"; do
       log "  IOWarp $mode op=$op threads=$nt"
-      out=$(CHI_IPC_MODE="$mode" CHI_WITH_RUNTIME=0 \
+      out=$(CLIO_IPC_MODE="$mode" CLIO_WITH_RUNTIME=0 \
         "$CTE_BENCH" "$op" "$nt" "$DEPTH" "$IO_SIZE" "$IO_COUNT" \
         2>"$RESULTS_DIR/bench_${mode}_${op}_t${nt}.log")
       agg=$(echo "$out" | grep "Aggregate bandwidth" | head -1 \

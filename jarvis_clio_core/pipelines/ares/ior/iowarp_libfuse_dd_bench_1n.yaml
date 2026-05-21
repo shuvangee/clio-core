@@ -1,5 +1,5 @@
 # Pipeline: dd benchmark through clio_cte_libfuse with the chimaera
-# runtime embedded in the FUSE process (CHI_WITH_RUNTIME=1).
+# runtime embedded in the FUSE process (CLIO_WITH_RUNTIME=1).
 #
 # No clio_runtime package -- clio_cte_fuse owns the runtime. The pool is
 # composed by clio_cte (deploy_mode default) which connects via SHM to

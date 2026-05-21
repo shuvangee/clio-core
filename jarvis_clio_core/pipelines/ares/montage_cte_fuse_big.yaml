@@ -2,7 +2,7 @@
 #
 # Real montage pipeline inside the montage_apptainer_test SIF, with
 # the IOWarp libfuse adapter mounted at /mnt/clio_cte and backed by a
-# 35 GiB RAM bdev in the chimaera runtime. Output `cp` into
+# 35 GiB RAM bdev in the clio_run runtime. Output `cp` into
 # /mnt/clio_cte/montage_cte_fuse_big exercises the FUSE adapter under
 # real FITS payloads.
 #

@@ -34,12 +34,12 @@ services:
     environment:
       - NODE_ID=1
       - NODE_IP=172.28.0.10
-      - CHI_SERVER_CONF=/workspace/context-transfer-engine/test/integration/distributed/clio_config.yaml
+      - CLIO_SERVER_CONF=/workspace/context-transfer-engine/test/integration/distributed/clio_config.yaml
       - CONTAINER_HOSTFILE=/workspace/context-transfer-engine/test/integration/distributed/hostfile
       - TEST_FILTER=${TEST_FILTER:-}
       - SECTION_FILTER=${SECTION_FILTER:-}
       - CTE_NUM_NODES=4
-      - CHI_WITH_RUNTIME=0
+      - CLIO_WITH_RUNTIME=0
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -51,7 +51,7 @@ services:
         echo '========================================' &&
         echo 'Node 1: Starting Chimaera runtime in background' &&
         echo '========================================' &&
-        gdb -batch -ex 'set confirm off' -ex run -ex 'thread apply all bt' -ex quit --args /workspace/build/bin/chimaera runtime start &
+        gdb -batch -ex 'set confirm off' -ex run -ex 'thread apply all bt' -ex quit --args /workspace/build/bin/clio_run runtime start &
         RUNTIME_PID=$$! &&
         echo \"Node 1: Runtime started (PID $$RUNTIME_PID)\" &&
         sleep 3 &&
@@ -92,7 +92,7 @@ services:
     environment:
       - NODE_ID=2
       - NODE_IP=172.28.0.11
-      - CHI_SERVER_CONF=/workspace/context-transfer-engine/test/integration/distributed/clio_config.yaml
+      - CLIO_SERVER_CONF=/workspace/context-transfer-engine/test/integration/distributed/clio_config.yaml
       - CONTAINER_HOSTFILE=/workspace/context-transfer-engine/test/integration/distributed/hostfile
       - CTE_NUM_NODES=4
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
@@ -103,7 +103,7 @@ services:
     command: >
       "
         echo 'Node 2: Starting Chimaera runtime in foreground' &&
-        /workspace/build/bin/chimaera runtime start
+        /workspace/build/bin/clio_run runtime start
       "
 
   # Node 3 - Secondary node
@@ -124,7 +124,7 @@ services:
     environment:
       - NODE_ID=3
       - NODE_IP=172.28.0.12
-      - CHI_SERVER_CONF=/workspace/context-transfer-engine/test/integration/distributed/clio_config.yaml
+      - CLIO_SERVER_CONF=/workspace/context-transfer-engine/test/integration/distributed/clio_config.yaml
       - CONTAINER_HOSTFILE=/workspace/context-transfer-engine/test/integration/distributed/hostfile
       - CTE_NUM_NODES=4
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
@@ -135,7 +135,7 @@ services:
     command: >
       "
         echo 'Node 3: Starting Chimaera runtime in foreground' &&
-        /workspace/build/bin/chimaera runtime start
+        /workspace/build/bin/clio_run runtime start
       "
 
   # Node 4 - Secondary node
@@ -156,7 +156,7 @@ services:
     environment:
       - NODE_ID=4
       - NODE_IP=172.28.0.13
-      - CHI_SERVER_CONF=/workspace/context-transfer-engine/test/integration/distributed/clio_config.yaml
+      - CLIO_SERVER_CONF=/workspace/context-transfer-engine/test/integration/distributed/clio_config.yaml
       - CONTAINER_HOSTFILE=/workspace/context-transfer-engine/test/integration/distributed/hostfile
       - CTE_NUM_NODES=4
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
@@ -167,7 +167,7 @@ services:
     command: >
       "
         echo 'Node 4: Starting Chimaera runtime in foreground' &&
-        /workspace/build/bin/chimaera runtime start
+        /workspace/build/bin/clio_run runtime start
       "
 
 networks:

@@ -1,18 +1,18 @@
 # Context Assimilation Engine (CAE)
 
-A Chimaera module (ChiMod) for high-performance data ingestion into the IOWarp
+A Chimaera module (Module) for high-performance data ingestion into the IOWarp
 ecosystem. CAE assimilates data from external sources — local binary files,
 HDF5 datasets, and Globus endpoints — into the Context Transfer Engine (CTE)
 for distributed storage and retrieval.
 
 ## Overview
 
-CAE runs as a pool inside the Chimaera runtime alongside CTE. Clients submit
+CAE runs as a pool inside the Clio runtime alongside CTE. Clients submit
 OMNI YAML files to describe data transfers; CAE parses them and dispatches
 assimilation tasks to the appropriate backend (binary, HDF5, or Globus).
 
 ```
-External Source          CAE ChiMod              CTE ChiMod
+External Source          CAE Module              CTE Module
 (file, HDF5, Globus) --> ParseOmni task -------> Tag + Blob storage
 ```
 
@@ -37,11 +37,11 @@ cmake -DCMAKE_BUILD_TYPE=Release -DWRP_CORE_ENABLE_HDF5=ON ..
 
 ## Running
 
-### 1. Start the Chimaera runtime with CTE and CAE
+### 1. Start the Clio runtime with CTE and CAE
 
 ```bash
-export CHI_SERVER_CONF=/path/to/clio_config.yaml
-chimaera runtime start
+export CLIO_X=/path/to/clio_config.yaml
+clio_run runtime start
 ```
 
 An example configuration deploying both CTE and CAE is provided in
@@ -109,7 +109,7 @@ transfers:
 
 ```
 config/      - Example runtime configuration files
-core/        - ChiMod implementation
+core/        - Module implementation
   include/   - Public headers (tasks, assimilation context, factory)
   src/        - Runtime and client implementation
   util/       - clio_cae_omni command-line tool

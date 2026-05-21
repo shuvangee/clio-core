@@ -238,7 +238,7 @@ if os.path.isfile(devsetup_path):
         ("UID/GID mapping", ["HOST_UID", "uid"]),
         ("troubleshooting section", ["troubleshoot"]),
         ("GPU container path", ["nvidia-gpu", "cuda"]),
-        ("IPC transport modes", ["CHI_IPC_MODE"]),
+        ("IPC transport modes", ["CLIO_IPC_MODE"]),
     ]
 
     for label, patterns in docker_coverage:

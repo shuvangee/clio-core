@@ -5,7 +5,7 @@
 # 3. Client shuts down node 1's runtime via AsyncStopRuntime
 # 4. Client sends another task — WaitForServerAndReconnect triggers
 # 5. Phase 1 (original server) times out quickly
-# 6. Phase 2 (CHI_CLIENT_TRY_NEW_SERVERS) tries random hosts from hostfile
+# 6. Phase 2 (CLIO_CLIENT_TRY_NEW_SERVERS) tries random hosts from hostfile
 # 7. Client reconnects to a surviving node and the task completes
 #
 # Usage:
@@ -29,12 +29,12 @@ services:
     environment:
       - NODE_ID=1
       - NODE_IP=172.26.0.10
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/reconnect/clio_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/reconnect/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/reconnect/hostfile
-      - CHI_WITH_RUNTIME=0
-      - CHI_NUM_CONTAINERS=4
-      - CHI_CLIENT_RETRY_TIMEOUT=5
-      - CHI_CLIENT_TRY_NEW_SERVERS=16
+      - CLIO_WITH_RUNTIME=0
+      - CLIO_NUM_CONTAINERS=4
+      - CLIO_CLIENT_RETRY_TIMEOUT=5
+      - CLIO_CLIENT_TRY_NEW_SERVERS=16
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -43,7 +43,7 @@ services:
     command: >
       "
         echo 'Node 1: Starting runtime in background...' &&
-        /workspace/build/bin/chimaera runtime start &
+        /workspace/build/bin/clio_run runtime start &
         RUNTIME_PID=\$! &&
         echo 'Node 1: Runtime started (PID \$RUNTIME_PID). Container stays alive for test runner.' &&
         sleep infinity
@@ -65,10 +65,10 @@ services:
     environment:
       - NODE_ID=2
       - NODE_IP=172.26.0.11
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/reconnect/clio_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/reconnect/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/reconnect/hostfile
-      - CHI_WITH_RUNTIME=0
-      - CHI_NUM_CONTAINERS=4
+      - CLIO_WITH_RUNTIME=0
+      - CLIO_NUM_CONTAINERS=4
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -77,7 +77,7 @@ services:
     command: >
       "
         echo 'Node 2: Starting runtime...' &&
-        /workspace/build/bin/chimaera runtime start
+        /workspace/build/bin/clio_run runtime start
       "
 
   # Node 3
@@ -96,10 +96,10 @@ services:
     environment:
       - NODE_ID=3
       - NODE_IP=172.26.0.12
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/reconnect/clio_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/reconnect/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/reconnect/hostfile
-      - CHI_WITH_RUNTIME=0
-      - CHI_NUM_CONTAINERS=4
+      - CLIO_WITH_RUNTIME=0
+      - CLIO_NUM_CONTAINERS=4
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -108,7 +108,7 @@ services:
     command: >
       "
         echo 'Node 3: Starting runtime...' &&
-        /workspace/build/bin/chimaera runtime start
+        /workspace/build/bin/clio_run runtime start
       "
 
   # Node 4
@@ -127,10 +127,10 @@ services:
     environment:
       - NODE_ID=4
       - NODE_IP=172.26.0.13
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/reconnect/clio_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/reconnect/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/reconnect/hostfile
-      - CHI_WITH_RUNTIME=0
-      - CHI_NUM_CONTAINERS=4
+      - CLIO_WITH_RUNTIME=0
+      - CLIO_NUM_CONTAINERS=4
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -139,7 +139,7 @@ services:
     command: >
       "
         echo 'Node 4: Starting runtime...' &&
-        /workspace/build/bin/chimaera runtime start
+        /workspace/build/bin/clio_run runtime start
       "
 
 networks:

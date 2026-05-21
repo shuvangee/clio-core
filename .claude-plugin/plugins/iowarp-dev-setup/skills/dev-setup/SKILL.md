@@ -95,8 +95,8 @@ ctest -R omni                # Context Assimilation Engine
 
 ```bash
 # Start runtime with default config
-export CHI_SERVER_CONF=/workspace/docker/clio_cte_bench/cte_config.yaml
-chimaera runtime start &
+export CLIO_X=/workspace/docker/clio_cte_bench/cte_config.yaml
+clio_run runtime start &
 
 # After a moment, run a quick benchmark
 clio_run_thrpt_benchmark --test-case latency --threads 4 --duration 5
@@ -250,7 +250,7 @@ rm -rf /tmp/chimaera_$(whoami)/*
 ```
 
 **Runtime won't start:**
-- Check config path: `echo $CHI_SERVER_CONF`
+- Check config path: `echo $CLIO_X`
 - Validate YAML syntax of the config file
 - Check port availability: `lsof -i :9413`
 
@@ -265,7 +265,7 @@ rm -rf /tmp/chimaera_$(whoami)/*
 
 Key CMake flags:
 ```
--DWRP_CORE_ENABLE_RUNTIME=ON    # Chimaera runtime
+-DWRP_CORE_ENABLE_RUNTIME=ON    # Clio runtime
 -DWRP_CORE_ENABLE_CTE=ON        # Context Transfer Engine
 -DWRP_CORE_ENABLE_CAE=ON        # Context Assimilation Engine
 -DWRP_CORE_ENABLE_CEE=ON        # Context Exploration Engine
@@ -290,11 +290,11 @@ cmake --preset=debug && cmake --build build -j$(nproc)
 cd build && ctest -VV
 
 # Start runtime
-export CHI_SERVER_CONF=/workspace/docker/clio_cte_bench/cte_config.yaml
-chimaera runtime start
+export CLIO_X=/workspace/docker/clio_cte_bench/cte_config.yaml
+clio_run runtime start
 
 # IPC transport modes
-export CHI_IPC_MODE=SHM   # Shared memory (lowest latency, same machine)
-export CHI_IPC_MODE=TCP   # TCP via ZeroMQ (default, cross-machine)
-export CHI_IPC_MODE=IPC   # Unix domain socket (same machine, no TCP overhead)
+export CLIO_X=SHM   # Shared memory (lowest latency, same machine)
+export CLIO_X=TCP   # TCP via ZeroMQ (default, cross-machine)
+export CLIO_X=IPC   # Unix domain socket (same machine, no TCP overhead)
 ```

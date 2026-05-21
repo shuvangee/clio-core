@@ -22,7 +22,7 @@ Example-driven test suite demonstrating MCP (Model Context Protocol) integration
 python3 test_bindings.py
 
 # Run without runtime initialization (external runtime)
-CHI_WITH_RUNTIME=0 python3 test_bindings.py
+CLIO_X=0 python3 test_bindings.py
 ```
 
 ### 2. `test_cte_telemetry.py`
@@ -38,8 +38,8 @@ Focused unit test suite for telemetry functionality.
 **Usage with pytest**:
 ```bash
 # Set environment variables
-export CHI_WITH_RUNTIME=1
-export CHI_SERVER_CONF=/path/to/cte_config.yaml
+export CLIO_X=1
+export CLIO_X=/path/to/cte_config.yaml
 
 # Run all tests
 pytest test_cte_telemetry.py -v
@@ -53,7 +53,7 @@ pytest test_cte_telemetry.py -v -s
 
 **Usage as standalone script**:
 ```bash
-CHI_WITH_RUNTIME=1 CHI_SERVER_CONF=/path/to/cte_config.yaml python3 test_cte_telemetry.py
+CLIO_X=1 CLIO_X=/path/to/cte_config.yaml python3 test_cte_telemetry.py
 ```
 
 ## PollTelemetryLog Test Details
@@ -106,13 +106,13 @@ for entry in entries:
 
 ### Required for Runtime Initialization
 
-- `CHI_WITH_RUNTIME`: Set to `1` to enable runtime initialization (default: `1`)
-- `CHI_SERVER_CONF`: Path to CTE configuration YAML file
+- `CLIO_X`: Set to `1` to enable runtime initialization (default: `1`)
+- `CLIO_X`: Path to CTE configuration YAML file
 
 ### Optional
 
-- `CHI_REPO_PATH`: Path to ChiMod repository (auto-detected from module location)
-- `LD_LIBRARY_PATH`: Library search path (auto-configured to include ChiMod directory)
+- `CLIO_X`: Path to Module repository (auto-detected from module location)
+- `LD_LIBRARY_PATH`: Library search path (auto-configured to include Module directory)
 
 ## Configuration File
 
@@ -148,7 +148,7 @@ compose:
 cd /workspace/build
 
 # Set config path
-export CHI_SERVER_CONF=/workspace/context-transfer-engine/test/unit/adapters/adios2/cte_config.yaml
+export CLIO_X=/workspace/context-transfer-engine/test/unit/adapters/adios2/cte_config.yaml
 
 # Run example tests
 python3 /workspace/context-transfer-engine/wrapper/python/test_bindings.py
@@ -163,7 +163,7 @@ pytest /workspace/context-transfer-engine/wrapper/python/test_cte_telemetry.py -
 cd /workspace/context-transfer-engine/wrapper/python
 
 # Set config and library paths
-export CHI_SERVER_CONF=/workspace/context-transfer-engine/test/unit/adapters/adios2/cte_config.yaml
+export CLIO_X=/workspace/context-transfer-engine/test/unit/adapters/adios2/cte_config.yaml
 export LD_LIBRARY_PATH=/workspace/build/bin:$LD_LIBRARY_PATH
 export PYTHONPATH=/workspace/build/bin:$PYTHONPATH
 
@@ -186,7 +186,7 @@ If you see `ImportError: No module named 'clio_cte_core_ext'`:
 
 If runtime initialization fails:
 
-1. Check config file exists: `ls -la $CHI_SERVER_CONF`
+1. Check config file exists: `ls -la $CLIO_X`
 2. Verify config syntax is valid YAML
 3. Check storage paths are writable
 4. Ensure no other runtime instance is running
@@ -241,8 +241,8 @@ To integrate these tests in CI/CD:
 # Example GitHub Actions workflow step
 - name: Run CTE Python Tests
   env:
-    CHI_WITH_RUNTIME: 1
-    CHI_SERVER_CONF: /path/to/test_config.yaml
+    CLIO_X: 1
+    CLIO_X: /path/to/test_config.yaml
     LD_LIBRARY_PATH: ${{ github.workspace }}/build/bin
     PYTHONPATH: ${{ github.workspace }}/build/bin
   run: |

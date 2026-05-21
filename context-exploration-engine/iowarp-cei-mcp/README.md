@@ -35,7 +35,7 @@ The core Context Interface operations as defined in `test_bindings.py`:
 
 ### Runtime Management
 
-- **initialize_cte_runtime**: Initialize CTE runtime (Chimaera runtime, client, and CTE subsystem)
+- **initialize_cte_runtime**: Initialize CTE runtime (Clio runtime, client, and CTE subsystem)
 - **get_client_status**: Check CTE client initialization status
 - **get_cte_types**: Discover available CTE types and operations
 

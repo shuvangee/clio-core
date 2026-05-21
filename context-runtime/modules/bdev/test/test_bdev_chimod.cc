@@ -1364,7 +1364,7 @@ TEST_CASE("bdev_file_explicit_backend_shm", "[bdev][file][explicit][shm]") {
     INFO("Skipping: CHI_IPC_MODE=" + std::string(ipc_mode) + " (need SHM)");
     return;
   }
-  setenv("CHI_IPC_MODE", "SHM", 1);
+  setenv("CLIO_IPC_MODE", "SHM", 1);
   run_bdev_file_explicit_backend_test("shm");
 }
 
@@ -1374,7 +1374,7 @@ TEST_CASE("bdev_file_explicit_backend_tcp", "[bdev][file][explicit][tcp]") {
     INFO("Skipping: CHI_IPC_MODE=" + std::string(ipc_mode) + " (need TCP)");
     return;
   }
-  setenv("CHI_IPC_MODE", "TCP", 1);
+  setenv("CLIO_IPC_MODE", "TCP", 1);
   run_bdev_file_explicit_backend_test("tcp");
 }
 
@@ -1384,7 +1384,7 @@ TEST_CASE("bdev_file_explicit_backend_ipc", "[bdev][file][explicit][ipc]") {
     INFO("Skipping: CHI_IPC_MODE=" + std::string(ipc_mode) + " (need IPC)");
     return;
   }
-  setenv("CHI_IPC_MODE", "IPC", 1);
+  setenv("CLIO_IPC_MODE", "IPC", 1);
   run_bdev_file_explicit_backend_test("ipc");
 }
 

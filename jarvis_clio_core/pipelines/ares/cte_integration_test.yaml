@@ -17,7 +17,7 @@ pkgs:
     log_level: "info"
     sleep: 0
 
-  # Stage 2: Deploy CTE pools on all nodes (via parallel SSH + chimaera compose)
+  # Stage 2: Deploy CTE pools on all nodes (via parallel SSH + clio_run compose)
   - pkg_type: jarvis_clio_core.clio_cte
     pkg_name: cte_core
     devices:

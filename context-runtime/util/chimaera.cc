@@ -5,23 +5,36 @@
 #include "chimaera_commands.h"
 
 namespace {
+// Program name to display in usage messages: derived from argv[0]'s basename
+// so the symlink invocation `clio_run` prints "Usage: clio_run ..." while
+// the legacy `chimaera` invocation keeps the historical text. Set by main().
+const char* g_progname = "clio_run";
+
 void PrintUsage() {
-  std::cerr << "Usage: chimaera <command> [options]\n"
+  std::cerr << "Usage: " << g_progname << " <command> [options]\n"
             << "\n"
             << "Commands:\n"
-            << "  runtime start   Start the Chimaera runtime server\n"
-            << "  runtime restart Restart the Chimaera runtime (WAL replay)\n"
-            << "  runtime stop    Stop the Chimaera runtime server\n"
+            << "  runtime start   Start the Clio runtime server\n"
+            << "  runtime restart Restart the Clio runtime (WAL replay)\n"
+            << "  runtime stop    Stop the Clio runtime server\n"
             << "  migrate         Migrate a container to a different node\n"
             << "  monitor         Monitor worker statistics\n"
             << "  compose         Create/destroy pools from compose config\n"
             << "  repo refresh    Autogenerate ChiMod method files\n"
             << "\n"
-            << "Run 'chimaera <command> --help' for more information on a command.\n";
+            << "Run '" << g_progname
+            << " <command> --help' for more information on a command.\n";
 }
 }  // namespace
 
 int main(int argc, char* argv[]) {
+  // Set the displayed program name from argv[0]'s basename so usage messages
+  // match whichever symlink (clio_run or chimaera) the user invoked.
+  if (argc > 0 && argv[0] != nullptr && argv[0][0] != '\0') {
+    const char* base = std::strrchr(argv[0], '/');
+    g_progname = base ? base + 1 : argv[0];
+  }
+
   if (argc < 2) {
     PrintUsage();
     return 1;
@@ -37,12 +50,13 @@ int main(int argc, char* argv[]) {
   // Handle "runtime start" and "runtime stop" subcommands
   if (cmd == "runtime") {
     if (argc < 3) {
-      std::cerr << "Usage: chimaera runtime <start|restart|stop> [options]\n";
+      std::cerr << "Usage: " << g_progname
+                << " runtime <start|restart|stop> [options]\n";
       return 1;
     }
 
     std::string subcmd = argv[2];
-    // Strip "chimaera runtime <subcmd>" from argv
+    // Strip "<progname> runtime <subcmd>" from argv
     int new_argc = argc - 3;
     char** new_argv = argv + 3;
 
@@ -54,7 +68,8 @@ int main(int argc, char* argv[]) {
       return RuntimeStop(new_argc, new_argv);
     } else {
       std::cerr << "Unknown runtime subcommand: " << subcmd << "\n";
-      std::cerr << "Usage: chimaera runtime <start|restart|stop> [options]\n";
+      std::cerr << "Usage: " << g_progname
+                << " runtime <start|restart|stop> [options]\n";
       return 1;
     }
   }
@@ -62,12 +77,12 @@ int main(int argc, char* argv[]) {
   // Handle "repo refresh" subcommand
   if (cmd == "repo") {
     if (argc < 3) {
-      std::cerr << "Usage: chimaera repo <refresh> [options]\n";
+      std::cerr << "Usage: " << g_progname << " repo <refresh> [options]\n";
       return 1;
     }
 
     std::string subcmd = argv[2];
-    // Strip "chimaera repo <subcmd>" from argv
+    // Strip "<progname> repo <subcmd>" from argv
     int new_argc = argc - 3;
     char** new_argv = argv + 3;
 
@@ -75,7 +90,7 @@ int main(int argc, char* argv[]) {
       return RefreshRepo(new_argc, new_argv);
     } else {
       std::cerr << "Unknown repo subcommand: " << subcmd << "\n";
-      std::cerr << "Usage: chimaera repo <refresh> [options]\n";
+      std::cerr << "Usage: " << g_progname << " repo <refresh> [options]\n";
       return 1;
     }
   }

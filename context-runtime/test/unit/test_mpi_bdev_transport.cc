@@ -258,7 +258,7 @@ int main(int argc, char* argv[]) {
     // Cleanup stale shared memory
     CleanupSharedMemory();
 
-    setenv("CHI_WITH_RUNTIME", "1", 1);
+    setenv("CLIO_WITH_RUNTIME", "1", 1);
     bool success = CHIMAERA_INIT(ChimaeraMode::kServer, true);
     if (!success) {
       HLOG(kError, "[Rank 0] CHIMAERA_INIT(kServer) failed!");
@@ -307,8 +307,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Set transport mode
-    setenv("CHI_IPC_MODE", mode_name.c_str(), 1);
-    setenv("CHI_WITH_RUNTIME", "0", 1);
+    setenv("CLIO_IPC_MODE", mode_name.c_str(), 1);
+    setenv("CLIO_WITH_RUNTIME", "0", 1);
 
     HLOG(kInfo, "[Rank {}] Connecting as {} client...", rank, mode_name);
 

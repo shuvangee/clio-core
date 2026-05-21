@@ -1,6 +1,6 @@
-# CAE ChiMod Unit Tests
+# CAE Module Unit Tests
 
-This directory contains unit tests for the Content Assimilation Engine (CAE) ChiMod.
+This directory contains unit tests for the Content Assimilation Engine (CAE) Module.
 
 ## Test Organization
 
@@ -28,7 +28,7 @@ Before running tests, ensure:
    ```
 
 2. **Ensure runtime components are available:**
-   - `chi_runtime` (Chimaera runtime)
+   - `chi_runtime` (Clio runtime)
    - `clio_cte_daemon` (Content Transfer Engine daemon)
    - Test executables in `build/bin/`
 
@@ -63,7 +63,7 @@ Binary Assimilation ParseOmni Test
 ========================================
 
 [STEP 1] Checking prerequisites...
-[STEP 2] Starting Chimaera runtime...
+[STEP 2] Starting Clio runtime...
 [STEP 3] Starting CTE daemon...
 [STEP 4] Running test executable...
 [STEP 5] Analyzing results...

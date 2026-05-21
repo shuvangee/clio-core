@@ -1,7 +1,7 @@
 ---
 # WRP Runtime Configuration for Jarvis Deployment Test
 # Runtime-only config (no compose section) - matches Jarvis ClioRuntime output
-# CTE compose is a separate step via `chimaera compose`
+# CTE compose is a separate step via `clio_run compose`
 
 # Memory segment configuration
 memory:

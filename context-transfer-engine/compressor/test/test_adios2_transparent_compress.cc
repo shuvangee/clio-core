@@ -43,7 +43,7 @@ static void EnsureInit() {
   // Use the compose config that places compressor at 512.0, CTE core at 513.0
   fs::path config_path = fs::path(__FILE__).parent_path() /
                           "test_transparent_compress_config.yaml";
-  setenv("CHI_SERVER_CONF", config_path.c_str(), 1);
+  setenv("CLIO_SERVER_CONF", config_path.c_str(), 1);
 
   bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kServer);
   REQUIRE(success);

@@ -115,13 +115,13 @@ matches_filter() {
 # $1: test filter name
 # Returns the docker exec's exit code so callers can detect failures
 # (including the "container is not running" case from a daemon that
-# crashed during chimaera runtime init).
+# crashed during clio_run runtime init).
 run_single_test() {
     local filter="$1"
     local ipc_mode="${2:-}"
     if ! docker exec iowarp-distributed-node1 bash -c "
-        export CHI_WITH_RUNTIME=0
-        ${ipc_mode:+export CHI_IPC_MODE=$ipc_mode}
+        export CLIO_WITH_RUNTIME=0
+        ${ipc_mode:+export CLIO_IPC_MODE=$ipc_mode}
         chimaera_bdev_chimod_tests '$filter'
     "; then
         return 1
@@ -145,7 +145,7 @@ run_test_docker_direct() {
     for mode in shm tcp ipc; do
         local test_name="bdev_file_explicit_backend_${mode}"
         if matches_filter "$test_name" "$TEST_FILTER"; then
-            log_info "Running $test_name (CHI_IPC_MODE=${mode^^})..."
+            log_info "Running $test_name (CLIO_IPC_MODE=${mode^^})..."
             if run_single_test "$test_name" "${mode^^}"; then
                 log_success "$test_name passed"
             else

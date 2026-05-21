@@ -22,9 +22,9 @@ We use rpaths for libraries. This stuff does not get overriden by LD_LIBRARY_PAT
 
 ## Chimods
 
-When building chimods, make sure to edit chimaera_mod.yaml and chimaera_repo.yaml.
+When building chimods, make sure to edit clio_mod.yaml and clio_repo.yaml.
 
-If you add new methods to a chimod, please edit chimaera_mod.yaml and use the chimaera repo refresh binary to autogenerate the relevant autogen files.
+If you add new methods to a chimod, please edit clio_mod.yaml and use the clio_run repo refresh binary to autogenerate the relevant autogen files.
 
 
 ## ⚠️ CRITICAL BUILD RULE ⚠️
@@ -275,7 +275,7 @@ cmake --preset=debug -DWRP_CORE_ENABLE_CTE=ON -DWRP_CORE_ENABLE_CAE=OFF
 - Always use the debug CMakePreset when compiling code in this repo
 - Never hardcode paths in CMakeLists.txt files
 - Use find_package() for all dependencies
-- Follow ChiMod build patterns from MODULE_DEVELOPMENT_GUIDE.md
+- Follow Module build patterns from MODULE_DEVELOPMENT_GUIDE.md
 - All compilation warnings have been resolved as of the current state
 
 ### RPATH Configuration
@@ -290,20 +290,20 @@ The build system uses **relative RPATHs** (`$ORIGIN`) for portable, relocatable 
 
 Always use CTP_MCTX macro unless we are writing GPU code, which necessitates a specific mctx to be created.
 
-### ChiMod Build Patterns
+### Module Build Patterns
 
-This project follows the Chimaera MODULE_DEVELOPMENT_GUIDE.md patterns for proper ChiMod development:
+This project follows the Chimaera MODULE_DEVELOPMENT_GUIDE.md patterns for proper Module development:
 
-**Required Packages for ChiMod Development:**
+**Required Packages for Module Development:**
 ```cmake
-# Core Chimaera framework (includes ChimaeraCommon.cmake functions)
+# Core Clio framework (includes ChimaeraCommon.cmake functions)
 find_package(chimaera REQUIRED)              # Core library (chimaera::cxx)
-find_package(chimaera_admin REQUIRED)        # Admin ChiMod (required for most ChiMods)
+find_package(chimaera_admin REQUIRED)        # Admin Module (required for most ChiMods)
 ```
 
-**ChiMod Creation Pattern:**
+**Module Creation Pattern:**
 ```cmake
-# Use modern ChiMod build functions instead of manual add_library
+# Use modern Module build functions instead of manual add_library
 add_chimod_runtime(
   CHIMOD_NAME core
   SOURCES
@@ -341,7 +341,7 @@ The following PoolManager methods are coroutines that return `TaskResume`:
 - `DestroyPool()` - Destroys a pool (coroutine for consistency)
 
 **Why Coroutines:**
-These methods are coroutines to properly handle nested pool creation. When a ChiMod's Create method (e.g., CTE Create) needs to create sub-pools (e.g., bdev for storage), it uses `co_await`. The coroutine chain allows proper suspension and resumption:
+These methods are coroutines to properly handle nested pool creation. When a Module's Create method (e.g., CTE Create) needs to create sub-pools (e.g., bdev for storage), it uses `co_await`. The coroutine chain allows proper suspension and resumption:
 1. Admin's `GetOrCreatePool` co_awaits `PoolManager::CreatePool`
 2. `PoolManager::CreatePool` co_awaits `container->Run()` (the Create method)
 3. The Create method can co_await nested pool creations (e.g., bdev Create)
@@ -422,7 +422,7 @@ using TaskLane = chi::ipc::multi_mpsc_ring_buffer<ctp::ipc::TypedPointer<Task>, 
 
 Use `TaskLane*` for all lane pointers in RunContext and other interfaces. Avoid `void*` and explicit type casts.
 
-## ChiMod Client Requirements
+## Module Client Requirements
 
 ### PoolQuery Recommendations for Create Operations
 
@@ -444,7 +444,7 @@ bdev_client.Create(mctx, chi::PoolQuery::Dynamic(), file_path, chimaera::bdev::B
 ```
 
 ### CreateTask Pool Assignment
-CreateTask operations in all ChiMod clients MUST use `chi::kAdminPoolId` instead of the client's `pool_id_`. This is because CreateTask is actually a GetOrCreatePoolTask that must be processed by the admin ChiMod to create or find the target pool.
+CreateTask operations in all Module clients MUST use `chi::kAdminPoolId` instead of the client's `pool_id_`. This is because CreateTask is actually a GetOrCreatePoolTask that must be processed by the admin Module to create or find the target pool.
 
 **Correct Usage:**
 ```cpp
@@ -470,19 +470,19 @@ This mapping allows DirectHash to correctly route tasks:
 2. Container ID maps to physical node ID via the address table
 3. Task completer reflects the physical node ID where it executed
 
-### ChiMod Name Parameter
-ChiMod clients MUST use `CreateParams::chimod_lib_name` instead of hardcoded module names in CreateTask operations.
+### Module Name Parameter
+Module clients MUST use `CreateParams::chimod_lib_name` instead of hardcoded module names in CreateTask operations.
 
 ### Pool Name Requirements
-All ChiMod Create functions MUST require a user-provided `pool_name` parameter. Never auto-generate pool names using `pool_id_` during Create operations, as `pool_id_` is not set until after Create completes.
+All Module Create functions MUST require a user-provided `pool_name` parameter. Never auto-generate pool names using `pool_id_` during Create operations, as `pool_id_` is not set until after Create completes.
 
 **Admin Pool Name Requirement:**
 The admin pool name MUST always be "admin". Multiple admin pools are NOT supported.
 
-## ChiMod Linking Requirements
+## Module Linking Requirements
 
 ### Target Naming and Aliases
-ChiMod libraries use consistent underscore-based naming:
+Module libraries use consistent underscore-based naming:
 
 **Target Names:**
 - Runtime: `${NAMESPACE}_${CHIMOD_NAME}_runtime` (e.g., `chimaera_admin_runtime`)
@@ -498,11 +498,11 @@ ChiMod libraries use consistent underscore-based naming:
 - Core package: `chimaera` (provides `chimaera::cxx`)
 
 ### Automatic Dependency Linking
-ChiMod libraries automatically handle common dependencies:
+Module libraries automatically handle common dependencies:
 
 **Automatic Dependencies for Runtime Code:**
-- `rt` library: Automatically linked to all ChiMod runtime targets for POSIX real-time library support (async I/O)
-- Admin ChiMod: Automatically linked to all non-admin ChiMod runtime and client targets
+- `rt` library: Automatically linked to all Module runtime targets for POSIX real-time library support (async I/O)
+- Admin Module: Automatically linked to all non-admin Module runtime and client targets
 - Admin includes: Automatically added to include directories for non-admin ChiMods
 
 **For External Applications:**
@@ -516,7 +516,7 @@ find_package(iowarp-core REQUIRED)
 #   Core Components:
 #     - All ctp::* modular targets (ctp::cxx, ctp::configure, ctp::serialize, etc.)
 #     - chimaera::cxx (core runtime library)
-#     - ChiMod build utilities (add_chimod_client, add_chimod_runtime, etc.)
+#     - Module build utilities (add_chimod_client, add_chimod_runtime, etc.)
 #
 #   Core ChiMods (Always Available):
 #     - chimaera::admin_client, chimaera::admin_runtime
@@ -526,14 +526,14 @@ find_package(iowarp-core REQUIRED)
 #     - clio_cte::core_client, clio_cte::core_runtime (if CLIO_CORE_ENABLE_CTE=ON)
 #     - clio_cae::core_client, clio_cae::core_runtime (if CLIO_CORE_ENABLE_CAE=ON)
 
-# Then link to the ChiMod libraries you need
+# Then link to the Module libraries you need
 target_link_libraries(your_target
-  chimaera::admin_client     # Admin ChiMod (always available)
-  chimaera::bdev_client      # Block device ChiMod (always available)
-  clio_cte::core_client       # CTE ChiMod (if enabled)
-  clio_cae::core_client       # CAE ChiMod (if enabled)
+  chimaera::admin_client     # Admin Module (always available)
+  chimaera::bdev_client      # Block device Module (always available)
+  clio_cte::core_client       # CTE Module (if enabled)
+  clio_cae::core_client       # CAE Module (if enabled)
 )
-# Dependencies are automatically included by ChiMod libraries
+# Dependencies are automatically included by Module libraries
 # No need to manually link ctp::cxx or chimaera::cxx
 ```
 
@@ -542,10 +542,10 @@ If you need finer control, you can still find packages individually:
 ```cmake
 find_package(ClioCtp REQUIRED)        # Provides ctp::* targets
 find_package(chimaera REQUIRED)         # Provides chimaera::cxx
-find_package(chimaera_admin REQUIRED)   # Provides admin ChiMod
-find_package(chimaera_bdev REQUIRED)    # Provides bdev ChiMod
-find_package(clio_cte_core REQUIRED)     # Provides CTE ChiMod (if enabled)
-find_package(clio_cae_core REQUIRED)     # Provides CAE ChiMod (if enabled)
+find_package(chimaera_admin REQUIRED)   # Provides admin Module
+find_package(chimaera_bdev REQUIRED)    # Provides bdev Module
+find_package(clio_cte_core REQUIRED)     # Provides CTE Module (if enabled)
+find_package(clio_cae_core REQUIRED)     # Provides CAE Module (if enabled)
 ```
 
 ### CTP Modular Dependency Targets
@@ -576,7 +576,7 @@ CTP (ClioCtp/context-transport-primitives) provides modular INTERFACE library ta
 
 - **`ctp::lightbeam`** - Network transport (ZeroMQ, libfabric, Thallium)
   - Provides: High-performance network communication
-  - Used by: Chimaera runtime for distributed operations
+  - Used by: Clio runtime for distributed operations
   - Compile definitions: `CTP_ENABLE_ZMQ`, `CTP_ENABLE_LIBFABRIC`, `CTP_ENABLE_THALLIUM`
 
 - **`ctp::thread_all`** - Threading support
@@ -627,8 +627,8 @@ CTP (ClioCtp/context-transport-primitives) provides modular INTERFACE library ta
 1. **Never link to yaml-cpp directly** - Use `ctp::configure` instead (except within ctp::configure itself)
 2. **Never link to cereal directly** - Use `ctp::serialize` instead
 3. **Be selective** - Only link to the modular targets you actually need
-4. **ChiMod clients** - Should only link to `ctp::cxx` (automatically included)
-5. **ChiMod runtimes** - May link to additional modular targets as needed
+4. **Module clients** - Should only link to `ctp::cxx` (automatically included)
+5. **Module runtimes** - May link to additional modular targets as needed
 6. **Tests** - Link only to the specific modular targets they test
 7. **GPU code** - Use `ctp::cuda_cxx` or `ctp::rocm_cxx` for GPU kernel code; use `ctp::cxx` for host code
 
@@ -659,7 +659,7 @@ target_link_libraries(my_cuda_kernel
 )
 ```
 
-## ChiMod Runtime Code Standards
+## Module Runtime Code Standards
 
 ### Autogenerated Code Duplication
 Runtime code (`*_runtime.cc` files) should **NEVER** duplicate autogenerated code methods. The following methods are automatically generated and must not be manually implemented in runtime source files:
@@ -676,7 +676,7 @@ Runtime code (`*_runtime.cc` files) should **NEVER** duplicate autogenerated cod
 
 ### CoMutex and CoRwLock
 
-The chimaera runtime provides two simplified coroutine-aware synchronization primitives for runtime code:
+The clio_run runtime provides two simplified coroutine-aware synchronization primitives for runtime code:
 
 **CoMutex (Coroutine Mutex)**
 - **Header**: `chimaera/comutex.h`
@@ -747,14 +747,14 @@ create_task->Wait();
 ASSERT_EQ(create_task->GetReturnCode(), 0) << "Create task failed with return code: " << create_task->GetReturnCode();
 ```
 
-This requirement applies to ALL ChiMod Create operations in unit tests including admin, bdev, and any custom ChiMods.
+This requirement applies to ALL Module Create operations in unit tests including admin, bdev, and any custom ChiMods.
 
 ### Test Framework Requirements
 
-**CRITICAL**: Unit tests that initialize the Chimaera runtime MUST use the `simple_test.h` framework. **DO NOT use Catch2** with Chimaera runtime initialization.
+**CRITICAL**: Unit tests that initialize the Clio runtime MUST use the `simple_test.h` framework. **DO NOT use Catch2** with Clio runtime initialization.
 
 **Catch2 Incompatibility:**
-- Catch2's test framework causes segmentation faults when used with Chimaera runtime initialization
+- Catch2's test framework causes segmentation faults when used with Clio runtime initialization
 - This issue was confirmed by copying working test code from `test_bdev_chimod.cc` (which uses simple_test.h) to a Catch2-based test - the identical code segfaulted with Catch2 but worked with simple_test.h
 - Root cause: Catch2's test runner infrastructure conflicts with Chimaera's runtime initialization
 
@@ -797,7 +797,7 @@ REQUIRE(CHI_IPC->IsInitialized());
 **Initialization Parameters:**
 - **Mode**: Always use `chi::ChimaeraMode::kClient` for unit tests
 - **default_with_runtime**: Always use `true` for unit tests (starts runtime automatically)
-- **Environment Variable**: `CHI_WITH_RUNTIME` is handled automatically by `CHIMAERA_INIT()`
+- **Environment Variable**: `CLIO_X` is handled automatically by `CHIMAERA_INIT()`
   - If set to `1`: Runtime will be started
   - If set to `0`: Only client initialization (useful for external runtime scenarios)
   - If not set: Uses the `default_with_runtime` parameter value
@@ -880,7 +880,7 @@ environment:
   - CHI_RUNTIME_DATA_SEGMENT_SIZE=512M
   - CHI_PORT=9413              # Override RPC port (default: 9413)
   - CHI_SERVER_ADDR=127.0.0.1 # Override server address for clients
-  - CHI_IPC_MODE=TCP          # SHM, TCP (default), or IPC
+  - CLIO_X=TCP          # SHM, TCP (default), or IPC
   - CHI_LOG_LEVEL=info
   - CHI_SHM_SIZE=2147483648
 ```
@@ -911,14 +911,14 @@ environment:
 
 ## IPC Transport Modes
 
-Chimaera clients communicate with the runtime server using one of three IPC transport modes, controlled by the `CHI_IPC_MODE` environment variable. This variable is read during `IpcManager::ClientInit()`.
+Chimaera clients communicate with the runtime server using one of three IPC transport modes, controlled by the `CLIO_X` environment variable. This variable is read during `IpcManager::ClientInit()`.
 
 **Values:**
 
 | Value | Mode | Description |
 |-------|------|-------------|
 | `SHM` / `shm` | Shared Memory | Client attaches to the server's shared memory queues and pushes tasks directly. Lowest latency, requires same-machine access to the server's shared memory segment. |
-| `TCP` / `tcp` | TCP (ZeroMQ) | Client sends serialized tasks over TCP via lightbeam PUSH/PULL sockets. Works across machines. **This is the default when `CHI_IPC_MODE` is unset.** |
+| `TCP` / `tcp` | TCP (ZeroMQ) | Client sends serialized tasks over TCP via lightbeam PUSH/PULL sockets. Works across machines. **This is the default when `CLIO_X` is unset.** |
 | `IPC` / `ipc` | Unix Domain Socket (ZeroMQ) | Client sends serialized tasks over a Unix domain socket via lightbeam PUSH/PULL. Same-machine only, avoids TCP overhead. |
 
 **Bulk data handling:**
@@ -928,13 +928,13 @@ Chimaera clients communicate with the runtime server using one of three IPC tran
 **Example:**
 ```bash
 # Use shared memory transport (same machine, lowest latency)
-export CHI_IPC_MODE=SHM
+export CLIO_X=SHM
 
 # Use TCP transport (default, works across machines)
-export CHI_IPC_MODE=TCP
+export CLIO_X=TCP
 
 # Use Unix domain socket transport (same machine, no TCP overhead)
-export CHI_IPC_MODE=IPC
+export CLIO_X=IPC
 ```
 
 ## Python Wheel Distribution
@@ -954,7 +954,7 @@ python -m build --wheel
 ```
 
 **What Gets Bundled:**
-- All IOWarp libraries (libchimaera_cxx.so, libclio_ctp_host.so, ChiMod libraries)
+- All IOWarp libraries (libchimaera_cxx.so, libclio_ctp_host.so, Module libraries)
 - Dependencies from install.sh (Boost, HDF5, ZeroMQ, yaml-cpp, etc.)
 - Command-line tools (clio_cte, clio_cae_omni, chimaera, etc.)
 - Headers and CMake configuration files
@@ -998,9 +998,9 @@ This documentation covers:
 A standalone external integration test is available at: `context-transfer-engine/test/unit/external/`
 
 This test demonstrates MODULE_DEVELOPMENT_GUIDE.md compliant patterns:
-- Modern find_package() usage for ChiMod discovery
+- Modern find_package() usage for Module discovery
 - Proper target linking with namespace::module_type aliases
-- Automatic dependency resolution through ChiMod targets
+- Automatic dependency resolution through Module targets
 - External application CMake configuration
 
 ## Cleanup Commands
@@ -1047,11 +1047,11 @@ find . -name "Testing" -type d -exec rm -rf {} + 2>/dev/null || true
 echo "CMake cleanup completed!"
 ```
 
-## ChiMod Development
+## Module Development
 
 When creating or modifying ChiMods (Chimaera modules), refer to the comprehensive module development guide:
 
-**📖 See [context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md](context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md) for complete ChiMod development documentation**
+**📖 See [context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md](context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md) for complete Module development documentation**
 
 This guide covers:
 - Module structure and architecture
@@ -1061,5 +1061,5 @@ This guide covers:
 - Configuration and code generation
 - Synchronization primitives
 - Execution modes and dynamic scheduling
-- External ChiMod development
+- External Module development
 - Best practices and common pitfalls

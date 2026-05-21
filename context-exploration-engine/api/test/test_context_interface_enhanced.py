@@ -15,7 +15,7 @@ import os
 import tempfile
 
 # Start an embedded runtime so API calls don't timeout waiting for a server
-os.environ['CHI_WITH_RUNTIME'] = '1'
+os.environ['CLIO_WITH_RUNTIME'] = '1'
 
 # Add build directory to path for module import
 sys.path.insert(0, os.path.join(os.getcwd(), 'bin'))

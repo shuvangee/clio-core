@@ -26,7 +26,7 @@ NC='\033[0m' # No Color
 
 # Script directory and paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${CHI_SERVER_CONF:-$SCRIPT_DIR/cte_config_ram.yaml}"
+CONFIG_FILE="${CLIO_SERVER_CONF:-$SCRIPT_DIR/cte_config_ram.yaml}"
 BENCHMARK_EXE="clio_cte_bench"
 
 # Parse size string with k/K, m/M, g/G suffixes
@@ -154,14 +154,14 @@ main() {
     echo ""
 
     # Set environment variables
-    export CHI_WITH_RUNTIME=1
-    export CHI_SERVER_CONF="$CONFIG_FILE"
+    export CLIO_WITH_RUNTIME=1
+    export CLIO_SERVER_CONF="$CONFIG_FILE"
 
     # Run benchmark with mpirun
     echo -e "${GREEN}Starting benchmark...${NC}"
     echo ""
 
-    mpirun -x CHI_SERVER_CONF -x CHI_WITH_RUNTIME -n $num_procs "$BENCHMARK_EXE" "$test_case" "$depth" "$io_size_str" "$io_count"
+    mpirun -x CLIO_SERVER_CONF -x CLIO_WITH_RUNTIME -n $num_procs "$BENCHMARK_EXE" "$test_case" "$depth" "$io_size_str" "$io_count"
 
     local exit_code=$?
 

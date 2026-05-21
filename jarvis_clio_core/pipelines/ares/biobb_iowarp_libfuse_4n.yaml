@@ -49,7 +49,7 @@ env:
   # Node-local chimaera memfd dir (${HOSTNAME} expanded by the remote shell):
   # symlinks point into /proc/<pid>/fd/<n> on the creating node only, so
   # sharing the dir across nodes corrupts shm_open lookups.
-  CHI_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
+  CLIO_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
   BIOBB_FIX_MB: "32"
   BIOBB_P2G_MB: "128"
   BIOBB_EDIT_MB: "128"
@@ -120,7 +120,7 @@ pkgs:
     poll_period_ms: 5000
     iowarp_compress: none
     # pool_query: local + Pssh-fanning the compose to every node means each
-    # node's `chimaera compose` talks to its local admin container and
+    # node's `clio_run compose` talks to its local admin container and
     # creates clio_cte_core there with the proper storage config. No
     # broadcast routing or cross-node admin propagation required.
     pool_query: "local"

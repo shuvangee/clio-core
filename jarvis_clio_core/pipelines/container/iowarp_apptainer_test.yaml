@@ -14,7 +14,7 @@
 #  - No seccomp tweak needed: apptainer doesn't apply Docker's profile,
 #    so io_uring works for IOWarp's bdev backend out of the box.
 #  - engine: iowarp on adios2_gray_scott routes its writes through the
-#    IOWarp ADIOS2 engine, which talks to the chimaera runtime started
+#    IOWarp ADIOS2 engine, which talks to the clio_run runtime started
 #    by clio_runtime. No FUSE / LD_PRELOAD interceptor is involved.
 
 name: iowarp_apptainer_test
@@ -32,12 +32,12 @@ env:
   # HANDSHAKE_FAILED_NO_DETAIL value=32 (EPIPE) on the daemon's
   # ROUTER monitor when the compose DEALER gives up. 300s gives the
   # daemon plenty of time to answer.
-  CHI_WAIT_SERVER: "300"
-  CHI_RETRY_TIMEOUT: "300"
+  CLIO_WAIT_SERVER: "300"
+  CLIO_RETRY_TIMEOUT: "300"
   # Bump ZMQ I/O threads inside the chimaera daemon to handle the
   # 1023-peer cross-node SWIM probe storm at scale (default 2
   # saturates at >=64 nodes).
-  CHI_ZMQ_IO_THREADS: "8"
+  CLIO_ZMQ_IO_THREADS: "8"
   # Local same-node clients (gray-scott ranks doing IowarpEngine
   # CLIO_CTE_CLIENT_INIT) talk to the daemon over a Unix domain
   # socket instead of TCP. At 6144 ranks across 512 nodes, the
@@ -48,7 +48,7 @@ env:
   # adios2_gray_scott ranks don't inherit that — we need it in
   # the top-level pipeline env so every rank's process gets it.
   # Cross-node DEALER traffic on 9413 still uses TCP.
-  CHI_IPC_MODE: ipc
+  CLIO_IPC_MODE: ipc
 
 install_manager: container
 container_engine: apptainer

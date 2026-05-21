@@ -22,7 +22,7 @@
 name: clio_cte_bench_aurora_baremetal
 
 pkgs:
-  # Stage 1: chimaera runtime (parallel SSH launch on every host).
+  # Stage 1: clio_run runtime (parallel SSH launch on every host).
   - pkg_type: jarvis_clio_core.clio_runtime
     pkg_name: runtime
     num_threads: 4

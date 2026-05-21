@@ -20,8 +20,8 @@
 #   IO_SIZE              - Size of each I/O operation (default: 1m)
 #                          Supports: b (bytes), k (KB), m (MB), g (GB)
 #   IO_COUNT             - Number of operations to perform (default: 100)
-#   CHI_WITH_RUNTIME - Initialize CTE runtime in benchmark (default: 0, runtime handled by iowarp service)
-#   CHI_SERVER_CONF     - Path to CTE configuration file (default: /etc/iowarp/cte_config.yaml)
+#   CLIO_WITH_RUNTIME - Initialize CTE runtime in benchmark (default: 0, runtime handled by iowarp service)
+#   CLIO_SERVER_CONF     - Path to CTE configuration file (default: /etc/iowarp/cte_config.yaml)
 
 services:
   # IOWarp Runtime Service
@@ -34,9 +34,9 @@ services:
     volumes:
       - ./cte_config.yaml:/etc/iowarp/chimaera.yaml:ro
 
-    # Config lookup: CHI_SERVER_CONF is checked first by the runtime
+    # Config lookup: CLIO_SERVER_CONF is checked first by the runtime
     environment:
-      - CHI_SERVER_CONF=/etc/iowarp/chimaera.yaml
+      - CLIO_SERVER_CONF=/etc/iowarp/chimaera.yaml
 
     # Expose ZeroMQ port for client connections
     ports:
@@ -63,7 +63,7 @@ services:
     environment:
       # CTE Runtime Configuration
       # Do NOT initialize runtime in benchmark (runtime service handles this)
-      - CHI_WITH_RUNTIME=${CHI_WITH_RUNTIME:-0}
+      - CLIO_WITH_RUNTIME=${CLIO_WITH_RUNTIME:-0}
 
       # Benchmark Test Parameters
       # Test case selection: Put (write), Get (read), PutGet (mixed)
@@ -107,8 +107,8 @@ services:
   #   volumes:
   #     - ./cte_config.yaml:/etc/iowarp/cte_config.yaml:ro
   #   environment:
-  #     - CHI_WITH_RUNTIME=0
-  #     - CHI_SERVER_CONF=/etc/iowarp/cte_config.yaml
+  #     - CLIO_WITH_RUNTIME=0
+  #     - CLIO_SERVER_CONF=/etc/iowarp/cte_config.yaml
   #     - TEST_CASE=Put
   #     - NUM_PROCS=4
   #     - DEPTH=8
@@ -129,8 +129,8 @@ services:
   #   volumes:
   #     - ./cte_config.yaml:/etc/iowarp/cte_config.yaml:ro
   #   environment:
-  #     - CHI_WITH_RUNTIME=0
-  #     - CHI_SERVER_CONF=/etc/iowarp/cte_config.yaml
+  #     - CLIO_WITH_RUNTIME=0
+  #     - CLIO_SERVER_CONF=/etc/iowarp/cte_config.yaml
   #     - TEST_CASE=Get
   #     - NUM_PROCS=4
   #     - DEPTH=8
@@ -151,8 +151,8 @@ services:
   #   volumes:
   #     - ./cte_config.yaml:/etc/iowarp/cte_config.yaml:ro
   #   environment:
-  #     - CHI_WITH_RUNTIME=0
-  #     - CHI_SERVER_CONF=/etc/iowarp/cte_config.yaml
+  #     - CLIO_WITH_RUNTIME=0
+  #     - CLIO_SERVER_CONF=/etc/iowarp/cte_config.yaml
   #     - TEST_CASE=PutGet
   #     - NUM_PROCS=4
   #     - DEPTH=4
@@ -173,8 +173,8 @@ services:
   #   volumes:
   #     - ./cte_config.yaml:/etc/iowarp/cte_config.yaml:ro
   #   environment:
-  #     - CHI_WITH_RUNTIME=0
-  #     - CHI_SERVER_CONF=/etc/iowarp/cte_config.yaml
+  #     - CLIO_WITH_RUNTIME=0
+  #     - CLIO_SERVER_CONF=/etc/iowarp/cte_config.yaml
   #     - TEST_CASE=Put
   #     - NUM_PROCS=1
   #     - DEPTH=2
@@ -195,8 +195,8 @@ services:
   #   volumes:
   #     - ./cte_config.yaml:/etc/iowarp/cte_config.yaml:ro
   #   environment:
-  #     - CHI_WITH_RUNTIME=0
-  #     - CHI_SERVER_CONF=/etc/iowarp/cte_config.yaml
+  #     - CLIO_WITH_RUNTIME=0
+  #     - CLIO_SERVER_CONF=/etc/iowarp/cte_config.yaml
   #     - TEST_CASE=Put
   #     - NUM_PROCS=16
   #     - DEPTH=16

@@ -70,7 +70,7 @@ pid_t StartServerProcess() {
     (void)freopen("/dev/null", "w", stderr);
 
     // Child process: Start runtime server
-    setenv("CHI_WITH_RUNTIME", "1", 1);
+    setenv("CLIO_WITH_RUNTIME", "1", 1);
     bool success = CHIMAERA_INIT(ChimaeraMode::kServer, true);
     if (!success) {
       _exit(1);
@@ -156,7 +156,7 @@ TEST_CASE("ExternalClient - Basic Connection", "[external_client][ipc]") {
   REQUIRE(server_ready);
 
   // Now connect as EXTERNAL CLIENT (not integrated server+client)
-  setenv("CHI_WITH_RUNTIME", "0", 1);  // Force client-only mode
+  setenv("CLIO_WITH_RUNTIME", "0", 1);  // Force client-only mode
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
 
@@ -204,7 +204,7 @@ TEST_CASE("ExternalClient - Multiple Clients", "[external_client][ipc]") {
       (void)freopen("/dev/null", "w", stderr);
 
       // Child process: Connect as client
-      setenv("CHI_WITH_RUNTIME", "0", 1);
+      setenv("CLIO_WITH_RUNTIME", "0", 1);
       bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
       if (!success) {
         _exit(1);
@@ -248,7 +248,7 @@ TEST_CASE("ExternalClient - Connection Without Server",
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   // Try to connect as client when NO server exists
-  setenv("CHI_WITH_RUNTIME", "0", 1);
+  setenv("CLIO_WITH_RUNTIME", "0", 1);
 
   // This should fail gracefully (not crash)
   // Note: May succeed if a stale server from another test is still running
@@ -266,7 +266,7 @@ TEST_CASE("ExternalClient - Client Operations", "[external_client][ipc]") {
   REQUIRE(server_ready);
 
   // Connect as client
-  setenv("CHI_WITH_RUNTIME", "0", 1);
+  setenv("CLIO_WITH_RUNTIME", "0", 1);
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
 

@@ -7,11 +7,11 @@
 # Usage:  bash run.sh
 
 x-common-env: &common-env
-  CHI_SERVER_CONF: /workspace/context-runtime/test/integration/interactive/clio_conf.yaml
+  CLIO_SERVER_CONF: /workspace/context-runtime/test/integration/interactive/clio_conf.yaml
   CONTAINER_HOSTFILE: /workspace/context-runtime/test/integration/interactive/hostfile
-  CHI_WITH_RUNTIME: "0"
-  CHI_NUM_CONTAINERS: "8"
-  CHI_CLIENT_TRY_NEW_SERVERS: "16"
+  CLIO_WITH_RUNTIME: "0"
+  CLIO_NUM_CONTAINERS: "8"
+  CLIO_CLIENT_TRY_NEW_SERVERS: "16"
   PATH: /home/iowarp/venv/bin:/workspace/build/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
   LD_LIBRARY_PATH: /workspace/build/bin
 
@@ -40,7 +40,7 @@ x-worker-command: &worker-command >
     sudo /usr/sbin/sshd;
 
     echo \"Node $${NODE_ID}: Starting runtime...\" &&
-    /workspace/build/bin/chimaera runtime start &
+    /workspace/build/bin/clio_run runtime start &
     sleep infinity
   "
 
@@ -78,7 +78,7 @@ services:
         pip install flask pyyaml msgpack 2>&1 | tail -3 &&
 
         echo 'Node 1: Starting runtime in background...' &&
-        /workspace/build/bin/chimaera runtime start &
+        /workspace/build/bin/clio_run runtime start &
         RUNTIME_PID=\$!;
         sleep 5;
 

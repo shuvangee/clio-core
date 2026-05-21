@@ -6,7 +6,7 @@
 
 ## Status: PASSED ✓
 
-End-to-end Globus HTTPS file download through the Chimaera runtime works correctly.
+End-to-end Globus HTTPS file download through the Clio runtime works correctly.
 
 ---
 

@@ -117,7 +117,7 @@ Every C/C++ source file (.h, .hpp, .cc, .cpp) MUST have the BSD 3-Clause license
 2. **NEVER build outside `/workspace/build`.** No in-source builds. No `/tmp/build_*`.
 3. **NEVER use raw GPU macros** (`__CUDACC__`, `__HIPCC__`, etc.) — use `CTP_IS_GPU`, `CTP_IS_HOST`, `CTP_IS_GPU_COMPILER`, etc. from `context-transport-primitives/include/clio_ctp/constants/macros.h`.
 4. **NEVER write mock/stub code** unless explicitly requested. All implementations must be real and working.
-5. **NEVER use Catch2 with Chimaera runtime.** Use `simple_test.h` for unit tests.
+5. **NEVER use Catch2 with Clio runtime.** Use `simple_test.h` for unit tests.
 6. **NEVER use null pool queries.** Always use `local` if unsure.
 7. **Always store singleton pointers** before dereferencing: `auto *x = Singleton<T>::GetInstance(); x->var_;`
 8. **Name all QueueIds and priorities semantically.** Never use raw integers.
@@ -133,7 +133,7 @@ Every C/C++ source file (.h, .hpp, .cc, .cpp) MUST have the BSD 3-Clause license
 | Constants | kPascalCase | `kAdminPoolId`, `kCtePoolName` |
 | Macros | UPPER_SNAKE | `CTP_IS_GPU`, `CHI_IPC` |
 | CMake targets | namespace::component | `chimaera::admin_client` |
-| ChiMod names | lowercase underscore | `clio_cte_core`, `chimaera_admin` |
+| Module names | lowercase underscore | `clio_cte_core`, `chimaera_admin` |
 
 ---
 
@@ -146,7 +146,7 @@ clio-core/
 ├── context-transport-primitives/   # Shared memory data structures, IPC, GPU support
 │   ├── include/clio_ctp/         # Public headers (ctp:: namespace)
 │   ├── src/                        # Implementation
-│   └── docs/MODULE_DEVELOPMENT_GUIDE.md  # ChiMod dev guide
+│   └── docs/MODULE_DEVELOPMENT_GUIDE.md  # Module dev guide
 │
 ├── context-runtime/                # Chimaera modular runtime (chi:: namespace)
 │   ├── include/chimaera/           # Runtime headers
@@ -156,13 +156,13 @@ clio-core/
 │   └── test/                       # Unit + integration tests
 │
 ├── context-transfer-engine/        # I/O buffering engine (clio_cte:: namespace)
-│   ├── core/                       # CTE ChiMod
+│   ├── core/                       # CTE Module
 │   ├── adapter/                    # I/O pathway adapters
-│   ├── compressor/                 # Compression ChiMod
+│   ├── compressor/                 # Compression Module
 │   └── config/                     # CTE configurations
 │
 ├── context-assimilation-engine/    # Data ingestion (clio_cae:: namespace)
-│   ├── core/                       # CAE ChiMod
+│   ├── core/                       # CAE Module
 │   └── data/                       # OMNI format definitions
 │
 ├── context-exploration-engine/     # Data exploration tools
@@ -197,11 +197,11 @@ Every component depends on the ones below it. Never create upward dependencies.
 
 ### Key Abstractions
 
-**ChiMod (Chimaera Module):** The fundamental extensibility unit. Each engine (CTE, CAE) is implemented as a ChiMod with a client library and a runtime library.
+**Module (Chimaera Module):** The fundamental extensibility unit. Each engine (CTE, CAE) is implemented as a Module with a client library and a runtime library.
 
 **Task:** The unit of work in Chimaera. Tasks are coroutine-based, support cooperative yielding, and are scheduled across worker threads.
 
-**Pool:** A logical grouping of resources managed by a ChiMod. Each pool has a unique ID and name.
+**Pool:** A logical grouping of resources managed by a Module. Each pool has a unique ID and name.
 
 **PoolQuery:** Determines task routing. Types: `Local`, `Dynamic`, `Broadcast`, `DirectHash`.
 
@@ -222,7 +222,7 @@ Every component depends on the ones below it. Never create upward dependencies.
 When making changes, consider cross-repo impact:
 - **clio-core API changes** affect clio-kit, clio-agent, and downstream users
 - **Config format changes** must update `docs/docs/deployment/configuration.md`
-- **ChiMod interface changes** must update `MODULE_DEVELOPMENT_GUIDE.md`
+- **Module interface changes** must update `MODULE_DEVELOPMENT_GUIDE.md`
 
 ---
 
@@ -282,7 +282,7 @@ cd build && ctest -R <your_test> -VV
 
 This is critical — a test that fails proves you understand the bug. If you can't write a failing test, you don't understand the problem well enough yet.
 
-For Chimaera runtime tests, use `simple_test.h` (NOT Catch2):
+For Clio runtime tests, use `simple_test.h` (NOT Catch2):
 ```cpp
 #include "../../../context-runtime/test/simple_test.h"
 
@@ -363,7 +363,7 @@ None"
 - **Always install before testing:** `sudo cmake --install build` (RPATHs, not LD_LIBRARY_PATH)
 - **Run relevant tests after every change:** `ctest -R <component>`
 - **Format before committing:** Ensure clang-format compliance
-- **Update docs** if you change configs, APIs, or ChiMod interfaces
+- **Update docs** if you change configs, APIs, or Module interfaces
 
 ### Agent Usage
 
@@ -377,7 +377,7 @@ Use the right agent for the job:
 ### Testing Requirements
 
 - All new code must have unit tests
-- Use `simple_test.h` (NOT Catch2) for Chimaera runtime tests
+- Use `simple_test.h` (NOT Catch2) for Clio runtime tests
 - Initialize with `chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true)`
 - Always `ASSERT_EQ(client.GetReturnCode(), 0)` after Create operations
 - Run sanitizers before submitting: `bash CI/run_sanitizers.sh`

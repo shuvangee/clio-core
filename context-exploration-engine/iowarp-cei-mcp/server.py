@@ -141,7 +141,7 @@ def _initialize_runtime() -> bool:
                 module_file = cte.__file__ if hasattr(cte, '__file__') else None
                 if module_file:
                     bin_dir = os.path.dirname(os.path.abspath(module_file))
-                    os.environ["CHI_REPO_PATH"] = bin_dir
+                    os.environ["CLIO_REPO_PATH"] = bin_dir
                     existing_ld_path = os.getenv("LD_LIBRARY_PATH", "")
                     if existing_ld_path:
                         os.environ["LD_LIBRARY_PATH"] = f"{bin_dir}:{existing_ld_path}"
@@ -151,7 +151,7 @@ def _initialize_runtime() -> bool:
                 pass  # May fail, continue anyway
             
             # Get config path
-            config_path = os.getenv("CHI_SERVER_CONF", "")
+            config_path = os.getenv("CLIO_SERVER_CONF", "")
             
             # Step 1: Initialize Chimaera (unified init)
             chimaera_result = False
@@ -575,8 +575,8 @@ def initialize_cte_runtime() -> str:
     """Initialize the CTE runtime (Chimaera runtime, client, and CTE subsystem).
     
     This function follows the initialization pattern from test_bindings.py:
-    1. Setup environment paths (CHI_REPO_PATH, LD_LIBRARY_PATH)
-    2. Use CHI_SERVER_CONF if available, otherwise try empty config
+    1. Setup environment paths (CLIO_REPO_PATH, LD_LIBRARY_PATH)
+    2. Use CLIO_SERVER_CONF if available, otherwise try empty config
     3. Initialize Chimaera (chimaera_init with kClient mode, True) - wait 500ms
     4. Initialize CTE subsystem (initialize_cte with config_path)
     
@@ -634,20 +634,20 @@ def initialize_cte_runtime() -> str:
                 module_file = cte.__file__ if hasattr(cte, '__file__') else None
                 if module_file:
                     bin_dir = os.path.dirname(os.path.abspath(module_file))
-                    os.environ["CHI_REPO_PATH"] = bin_dir
+                    os.environ["CLIO_REPO_PATH"] = bin_dir
                     existing_ld_path = os.getenv("LD_LIBRARY_PATH", "")
                     if existing_ld_path:
                         os.environ["LD_LIBRARY_PATH"] = f"{bin_dir}:{existing_ld_path}"
                     else:
                         os.environ["LD_LIBRARY_PATH"] = bin_dir
-                    result['messages'].append(f'Set CHI_REPO_PATH={bin_dir}')
+                    result['messages'].append(f'Set CLIO_REPO_PATH={bin_dir}')
             except Exception as e:
                 result['messages'].append(f'Could not set environment paths: {str(e)}')
             log_progress(result) # Log after setting env paths
             
             # Step 0.5: Get or generate config path
-            # If CHI_SERVER_CONF is set, use it; otherwise try to generate a minimal config
-            config_path = os.getenv("CHI_SERVER_CONF", "")
+            # If CLIO_SERVER_CONF is set, use it; otherwise try to generate a minimal config
+            config_path = os.getenv("CLIO_SERVER_CONF", "")
             
             if not config_path:
                 # Try to generate a minimal config file (following test_bindings.py pattern)
@@ -708,16 +708,16 @@ def initialize_cte_runtime() -> str:
                         with open(config_path, 'w') as f:
                             yaml.dump(config, f)
                         
-                        os.environ['CHI_SERVER_CONF'] = config_path
+                        os.environ['CLIO_SERVER_CONF'] = config_path
                         result['messages'].append(f'Generated config file: {config_path} (port: {port})')
                     else:
                         result['messages'].append('Could not find available port for config generation')
                 except ImportError:
-                    result['messages'].append('PyYAML not available - cannot generate config (install pyyaml or set CHI_SERVER_CONF)')
+                    result['messages'].append('PyYAML not available - cannot generate config (install pyyaml or set CLIO_SERVER_CONF)')
                 except Exception as e:
                     result['messages'].append(f'Config generation failed: {type(e).__name__}: {str(e)}')
             else:
-                result['messages'].append(f'Using config from CHI_SERVER_CONF: {config_path}')
+                result['messages'].append(f'Using config from CLIO_SERVER_CONF: {config_path}')
             
             log_progress(result) # Log after getting/generating config path
             
@@ -864,7 +864,7 @@ def initialize_cte_runtime() -> str:
         
         # Add helpful message if initialization failed
         if not result['success']:
-            result['note'] = 'CTE runtime initialization may require external setup. Options: 1) Set CHI_SERVER_CONF to a valid config file path, 2) Ensure PyYAML is installed for automatic config generation (pip install pyyaml), 3) Ensure Chimaera runtime is not already running on the same port, 4) Use external Chimaera runtime setup. Note: If initialization fails with process exit, the C++ code may have called FATAL - check logs or try external setup.'
+            result['note'] = 'CTE runtime initialization may require external setup. Options: 1) Set CLIO_SERVER_CONF to a valid config file path, 2) Ensure PyYAML is installed for automatic config generation (pip install pyyaml), 3) Ensure Chimaera runtime is not already running on the same port, 4) Use external Chimaera runtime setup. Note: If initialization fails with process exit, the C++ code may have called FATAL - check logs or try external setup.'
         log_progress(result) # Log before finally block
         
     except Exception as e:

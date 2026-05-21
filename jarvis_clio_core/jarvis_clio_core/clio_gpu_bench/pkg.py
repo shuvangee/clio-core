@@ -80,7 +80,7 @@ class ClioGpuBench(Application):
     def _configure(self, **kwargs):
         """Configure the GPU benchmark"""
         os.makedirs(self.config['output_dir'], exist_ok=True)
-        self.setenv('CHI_WITH_RUNTIME', '0')
+        self.setenv('CLIO_WITH_RUNTIME', '0')
 
         self.log("GPU runtime benchmark configured")
         self.log(f"  RT blocks:     {self.config['rt_blocks']}")

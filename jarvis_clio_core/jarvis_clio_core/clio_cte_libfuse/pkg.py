@@ -48,7 +48,7 @@ class ClioCteLibfuse(Service):
     def _configure(self, **kwargs):
         super()._configure(**kwargs)
         self.setenv('CTP_LOG_LEVEL', self.config['log_level'])
-        self.setenv('CHI_WITH_RUNTIME', '0')
+        self.setenv('CLIO_WITH_RUNTIME', '0')
 
     def start(self):
         mp = self.config['mountpoint']

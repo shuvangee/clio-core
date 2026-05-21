@@ -1,8 +1,8 @@
 """
 Content Transfer Engine (CTE) configuration service for IOWarp.
 
-Configures and deploys CTE by generating a chimaera compose YAML config
-and running `chimaera compose`. Supports both bare-metal and container modes.
+Configures and deploys CTE by generating a clio_run compose YAML config
+and running `clio_run compose`. Supports both bare-metal and container modes.
 """
 from jarvis_cd.core.pkg import Service
 from jarvis_cd.util import SizeType
@@ -17,8 +17,8 @@ class ClioCte(Service):
     """
     CTE Service supporting default and container deployment.
 
-    deploy_mode='default': runs chimaera compose on the host.
-    deploy_mode='container': runs chimaera compose inside the deploy container.
+    deploy_mode='default': runs clio_run compose on the host.
+    deploy_mode='container': runs clio_run compose inside the deploy container.
     """
 
     def _init(self):
@@ -131,7 +131,7 @@ class ClioCte(Service):
 
     def _build_deploy_phase(self) -> str:
         """
-        No build needed — chimaera compose is already in the container_base
+        No build needed — clio_run compose is already in the container_base
         image (e.g., iowarp/deploy-cpu:latest).
         """
         return None
@@ -176,7 +176,7 @@ class ClioCte(Service):
     # ------------------------------------------------------------------
 
     def start(self):
-        self.log("Starting CTE using chimaera compose...")
+        self.log("Starting CTE using clio_run compose...")
 
         if not os.path.exists(self.compose_config_path):
             self.log(f"Error: Compose config not found: {self.compose_config_path}")
@@ -185,7 +185,7 @@ class ClioCte(Service):
         # WORKAROUND — proper fix lives in clio-core (chimaera client).
         #
         # At >=64 chimaera daemons on Aurora apptainer the very first
-        # `chimaera compose` after clio_runtime startup hits a ZMTP greeting
+        # `clio_run compose` after clio_runtime startup hits a ZMTP greeting
         # timeout against the daemon's local 9416 ROUTER (the daemon's I/O
         # threads are still saturated by initial SWIM probes). The compose
         # process's ZMQ shared context (chimaera GetSharedContext singleton)
@@ -204,17 +204,17 @@ class ClioCte(Service):
         #      connect() probe, so server_alive_ stays true on a half-open
         #      ctx and the existing reconnect path is never triggered).
         # When either lands, drop this loop and revert to:
-        #   cmd = f'chimaera compose {self.compose_config_path}'
+        #   cmd = f'clio_run compose {self.compose_config_path}'
         # Single-shot compose. The jarvis-cd SSH layer prepends env vars
         # as ``KEY=VAL`` before the command, and bash only forwards them
         # to a *simple* command — wrapping in ``for ... do ... done``
-        # would strip the env (notably CHI_SERVER_CONF), causing the
-        # chimaera compose client to fall back to ~/.chimaera and load
+        # would strip the env (notably CLIO_SERVER_CONF), causing the
+        # clio_run compose client to fall back to ~/.chimaera and load
         # unrelated compose entries that occupy our target pool IDs.
         # The original retry loop existed for an Aurora apptainer
         # ZMTP-greeting race at >=64 daemons; for the bare-metal /
         # single-node path here the simple form is enough.
-        cmd = f'chimaera compose {self.compose_config_path}'
+        cmd = f'clio_run compose {self.compose_config_path}'
 
         # Pssh fans the compose out to every node. With pool_query:
         # broadcast in the compose YAML, each admin container instance
@@ -313,7 +313,7 @@ class ClioCte(Service):
         # rather than /tmp: shared_dir is bind-mounted into the deploy
         # container at the same path, so the host-side Mkdir in
         # _configure() is actually visible inside the container when
-        # `chimaera compose` later opens the file. /tmp in a container
+        # `clio_run compose` later opens the file. /tmp in a container
         # is its own ephemeral tmpfs and won't see host mkdirs.
         return [
             (f'{self.shared_dir}/cte_storage/cte_target.bin', '100GB', 0.6)

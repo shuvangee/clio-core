@@ -27,7 +27,7 @@ mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include e
 
 env:
   TMPDIR: "/home/llogan/iowarp_prte_tmp"
-  CHI_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
+  CLIO_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
   PYF_TRACK_FRAMES: "8"
   PYF_TRACK_MB: "512"
   PYF_MCS_FRAMES: "8"

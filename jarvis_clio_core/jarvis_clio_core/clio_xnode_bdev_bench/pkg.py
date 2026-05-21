@@ -26,13 +26,13 @@ This package mirrors the manual sbatch script
      pipeline-level `mpi_cmd` and `ssh_cmd` YAML keys, the same way the
      IOR + clio_runtime pipeline uses them.
 
-  3) We propagate CHI_SERVER_CONF / CTP_LOG_LEVEL / CHI_IPC_MODE
+  3) We propagate CLIO_SERVER_CONF / CTP_LOG_LEVEL / CLIO_IPC_MODE
      (clio_runtime publishes these via setenv on configure), TMPDIR,
-     and CHI_MEMFD_DIR (top-level env: in the pipeline yaml). The
+     and CLIO_MEMFD_DIR (top-level env: in the pipeline yaml). The
      first four go through OpenMPI's `-x` (literal values). The fifth,
-     CHI_MEMFD_DIR, intentionally contains ${HOSTNAME} and must be
+     CLIO_MEMFD_DIR, intentionally contains ${HOSTNAME} and must be
      expanded by the rank-side shell on each node, so we wrap the
-     bench in `bash -c 'export CHI_MEMFD_DIR=".../$HOSTNAME"; exec
+     bench in `bash -c 'export CLIO_MEMFD_DIR=".../$HOSTNAME"; exec
      clio_xnode_bdev_bench ...'`. See _build_mpi_cmd for details.
 
 Runs synchronously; the binary exits on completion. No teardown work in
@@ -152,9 +152,9 @@ class ClioXnodeBdevBench(Application):
         comes from `ssh_cmd`. Both fall back to plain `mpiexec` if
         unset, but the ares pipelines always set them.
 
-        Per-rank env: ``CHI_SERVER_CONF`` / ``CTP_LOG_LEVEL`` /
-        ``CHI_IPC_MODE`` / ``TMPDIR`` go through OpenMPI's `-x` —
-        verbatim values, no shell expansion. ``CHI_MEMFD_DIR``, by
+        Per-rank env: ``CLIO_SERVER_CONF`` / ``CTP_LOG_LEVEL`` /
+        ``CLIO_IPC_MODE`` / ``TMPDIR`` go through OpenMPI's `-x` —
+        verbatim values, no shell expansion. ``CLIO_MEMFD_DIR``, by
         contrast, intentionally embeds the literal token ``$HOSTNAME``
         (the pipeline YAML's `env:` block writes
         ``/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}``) so that it can
@@ -165,7 +165,7 @@ class ClioXnodeBdevBench(Application):
         forward the literal token, so each rank would look for the
         unsubstituted ``${HOSTNAME}`` path and `shm_open` ENOENT-fails.
         Instead we wrap the bench in ``bash -lc 'export
-        CHI_MEMFD_DIR=...$HOSTNAME...; exec <bench> ...'`` — the rank-
+        CLIO_MEMFD_DIR=...$HOSTNAME...; exec <bench> ...'`` — the rank-
         side shell expands ``$HOSTNAME`` to its own node. Same trick
         the per-node chimaera daemon spawn uses (PsshExec's
         ``KEY=value <cmd>`` prefix, eval'd by the remote shell).
@@ -181,9 +181,9 @@ class ClioXnodeBdevBench(Application):
         # Env vars that don't depend on hostname — safe to forward with
         # -x as literal values from this process's env.
         forwarded_env = [
-            'CHI_SERVER_CONF',
+            'CLIO_SERVER_CONF',
             'CTP_LOG_LEVEL',
-            'CHI_IPC_MODE',
+            'CLIO_IPC_MODE',
             'TMPDIR',
         ]
         x_flags = ' '.join(f'-x {k}' for k in forwarded_env)
@@ -196,7 +196,7 @@ class ClioXnodeBdevBench(Application):
         if self.config['extra_args']:
             bench_args += f' {self.config["extra_args"]}'
 
-        # The mod_env CHI_MEMFD_DIR is the un-expanded template from
+        # The mod_env CLIO_MEMFD_DIR is the un-expanded template from
         # the pipeline yaml (e.g.
         # ``/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}``). Each rank
         # must resolve ${HOSTNAME} to its own node, which means letting
@@ -206,7 +206,7 @@ class ClioXnodeBdevBench(Application):
         # head-node shell (this Python process's shell=True subprocess)
         # passes $HOSTNAME through verbatim.
         memfd_template = self.mod_env.get(
-            'CHI_MEMFD_DIR',
+            'CLIO_MEMFD_DIR',
             '/tmp/chimaera_$USER')
         # Normalize ${HOSTNAME} → $HOSTNAME (bash treats them the same;
         # we use the bare form so simple double-quoted expansion works
@@ -216,7 +216,7 @@ class ClioXnodeBdevBench(Application):
         # expands $HOSTNAME. We then exec the bench so signals / exit
         # codes pass through cleanly.
         inner = (
-            f'export CHI_MEMFD_DIR="{memfd_template}"; '
+            f'export CLIO_MEMFD_DIR="{memfd_template}"; '
             f'exec {self.benchmark_executable} {bench_args}'
         )
         # Wrap in single-quotes for the outer mpiexec line so the
@@ -254,8 +254,8 @@ class ClioXnodeBdevBench(Application):
         cmd = self._build_mpi_cmd(mpi_hostfile)
         self.log(f"Bench cmd: {cmd}")
 
-        # Run with the full pipeline env (CHI_SERVER_CONF + TMPDIR +
-        # CHI_MEMFD_DIR + module-loaded mpiexec on PATH).
+        # Run with the full pipeline env (CLIO_SERVER_CONF + TMPDIR +
+        # CLIO_MEMFD_DIR + module-loaded mpiexec on PATH).
         Exec(cmd, LocalExecInfo(env=self.mod_env)).run()
 
     def stop(self):

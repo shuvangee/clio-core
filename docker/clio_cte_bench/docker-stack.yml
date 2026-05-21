@@ -5,7 +5,7 @@ version: "3.8"
 # Each service gets a unique NODE_ID so tags/blobs never collide across nodes.
 #
 # Architecture:
-#   - node1, node2: each runs the iowarp runtime with CHI_WITH_RUNTIME=1
+#   - node1, node2: each runs the iowarp runtime with CLIO_WITH_RUNTIME=1
 #     so the benchmark initialises its own embedded runtime. Nodes are
 #     independent (no shared runtime) which is the correct multi-node model.
 #
@@ -22,10 +22,10 @@ services:
     image: iowarp/deploy-cpu:latest
     command: >
       bash -c "
-        chimaera runtime start --config /etc/iowarp/chimaera.yaml &
+        clio_run runtime start --config /etc/iowarp/chimaera.yaml &
         sleep 3 &&
         clio_cte_bench Put 2 4 1m 20 &&
-        chimaera runtime stop
+        clio_run runtime stop
       "
     deploy:
       replicas: 1
@@ -33,7 +33,7 @@ services:
         condition: none
     environment:
       - NODE_ID=1
-      - CHI_SERVER_CONF=/etc/iowarp/chimaera.yaml
+      - CLIO_SERVER_CONF=/etc/iowarp/chimaera.yaml
     configs:
       - source: cte_config
         target: /etc/iowarp/chimaera.yaml
@@ -42,10 +42,10 @@ services:
     image: iowarp/deploy-cpu:latest
     command: >
       bash -c "
-        chimaera runtime start --config /etc/iowarp/chimaera.yaml &
+        clio_run runtime start --config /etc/iowarp/chimaera.yaml &
         sleep 3 &&
         clio_cte_bench Put 2 4 1m 20 &&
-        chimaera runtime stop
+        clio_run runtime stop
       "
     deploy:
       replicas: 1
@@ -53,7 +53,7 @@ services:
         condition: none
     environment:
       - NODE_ID=2
-      - CHI_SERVER_CONF=/etc/iowarp/chimaera.yaml
+      - CLIO_SERVER_CONF=/etc/iowarp/chimaera.yaml
     configs:
       - source: cte_config
         target: /etc/iowarp/chimaera.yaml

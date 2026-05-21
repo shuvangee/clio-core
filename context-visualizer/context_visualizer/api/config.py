@@ -12,15 +12,15 @@ def _load_config():
     """Find and parse the active YAML config file.
 
     Search order matches the runtime:
-      1. CHI_SERVER_CONF env
-      2. CHI_SERVER_CONF env
+      1. CLIO_SERVER_CONF env
+      2. CLIO_SERVER_CONF env
       3. ~/.chimaera/chimaera.yaml
     """
     import yaml
 
     candidates = [
-        os.environ.get("CHI_SERVER_CONF"),
-        os.environ.get("CHI_SERVER_CONF"),
+        os.environ.get("CLIO_SERVER_CONF"),
+        os.environ.get("CLIO_SERVER_CONF"),
         str(Path.home() / ".chimaera" / "chimaera.yaml"),
     ]
     for path in candidates:
@@ -35,8 +35,8 @@ def get_config():
     cfg = _load_config()
     if cfg is None:
         return jsonify({"error": "no config file found", "searched": [
-            "CHI_SERVER_CONF",
-            "CHI_SERVER_CONF",
+            "CLIO_SERVER_CONF",
+            "CLIO_SERVER_CONF",
             "~/.chimaera/chimaera.yaml",
         ]}), 404
     return jsonify({"config": cfg})

@@ -187,7 +187,7 @@ After installation, IOWarp Core files are organized as follows:
 ```
 $CONDA_PREFIX/
 ├── bin/                           # Command-line tools
-│   ├── chimaera runtime start
+│   ├── clio_run runtime start
 │   ├── clio_cte
 │   ├── clio_cae_omni
 │   └── ...
@@ -217,8 +217,8 @@ After installation, you can use IOWarp Core in several ways:
 ### 1. Command-Line Tools
 
 ```bash
-# Start the Chimaera runtime
-chimaera runtime start
+# Start the Clio runtime
+clio_run runtime start
 
 # Use CTE tools
 clio_cte --help

@@ -20,12 +20,12 @@ ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
 # Data plane on 40 GbE (enp47s0np0, 172.25/16); OOB on 1 GbE (eno1).
 mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include eno1 --prtemca prte_if_include eno1 --prtemca prte_tmpdir_base /home/llogan/iowarp_prte_tmp'
 
-# CHI_MEMFD_DIR baked with ${HOSTNAME} so each node's /proc/<pid>/fd
+# CLIO_MEMFD_DIR baked with ${HOSTNAME} so each node's /proc/<pid>/fd
 # symlinks live in a node-local dir (NFS-shared dir clobbers them
 # cross-node — see project_chi_memfd_dir_must_be_node_local).
 env:
   TMPDIR: "/home/llogan/iowarp_prte_tmp"
-  CHI_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
+  CLIO_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
 
 scheduler:
   name: slurm

@@ -108,7 +108,7 @@ The package generates a complete CTE YAML configuration file with:
 
 The package sets the following environment variable:
 
-- **`CHI_SERVER_CONF`**: Path to the generated CTE configuration file
+- **`CLIO_X`**: Path to the generated CTE configuration file
 
 ## Usage Example
 
@@ -137,7 +137,7 @@ clio_cte:
 1. Validates device specifications using SizeType
 2. Auto-detects storage via resource graph if no devices specified
 3. Generates CTE YAML configuration file
-4. Sets `CHI_SERVER_CONF` environment variable
+4. Sets `CLIO_X` environment variable
 
 ### Start
 No persistent process - returns success status and reports configuration location
@@ -155,7 +155,7 @@ Uses `Rm` with `PsshExecInfo` to remove storage device files across all cluster 
 
 This package is designed to work with:
 
-- **CTE Core Module**: Uses generated configuration via `CHI_SERVER_CONF`
+- **CTE Core Module**: Uses generated configuration via `CLIO_X`
 - **Jarvis Resource Graph**: For automatic storage discovery
 - **IoWarp Framework**: As part of the content transfer pipeline
 - **Cluster Environments**: Supports distributed storage cleanup

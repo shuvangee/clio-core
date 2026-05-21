@@ -167,13 +167,13 @@ class ClioCteBench(Application):
         self.setenv('CTE_BENCH_IO_SIZE', str(self.config['io_size']))
         self.setenv('CTE_BENCH_IO_COUNT', str(self.config['io_count']))
 
-        # Set CHI_WITH_RUNTIME environment variable based on configuration
+        # Set CLIO_WITH_RUNTIME environment variable based on configuration
         if self.config['init_runtime']:
-            self.setenv('CHI_WITH_RUNTIME', '1')
-            self.log("Runtime initialization enabled (CHI_WITH_RUNTIME=1)")
+            self.setenv('CLIO_WITH_RUNTIME', '1')
+            self.log("Runtime initialization enabled (CLIO_WITH_RUNTIME=1)")
         else:
-            self.setenv('CHI_WITH_RUNTIME', '0')
-            self.log("Runtime initialization disabled (CHI_WITH_RUNTIME=0)")
+            self.setenv('CLIO_WITH_RUNTIME', '0')
+            self.log("Runtime initialization disabled (CLIO_WITH_RUNTIME=0)")
 
         self.log("CTE benchmark configuration completed successfully")
 

@@ -92,7 +92,7 @@ stop_docker_cluster() {
 run_single_test() {
     local filter="$1"
     docker exec iowarp-reconnect-node1 bash -c "
-        export CHI_WITH_RUNTIME=0
+        export CLIO_WITH_RUNTIME=0
         chimaera_reconnect_tests '$filter'
     "
 }

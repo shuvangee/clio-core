@@ -21,7 +21,7 @@ Usage:
     python3 test_bindings.py
 
     # Run without runtime initialization
-    CHI_WITH_RUNTIME=0 python3 test_bindings.py
+    CLIO_WITH_RUNTIME=0 python3 test_bindings.py
 
 Example Usage in Your Code:
 ---------------------------
@@ -47,9 +47,9 @@ Example Usage in Your Code:
 
 Environment Variables:
 ---------------------
-    CHI_WITH_RUNTIME: Set to "0" or "false" to skip runtime initialization
-    CHI_SERVER_CONF: Path to Chimaera server configuration file
-    CHI_REPO_PATH: Path to ChiMod repository (for finding shared libraries)
+    CLIO_WITH_RUNTIME: Set to "0" or "false" to skip runtime initialization
+    CLIO_SERVER_CONF: Path to Chimaera server configuration file
+    CLIO_REPO_PATH: Path to ChiMod repository (for finding shared libraries)
     LD_LIBRARY_PATH: Library path for runtime dependencies
 """
 
@@ -72,12 +72,12 @@ _initialization_attempted = False
 def should_initialize_runtime():
     """Check if runtime should be initialized
 
-    Reads CHI_WITH_RUNTIME environment variable:
+    Reads CLIO_WITH_RUNTIME environment variable:
     - Not set or "1"/"true"/"yes"/"on": Initialize runtime (default: true)
     - "0"/"false"/"no"/"off": Skip initialization (runtime already initialized externally)
     """
     # Check unified flag
-    env_val = os.getenv("CHI_WITH_RUNTIME")
+    env_val = os.getenv("CLIO_WITH_RUNTIME")
     if env_val is None:
         return True  # Default: initialize runtime
 
@@ -87,7 +87,7 @@ def should_initialize_runtime():
 
 
 def setup_environment_paths():
-    """Set up CHI_REPO_PATH and LD_LIBRARY_PATH for ChiMod discovery (following C++ test pattern)
+    """Set up CLIO_REPO_PATH and LD_LIBRARY_PATH for ChiMod discovery (following C++ test pattern)
     
     This is critical for the runtime to find ChiMod shared libraries.
     Gets the build directory by finding where the Python module is located.
@@ -101,8 +101,8 @@ def setup_environment_paths():
             # Get the directory containing the module
             bin_dir = os.path.dirname(os.path.abspath(module_file))
             
-            # Set CHI_REPO_PATH and LD_LIBRARY_PATH to point to bin directory
-            os.environ["CHI_REPO_PATH"] = bin_dir
+            # Set CLIO_REPO_PATH and LD_LIBRARY_PATH to point to bin directory
+            os.environ["CLIO_REPO_PATH"] = bin_dir
             
             # Update LD_LIBRARY_PATH, preserving existing path
             existing_ld_path = os.getenv("LD_LIBRARY_PATH", "")
@@ -111,7 +111,7 @@ def setup_environment_paths():
             else:
                 os.environ["LD_LIBRARY_PATH"] = bin_dir
             
-            print(f"   Set CHI_REPO_PATH={bin_dir}")
+            print(f"   Set CLIO_REPO_PATH={bin_dir}")
             print(f"   Set LD_LIBRARY_PATH={os.environ['LD_LIBRARY_PATH']}")
             return True
     except Exception as e:
@@ -119,13 +119,13 @@ def setup_environment_paths():
         # Try to use current working directory as fallback
         cwd = os.getcwd()
         if os.path.exists(cwd):
-            os.environ["CHI_REPO_PATH"] = cwd
+            os.environ["CLIO_REPO_PATH"] = cwd
             existing_ld_path = os.getenv("LD_LIBRARY_PATH", "")
             if existing_ld_path:
                 os.environ["LD_LIBRARY_PATH"] = f"{cwd}:{existing_ld_path}"
             else:
                 os.environ["LD_LIBRARY_PATH"] = cwd
-            print(f"   Set CHI_REPO_PATH={cwd} (fallback)")
+            print(f"   Set CLIO_REPO_PATH={cwd} (fallback)")
             return True
     return False
 
@@ -235,7 +235,7 @@ def generate_test_config():
     print(f"   Generated config: {config_path}")
 
     # Set environment variable
-    os.environ['CHI_SERVER_CONF'] = config_path
+    os.environ['CLIO_SERVER_CONF'] = config_path
 
     return config_path
 
@@ -250,12 +250,12 @@ def initialize_runtime_early(cte):
     
     Usage Pattern:
         # Step 1: Set up environment paths (for ChiMod discovery)
-        os.environ["CHI_REPO_PATH"] = "/path/to/build/bin"
+        os.environ["CLIO_REPO_PATH"] = "/path/to/build/bin"
         os.environ["LD_LIBRARY_PATH"] = "/path/to/build/bin"
         
         # Step 2: Generate or load configuration
         config_path = generate_config()  # Creates YAML config with networking, storage, etc.
-        os.environ["CHI_SERVER_CONF"] = config_path
+        os.environ["CLIO_SERVER_CONF"] = config_path
         
         # Step 3: Initialize Chimaera (unified init - both runtime and client)
         if not cte.chimaera_init(cte.ChimaeraMode.kClient, True):
@@ -324,7 +324,7 @@ def initialize_runtime_early(cte):
             sys.stdout.flush()
 
             # Verify client initialization (following C++ pattern that checks IPC)
-            # In C++ tests they verify: REQUIRE(CHI_IPC != nullptr) and REQUIRE(CHI_IPC->IsInitialized())
+            # In C++ tests they verify: REQUIRE(CLIO_IPC != nullptr) and REQUIRE(CLIO_IPC->IsInitialized())
             print("✅ Chimaera client initialized")
             sys.stdout.flush()
 
@@ -890,7 +890,7 @@ def main():
     # Runtime initialization happens at the very beginning if enabled
     runtime_ok = False
     if should_initialize_runtime():
-        print("📋 Initializing Runtime (CHI_WITH_RUNTIME enabled)...")
+        print("📋 Initializing Runtime (CLIO_WITH_RUNTIME enabled)...")
         print("   Note: Runtime initialization happens FIRST before any client code")
 
         # Import module first (needed for runtime init)
@@ -910,9 +910,9 @@ def main():
         runtime_ok = initialize_runtime_early(cte)
         print()
     else:
-        cte_flag = os.getenv("CHI_WITH_RUNTIME")
+        cte_flag = os.getenv("CLIO_WITH_RUNTIME")
         if cte_flag:
-            print(f"📋 Skipping Runtime Initialization (CHI_WITH_RUNTIME={cte_flag})")
+            print(f"📋 Skipping Runtime Initialization (CLIO_WITH_RUNTIME={cte_flag})")
         else:
             print("📋 Skipping Runtime Initialization")
         print("   Runtime should already be initialized externally")

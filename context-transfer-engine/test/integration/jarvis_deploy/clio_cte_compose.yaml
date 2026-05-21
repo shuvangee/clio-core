@@ -1,7 +1,7 @@
 ---
 # WRP CTE Compose Configuration for Jarvis Deployment Test
 # Separate CTE compose config (matches Jarvis ClioCte output)
-# Applied via `chimaera compose` after runtime is started
+# Applied via `clio_run compose` after runtime is started
 
 compose:
   - mod_name: clio_cte_core

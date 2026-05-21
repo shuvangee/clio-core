@@ -54,7 +54,7 @@ CLIO Core follows a layered architecture integrating five core components:
                     ┌─────────────────┐
                     │  Chimaera       │
                     │  Runtime        │
-                    │  (ChiMod System)│
+                    │  (Module System)│
                     └─────────────────┘
                               │
                 ┌─────────────────────────┐
@@ -76,7 +76,7 @@ linked. No system installs are required beyond glibc and Python 3.10+.
 pip install iowarp-core
 ```
 
-The wheel includes the Chimaera runtime, the `chimaera` CLI, the CTE,
+The wheel includes the Clio runtime, the `chimaera` CLI, the CTE,
 CAE, and CEE engines, and the `clio_cee` Python bindings. A default
 configuration is seeded at `~/.chimaera/chimaera.yaml` on first import.
 
@@ -138,7 +138,7 @@ High-performance modular runtime for scientific computing and storage systems wi
 
 **Key Features:**
 - Ultra-high performance task execution (< 10μs latency)
-- Modular ChiMod system for dynamic extensibility
+- Modular Module system for dynamic extensibility
 - Coroutine-aware synchronization (CoMutex, CoRwLock)
 - Distributed architecture with shared memory IPC
 - Built-in storage backends (RAM, file-based, custom block devices)
@@ -194,17 +194,17 @@ the runtime works out of the box:
 
 ```bash
 # Foreground
-chimaera runtime start
+clio_run runtime start
 
 # Background
-chimaera runtime start &
+clio_run runtime start &
 ```
 
-To override the configuration, point `CHI_SERVER_CONF` at your YAML file:
+To override the configuration, point `CLIO_X` at your YAML file:
 
 ```bash
-export CHI_SERVER_CONF=/path/to/my_config.yaml
-chimaera runtime start
+export CLIO_X=/path/to/my_config.yaml
+clio_run runtime start
 ```
 
 ### Context Exploration Engine Python Example
@@ -256,7 +256,7 @@ Here is an example of the context transfer engine's C++ API.
 #include <clio_runtime/clio_runtime.h>
 
 int main() {
-  // 1. Initialize Chimaera runtime
+  // 1. Initialize Clio runtime
   bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
   if (!success) return 1;
 
@@ -315,8 +315,8 @@ find_package(iowarp-core REQUIRED)
 
 target_link_libraries(my_app
   clio_cte::core_client    # CTE client (for the example above)
-  chimaera::admin_client  # Admin ChiMod (always available)
-  chimaera::bdev_client   # Block device ChiMod (always available)
+  chimaera::admin_client  # Admin Module (always available)
+  chimaera::bdev_client   # Block device Module (always available)
 )
 ```
 
@@ -325,7 +325,7 @@ target_link_libraries(my_app
 *Core Components:*
 - All `ctp::*` modular targets (cxx, configure, serialize, interceptor, lightbeam, thread_all, mpi, compress, encrypt)
 - `chimaera::cxx` (core runtime library)
-- ChiMod build utilities
+- Module build utilities
 
 *Core ChiMods (Always Available):*
 - `chimaera::admin_client`, `chimaera::admin_runtime`
@@ -357,7 +357,7 @@ CLIO Core includes performance benchmarks for measuring runtime and I/O throughp
 
 ### Runtime Throughput Benchmark (clio_run_thrpt_benchmark)
 
-Measures task throughput and latency for the Chimaera runtime.
+Measures task throughput and latency for the Clio runtime.
 
 ```bash
 clio_run_thrpt_benchmark [options]
@@ -446,8 +446,8 @@ Comprehensive documentation is available for each component:
 
 - **[AGENTS.md](AGENTS.md)**: Unified development guide and coding standards
 - **[Context Transport Primitives](context-transport-primitives/README.md)**: Shared memory data structures
-- **[Chimaera Runtime](context-runtime/README.md)**: Modular runtime system and ChiMod development
-  - [MODULE_DEVELOPMENT_GUIDE.md](context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md): Complete ChiMod development guide
+- **[Chimaera Runtime](context-runtime/README.md)**: Modular runtime system and Module development
+  - [MODULE_DEVELOPMENT_GUIDE.md](context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md): Complete Module development guide
 - **[Context Transfer Engine](context-transfer-engine/README.md)**: I/O buffering and acceleration
   - [CTE API Documentation](context-transfer-engine/docs/cte/cte.md): Complete API reference
 - **[Context Assimilation Engine](context-assimilation-engine/README.md)**: Data ingestion and processing

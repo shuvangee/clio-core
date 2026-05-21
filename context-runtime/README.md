@@ -6,7 +6,7 @@
   <br />
   <a href="#getting-started">Getting Started</a> ·
   <a href="#external-integration">External Integration</a> ·
-  <a href="#chimod-development">ChiMod Development</a> ·
+  <a href="#chimod-development">Module Development</a> ·
   <a href="#documentation">Documentation</a> ·
   <a href="#contributing">Contributing</a>
 </p>
@@ -19,7 +19,7 @@
 
 Chimaera provides:
 - **High-Performance Task Execution**: Coroutine-based task scheduling with microsecond-level latencies
-- **Modular Architecture**: Extensible ChiMod system for custom functionality
+- **Modular Architecture**: Extensible Module system for custom functionality
 - **Advanced Synchronization**: CoMutex and CoRwLock for coroutine-aware synchronization
 - **Distributed Computing**: Seamless scaling from single node to cluster deployments
 - **Storage Integration**: Built-in support for block devices, file systems, and custom storage backends
@@ -28,7 +28,7 @@ Chimaera provides:
 ## Key Features
 
 - 🚀 **Ultra-High Performance**: Coroutine-based execution with shared memory IPC for microsecond-level task latencies
-- 🧩 **Modular ChiMod System**: Dynamically loadable modules for custom functionality without core modifications
+- 🧩 **Modular Module System**: Dynamically loadable modules for custom functionality without core modifications
 - 🔄 **Advanced Task Management**: Asynchronous and fire-and-forget task execution patterns
 - 🔐 **Coroutine-Aware Synchronization**: CoMutex and CoRwLock primitives for deadlock-free coordination
 - 💾 **Flexible Storage Backends**: Built-in support for RAM, file-based, and custom block device operations
@@ -43,7 +43,7 @@ Chimaera follows a modular semi-microkernel design:
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │  Client App 1   │    │  Client App 2   │    │  External App   │
 ├─────────────────┤    ├─────────────────┤    ├─────────────────┤
-│ ChiMod Clients  │    │ ChiMod Clients  │    │ ChiMod Clients  │
+│ Module Clients  │    │ Module Clients  │    │ Module Clients  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
@@ -61,7 +61,7 @@ Chimaera follows a modular semi-microkernel design:
             ┌────────────────────┼────────────────────┐
             │                    │                    │
     ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-    │ Admin ChiMod  │   │ Bdev ChiMod   │   │ Custom ChiMod │
+    │ Admin Module  │   │ Bdev Module   │   │ Custom Module │
     │ (Pool Mgmt)   │   │ (Block I/O)   │   │ (User Logic)  │
     └───────────────┘   └───────────────┘   └───────────────┘
 ```
@@ -109,7 +109,7 @@ cmake --install build --prefix /usr/local
 
 #### 2. Quick Start Example
 
-Create a simple application using the bdev ChiMod:
+Create a simple application using the bdev Module:
 
 ```cpp
 #include <clio_runtime/clio_runtime.h>
@@ -161,7 +161,7 @@ add_executable(my_app src/main.cpp)
 
 # Link against Chimaera libraries
 target_link_libraries(my_app
-  chimaera::cxx              # Core Chimaera runtime
+  chimaera::cxx              # Core Clio runtime
   chimaera::admin_client     # Admin module (always required)
   chimaera::bdev_client      # Block device operations
   ${CMAKE_THREAD_LIBS_INIT}  # Threading support
@@ -180,11 +180,11 @@ make
 
 ### Available ChiMods
 
-| ChiMod | Purpose | CMake Package | Description |
+| Module | Purpose | CMake Package | Description |
 |--------|---------|---------------|--------------|
 | **admin** | Core Management | `chimaera-admin` | Pool creation and system administration (always required) |
 | **bdev** | Block I/O | `chimaera-bdev` | High-performance block device operations with RAM/file backends |
-| **MOD_NAME** | Template | `chimaera-MOD_NAME` | Example ChiMod template for custom development |
+| **MOD_NAME** | Template | `chimaera-MOD_NAME` | Example Module template for custom development |
 
 ### Runtime vs Client Mode
 
@@ -208,15 +208,15 @@ chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, false);
 chi::CHIMAERA_INIT(chi::ChimaeraMode::kServer, false);
 ```
 
-## ChiMod Development
+## Module Development
 
-The true power of Chimaera lies in developing custom ChiMods. Each ChiMod is a self-contained module providing specialized functionality.
+The true power of Chimaera lies in developing custom ChiMods. Each Module is a self-contained module providing specialized functionality.
 
-### ChiMod Structure
+### Module Structure
 
 ```
 modules/my_module/
-├── chimaera_mod.yaml           # Module metadata
+├── clio_mod.yaml           # Module metadata
 ├── CMakeLists.txt              # Build configuration
 ├── doc/                        # Documentation
 │   ├── my_module.md           # API reference
@@ -271,9 +271,9 @@ public:
 Comprehensive documentation is available in the `docs/` directory:
 
 - **[MODULE_DEVELOPMENT_GUIDE.md](docs/MODULE_DEVELOPMENT_GUIDE.md)**: Complete guide for developing ChiMods
-- **[ChiMod Documentation](modules/)**: Individual ChiMod API references:
-  - [Admin ChiMod](modules/admin/doc/admin.md): Core system management
-  - [Bdev ChiMod](modules/bdev/doc/bdev.md): Block device operations
+- **[Module Documentation](modules/)**: Individual Module API references:
+  - [Admin Module](modules/admin/doc/admin.md): Core system management
+  - [Bdev Module](modules/bdev/doc/bdev.md): Block device operations
   - [MOD_NAME Template](modules/MOD_NAME/doc/MOD_NAME.md): Development template
 
 ### Testing

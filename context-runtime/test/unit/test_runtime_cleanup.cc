@@ -100,7 +100,7 @@ TEST_CASE("Cleanup - Client Finalization", "[cleanup][ipc]") {
   pid_t server_pid = fork();
   if (server_pid == 0) {
     // Child: Start server
-    setenv("CHI_WITH_RUNTIME", "1", 1);
+    setenv("CLIO_WITH_RUNTIME", "1", 1);
     CHIMAERA_INIT(ChimaeraMode::kServer, true);
     sleep(300);
     exit(0);
@@ -110,7 +110,7 @@ TEST_CASE("Cleanup - Client Finalization", "[cleanup][ipc]") {
   sleep(1);
 
   // Connect as client only
-  setenv("CHI_WITH_RUNTIME", "0", 1);
+  setenv("CLIO_WITH_RUNTIME", "0", 1);
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
 

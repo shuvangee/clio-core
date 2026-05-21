@@ -36,7 +36,7 @@ mechanisms that keep old code working.
 | Repo metadata YAML | `chimaera_repo.yaml` | `clio_repo.yaml` | The CMake repo-parser checks for `clio_repo.yaml` first, then falls back to `chimaera_repo.yaml`. Either filename is accepted. |
 | Module metadata YAML | `chimaera_mod.yaml` | `clio_mod.yaml` | Same — parser checks `clio_mod.yaml` first, falls back to `chimaera_mod.yaml`. |
 | Library names (`.so`/CMake targets) | `libchimaera_cxx.so`, `chimaera_cxx`, `libchimaera_admin_runtime.so`, … | unchanged | Not renamed in this pass. |
-| Daemon binary | `chimaera runtime start` | unchanged | Not renamed in this pass. |
+| Daemon / CLI binary | `chimaera runtime start`, `chimaera monitor`, `chimaera migrate`, `chimaera compose`, `chimaera repo refresh` | `clio_run runtime start`, `clio_run monitor`, `clio_run migrate`, `clio_run compose`, `clio_run repo refresh` | `clio_run` is installed as a symlink to the `chimaera` binary in the same `bin/` directory; both invocations work. The binary's usage messages adapt via `argv[0]` so they print whichever name the user invoked. |
 | C++ namespace | `chi::…` | unchanged | Not renamed in this pass. |
 
 ### Transport-primitives layer (`hermes_shm` / `HSHM` / `hshm::` → `clio_ctp` / `CTP_` / `ctp::`)
@@ -110,8 +110,9 @@ chimods can rename at their leisure.
 - The `chi::` C++ namespace.
 - CMake target names (`chimaera_cxx`, `chimaera_admin_runtime`, …) and their
   installed shared-library filenames.
-- The `chimaera` daemon binary (`chimaera runtime start` is still the
-  invocation).
+- The on-disk `chimaera` binary itself (the new `clio_run` is a symlink
+  installed alongside it; both invocations work and the binary's help text
+  adapts to whichever name was used).
 - The `ChimaeraMode` enum class.
 - Identifiers in code that include `chimaera` as a fragment (e.g., the
   `Chimaera` class itself, `chi::Chimaera`).

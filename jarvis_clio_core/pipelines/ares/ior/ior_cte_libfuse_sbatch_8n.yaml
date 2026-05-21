@@ -63,7 +63,7 @@ mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include e
 # /tmp/chimaera_$USER for the same reason and gets the same failure mode
 # (`shm_open failed: No such file or directory`).
 #
-# CHI_MEMFD_DIR MUST be node-local (or have hostname baked in). The dir
+# CLIO_MEMFD_DIR MUST be node-local (or have hostname baked in). The dir
 # holds symlinks pointing into /proc/<daemon_pid>/fd/<n> — those paths
 # are only resolvable on the node that created them. Putting two daemons
 # on a shared-NFS dir lets them clobber each other's symlinks and the
@@ -72,7 +72,7 @@ mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include e
 # the command on the remote side.
 env:
   TMPDIR: "/home/llogan/iowarp_prte_tmp"
-  CHI_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
+  CLIO_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
 
 scheduler:
   name: slurm
@@ -116,7 +116,7 @@ scheduler:
     - 'module load gcc/11.4.0/openmpi/5.0.5-x2kvx5l ior/3.3.0-fihmxeb'
     # Avoid /tmp (small + filled up on some nodes). PRTE/PMIx default
     # to /tmp for its per-job session dir; route it to NFS.
-    # (CHI_MEMFD_DIR's per-host dir is auto-created by chimaera's
+    # (CLIO_MEMFD_DIR's per-host dir is auto-created by chimaera's
     # EnsureMemfdDir at first use, so it's not mkdir'd here.)
     - 'mkdir -p /home/llogan/iowarp_prte_tmp'
 
@@ -149,7 +149,7 @@ pkgs:
     default_target_timeout_ms: 30000
     poll_period_ms: 5000
     # pool_query: local + Pssh-fanning the compose to every node means
-    # each node's `chimaera compose` talks to its local admin container
+    # each node's `clio_run compose` talks to its local admin container
     # and creates clio_cte_core there with the proper storage config.
     # No broadcast routing or cross-node admin propagation required.
     pool_query: "local"

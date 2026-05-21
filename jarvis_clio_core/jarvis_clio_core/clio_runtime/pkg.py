@@ -164,7 +164,7 @@ class ClioRuntime(Service):
             {
                 'name': 'do_start',
                 'msg': ('Whether this package should actually launch the '
-                        '`chimaera runtime start` daemon. Set to false when '
+                        '`clio_run runtime start` daemon. Set to false when '
                         'another package in the pipeline owns the runtime '
                         'process (e.g. clio_cte_libfuse with '
                         'embedded_runtime=true), in which case clio_runtime '
@@ -216,9 +216,9 @@ class ClioRuntime(Service):
 
         self.config_file = f'{self.shared_dir}/chimaera_config.yaml'
 
-        self.setenv('CHI_SERVER_CONF', self.config_file)
+        self.setenv('CLIO_SERVER_CONF', self.config_file)
         self.setenv('CTP_LOG_LEVEL', self.config['log_level'])
-        self.setenv('CHI_IPC_MODE', self.config['ipc_mode'].upper())
+        self.setenv('CLIO_IPC_MODE', self.config['ipc_mode'].upper())
 
         self._generate_config()
 
@@ -291,7 +291,7 @@ class ClioRuntime(Service):
 
     def start(self):
         # When `do_start: false`, another package in the pipeline owns
-        # the chimaera runtime process (e.g. clio_cte_libfuse with
+        # the clio_run runtime process (e.g. clio_cte_libfuse with
         # embedded_runtime=true). clio_runtime stays in the pipeline to
         # generate chimaera_config.yaml and handle configure/stop, but
         # the daemon spawn is skipped to avoid a port-9413 conflict.
@@ -306,7 +306,7 @@ class ClioRuntime(Service):
 
         self.log("Starting IOWarp runtime")
 
-        cmd = 'chimaera runtime start'
+        cmd = 'clio_run runtime start'
 
         exec_info = PsshExecInfo(
             env=self.env,
@@ -356,7 +356,7 @@ class ClioRuntime(Service):
 
         self.log("Stopping IOWarp runtime")
 
-        Exec('chimaera runtime stop',
+        Exec('clio_run runtime stop',
              PsshExecInfo(env=self.env, hostfile=self.hostfile)).run()
         Kill('chimaera',
              PsshExecInfo(env=self.env, hostfile=self.hostfile)).run()

@@ -79,8 +79,8 @@ echo ""
 # The runtime config contains a compose section that creates both
 # CTE (pool 512.0) and CAE (pool 400.0) automatically on startup.
 echo "Starting Chimaera runtime..."
-export CHI_SERVER_CONF="${RUNTIME_CONF}"
-chimaera runtime start &
+export CLIO_SERVER_CONF="${RUNTIME_CONF}"
+clio_run runtime start &
 CHIMAERA_PID=$!
 echo "Chimaera runtime started (PID: ${CHIMAERA_PID})"
 echo ""
@@ -131,7 +131,7 @@ fi
 # Cleanup: Stop Chimaera runtime
 echo ""
 echo "Stopping Chimaera runtime..."
-chimaera runtime stop 2>/dev/null || kill ${CHIMAERA_PID} 2>/dev/null || true
+clio_run runtime stop 2>/dev/null || kill ${CHIMAERA_PID} 2>/dev/null || true
 wait ${CHIMAERA_PID} 2>/dev/null || true
 echo "Chimaera runtime stopped"
 

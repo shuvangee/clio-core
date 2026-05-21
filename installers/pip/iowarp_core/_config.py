@@ -11,7 +11,7 @@ def find_config():
     """Find the Chimaera configuration file.
 
     Search order:
-    1. CHI_SERVER_CONF environment variable
+    1. CLIO_SERVER_CONF environment variable
     2. ~/.chimaera/chimaera.yaml
     3. Bundled default in the package data/ directory
 
@@ -19,7 +19,7 @@ def find_config():
         str: Path to the configuration file, or None if not found.
     """
     # 1. Environment variable override
-    env_conf = os.environ.get("CHI_SERVER_CONF")
+    env_conf = os.environ.get("CLIO_SERVER_CONF")
     if env_conf and os.path.isfile(env_conf):
         return env_conf
 

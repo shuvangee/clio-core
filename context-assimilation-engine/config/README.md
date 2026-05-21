@@ -8,7 +8,7 @@ This directory contains example configuration files for deploying the Context As
 
 Complete example showing how to configure both CTE and CAE ChiMods together in a unified runtime configuration.
 
-## CAE ChiMod Configuration
+## CAE Module Configuration
 
 ### Pool Constants
 
@@ -21,7 +21,7 @@ The CAE pool uses these constants (defined in `clio_cae/core/constants.h`):
 
 ```yaml
 compose:
-  - mod_name: clio_cae_core      # CAE Core ChiMod library name
+  - mod_name: clio_cae_core      # CAE Core Module library name
     pool_name: cae_main          # User-defined pool name
     pool_query: local            # Pool query type (local, broadcast, dynamic)
     pool_id: "400.0"             # CAE pool ID (must match kCaePoolId)
@@ -29,7 +29,7 @@ compose:
 
 ### Parameters Explanation
 
-- **mod_name**: Must be `clio_cae_core` (the CAE Core ChiMod library)
+- **mod_name**: Must be `clio_cae_core` (the CAE Core Module library)
 - **pool_name**: User-defined name for the CAE pool
 - **pool_query**:
   - `local`: Create pool only on local node
@@ -37,14 +37,14 @@ compose:
   - `dynamic`: Let the runtime decide based on existing pools
 - **pool_id**: Must be `"400.0"` to match the constant defined in code
 
-## Usage with chimaera compose
+## Usage with clio_run compose
 
 ```bash
-# Start the Chimaera runtime
-chimaera runtime start
+# Start the Clio runtime
+clio_run runtime start
 
 # Deploy CAE using the configuration file
-chimaera compose /path/to/clio_config_example.yaml
+clio_run compose /path/to/clio_config_example.yaml
 
 # Now CAE is available for use
 clio_cae_omni /path/to/omni_file.yaml
@@ -71,11 +71,11 @@ See `clio_config_example.yaml` for a complete configuration showing both ChiMods
 
 ```bash
 # 1. Start runtime
-export CHI_SERVER_CONF=/path/to/clio_config_example.yaml
-chimaera runtime start &
+export CLIO_X=/path/to/clio_config_example.yaml
+clio_run runtime start &
 
 # 2. Deploy CTE and CAE
-chimaera compose $CHI_SERVER_CONF
+clio_run compose $CLIO_X
 
 # 3. Use CAE to ingest data
 clio_cae_omni /path/to/my_data_transfer.yaml

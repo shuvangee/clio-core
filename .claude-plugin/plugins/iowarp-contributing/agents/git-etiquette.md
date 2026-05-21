@@ -45,7 +45,7 @@ Flag these immediately:
 - Hardcoded paths in CMakeLists.txt
 - Missing file headers
 - Raw GPU macros instead of CTP_IS_* wrappers
-- Catch2 used with Chimaera runtime
+- Catch2 used with Clio runtime
 - Mock/stub implementations
 - Functions over 100 lines
 - Missing docstrings on new functions
