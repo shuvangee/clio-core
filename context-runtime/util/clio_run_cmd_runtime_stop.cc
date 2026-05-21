@@ -7,7 +7,7 @@
 #include "clio_runtime/clio_runtime.h"
 #include "clio_runtime/pool_query.h"
 #include "clio_runtime/types.h"
-#include "chimaera_commands.h"
+#include "clio_run_commands.h"
 
 int RuntimeStop(int argc, char* argv[]) {
   HLOG(kDebug, "Stopping Chimaera runtime...");

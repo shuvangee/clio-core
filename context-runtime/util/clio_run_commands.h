@@ -1,8 +1,8 @@
-#ifndef CHIMAERA_COMMANDS_H_
-#define CHIMAERA_COMMANDS_H_
+#ifndef CLIO_RUN_COMMANDS_H_
+#define CLIO_RUN_COMMANDS_H_
 
 /**
- * Command function declarations for the unified chimaera CLI
+ * Command function declarations for the unified clio_run CLI
  * Each command function takes argc/argv with the subcommand args already stripped
  */
 
@@ -14,4 +14,4 @@ int Compose(int argc, char** argv);
 int Migrate(int argc, char** argv);
 int RefreshRepo(int argc, char** argv);
 
-#endif  // CHIMAERA_COMMANDS_H_
+#endif  // CLIO_RUN_COMMANDS_H_

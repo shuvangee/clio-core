@@ -10,7 +10,7 @@
 #include "clio_runtime/admin/admin_client.h"
 #include "clio_runtime/singletons.h"
 #include "clio_runtime/types.h"
-#include "chimaera_commands.h"
+#include "clio_run_commands.h"
 
 namespace {
 volatile sig_atomic_t g_keep_running = 1;

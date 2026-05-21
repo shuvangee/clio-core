@@ -2,7 +2,7 @@
 #include <iostream>
 #include <string>
 
-#include "chimaera_commands.h"
+#include "clio_run_commands.h"
 
 namespace {
 // Program name to display in usage messages: derived from argv[0]'s basename
