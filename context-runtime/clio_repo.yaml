@@ -1,14 +1,10 @@
 # CLIO Runtime repository configuration.
-#
-# read_repo_namespace() (cmake/ClioCoreCommon.cmake) walks UP the directory
-# tree from context-runtime/ looking for clio_repo.yaml (preferred) or
-# chimaera_repo.yaml (legacy).  Without this file the function falls
-# through to its hardcoded fallback `namespace: chimaera`, which then
-# breaks the install(EXPORT) GPU-target check in CMakeLists.txt (the
-# target is hardcoded as clio_run_cxx_gpu, so the namespace-derived
-# check `${CLIO_RUN_NAMESPACE}_cxx_gpu` only finds it when the namespace
-# resolves to "clio_run").
+# Read by read_repo_namespace() in cmake/ClioCoreCommon.cmake to set
+# CLIO_RUN_NAMESPACE. Without this file the function falls through to a
+# hardcoded fallback and CLIO_RUN_NAMESPACE ends up as the legacy
+# project name, which then breaks the install(EXPORT) GPU-target check
+# in CMakeLists.txt.
 name: runtime
 namespace: clio_run
 version: 1.0.0
-description: CLIO Runtime — task dispatch / IPC / ChiMod orchestration
+description: CLIO Runtime - task dispatch, IPC, ChiMod orchestration
