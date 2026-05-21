@@ -47,7 +47,7 @@ clio_run runtime start
 clio_run compose /path/to/clio_config_example.yaml
 
 # Now CAE is available for use
-clio_cae_omni /path/to/omni_file.yaml
+clio_cae /path/to/omni_file.yaml
 ```
 
 ## Integration with CTE
@@ -78,7 +78,7 @@ clio_run runtime start &
 clio_run compose $CLIO_X
 
 # 3. Use CAE to ingest data
-clio_cae_omni /path/to/my_data_transfer.yaml
+clio_cae /path/to/my_data_transfer.yaml
 
 # 4. Access data through CTE
 # (Your application uses CTE client to access assimilated data)

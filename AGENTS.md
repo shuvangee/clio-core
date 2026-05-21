@@ -956,7 +956,7 @@ python -m build --wheel
 **What Gets Bundled:**
 - All IOWarp libraries (libchimaera_cxx.so, libclio_ctp_host.so, Module libraries)
 - Dependencies from install.sh (Boost, HDF5, ZeroMQ, yaml-cpp, etc.)
-- Command-line tools (clio_cte, clio_cae_omni, chimaera, etc.)
+- Command-line tools (clio_cte, clio_cae, chimaera, etc.)
 - Headers and CMake configuration files
 - Conda dependencies (if building in a Conda environment)
 

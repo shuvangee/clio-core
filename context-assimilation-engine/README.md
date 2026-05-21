@@ -62,7 +62,7 @@ compose:
 ### 2. Submit an OMNI file
 
 ```bash
-clio_cae_omni /path/to/my_transfers.yaml
+clio_cae /path/to/my_transfers.yaml
 ```
 
 ## OMNI File Format
@@ -112,7 +112,7 @@ config/      - Example runtime configuration files
 core/        - Module implementation
   include/   - Public headers (tasks, assimilation context, factory)
   src/        - Runtime and client implementation
-  util/       - clio_cae_omni command-line tool
+  util/       - clio_cae command-line tool
 data/        - Sample datasets for testing (HDF5, CSV, Parquet)
 test/
   unit/      - Unit tests (binary, HDF5, range, error handling)

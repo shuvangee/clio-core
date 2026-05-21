@@ -14,13 +14,17 @@ void PrintUsage() {
   std::cerr << "Usage: " << g_progname << " <command> [options]\n"
             << "\n"
             << "Commands:\n"
-            << "  runtime start   Start the Clio runtime server\n"
-            << "  runtime restart Restart the Clio runtime (WAL replay)\n"
-            << "  runtime stop    Stop the Clio runtime server\n"
+            << "  start           Start the Clio runtime server\n"
+            << "  restart         Restart the Clio runtime (WAL replay)\n"
+            << "  stop            Stop the Clio runtime server\n"
             << "  migrate         Migrate a container to a different node\n"
             << "  monitor         Monitor worker statistics\n"
             << "  compose         Create/destroy pools from compose config\n"
-            << "  repo refresh    Autogenerate ChiMod method files\n"
+            << "  refresh         Autogenerate ChiMod method files\n"
+            << "\n"
+            << "Legacy nested forms (still supported):\n"
+            << "  runtime <start|restart|stop>\n"
+            << "  repo refresh\n"
             << "\n"
             << "Run '" << g_progname
             << " <command> --help' for more information on a command.\n";
@@ -47,11 +51,39 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  // Handle "runtime start" and "runtime stop" subcommands
+  // Flat dispatch (canonical form):
+  //   <progname> start | restart | stop | refresh | migrate | monitor | compose
+  // Strip "<progname> <cmd>" from argv. Each handler sees only its own args.
+  {
+    int new_argc = argc - 2;
+    char** new_argv = argv + 2;
+
+    if (cmd == "start") {
+      return RuntimeStart(new_argc, new_argv);
+    } else if (cmd == "restart") {
+      return RuntimeRestart(new_argc, new_argv);
+    } else if (cmd == "stop") {
+      return RuntimeStop(new_argc, new_argv);
+    } else if (cmd == "refresh") {
+      return RefreshRepo(new_argc, new_argv);
+    } else if (cmd == "migrate") {
+      return Migrate(new_argc, new_argv);
+    } else if (cmd == "monitor") {
+      return Monitor(new_argc, new_argv);
+    } else if (cmd == "compose") {
+      return Compose(new_argc, new_argv);
+    }
+  }
+
+  // Legacy nested forms (kept working for backward compat):
+  //   <progname> runtime <start|restart|stop>
+  //   <progname> repo refresh
   if (cmd == "runtime") {
     if (argc < 3) {
       std::cerr << "Usage: " << g_progname
-                << " runtime <start|restart|stop> [options]\n";
+                << " runtime <start|restart|stop> [options]\n"
+                << "Hint: the canonical flat form is `" << g_progname
+                << " <start|restart|stop>`.\n";
       return 1;
     }
 
@@ -74,10 +106,11 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  // Handle "repo refresh" subcommand
   if (cmd == "repo") {
     if (argc < 3) {
-      std::cerr << "Usage: " << g_progname << " repo <refresh> [options]\n";
+      std::cerr << "Usage: " << g_progname << " repo <refresh> [options]\n"
+                << "Hint: the canonical flat form is `" << g_progname
+                << " refresh`.\n";
       return 1;
     }
 
@@ -95,19 +128,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  // Strip "chimaera <cmd>" from argv
-  int new_argc = argc - 2;
-  char** new_argv = argv + 2;
-
-  if (cmd == "migrate") {
-    return Migrate(new_argc, new_argv);
-  } else if (cmd == "monitor") {
-    return Monitor(new_argc, new_argv);
-  } else if (cmd == "compose") {
-    return Compose(new_argc, new_argv);
-  } else {
-    std::cerr << "Unknown command: " << cmd << "\n";
-    PrintUsage();
-    return 1;
-  }
+  std::cerr << "Unknown command: " << cmd << "\n";
+  PrintUsage();
+  return 1;
 }

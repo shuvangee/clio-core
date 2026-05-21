@@ -32,10 +32,13 @@
  */
 
 /**
- * clio_cae_ingest - Ingest OMNI file for CAE processing
+ * clio_cae - Ingest an OMNI YAML file for CAE processing.
  *
- * This utility reads an OMNI YAML file and calls ParseOmni to schedule
- * assimilation tasks. Usage: clio_cae_ingest <omni_file_path>
+ * Reads the OMNI file and calls ParseOmni to schedule assimilation tasks.
+ * Usage: clio_cae <omni_file_path>
+ *
+ * Installed as `clio_cae`; the legacy name `clio_cae_omni` is preserved
+ * as an install-time symlink for backward compat.
  */
 
 #include <clio_ctp/util/config_parse.h>

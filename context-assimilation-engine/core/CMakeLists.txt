@@ -111,15 +111,32 @@ endif()
 # Utilities
 #------------------------------------------------------------------------------
 
-# clio_cae_omni utility
-add_executable(clio_cae_omni util/clio_cae_omni.cc)
-target_link_libraries(clio_cae_omni
+# clio_cae utility (CAE OMNI ingest driver). Installed as `clio_cae`;
+# the legacy `clio_cae_omni` name is preserved as an install-time symlink
+# so out-of-tree scripts and pipelines keep working.
+add_executable(clio_cae util/clio_cae.cc)
+target_link_libraries(clio_cae
   PRIVATE
     clio_cae_core_client
     chimaera::cxx
     ctp::configure
 )
-install(TARGETS clio_cae_omni DESTINATION bin)
+install(TARGETS clio_cae DESTINATION bin)
+
+# Install `clio_cae_omni` as a symlink to `clio_cae` (Windows: copy fallback).
+install(CODE "
+  set(_src \"\${CMAKE_INSTALL_PREFIX}/bin/clio_cae\")
+  set(_dst \"\${CMAKE_INSTALL_PREFIX}/bin/clio_cae_omni\")
+  if(EXISTS \"\${_src}\")
+    if(WIN32)
+      file(INSTALL \"\${_src}\" DESTINATION \"\${CMAKE_INSTALL_PREFIX}/bin\"
+           RENAME clio_cae_omni.exe)
+    else()
+      execute_process(COMMAND \${CMAKE_COMMAND} -E create_symlink clio_cae \"\${_dst}\")
+    endif()
+    message(STATUS \"Installed clio_cae_omni -> clio_cae symlink at \${_dst}\")
+  endif()
+")
 
 #------------------------------------------------------------------------------
 # Tests

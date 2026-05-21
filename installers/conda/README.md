@@ -189,7 +189,7 @@ $CONDA_PREFIX/
 ├── bin/                           # Command-line tools
 │   ├── clio_run runtime start
 │   ├── clio_cte
-│   ├── clio_cae_omni
+│   ├── clio_cae
 │   └── ...
 ├── lib/                           # Shared libraries
 │   ├── libchimaera_cxx.so
