@@ -768,16 +768,23 @@ class ZeroMqTransport : public Transport {
     uint64_t t_ser_end = stamp();
     size_t write_bulk_count = meta.send_bulks;
 
-    // --- Per-Send completion holder (allocated up-front so EVERY exit
-    // ---  path from Send fires the user callback exactly once) ---
+    // --- Per-Send completion holder ---
     //
-    // The starter ref is dropped via a scope-guard destructor; that
-    // way an early return on a meta/id/delim frame failure can't leak
-    // the holder. Bulk loop adds one ref per zmq_msg_init_data; ZMQ
-    // releases each ref when the bulk is flushed (success) or when
-    // the caller calls zmq_msg_close after a bulk send failure.
+    // ASYNC mode (ctx.IsSync() == false, the legacy / streaming path):
+    //   allocated up-front so EVERY exit from Send fires the user
+    //   callback exactly once. The starter ref is dropped via a
+    //   scope-guard destructor; bulk loop adds one ref per
+    //   zmq_msg_init_data; ZMQ releases each ref when the bulk is
+    //   flushed (success) or when the caller calls zmq_msg_close after
+    //   a bulk send failure.
+    //
+    // SYNC mode (ctx.IsSync() == true): skipped entirely. Bulks are
+    // sent copy-based via plain zmq_send so ZMQ has no reference to
+    // caller buffers after this Send returns. The caller manages
+    // buffer / task lifetime synchronously around the Send call;
+    // ctx.on_send_complete is not invoked.
     zmq_detail::SendCompletion *completion = nullptr;
-    if (ctx.on_send_complete != nullptr) {
+    if (!ctx.IsSync() && ctx.on_send_complete != nullptr) {
       completion = new zmq_detail::SendCompletion();
       completion->pending.store(1, std::memory_order_relaxed);  // starter
       completion->user_cb = ctx.on_send_complete;
@@ -884,6 +891,31 @@ class ZeroMqTransport : public Transport {
         flags |= ZMQ_SNDMORE;
       }
 
+      bulk_bytes_sum += meta.send[i].size;
+      if (ctx.IsSync()) {
+        // SYNC: plain copy-based zmq_send. ZMQ copies our buffer into
+        // its own internal frame inside this call; after the call
+        // returns it has no reference to meta.send[i].data anymore, so
+        // the caller can safely free / reuse the buffer the instant
+        // Send returns. Peak memory is briefly 2x one bulk's size
+        // (ours + ZMQ's copy) during the call — acceptable because
+        // we serialize: only one transfer is in flight at any time,
+        // and avoids the sustained 2x of the async pipeline.
+        rc = zmq_send_eintr(socket_, meta.send[i].data.ptr_,
+                             meta.send[i].size, flags);
+        if (rc == -1) {
+          HLOG(kError, "ZeroMqTransport::Send(sync) - bulk {} FAILED: {}",
+               i, zmq_strerror(zmq_errno()));
+          bulk_send_rc = zmq_errno();
+          break;
+        }
+        continue;
+      }
+
+      // ASYNC: zero-copy zmq_msg_init_data path. ZMQ retains a reference
+      // to our buffer until the I/O thread drains it; the SendCompletion
+      // / release_bulk machinery tracks that and fires user_cb when the
+      // last ref drops.
       zmq_msg_t msg;
       if (completion) {
         // Take one ref BEFORE init_data so the release callback can
@@ -897,7 +929,6 @@ class ZeroMqTransport : public Transport {
         zmq_msg_init_data(&msg, meta.send[i].data.ptr_, meta.send[i].size,
                            &zmq_noop_free, nullptr);
       }
-      bulk_bytes_sum += meta.send[i].size;
       rc = zmq_msg_send_eintr(&msg, socket_, flags);
       if (rc == -1) {
         HLOG(kError, "ZeroMqTransport::Send - bulk {} FAILED: {}", i,

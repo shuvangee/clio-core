@@ -256,41 +256,17 @@ bool IpcCpu2CpuZmq::RuntimeSend(
         archive.client_info_.fd_ = future_shm->response_fd_;
       }
 
-      // Send via lightbeam, handing it a "delete this task when you're
-      // done with the zero-copy bulk" callback. The transport keeps the
-      // task buffer alive via an internal atomic refcount tied to each
-      // zmq_msg_init_data ref; when ZMQ has confirmed every bulk has
-      // flushed (success path) or rejected them (failure path via
-      // zmq_msg_close), it invokes this callback to free the task.
-      // DelTask is just `task->~T(); operator delete(task);` — no
-      // coroutine state, no locks — so it's safe to run from ZMQ's
-      // I/O thread.
-      ctp::lbm::LbmContext send_ctx;
-      send_ctx.on_send_complete = +[](void *user_data) {
-        auto *task_raw = static_cast<Task *>(user_data);
-        if (!task_raw) return;
-        auto *pm = CLIO_POOL_MANAGER;
-        if (pm == nullptr) return;
-        auto *del_container = pm->GetStaticContainer(task_raw->pool_id_);
-        if (del_container) {
-          // DelTask reads only ptr_ from the FullPtr; the raw-pointer
-          // ctor (shm_=null alloc + offset=ptr) is enough.
-          del_container->DelTask(
-              task_raw->method_, ctp::ipc::FullPtr<Task>(task_raw));
-        }
-      };
-      send_ctx.on_send_complete_data = origin_task.ptr_;
-
+      // SYNC send: lightbeam copies bulks into ZMQ inside this call and
+      // holds no reference to origin_task's buffers after it returns, so
+      // we DelTask synchronously below.  No async callback, no I/O-thread
+      // race with the task's destructor.
+      //
       // On read responses each task ships a 1 MiB bulk frame; at high
       // concurrency the ROUTER socket can transiently return EAGAIN.
       // Without retry the response is lost and the client spins on
-      // FUTURE_COMPLETE forever, so re-queue on failure.
-      //
-      // Lifetime contract with lightbeam (see SendCompletion's
-      // `cancelled` flag): on rc==0 the transport fires on_send_complete
-      // exactly once after every bulk flushes (DelTask runs there). On
-      // rc!=0 the transport cancels the callback — the task stays alive
-      // and the caller owns its lifetime, so re-queueing is safe.
+      // FUTURE_COMPLETE forever, so re-queue on failure (without
+      // DelTask — task lifetime stays with the queued_future).
+      ctp::lbm::LbmContext send_ctx(ctp::lbm::LBM_SYNC);
       int rc = response_transport->Send(archive, send_ctx);
       if (rc != 0) {
         size_t fail_total =
@@ -301,6 +277,17 @@ bool IpcCpu2CpuZmq::RuntimeSend(
              rc, fail_total, static_cast<int>(priority));
         ipc->EnqueueNetTask(queued_future, priority);
         continue;
+      }
+
+      // Send succeeded — caller-side buffers are no longer referenced
+      // by ZMQ, so it's safe to delete the task here.
+      {
+        auto *pm = CLIO_POOL_MANAGER;
+        auto *del_container =
+            pm ? pm->GetStaticContainer(origin_task->pool_id_) : nullptr;
+        if (del_container) {
+          del_container->DelTask(origin_task->method_, origin_task);
+        }
       }
 
       did_work = true;

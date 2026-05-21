@@ -291,6 +291,17 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
                static_cast<int>(msg_type));
           break;
       }
+      // Release the per-bulk zmq_msg_t handles that ZeroMqTransport::RecvBulks
+      // allocated for any borrowed (caller-didn't-preallocate) bulks. RecvIn /
+      // RecvOut have already copied the bulk payloads into shm-owned task
+      // buffers (via LoadTaskArchive::bulk -> CLIO_IPC->AllocateBuffer +
+      // memcpy + TASK_DATA_OWNER), so dropping the ZMQ frames here is safe.
+      // Without this, every PutBlob/GetBlob loopback round-trip leaks one
+      // 2 MiB ZMQ-owned frame per direction (~8 MiB per op under
+      // direct0+FORCE_NET) — archive goes out of scope after this iteration
+      // anyway, but the desc-owned zmq_msg_t lives in libzmq memory that
+      // only zmq_msg_close releases; the destructor can't reach it.
+      lbm_transport->ClearRecvHandles(archive);
     }
     HLOG(kInfo, "[PeerRecvThread] shutting down");
   });
@@ -713,7 +724,11 @@ void Runtime::SendIn(ctp::ipc::FullPtr<chi::Task> origin_task,
     container->SaveTask(task_copy->method_, archive, task_copy);
     uint64_t ser_dt = HrtNs() - ser_t0;
 
-    ctp::lbm::LbmContext ctx(0);  // Non-blocking async send
+    // SYNC send: lightbeam copies bulks into ZMQ during this call. After
+    // Send returns ZMQ holds no reference to task_copy's buffers, so the
+    // copy's lifetime (already pinned by origin_task_rctx->subtasks_[i]
+    // until the response is received) is unaffected by ZMQ's I/O thread.
+    ctp::lbm::LbmContext ctx(ctp::lbm::LBM_SYNC);
     HLOG(kDebug, "[SendIn] Task {} sending to node {} via lightbeam",
          origin_task->task_id_, target_node_id);
     uint64_t lbm_t0 = HrtNs();
@@ -858,24 +873,11 @@ void Runtime::SendOut(ctp::ipc::FullPtr<chi::Task> origin_task) {
   container->SaveTask(origin_task->method_, archive, origin_task);
   uint64_t sout_ser_dt = HrtNs() - sout_ser_t0;
 
-  ctp::lbm::LbmContext ctx(0);
-  // Lifetime-safe zero-copy: lightbeam will fire on_send_complete exactly
-  // once when ZMQ has finished with every bulk frame (success OR failure
-  // path); DelTask is `~Task() + operator delete` so it's safe to run
-  // from ZMQ's I/O thread.  See ipc_cpu2cpu_zmq.cc's RuntimeSend for the
-  // canonical use of this pattern.
-  ctx.on_send_complete = +[](void *user_data) {
-    auto *task_raw = static_cast<chi::Task *>(user_data);
-    if (!task_raw) return;
-    auto *pm = CLIO_POOL_MANAGER;
-    if (!pm) return;
-    auto *del = pm->GetStaticContainer(task_raw->pool_id_);
-    if (del) {
-      del->DelTask(task_raw->method_,
-                   ctp::ipc::FullPtr<chi::Task>(task_raw));
-    }
-  };
-  ctx.on_send_complete_data = origin_task.ptr_;
+  // SYNC send: lightbeam copies our bulks into ZMQ during the call and
+  // holds no reference to origin_task after Send returns, so DelTask
+  // runs deterministically below — no on_send_complete, no async
+  // lifetime tracking, no UAF race with ZMQ's I/O thread.
+  ctp::lbm::LbmContext ctx(ctp::lbm::LBM_SYNC);
   uint64_t sout_lbm_t0 = HrtNs();
   int rc = lbm_transport->Send(archive, ctx);
   uint64_t sout_lbm_dt = HrtNs() - sout_lbm_t0;
@@ -920,9 +922,10 @@ void Runtime::SendOut(ctp::ipc::FullPtr<chi::Task> origin_task) {
     }
   }
 
-  // Task delete is handled by lightbeam — on rc==0 the on_send_complete
-  // callback set above runs DelTask once ZMQ has flushed every bulk;
-  // nothing for us to do here.
+  // SYNC send: Send returned, ZMQ has copied every bulk into its own
+  // buffer, no outstanding reference to origin_task remains anywhere
+  // outside us. Safe to DelTask synchronously.
+  container->DelTask(origin_task->method_, origin_task);
 }
 
 /**
@@ -1483,6 +1486,11 @@ chi::TaskResume Runtime::Recv(ctp::ipc::FullPtr<RecvTask> task,
       task->SetReturnCode(3);
       break;
   }
+
+  // The dedicated PeerRecvThread (admin_runtime.cc:249) is the real recv
+  // loop for inbound peer/loopback messages; this Recv periodic task path
+  // is reserved for legacy / non-peer flows that don't allocate zmq_msg_t
+  // frames. No ClearRecvHandles needed here.
 
   CLIO_CO_RETURN;
   CLIO_TASK_BODY_END
