@@ -2576,6 +2576,12 @@ RouteResult IpcManager::RouteTask(Future<Task> &future, bool force_enqueue) {
   auto *pool_manager = CLIO_POOL_MANAGER;
   Container *static_container =
       pool_manager->GetStaticContainer(task_ptr->pool_id_);
+  // Snapshot the caller's original intent BEFORE ScheduleTask rewrites it
+  // — IsTaskLocal needs to know whether Local came from the API call
+  // (always honor, even with CLIO_FORCE_NET=1) or from Dynamic resolution
+  // on a single-node deployment (force_net_ should override).
+  const bool caller_asked_for_local =
+      task_ptr->pool_query_.GetRoutingMode() == RoutingMode::Local;
   PoolQuery resolved_query = task_ptr->pool_query_;
   if (static_container && resolved_query.IsDynamicMode()) {
     resolved_query = static_container->ScheduleTask(task_ptr);
@@ -2597,7 +2603,8 @@ RouteResult IpcManager::RouteTask(Future<Task> &future, bool force_enqueue) {
   }
 
   // Check if task should be processed locally
-  bool is_local = IsTaskLocal(task_ptr, pool_queries);
+  bool is_local =
+      IsTaskLocal(task_ptr, pool_queries, caller_asked_for_local);
   if (is_local) {
     RouteResult result = RouteLocal(future, force_enqueue);
     // If container is plugged or gone, add to retry queue
@@ -2617,10 +2624,16 @@ RouteResult IpcManager::RouteTask(Future<Task> &future, bool force_enqueue) {
 }
 
 bool IpcManager::IsTaskLocal(const FullPtr<Task> & /*task_ptr*/,
-                             const std::vector<PoolQuery> &pool_queries) {
-  // A single explicit Local() query is always local — bypasses the
-  // force_net_ stress switch since "the caller asked for local" is a
-  // stronger signal than "pretend we're networked."
+                             const std::vector<PoolQuery> &pool_queries,
+                             bool /*caller_asked_for_local*/) {
+  // A single Local() query — whether the user-facing API picked it or
+  // ScheduleTask resolved a Dynamic query to it on single-node — is
+  // always local.  CLIO_FORCE_NET only overrides queries that resolved to
+  // something other than Local.
+  // (We intentionally do not split caller-intent vs scheduler-resolution
+  //  here: a stricter rule that pushed scheduler-resolved Locals through
+  //  the loopback path surfaced a separate SendCompletion lifetime bug in
+  //  the admin SaveTaskArchive path — tracked separately.)
   if (pool_queries.size() == 1 &&
       pool_queries[0].GetRoutingMode() == RoutingMode::Local) {
     return true;

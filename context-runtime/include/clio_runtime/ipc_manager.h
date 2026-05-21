@@ -565,9 +565,16 @@ class IpcManager {
                                           PoolId pool_id,
                                           const FullPtr<Task> &task_ptr);
 
-  /** Check if task should be processed locally */
+  /** Check if task should be processed locally.
+   *  @param caller_asked_for_local True iff the user-facing API call was made
+   *    with PoolQuery::Local(). The default route from a Dynamic query is
+   *    Local on single-node deployments, but for the CLIO_FORCE_NET stress
+   *    switch to mean anything we have to distinguish "the caller said
+   *    local" (always honor) from "the scheduler resolved to local" (let
+   *    force_net override). */
   bool IsTaskLocal(const FullPtr<Task> &task_ptr,
-                   const std::vector<PoolQuery> &pool_queries);
+                   const std::vector<PoolQuery> &pool_queries,
+                   bool caller_asked_for_local);
 
   /** Route task locally.
    * If force_enqueue is true, always enqueue even if dest == current worker. */

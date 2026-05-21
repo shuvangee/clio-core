@@ -130,6 +130,13 @@ struct BenchArgs {
   u64 max_total_blobs = 0;        // 0 = unbounded; else TOTAL distinct keys
                                   // across all threads (split evenly)
   double time_limit_s = 0.0;      // 0 = run io_count ops; else run for N s
+  // PoolQuery flavor each AsyncPutBlob/AsyncGetBlob is issued with.
+  //   "local"   — PoolQuery::Local()    (default; the natural same-node case)
+  //   "dynamic" — PoolQuery::Dynamic()  (scheduler resolves; under
+  //               CLIO_FORCE_NET=1 the resolution becomes a DirectId and
+  //               IsTaskLocal returns false, so every op goes through the
+  //               ZMQ loopback path — used to stress-test the network code)
+  std::string query_type = "local";
   bool ok = false;                // false => caller should print usage & exit
 
   // Distinct keys a single thread cycles through. The global keyspace
@@ -147,7 +154,7 @@ inline void PrintUsage(const char *argv0) {
   HLOG(kError, "Usage: {} [--op Put|Get|PutGet] [--threads N] [--depth N]",
        argv0);
   HLOG(kError, "       [--io-size 1m] [--io-count N] [--max-total-blobs N] "
-               "[--time-limit SECONDS]");
+               "[--time-limit SECONDS] [--query-type local|dynamic]");
   HLOG(kError, "  Legacy positional form (still supported):");
   HLOG(kError, "       {} <test_case> <threads> <depth> <io_size> <io_count>",
        argv0);
@@ -203,6 +210,14 @@ inline BenchArgs ParseBenchArgs(int argc, char **argv) {
       } else if (f == "--time-limit") {
         const char *v = need(++i); if (!v) return a;
         a.time_limit_s = std::stod(v);
+      } else if (f == "--query-type" || f == "--query") {
+        const char *v = need(++i); if (!v) return a;
+        a.query_type = v;
+        if (a.query_type != "local" && a.query_type != "dynamic") {
+          HLOG(kError, "--query-type must be 'local' or 'dynamic' (got '{}')",
+               a.query_type);
+          return a;
+        }
       } else {
         HLOG(kError, "Unknown option: {}", f);
         PrintUsage(argv[0]);

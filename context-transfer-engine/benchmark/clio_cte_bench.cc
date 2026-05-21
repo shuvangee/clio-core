@@ -101,10 +101,19 @@ class CTEBenchmark {
     HLOG(kInfo, "Node ID: {}  Test: {}  Threads: {}  Depth: {}", node_id_,
          a_.test_case, a_.threads, a_.depth);
     HLOG(kInfo, "I/O size: {}  io-count/thread: {}  max-total-blobs: {} "
-                "({}/thread)  time-limit: {}s",
+                "({}/thread)  time-limit: {}s  query: {}",
          clio_bench::FormatSize(a_.io_size), a_.io_count, a_.max_total_blobs,
-         per_thread_blobs_, a_.time_limit_s);
+         per_thread_blobs_, a_.time_limit_s, a_.query_type);
     HLOG(kInfo, "===========================");
+  }
+
+  // PoolQuery flavor each AsyncPutBlob/AsyncGetBlob is issued with.
+  // Read once per worker thread; constant for the duration of the run.
+  chi::PoolQuery MakeQuery() const {
+    if (a_.query_type == "dynamic") {
+      return chi::PoolQuery::Dynamic();
+    }
+    return chi::PoolQuery::Local();
   }
 
   // Number of distinct keys a thread uses (finite pool for Get to read).
@@ -130,12 +139,14 @@ class CTEBenchmark {
     auto blob_name = [&](long k) {
       return "blob_t" + std::to_string(tid) + "_" + std::to_string(k);
     };
+    const chi::PoolQuery pq = MakeQuery();
 
     // Get needs the keyspace populated first (untimed).
     if (mode == Mode::kGet) {
       for (long k = 0; k < KeyspaceSize(); ++k) {
         auto t = cte->AsyncPutBlob(tag_id, blob_name(k), 0, a_.io_size,
-                                   put_ptr, 0.8f);
+                                   put_ptr, 0.8f,
+                                   clio_cte::core::Context(), 0, pq);
         t.Wait();
         if (t->return_code_.load() != 0) {
           err.store(true, std::memory_order_relaxed);
@@ -162,7 +173,8 @@ class CTEBenchmark {
         for (long j = 0; j < batch; ++j) {
           pts.push_back(cte->AsyncPutBlob(
               tag_id, blob_name(KeyIndex(i + j, per_thread_blobs_)), 0,
-              a_.io_size, put_ptr, 0.8f));
+              a_.io_size, put_ptr, 0.8f,
+              clio_cte::core::Context(), 0, pq));
         }
         for (auto &t : pts) {
           t.Wait();
@@ -176,7 +188,7 @@ class CTEBenchmark {
         for (long j = 0; j < batch; ++j) {
           auto t = cte->AsyncGetBlob(
               tag_id, blob_name(KeyIndex(i + j, per_thread_blobs_)), 0,
-              a_.io_size, 0, get_ptr);
+              a_.io_size, 0, get_ptr, pq);
           t.Wait();
           if (t->return_code_.load() != 0) {
             HLOG(kError, "[t{}] GetBlob rc={}", tid, t->return_code_.load());
