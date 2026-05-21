@@ -142,8 +142,11 @@ if(CHIMAERA_GPU_SOURCES)
   # `chimaera_cxx` alias added at the bottom of this file.  In-tree
   # consumers (context-runtime/test/unit, context-transfer-engine
   # gpu_vector adapter) still link to the legacy name; adding an ALIAS
-  # here lets that work without renaming every CMakeLists.
-  if(NOT TARGET chimaera_cxx_gpu)
+  # here lets that work without renaming every CMakeLists.  Guarded
+  # on the GPU target's existence because CHIMAERA_GPU_SOURCES can be
+  # non-empty even when none of CUDA/SYCL/ROCm are enabled (CPU-only
+  # builds in CI), in which case no GPU target was actually defined.
+  if(TARGET ${CHIMAERA_LIB_NAME}_gpu AND NOT TARGET chimaera_cxx_gpu)
     add_library(chimaera_cxx_gpu ALIAS ${CHIMAERA_LIB_NAME}_gpu)
   endif()
 endif()
