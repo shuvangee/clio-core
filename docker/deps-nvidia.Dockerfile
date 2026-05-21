@@ -130,7 +130,7 @@ RUN apt-get update \
 # without the AMD-flavored hipcc dropping a conflicting binary.
 #
 # Required env at build time: HIP_PLATFORM=nvidia (forwarded into the
-# CMake configure step by IowarpCoreCommon's wrp_core_enable_rocm
+# CMake configure step by ClioCoreCommon's wrp_core_enable_rocm
 # macro). At runtime nothing extra is needed because the HIP runtime
 # is header-only on NVIDIA — calls inline directly into cudart.
 

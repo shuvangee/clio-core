@@ -58,7 +58,7 @@ set(CLIO_CTP_EXPORTED_TARGETS "ClioCtp")
 # ------------------------------------------------------------------------------
 # CMake Modules
 # ------------------------------------------------------------------------------
-# CMake modules are now loaded from /workspace/cmake via IowarpCoreCommon.cmake
+# CMake modules are now loaded from /workspace/cmake via ClioCoreCommon.cmake
 # No need for local cmake directory
 
 # ------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ endif()
 # ------------------------------------------------------------------------------
 # External libraries
 # ------------------------------------------------------------------------------
-# External libraries are now found by IowarpCoreCommon.cmake in /workspace/cmake
+# External libraries are now found by ClioCoreCommon.cmake in /workspace/cmake
 # No local includes needed
 
 # CMAKE_EXPORT_COMPILE_COMMANDS and RPATH settings are set by root CMakeLists.txt

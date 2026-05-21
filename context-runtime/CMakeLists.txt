@@ -25,7 +25,7 @@ endif()
 #------------------------------------------------------------------------------
 # SECTION 3: CHIMOD CMAKE UTILITIES AND DEPENDENCIES
 #------------------------------------------------------------------------------
-# ChiMod utilities are now provided by IowarpCoreCommon.cmake in /workspace/cmake
+# ChiMod utilities are now provided by ClioCoreCommon.cmake in /workspace/cmake
 # No local includes needed - all find_package calls are in root CMakeLists.txt
 
 #------------------------------------------------------------------------------
@@ -116,16 +116,19 @@ if(TARGET cereal)
     set(_CEREAL_TARGET cereal)
 endif()
 
-# Collect GPU target if it exists
+# Collect GPU target if it exists (still keyed off the legacy
+# `${CLIO_RUN_NAMESPACE}_cxx_gpu` name produced by context-runtime/src for
+# CUDA/SYCL/ROCm builds).
 set(_GPU_TARGET "")
 if(TARGET ${CLIO_RUN_NAMESPACE}_cxx_gpu)
   set(_GPU_TARGET ${CLIO_RUN_NAMESPACE}_cxx_gpu)
 endif()
 
-# Install main library (and GPU library if built).
-# PUBLIC_HEADER points at the new canonical path; the legacy chimaera/chimaera.h
-# is installed via the DIRECTORY install below (as a forwarder shim).
-install(TARGETS ${CLIO_RUN_NAMESPACE}_cxx ${_GPU_TARGET} ${_CEREAL_TARGET}
+# Install main library (and GPU library if built). The canonical target name
+# is `clio_run_cxx` (see context-runtime/src/CMakeLists.txt); the
+# install-time alias namespace stays `chimaera::` for backward compat with
+# external find_package consumers like coeus-adapter.
+install(TARGETS clio_run_cxx ${_GPU_TARGET} ${_CEREAL_TARGET}
   EXPORT ${MAIN_EXPORT_NAME}
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
@@ -133,6 +136,32 @@ install(TARGETS ${CLIO_RUN_NAMESPACE}_cxx ${_GPU_TARGET} ${_CEREAL_TARGET}
   PUBLIC_HEADER DESTINATION include/clio_runtime
   INCLUDES DESTINATION include
 )
+
+# Install a libchimaera_cxx.so symlink alongside the canonical
+# libclio_run_cxx.so so any external binary that loaded the historical
+# name via LD_LIBRARY_PATH or RPATH (dlopen / direct -lchimaera_cxx link)
+# keeps resolving.
+install(CODE "
+  if(WIN32)
+    return()
+  endif()
+  set(_libdir \"\${CMAKE_INSTALL_PREFIX}/lib\")
+  # SHARED libs land as e.g. libclio_run_cxx.so.1.5.7 with
+  # libclio_run_cxx.so.1 and libclio_run_cxx.so symlinks.
+  # Mirror the same trio for libchimaera_cxx.so.
+  file(GLOB _real_files RELATIVE \"\${_libdir}\"
+       \"\${_libdir}/libclio_run_cxx.so*\")
+  foreach(_real_name \${_real_files})
+    string(REPLACE \"libclio_run_cxx\" \"libchimaera_cxx\"
+           _link_name \"\${_real_name}\")
+    if(NOT \"\${_link_name}\" STREQUAL \"\${_real_name}\"
+       AND NOT EXISTS \"\${_libdir}/\${_link_name}\")
+      execute_process(COMMAND \${CMAKE_COMMAND} -E create_symlink
+        \"\${_real_name}\" \"\${_libdir}/\${_link_name}\")
+      message(STATUS \"Installed legacy symlink \${_link_name} -> \${_real_name}\")
+    endif()
+  endforeach()
+")
 
 # Install canonical headers (new name) AND the legacy forwarder-shim tree
 # (so external code using `#include <chimaera/...>` still resolves).
@@ -211,11 +240,20 @@ set(CHIMAERA_CONFIG_CONTENT "@PACKAGE_INIT@
 include(CMakeFindDependencyMacro)
 
 # All dependencies are handled by root CMakeLists.txt
-# Include IowarpCoreCommon for external ChiMod development
-include(\"\${CMAKE_CURRENT_LIST_DIR}/IowarpCoreCommon.cmake\")
+# Include ClioCoreCommon for external Module development
+include(\"\${CMAKE_CURRENT_LIST_DIR}/ClioCoreCommon.cmake\")
 
 # Include the exported targets
 include(\"\${CMAKE_CURRENT_LIST_DIR}/@MAIN_EXPORT_NAME@.cmake\")
+
+# Backward-compat alias: clio_run::cxx -> chimaera::cxx
+# Lets new code link via the canonical clio_runtime:: namespace while the
+# installed targets keep their historical chimaera:: prefix.
+if(TARGET chimaera::cxx AND NOT TARGET clio_run::cxx)
+  add_library(clio_run::cxx INTERFACE IMPORTED)
+  set_target_properties(clio_run::cxx PROPERTIES
+    INTERFACE_LINK_LIBRARIES chimaera::cxx)
+endif()
 
 # Provide components
 check_required_components(@MAIN_PACKAGE_NAME@)
@@ -238,7 +276,7 @@ write_basic_package_version_file(
 install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/${MAIN_PACKAGE_NAME}Config.cmake"
   "${CMAKE_CURRENT_BINARY_DIR}/${MAIN_PACKAGE_NAME}ConfigVersion.cmake"
-  "${CMAKE_SOURCE_DIR}/cmake/IowarpCoreCommon.cmake"
+  "${CMAKE_SOURCE_DIR}/cmake/ClioCoreCommon.cmake"
   DESTINATION lib/cmake/${MAIN_PACKAGE_NAME}
 )
 

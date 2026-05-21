@@ -15,7 +15,7 @@ set(CLIO_CTE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 # CTE_ENABLE_CMAKE_DOTENV is set by root CMakeLists.txt
 # DOTENV handling is done by root CMakeLists.txt
 
-# CMake modules and ChiMod utilities are now provided by IowarpCoreCommon.cmake
+# CMake modules and ChiMod utilities are now provided by ClioCoreCommon.cmake
 # All find_package calls are handled by root CMakeLists.txt
 # Targets chimaera::cxx, clio_admin_client, etc. are already available
 

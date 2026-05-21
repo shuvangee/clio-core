@@ -48,8 +48,11 @@ foreach(src ${CHIMAERA_EXTERNAL_GPU_SOURCES})
   list(APPEND CHIMAERA_GPU_SOURCES ${src})
 endforeach()
 
-# Create main library with namespace prefix to avoid conflicts
-set(CHIMAERA_LIB_NAME "${CLIO_RUN_NAMESPACE}_cxx")
+# Create the main CLIO Runtime library. Canonical name is `clio_run_cxx`
+# (target + .so file); legacy aliases `chimaera_cxx` and `chimaera::cxx` are
+# created below for backward compat. The `CHIMAERA_LIB_NAME` variable kept
+# its historical name to minimise churn across the in-file uses.
+set(CHIMAERA_LIB_NAME "clio_run_cxx")
 add_library(${CHIMAERA_LIB_NAME} SHARED ${CHIMAERA_CPU_SOURCES})
 
 # Build GPU work orchestrator library if CUDA/ROCm/SYCL enabled and GPU sources exist
@@ -205,10 +208,12 @@ set_target_properties(${CHIMAERA_LIB_NAME} PROPERTIES
   VERSION ${PROJECT_VERSION}
   SOVERSION 1
   PUBLIC_HEADER "${CLIO_RUN_ROOT}/include/clio_runtime/clio_runtime.h"
-  OUTPUT_NAME "${CLIO_RUN_NAMESPACE}_cxx"
+  OUTPUT_NAME "clio_run_cxx"
 )
 
-# Export target for parent scope
+# Export target for parent scope. EXPORT_NAME is intentionally `cxx` so the
+# installed alias is `chimaera::cxx` (the historical install-time name that
+# external consumers — coeus-adapter, etc. — still link against).
 set_target_properties(${CHIMAERA_LIB_NAME} PROPERTIES EXPORT_NAME cxx)
 
 # Precompiled headers for faster builds. Skipped under SYCL because the
@@ -222,5 +227,14 @@ if(NOT CLIO_CORE_ENABLE_SYCL)
   )
 endif()
 
-# Create namespace alias for external consumption
-add_library(${CLIO_RUN_NAMESPACE}::cxx ALIAS ${CHIMAERA_LIB_NAME})
+# Backward-compat target aliases (one ALIAS per legacy name pointing at the
+# canonical `clio_run_cxx` target). The canonical / install-time form is
+# `chimaera::cxx` (kept stable for external find_package consumers), but new
+# in-tree code can equivalently use `clio_run::cxx` / `clio_run_cxx`.
+add_library(${CLIO_RUN_NAMESPACE}::cxx ALIAS ${CHIMAERA_LIB_NAME})  # chimaera::cxx
+if(NOT TARGET clio_run::cxx)
+  add_library(clio_run::cxx ALIAS ${CHIMAERA_LIB_NAME})
+endif()
+if(NOT TARGET chimaera_cxx)
+  add_library(chimaera_cxx ALIAS ${CHIMAERA_LIB_NAME})
+endif()

@@ -206,11 +206,11 @@ if(CLIO_CORE_ENABLE_CMAKE_DOTENV)
 endif()
 
 #------------------------------------------------------------------------------
-# Load IowarpCoreCommon utilities
+# Load ClioCoreCommon utilities
 #------------------------------------------------------------------------------
 # Provides macros for dependency resolution and ChiMod build functions
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-include(IowarpCoreCommon)
+include(ClioCoreCommon)
 
 #------------------------------------------------------------------------------
 # External Library Discovery
@@ -653,7 +653,7 @@ endif()
 if(CLIO_CORE_ENABLE_PYTHON)
   message(STATUS "Python bindings enabled - configuring nanobind")
 
-  # Find Python executable using helper from IowarpCoreCommon
+  # Find Python executable using helper from ClioCoreCommon
   find_first_path_python()
 
   # Find Python for nanobind
@@ -943,11 +943,11 @@ if(CLIO_CORE_ENABLE_TESTS)
 endif()
 
 
-# yaml-cpp is already found by IowarpCoreCommon (line 202)
+# yaml-cpp is already found by ClioCoreCommon (line 202)
 if(NOT TARGET yaml-cpp AND NOT TARGET yaml-cpp::yaml-cpp)
   message(FATAL_ERROR "yaml-cpp was not found. Please run install.sh to install dependencies.")
 endif()
-message(STATUS "yaml-cpp already found by IowarpCoreCommon")
+message(STATUS "yaml-cpp already found by ClioCoreCommon")
 
 # Context Transport Primitives (formerly context-transport-primitives) - Required by runtime
 message(STATUS "Building context-transport-primitives component")
@@ -1205,7 +1205,7 @@ include(CMakePackageConfigHelpers)
 
 # Configure the package config file from template
 configure_package_config_file(
-    "${CMAKE_SOURCE_DIR}/cmake/IowarpCoreConfig.cmake.in"
+    "${CMAKE_SOURCE_DIR}/cmake/ClioCoreConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/iowarp-coreConfig.cmake"
     INSTALL_DESTINATION lib/cmake/iowarp-core
 )
@@ -1217,11 +1217,15 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
-# Install the package config files
+# Install the package config files. Both ClioCoreCommon (canonical) and
+# the IowarpCoreCommon forwarder are installed so external CMake code
+# that does `include(IowarpCoreCommon)` after find_package(iowarp-core)
+# keeps working unchanged.
 install(
     FILES
         "${CMAKE_CURRENT_BINARY_DIR}/iowarp-coreConfig.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/iowarp-coreConfigVersion.cmake"
+        "${CMAKE_SOURCE_DIR}/cmake/ClioCoreCommon.cmake"
         "${CMAKE_SOURCE_DIR}/cmake/IowarpCoreCommon.cmake"
     DESTINATION
         lib/cmake/iowarp-core
@@ -1281,7 +1285,7 @@ message(STATUS "")
 # it up at startup.
 
 # Shared libraries -> iowarp_core/lib/
-set(PIP_LIB_TARGETS clio_ctp_host chimaera_cxx)
+set(PIP_LIB_TARGETS clio_ctp_host clio_run_cxx)
 if(TARGET clio_admin_client)
   list(APPEND PIP_LIB_TARGETS clio_admin_client clio_admin_runtime)
 endif()
