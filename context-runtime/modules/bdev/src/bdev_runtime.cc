@@ -1084,21 +1084,12 @@ char* Runtime::GetRamPage(size_t page_idx) const {
 }
 
 void Runtime::WriteToRam(ctp::ipc::FullPtr<WriteTask> task) {
-  static thread_local size_t ram_write_count = 0;
-  static thread_local double t_resolve_ms = 0, t_memcpy_ms = 0;
-  ctp::Timer timer;
-
-  timer.Resume();
   auto *ipc_mgr = CLIO_IPC;
   ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
-  timer.Pause();
-  t_resolve_ms += timer.GetMsec();
-  timer.Reset();
 
   chi::u64 total_bytes_written = 0;
   chi::u64 data_offset = 0;
 
-  timer.Resume();
   for (size_t i = 0; i < task->blocks_.size(); ++i) {
     const Block &block = task->blocks_[i];
 
@@ -1140,53 +1131,21 @@ void Runtime::WriteToRam(ctp::ipc::FullPtr<WriteTask> task) {
 
     total_bytes_written += block_write_size;
   }
-  timer.Pause();
-  t_memcpy_ms += timer.GetMsec();
-  timer.Reset();
 
   task->return_code_ = 0;
   task->bytes_written_ = total_bytes_written;
 
   total_writes_.fetch_add(1);
   total_bytes_written_.fetch_add(task->bytes_written_);
-
-  ++ram_write_count;
-  if (ram_write_count <= 16) {
-    double bw_mibs = task->bytes_written_ /
-                     static_cast<double>(1ULL << 20) /
-                     std::max(t_memcpy_ms, 1e-6) * 1e3;
-    char line[256];
-    std::snprintf(
-        line, sizeof(line),
-        "[WriteToRam #%zu] bytes=%llu resolve_us=%.1f memcpy_ms=%.3f (%.1f MiB/s)",
-        ram_write_count,
-        static_cast<unsigned long long>(task->bytes_written_),
-        t_resolve_ms * 1e3, t_memcpy_ms, bw_mibs);
-    HLOG(kInfo, "{}", line);
-    t_resolve_ms = t_memcpy_ms = 0;
-  } else if (ram_write_count % 100 == 0) {
-    HLOG(kDebug, "[WriteToRam] ops={} resolve={} ms memcpy={} ms",
-         ram_write_count, t_resolve_ms, t_memcpy_ms);
-    t_resolve_ms = t_memcpy_ms = 0;
-  }
 }
 
 void Runtime::ReadFromRam(ctp::ipc::FullPtr<ReadTask> task) {
-  static thread_local size_t ram_read_count = 0;
-  static thread_local double tr_resolve_ms = 0, tr_memcpy_ms = 0;
-  ctp::Timer rtimer;
-
-  rtimer.Resume();
   auto *ipc_mgr = CLIO_IPC;
   ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
-  rtimer.Pause();
-  tr_resolve_ms += rtimer.GetMsec();
-  rtimer.Reset();
 
   chi::u64 total_bytes_read = 0;
   chi::u64 data_offset = 0;
 
-  rtimer.Resume();
   for (size_t i = 0; i < task->blocks_.size(); ++i) {
     const Block &block = task->blocks_[i];
 
@@ -1241,30 +1200,12 @@ void Runtime::ReadFromRam(ctp::ipc::FullPtr<ReadTask> task) {
 
     total_bytes_read += block_read_size;
   }
-  rtimer.Pause();
-  tr_memcpy_ms += rtimer.GetMsec();
 
   task->return_code_ = 0;
   task->bytes_read_ = total_bytes_read;
 
   total_reads_.fetch_add(1);
   total_bytes_read_.fetch_add(total_bytes_read);
-
-  ++ram_read_count;
-  if (ram_read_count <= 16) {
-    double bw_mibs = total_bytes_read /
-                     static_cast<double>(1ULL << 20) /
-                     std::max(tr_memcpy_ms, 1e-6) * 1e3;
-    char line[256];
-    std::snprintf(
-        line, sizeof(line),
-        "[ReadFromRam #%zu] bytes=%llu resolve_us=%.1f memcpy_ms=%.3f (%.1f MiB/s)",
-        ram_read_count,
-        static_cast<unsigned long long>(total_bytes_read),
-        tr_resolve_ms * 1e3, tr_memcpy_ms, bw_mibs);
-    HLOG(kInfo, "{}", line);
-    tr_resolve_ms = tr_memcpy_ms = 0;
-  }
 }
 
 // VIRTUAL METHOD IMPLEMENTATIONS (now in autogen/bdev_lib_exec.cc)
