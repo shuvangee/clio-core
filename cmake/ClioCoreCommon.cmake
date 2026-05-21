@@ -767,9 +767,16 @@ function(read_repo_namespace output_var start_path)
     foreach(repo_file ${_repo_candidates})
       if(EXISTS "${repo_file}")
         file(READ "${repo_file}" REPO_YAML_CONTENT)
-        string(REGEX MATCH "namespace: *([^\n\r]+)" NAMESPACE_MATCH "${REPO_YAML_CONTENT}")
+        # Anchor to line-start so we only match the real top-level YAML
+        # entry, not occurrences of the substring "namespace:" inside a
+        # comment. file(READ) returns the whole file, and CMake regex
+        # has no multiline flag, so we prepend a newline and require
+        # one before the keyword.
+        string(REGEX MATCH "\n[ \t]*namespace: *([^\n\r]+)"
+               NAMESPACE_MATCH "\n${REPO_YAML_CONTENT}")
         if(NAMESPACE_MATCH)
-          string(REGEX REPLACE "namespace: *" "" namespace "${NAMESPACE_MATCH}")
+          string(REGEX REPLACE "\n[ \t]*namespace: *" ""
+                 namespace "${NAMESPACE_MATCH}")
           string(STRIP "${namespace}" namespace)
           set(${output_var} "${namespace}" PARENT_SCOPE)
           return()

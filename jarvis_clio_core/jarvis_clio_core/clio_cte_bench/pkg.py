@@ -115,6 +115,18 @@ class ClioCteBench(Application):
                 'type': bool,
                 'default': False,
                 'help': 'Set to True to initialize runtime, False to only initialize client'
+            },
+            {
+                'name': 'query_type',
+                'msg': 'PoolQuery used by the bench (maps to --query-type)',
+                'type': str,
+                'choices': ['local', 'dynamic', 'direct0'],
+                'default': 'local',
+                'help': 'local: PoolQuery::Local (co-located target); '
+                        'dynamic: PoolQuery::Dynamic; direct0: '
+                        'PoolQuery::DirectHash(0) -- explicit non-Local '
+                        'routing to node 0, useful for measuring '
+                        'cross-node CTE paths.'
             }
         ]
 
@@ -202,6 +214,7 @@ class ClioCteBench(Application):
             cmd += ['--io-count', str(self.config['io_count'])]
         if int(self.config['max_total_blobs']) > 0:
             cmd += ['--max-total-blobs', str(self.config['max_total_blobs'])]
+        cmd += ['--query-type', str(self.config['query_type'])]
 
         self.log(
             f"Running benchmark via Pssh: {self.config['nprocs']} procs, "
