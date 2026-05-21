@@ -8,6 +8,10 @@
 #include "clio_runtime/ipc_manager.h"
 #include "clio_runtime/singletons.h"
 
+#include <deque>
+#include <mutex>
+#include <vector>
+
 namespace chi {
 
 //==============================================================================
@@ -174,17 +178,53 @@ bool IpcCpu2CpuZmq::RuntimeSend(
   static std::atomic<size_t> send_counter{0};
   static std::atomic<size_t> send_fail_counter{0};
 
-  // Flush deferred deletes from previous invocation.
-  // Zero-copy send (zmq_msg_init_data) lets ZMQ's IO thread read from the
-  // task buffer after zmq_msg_send returns. Deferring DelTask by one
-  // invocation guarantees the IO thread has flushed the message.
-  for (auto &t : deferred_deletes) {
+  // Multi-invocation deferred-delete queue.  ZMQ's zero-copy send
+  // (zmq_msg_init_data + zmq_noop_free) lets the IO thread read from the
+  // task's serialization buffer AFTER zmq_msg_send returns — DelTask /
+  // ~Task is unsafe until ZMQ has actually flushed the message to the
+  // kernel.  A 1-invocation deferral was sufficient under light load but
+  // back-pressured runs (PutGet at 4 threads × depth 8 × 2 MiB blobs,
+  // sustained ~5 GB/s) need substantially longer: the IO thread can sit
+  // on a msg for tens of ms while ClientSend cycles every ~1 ms.  When
+  // the original task gets freed inside that window, the kernel's
+  // send(2) hits the unmapped page and zmq errno_asserts:
+  //     "Bad address (/tmp/zeromq-4.3.5/src/tcp.cpp:227)"
+  //
+  // Hold tasks across kDeferralDepth invocations before deletion — picked
+  // generously (~50ms of headroom at 1ms cycles) so even worst-case
+  // back-pressure on the ROUTER socket clears before we free.  All
+  // batches share one mutex; ClientSend can run on any worker so a
+  // thread_local would lose state when the coroutine wakes on a
+  // different worker.
+  static constexpr size_t kDeferralDepth = 64;
+  static std::mutex defer_mu;
+  static std::deque<std::vector<ctp::ipc::FullPtr<Task>>> defer_queue;
+
+  // Move the caller's batch (collected on the previous invocation) into
+  // the back of the deferral queue under lock.  The caller's vector is
+  // cleared so it can accumulate this invocation's new sends.
+  std::vector<ctp::ipc::FullPtr<Task>> to_delete;
+  {
+    std::lock_guard<std::mutex> lock(defer_mu);
+    if (!deferred_deletes.empty()) {
+      defer_queue.emplace_back(std::move(deferred_deletes));
+      deferred_deletes.clear();
+    }
+    // Flush the OLDEST batch only when the queue has aged past
+    // kDeferralDepth invocations.  Within the lock we just splice it
+    // out; the actual DelTask calls happen below without the mutex
+    // held, so a slow container destructor doesn't stall enqueues.
+    if (defer_queue.size() > kDeferralDepth) {
+      to_delete = std::move(defer_queue.front());
+      defer_queue.pop_front();
+    }
+  }
+  for (auto &t : to_delete) {
     auto *del_container = pool_manager->GetStaticContainer(t->pool_id_);
     if (del_container) {
       del_container->DelTask(t->method_, t);
     }
   }
-  deferred_deletes.clear();
 
   // Process both TCP and IPC queues
   for (int mode_idx = 0; mode_idx < 2; ++mode_idx) {
