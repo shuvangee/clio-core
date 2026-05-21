@@ -188,13 +188,18 @@ if [ "$DO_BUILD" = true ]; then
     fi
 
     print_info "Configuring build with coverage enabled..."
+    # CMake variables are CLIO_*; the legacy WRP_* names were silently
+    # ignored (no_op overrides) after the rebrand, so the debug preset's
+    # CLIO_CTE_ENABLE_COMPRESS=ON default leaked through and broke the
+    # pkg_check_modules(liblz4 REQUIRED) call when lz4 wasn't in the
+    # conda env.
     cmake --preset=debug \
-        -DWRP_CORE_ENABLE_COVERAGE=ON \
-        -DWRP_CORE_ENABLE_CONDA=ON \
-        -DWRP_CORE_ENABLE_DOCKER_CI=OFF \
-        -DWRP_CTE_ENABLE_ADIOS2_ADAPTER=OFF \
-        -DWRP_CTE_ENABLE_COMPRESS=OFF \
-        -DWRP_CORE_ENABLE_GRAY_SCOTT=OFF
+        -DCLIO_CORE_ENABLE_COVERAGE=ON \
+        -DCLIO_CORE_ENABLE_CONDA=ON \
+        -DCLIO_CORE_ENABLE_DOCKER_CI=OFF \
+        -DCLIO_CTE_ENABLE_ADIOS2_ADAPTER=OFF \
+        -DCLIO_CTE_ENABLE_COMPRESS=OFF \
+        -DCLIO_CORE_ENABLE_GRAY_SCOTT=OFF
 
     print_info "Building project..."
     NUM_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
