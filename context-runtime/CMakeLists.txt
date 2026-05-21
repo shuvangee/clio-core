@@ -116,12 +116,18 @@ if(TARGET cereal)
     set(_CEREAL_TARGET cereal)
 endif()
 
-# Collect GPU target if it exists (still keyed off the legacy
-# `${CLIO_RUN_NAMESPACE}_cxx_gpu` name produced by context-runtime/src for
-# CUDA/SYCL/ROCm builds).
+# Collect GPU target if it exists.  The GPU twin is defined in
+# context-runtime/src/CMakeLists.txt as `${CHIMAERA_LIB_NAME}_gpu` where
+# CHIMAERA_LIB_NAME is hardcoded to "clio_run_cxx" — keep this check
+# aligned with that hardcoded name (NOT ${CLIO_RUN_NAMESPACE}_cxx_gpu,
+# which expands to "chimaera_cxx_gpu" on repos where the namespace
+# stayed `chimaera` for backward compat and silently fails to match the
+# real target, leaving the GPU lib out of the install-export set —
+# which then trips "requires target … not in any export set" on the
+# install(EXPORT) below because clio_run_cxx PRIVATE-links it).
 set(_GPU_TARGET "")
-if(TARGET ${CLIO_RUN_NAMESPACE}_cxx_gpu)
-  set(_GPU_TARGET ${CLIO_RUN_NAMESPACE}_cxx_gpu)
+if(TARGET clio_run_cxx_gpu)
+  set(_GPU_TARGET clio_run_cxx_gpu)
 endif()
 
 # Install main library (and GPU library if built). The canonical target name

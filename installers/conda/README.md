@@ -122,7 +122,7 @@ elf_enabled: "OFF"
 
 ```
 installers/conda/
-├── recipe.yaml              # Main recipe (rattler-build format)
+├── meta.yaml                 # Main recipe (conda-build format)
 ├── conda_build_config.yaml  # Variant definitions
 ├── conda-forge.yml          # conda-forge CI configuration
 ├── conda-local.sh           # Local build script
@@ -250,7 +250,7 @@ target_link_libraries(your_app
 To submit to conda-forge:
 
 1. Fork [conda-forge/staged-recipes](https://github.com/conda-forge/staged-recipes)
-2. Copy `recipe.yaml` and `conda_build_config.yaml` to `recipes/iowarp-core/`
+2. Copy `meta.yaml` and `conda_build_config.yaml` to `recipes/iowarp-core/`
 3. Submit a pull request
 
 The CI will automatically build all variant combinations defined in `conda_build_config.yaml`.
