@@ -228,7 +228,7 @@ void TaskAllocationWorkerThread(size_t thread_id, const BenchmarkConfig &config,
                                 std::atomic<size_t> &completed_ops,
                                 std::chrono::nanoseconds &elapsed_time) {
   // Get IPC manager
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
 
   // Use io_size for task allocation benchmark
   size_t alloc_size = config.io_size;
@@ -294,7 +294,7 @@ void IOWorkerThread(size_t thread_id, const BenchmarkConfig &config,
   clio_run::bdev::Client bdev_client(pool_id);
 
   // Allocate data buffer in shared memory for writes (full io_size)
-  auto write_buffer = CHI_IPC->AllocateBuffer(config.io_size);
+  auto write_buffer = CLIO_IPC->AllocateBuffer(config.io_size);
   std::memset(write_buffer.ptr_, static_cast<int>(thread_id), config.io_size);
   HLOG(kInfo, "Allocate write buffer for thread {}", config.io_size);
 
@@ -313,7 +313,7 @@ void IOWorkerThread(size_t thread_id, const BenchmarkConfig &config,
       HLOG(kError, "Thread {}: AllocateBlocks failed (rc={}, blocks={})",
            thread_id, alloc_task->GetReturnCode(), alloc_task->blocks_.size());
       stop_flag.store(true, std::memory_order_relaxed);
-      CHI_IPC->FreeBuffer(write_buffer);
+      CLIO_IPC->FreeBuffer(write_buffer);
       return;
     }
     std::vector<clio_run::bdev::Block> blocks;
@@ -364,7 +364,7 @@ void IOWorkerThread(size_t thread_id, const BenchmarkConfig &config,
       end_time - start_time);
 
   // Free the allocated write buffer
-  CHI_IPC->FreeBuffer(write_buffer);
+  CLIO_IPC->FreeBuffer(write_buffer);
 
   // Update global counters
   completed_ops.fetch_add(local_ops, std::memory_order_relaxed);

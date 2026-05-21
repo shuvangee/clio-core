@@ -13,7 +13,7 @@
  * grid block, with thread 0 of each block doing the Send + Wait. The
  * full pipeline runs:
  *
- *   per-block thread 0: CHI_IPC->Send(task_fp[blockIdx.x])
+ *   per-block thread 0: CLIO_IPC->Send(task_fp[blockIdx.x])
  *                       -> IpcGpu2Cpu::ClientSend pushes onto the
  *                          per-device gpu2cpu_queue
  *                       -> CPU GPU worker pops, dispatches MOD_NAME::Runtime::GpuSubmit
@@ -50,8 +50,8 @@ __global__ void ChiGpuKernelStress(chi::IpcManagerGpuInfo gpu_info,
   chi::u32 slot = blockIdx.x;
   if (slot >= num_tasks) return;
   // Use the kernel-scope `g_ipc_manager_ptr` (declared by CHIMAERA_GPU_INIT)
-  // rather than the CHI_IPC macro: NVCC compiles the kernel body in both
-  // the host and device passes, and the host-pass expansion of CHI_IPC
+  // rather than the CLIO_IPC macro: NVCC compiles the kernel body in both
+  // the host and device passes, and the host-pass expansion of CLIO_IPC
   // resolves the global `g_ipc_manager` symbol — which the macro shadows
   // with a `chi::gpu::IpcManager&` local. Reaching through the typed
   // pointer dodges that name collision and compiles cleanly in both passes.
@@ -74,7 +74,7 @@ TEST_CASE("GPU producer-only stress: kernel submits N tasks",
           "[gpu2cpu][stress]") {
   using namespace chi_test_gpu_stress;
   EnsureInit();
-  auto *ipc = CHI_CPU_IPC;
+  auto *ipc = CLIO_CPU_IPC;
   const chi::u32 gpu_id = 0;
 
   // 1. Allocate + register a pinned-host backend big enough for all slots.

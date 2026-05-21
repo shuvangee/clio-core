@@ -57,7 +57,7 @@ namespace chi {
 
 // Forward declaration to avoid circular dependency
 using WorkQueue =
-    ctp::ipc::mpsc_ring_buffer<ctp::ipc::ShmPtr<TaskLane>, CHI_QUEUE_ALLOC_T>;
+    ctp::ipc::mpsc_ring_buffer<ctp::ipc::ShmPtr<TaskLane>, CLIO_QUEUE_ALLOC_T>;
 
 // Forward declarations
 class Task;
@@ -462,7 +462,7 @@ class Worker {
   // Stores Future<Task> objects to set FUTURE_COMPLETE, avoiding stale RunContext* pointers
   // Allocated from malloc allocator (temporary runtime data, not IPC)
   static constexpr u32 EVENT_QUEUE_DEPTH = 1024;
-  ctp::ipc::mpsc_ring_buffer<Future<Task, CHI_QUEUE_ALLOC_T>, ctp::ipc::MallocAllocator> *event_queue_;
+  ctp::ipc::mpsc_ring_buffer<Future<Task, CLIO_QUEUE_ALLOC_T>, ctp::ipc::MallocAllocator> *event_queue_;
 
   // Periodic queue system for time-based periodic tasks:
   // - Queue[0]: Tasks with yield_time_us_ <= 50us (checked every 16 iterations)

@@ -145,7 +145,7 @@ class Container {
     method_mape_.resize(max_method_id, 0.0f);
     method_model_wall_.resize(max_method_id, 1.0f);
     method_mape_wall_.resize(max_method_id, 0.0f);
-    auto *config = CHI_CONFIG_MANAGER;
+    auto *config = CLIO_CONFIG_MANAGER;
     if (config) {
       learning_rate_ = config->GetLearningRate();
     }
@@ -498,7 +498,7 @@ class Container {
 
   /**
    * Delete a task via Container dispatch with proper type casting
-   * Replaces direct CHI_IPC->DelTask(base_ptr) to ensure correct destructor
+   * Replaces direct CLIO_IPC->DelTask(base_ptr) to ensure correct destructor
    * @param method The method ID for proper task type casting
    * @param task_ptr The task to delete
    */

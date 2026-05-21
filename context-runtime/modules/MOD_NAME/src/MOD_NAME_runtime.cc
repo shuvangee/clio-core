@@ -53,7 +53,7 @@ namespace clio_run::MOD_NAME {
 //===========================================================================
 
 chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task, chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "MOD_NAME: Executing Create task for pool {}", task->pool_id_);
 
   // Container is already initialized via Init() before Create is called
@@ -65,12 +65,12 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task, chi::RunCont
         "count: {})",
         pool_name_, task->pool_id_, create_count_);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Custom(ctp::ipc::FullPtr<CustomTask> task, chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "MOD_NAME: Executing Custom task with data: {}",
         task->data_.c_str());
 
@@ -81,12 +81,12 @@ chi::TaskResume Runtime::Custom(ctp::ipc::FullPtr<CustomTask> task, chi::RunCont
 
   HLOG(kDebug, "MOD_NAME: Custom completed (count: {})", custom_count_);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task, chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "MOD_NAME: Executing Destroy task - Pool ID: {}",
         task->target_pool_id_);
 
@@ -98,8 +98,8 @@ chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task, chi::RunCo
   // For now, just mark as successful
   HLOG(kDebug, "MOD_NAME: Container destroyed successfully");
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::u64 Runtime::GetWorkRemaining() const {
@@ -113,7 +113,7 @@ chi::u64 Runtime::GetWorkRemaining() const {
 
 chi::TaskResume Runtime::CoMutexTest(ctp::ipc::FullPtr<CoMutexTestTask> task,
                           chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "MOD_NAME: Executing CoMutexTest task {} (hold: {}ms)",
         task->test_id_, task->hold_duration_ms_);
 
@@ -137,13 +137,13 @@ chi::TaskResume Runtime::CoMutexTest(ctp::ipc::FullPtr<CoMutexTestTask> task,
   task->return_code_ = 0; // Success (0 means success in most conventions)
   HLOG(kDebug, "MOD_NAME: CoMutexTest {} completed", task->test_id_);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::CoRwLockTest(ctp::ipc::FullPtr<CoRwLockTestTask> task,
                            chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "MOD_NAME: Executing CoRwLockTest task {} ({}, hold: {}ms)",
         task->test_id_, (task->is_writer_ ? "writer" : "reader"),
         task->hold_duration_ms_);
@@ -186,13 +186,13 @@ chi::TaskResume Runtime::CoRwLockTest(ctp::ipc::FullPtr<CoRwLockTestTask> task,
   task->return_code_ = 0; // Success (0 means success in most conventions)
   HLOG(kDebug, "MOD_NAME: CoRwLockTest {} completed", task->test_id_);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::WaitTest(ctp::ipc::FullPtr<WaitTestTask> task,
                                   chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug,
         "MOD_NAME: Executing WaitTest task {} (depth: {}, current_depth: {})",
         task->test_id_, task->depth_, task->current_depth_);
@@ -211,7 +211,7 @@ chi::TaskResume Runtime::WaitTest(ctp::ipc::FullPtr<WaitTestTask> task,
     chi::u32 remaining_depth = task->depth_ - task->current_depth_;
     auto subtask = client_.AsyncWaitTest(
         task->pool_query_, remaining_depth, task->test_id_);
-    CHI_CO_AWAIT(subtask);
+    CLIO_CO_AWAIT(subtask);
     chi::u32 origin_task_final_depth = subtask->current_depth_;
     (void)origin_task_final_depth;
 
@@ -227,13 +227,13 @@ chi::TaskResume Runtime::WaitTest(ctp::ipc::FullPtr<WaitTestTask> task,
 
   HLOG(kDebug, "MOD_NAME: WaitTest {} completed at depth {}", task->test_id_,
         task->current_depth_);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::TestLargeOutput(ctp::ipc::FullPtr<TestLargeOutputTask> task,
                                          chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "MOD_NAME: Executing TestLargeOutput task");
 
   // Allocate 1MB vector (1024 * 1024 bytes)
@@ -248,13 +248,13 @@ chi::TaskResume Runtime::TestLargeOutput(ctp::ipc::FullPtr<TestLargeOutputTask> 
   HLOG(kDebug, "MOD_NAME: TestLargeOutput completed with {}KB output",
        kOutputSize / 1024);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::GpuSubmit(ctp::ipc::FullPtr<GpuSubmitTask> task,
                                    chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "MOD_NAME: Executing GpuSubmit task from GPU {}, test_value={}",
        task->gpu_id_, task->test_value_);
 
@@ -265,8 +265,8 @@ chi::TaskResume Runtime::GpuSubmit(ctp::ipc::FullPtr<GpuSubmitTask> task,
   HLOG(kDebug, "MOD_NAME: GpuSubmit completed, result_value={}",
        task->result_value_);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::SubtaskTest(ctp::ipc::FullPtr<SubtaskTestTask> task,
@@ -281,7 +281,7 @@ chi::TaskResume Runtime::SubtaskTest(ctp::ipc::FullPtr<SubtaskTestTask> task,
 
 chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
                                  chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Generate test data: a vector of MonitorData structs
   msgpack::sbuffer sbuf;
   msgpack::packer<msgpack::sbuffer> pk(sbuf);
@@ -298,8 +298,8 @@ chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
   task->results_[container_id_] = std::string(sbuf.data(), sbuf.size());
   task->SetReturnCode(0);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 // Static member definitions
@@ -308,5 +308,5 @@ chi::CoRwLock Runtime::test_corwlock_;
 
 } // namespace clio_run::MOD_NAME
 
-// Define ChiMod entry points using CHI_TASK_CC macro
-CHI_TASK_CC(clio_run::MOD_NAME::Runtime)
+// Define ChiMod entry points using CLIO_TASK_CC macro
+CLIO_TASK_CC(clio_run::MOD_NAME::Runtime)

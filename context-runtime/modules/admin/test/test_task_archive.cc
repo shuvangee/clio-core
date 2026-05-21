@@ -538,9 +538,9 @@ public:
     // Test implementation - do nothing
     (void)method;
     (void)task_ptr;
-    CHI_TASK_BODY_BEGIN
-    CHI_CO_RETURN;
-    CHI_TASK_BODY_END
+    CLIO_TASK_BODY_BEGIN
+    CLIO_CO_RETURN;
+    CLIO_TASK_BODY_END
   }
 
   void SaveTask(chi::u32 method, chi::SaveTaskArchive &archive,
@@ -571,7 +571,7 @@ public:
     // Test implementation - create new task and copy
     (void)method;
     (void)deep;
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     if (ipc_manager) {
       auto new_task_ptr = ipc_manager->NewTask<chi::Task>();
       if (!new_task_ptr.IsNull()) {
@@ -585,7 +585,7 @@ public:
   ctp::ipc::FullPtr<chi::Task> NewTask(chi::u32 method) override {
     // Test implementation - create a basic Task
     (void)method;
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     if (ipc_manager) {
       return ipc_manager->NewTask<chi::Task>();
     }
@@ -625,7 +625,7 @@ public:
 
   void DelTask(chi::u32 method, ctp::ipc::FullPtr<chi::Task> task_ptr) override {
     (void)method;
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     if (ipc_manager) {
       ipc_manager->DelTask(task_ptr);
     }

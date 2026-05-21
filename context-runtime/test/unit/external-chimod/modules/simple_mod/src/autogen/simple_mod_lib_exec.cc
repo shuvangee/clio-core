@@ -28,15 +28,15 @@ void Runtime::Init(const chi::PoolId &pool_id, const std::string &pool_name,
 }
 
 chi::TaskResume Runtime::Run(chi::u32 method, ctp::ipc::FullPtr<chi::Task> task_ptr, chi::RunContext& rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   switch (method) {
     default: {
       // Unknown method - do nothing
       break;
     }
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::SaveTask(chi::u32 method, chi::SaveTaskArchive& archive, 
@@ -96,7 +96,7 @@ void Runtime::LocalSaveTask(chi::u32 method, chi::DefaultSaveArchive& archive,
 }
 
 ctp::ipc::FullPtr<chi::Task> Runtime::NewCopyTask(chi::u32 method, ctp::ipc::FullPtr<chi::Task> orig_task_ptr, bool deep) {
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) {
     return ctp::ipc::FullPtr<chi::Task>();
   }
@@ -118,7 +118,7 @@ ctp::ipc::FullPtr<chi::Task> Runtime::NewCopyTask(chi::u32 method, ctp::ipc::Ful
 }
 
 ctp::ipc::FullPtr<chi::Task> Runtime::NewTask(chi::u32 method) {
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) {
     return ctp::ipc::FullPtr<chi::Task>();
   }
@@ -142,7 +142,7 @@ void Runtime::Aggregate(chi::u32 method, ctp::ipc::FullPtr<chi::Task> orig_task,
 }
 
 void Runtime::DelTask(chi::u32 method, ctp::ipc::FullPtr<chi::Task> task_ptr) {
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) return;
   switch (method) {
     default: {

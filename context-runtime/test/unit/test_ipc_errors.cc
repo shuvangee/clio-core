@@ -85,8 +85,8 @@ TEST_CASE("IpcErrors - Client Connect Without Server", "[ipc][errors]") {
   REQUIRE(!success);
 
   // Verify IPC manager is not initialized
-  // Note: CHI_IPC may be null or in uninitialized state
-  auto *ipc = CHI_IPC;
+  // Note: CLIO_IPC may be null or in uninitialized state
+  auto *ipc = CLIO_IPC;
   if (ipc != nullptr) {
     REQUIRE(!ipc->IsInitialized());
   }
@@ -131,7 +131,7 @@ TEST_CASE("IpcErrors - Huge Buffer Allocation", "[ipc][errors][memory]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to allocate impossibly large buffer
@@ -148,7 +148,7 @@ TEST_CASE("IpcErrors - Zero Size Allocation", "[ipc][errors][memory]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to allocate zero-size buffer
@@ -169,7 +169,7 @@ TEST_CASE("IpcErrors - Invalid Buffer Free", "[ipc][errors][memory]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to free null buffer - this should be handled gracefully
@@ -191,7 +191,7 @@ TEST_CASE("IpcErrors - Invalid Node ID", "[ipc][errors][network]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to get host with invalid node ID
@@ -210,7 +210,7 @@ TEST_CASE("IpcErrors - Invalid IP Address", "[ipc][errors][network]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to get host by invalid IP
@@ -233,7 +233,7 @@ TEST_CASE("IpcErrors - Network Client Creation Failure",
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to create client with invalid address
@@ -257,7 +257,7 @@ TEST_CASE("IpcErrors - Network Queue Operations", "[ipc][errors][queue]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to pop from empty network queue across the latency/IO lanes
@@ -278,7 +278,7 @@ TEST_CASE("IpcErrors - Invalid Allocator Registration", "[ipc][errors][shm]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to register with invalid allocator ID
@@ -294,7 +294,7 @@ TEST_CASE("IpcErrors - GetClientShmInfo Invalid Index",
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to get info with invalid index
@@ -312,7 +312,7 @@ TEST_CASE("IpcErrors - SetNumSchedQueues Edge Cases", "[ipc][errors][sched]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Get current value
@@ -351,14 +351,14 @@ TEST_CASE("IpcErrors - Concurrent Init/Finalize", "[ipc][errors][multiproc]") {
       bool success = CHIMAERA_INIT(ChimaeraMode::kClient, true);
 
       if (success) {
-        auto *ipc = CHI_IPC;
+        auto *ipc = CLIO_IPC;
         if (ipc && ipc->IsInitialized()) {
           // Do some operations
           ipc->GetNodeId();
           ipc->GetNumSchedQueues();
 
           // Finalize using CLIO Runtime API
-          CHI_CHIMAERA_MANAGER->ServerFinalize();
+          CLIO_CHIMAERA_MANAGER->ServerFinalize();
         }
         exit(0);
       } else {

@@ -39,7 +39,7 @@
  *
  * Why this header exists:
  *   The CPU-side CTE metadata uses chi::priv::string and chi::priv::vector
- *   templated on CHI_PRIV_ALLOC_T, whose layout differs between SYCL host
+ *   templated on CLIO_PRIV_ALLOC_T, whose layout differs between SYCL host
  *   and device passes (see context-transfer-engine/test/unit/gpu/
  *   test_sycl_cte_putblob.cc). That makes those types unusable from a
  *   single-source SYCL kernel. The GPU metadata cache here uses ONLY POD

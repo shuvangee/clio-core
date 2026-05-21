@@ -290,7 +290,7 @@ static inline bool CteDirExists(const std::string &dir_path) {
 static inline bool CtePutBlob(const clio_cte::core::TagId &tag_id,
                               const std::string &blob_name, const char *data,
                               size_t data_size, size_t blob_off) {
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto *cte_client = CLIO_CTE_CLIENT;
   ctp::ipc::FullPtr<char> shm_buf = ipc_manager->AllocateBuffer(data_size);
   if (shm_buf.IsNull()) return false;
@@ -325,7 +325,7 @@ static inline bool CtePutBlobAsync(struct FuseFileHandle *handle,
                                    const std::string &blob_name,
                                    const char *data, size_t data_size,
                                    size_t blob_off) {
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto *cte_client = CLIO_CTE_CLIENT;
   ctp::ipc::FullPtr<char> shm_buf = ipc_manager->AllocateBuffer(data_size);
   if (shm_buf.IsNull()) return false;
@@ -385,7 +385,7 @@ static inline int DrainPendingWrites(struct FuseFileHandle *handle) {
     drain.swap(handle->pending_writes);
   }
   if (drain.empty()) return 0;
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   int rc = 0;
   for (auto &pw : drain) {
     pw.task.Wait();
@@ -401,7 +401,7 @@ static inline int DrainPendingWrites(struct FuseFileHandle *handle) {
 static inline bool CteGetBlob(const clio_cte::core::TagId &tag_id,
                               const std::string &blob_name, char *data,
                               size_t data_size, size_t blob_off) {
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto *cte_client = CLIO_CTE_CLIENT;
   ctp::ipc::FullPtr<char> shm_buf = ipc_manager->AllocateBuffer(data_size);
   if (shm_buf.IsNull()) return false;

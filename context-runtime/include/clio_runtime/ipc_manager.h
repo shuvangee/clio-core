@@ -82,7 +82,7 @@ namespace chi {
 namespace gpu { class IpcManager; }
 
 // Forward declarations — full definitions in local_task_archives.h,
-// included after CHI_IPC is defined at the bottom of this header.
+// included after CLIO_IPC is defined at the bottom of this header.
 template <typename BufferT> class LocalSaveTaskArchive;
 template <typename BufferT> class LocalLoadTaskArchive;
 using DefaultSaveArchive = LocalSaveTaskArchive<chi::priv::vector<char>>;
@@ -119,7 +119,7 @@ static constexpr size_t kNetQueueIoByteBudget = 8u << 20;   // 8 MiB / tick
  * Network queue for storing Future<SendTask> objects
  * One lane with two priorities (SendIn and SendOut)
  */
-using NetQueue = ctp::ipc::multi_mpsc_ring_buffer<Future<Task>, CHI_QUEUE_ALLOC_T>;
+using NetQueue = ctp::ipc::multi_mpsc_ring_buffer<Future<Task>, CLIO_QUEUE_ALLOC_T>;
 
 /**
  * Typedef for worker queue type to simplify usage
@@ -218,10 +218,10 @@ class IpcManager {
 
 
   /**
-   * Returns the per-thread task allocator (CHI_TASK_ALLOC_T*).
+   * Returns the per-thread task allocator (CLIO_TASK_ALLOC_T*).
    * Host: main_allocator_ (MultiProcessAllocator)
    */
-  CHI_TASK_ALLOC_T *GetMainAllocator() {
+  CLIO_TASK_ALLOC_T *GetMainAllocator() {
     return main_allocator_;
   }
 
@@ -465,8 +465,8 @@ class IpcManager {
    */
   template <typename TaskT>
   Future<TaskT> MakeFuture(const ctp::ipc::FullPtr<TaskT> &task_ptr) {
-    bool is_runtime = CHI_CHIMAERA_MANAGER->IsRuntime();
-    Worker *worker = CHI_CUR_WORKER;
+    bool is_runtime = CLIO_CHIMAERA_MANAGER->IsRuntime();
+    Worker *worker = CLIO_CUR_WORKER;
 
     // Runtime path requires BOTH IsRuntime AND worker to be non-null
     bool use_runtime_path = is_runtime && worker != nullptr;
@@ -499,8 +499,8 @@ class IpcManager {
   template <typename TaskT>
   Future<TaskT> Send(const ctp::ipc::FullPtr<TaskT> &task_ptr,
                      bool awake_event = true) {
-    bool is_runtime = CHI_CHIMAERA_MANAGER->IsRuntime();
-    Worker *worker = CHI_CUR_WORKER;
+    bool is_runtime = CLIO_CHIMAERA_MANAGER->IsRuntime();
+    Worker *worker = CLIO_CUR_WORKER;
 
     // Client TCP/IPC path
     if (!is_runtime && ipc_mode_ != IpcMode::kShm) {
@@ -585,7 +585,7 @@ class IpcManager {
    */
   template <typename TaskT>
   bool Recv(Future<TaskT> &future, float max_sec = 0) {
-    bool is_runtime = CHI_CHIMAERA_MANAGER->IsRuntime();
+    bool is_runtime = CLIO_CHIMAERA_MANAGER->IsRuntime();
     if (is_runtime) return true;
 
     auto future_shm = future.GetFutureShm();
@@ -1277,7 +1277,7 @@ class IpcManager {
   // Main allocator pointer for runtime shared memory (task data, FutureShm)
   // CPU: MultiProcessAllocator — shared across runtime + client processes
   // GPU: unused (gpu_alloc_table_ provides per-thread BuddyAllocator)
-  CHI_TASK_ALLOC_T *main_allocator_ = nullptr;
+  CLIO_TASK_ALLOC_T *main_allocator_ = nullptr;
 
   // Shared memory backend for queue segment (TaskQueue ring buffers)
   ctp::ipc::PosixShmMmap queue_backend_;
@@ -1286,7 +1286,7 @@ class IpcManager {
   ctp::ipc::AllocatorId queue_allocator_id_;
 
   // Queue allocator pointer — ArenaAllocator for all TaskQueue structures
-  CHI_QUEUE_ALLOC_T *queue_allocator_ = nullptr;
+  CLIO_QUEUE_ALLOC_T *queue_allocator_ = nullptr;
 
   // Number of workers for which queues are allocated
   u32 num_workers_ = 0;
@@ -1648,14 +1648,14 @@ CTP_CROSS_FUN Future<TaskT, AllocT>::~Future() {
     // Clean up zero-copy response archive (TCP/IPC only, never used on GPU)
     if (!future_shm_.IsNull()) {
 #if CTP_IS_HOST
-      ctp::ipc::FullPtr<FutureShm> fs = CHI_CPU_IPC->ToFullPtr(future_shm_);
+      ctp::ipc::FullPtr<FutureShm> fs = CLIO_CPU_IPC->ToFullPtr(future_shm_);
       if (!fs.IsNull() && (fs->origin_ == FutureShm::FUTURE_CLIENT_TCP ||
                            fs->origin_ == FutureShm::FUTURE_CLIENT_IPC)) {
-        CHI_CPU_IPC->CleanupResponseArchive(fs->client_task_vaddr_);
+        CLIO_CPU_IPC->CleanupResponseArchive(fs->client_task_vaddr_);
       }
       // Free FutureShm (host only)
       ctp::ipc::ShmPtr<char> buffer_shm = future_shm_.template Cast<char>();
-      CHI_CPU_IPC->FreeBuffer(buffer_shm);
+      CLIO_CPU_IPC->FreeBuffer(buffer_shm);
       future_shm_.SetNull();
 #endif
     }
@@ -1673,9 +1673,9 @@ Future<TaskT, AllocT>::GetFutureShm() const {
     return ctp::ipc::FullPtr<FutureT>();
   }
 #if CTP_IS_GPU
-  return CHI_IPC->ToFullPtr(future_shm_);
+  return CLIO_IPC->ToFullPtr(future_shm_);
 #else
-  return CHI_CPU_IPC->ToFullPtr(future_shm_);
+  return CLIO_CPU_IPC->ToFullPtr(future_shm_);
 #endif
 }
 
@@ -1784,7 +1784,7 @@ CTP_CROSS_FUN bool Future<TaskT, AllocT>::Wait(float max_sec,
   // deserialize without blocking.
   if (max_sec == 0.0f) {
     ctp::ipc::FullPtr<FutureShm> future_full_poll =
-        CHI_CPU_IPC->ToFullPtr(future_shm_);
+        CLIO_CPU_IPC->ToFullPtr(future_shm_);
     if (future_full_poll.IsNull()) {
       return false;
     }
@@ -1794,7 +1794,7 @@ CTP_CROSS_FUN bool Future<TaskT, AllocT>::Wait(float max_sec,
     // Complete -> fall through to normal wait path (cheap; flag is set).
   }
 
-  bool is_runtime = CHI_CHIMAERA_MANAGER->IsRuntime();
+  bool is_runtime = CLIO_CHIMAERA_MANAGER->IsRuntime();
 
 #if CTP_ENABLE_CUDA || CTP_ENABLE_ROCM
   // CPU→GPU POD path: sentinel allocator ID marks device pointers.
@@ -1805,7 +1805,7 @@ CTP_CROSS_FUN bool Future<TaskT, AllocT>::Wait(float max_sec,
 #endif
 
   // Resolve FutureShm for non-GPU paths
-  ctp::ipc::FullPtr<FutureShm> future_full = CHI_CPU_IPC->ToFullPtr(future_shm_);
+  ctp::ipc::FullPtr<FutureShm> future_full = CLIO_CPU_IPC->ToFullPtr(future_shm_);
   if (future_full.IsNull()) {
     HLOG(kError, "Future::Wait: ToFullPtr returned null");
     return false;
@@ -1858,17 +1858,17 @@ CTP_HOST_FUN bool Future<TaskT, AllocT>::WaitCpu2Gpu(float max_sec,
 template <typename TaskT, typename AllocT>
 CTP_HOST_FUN bool Future<TaskT, AllocT>::WaitCpu2Cpu(float max_sec,
                                                        bool reuse_task) {
-  bool is_runtime = CHI_CHIMAERA_MANAGER->IsRuntime();
+  bool is_runtime = CLIO_CHIMAERA_MANAGER->IsRuntime();
   if (is_runtime) {
     // Runtime self-send: poll FUTURE_COMPLETE in SHM
     ctp::ipc::FullPtr<FutureShm> future_full =
-        CHI_CPU_IPC->ToFullPtr(future_shm_);
+        CLIO_CPU_IPC->ToFullPtr(future_shm_);
     if (future_full.IsNull()) return false;
     bool ok = IpcCpu2Self::ClientRecv(*this, max_sec, future_full);
     if (!ok) return false;
   } else {
     // Client: SHM or ZMQ recv path
-    if (!CHI_CPU_IPC->Recv(*this, max_sec)) {
+    if (!CLIO_CPU_IPC->Recv(*this, max_sec)) {
       task_ptr_->SetReturnCode(static_cast<u32>(-1));
       return false;
     }
@@ -1886,7 +1886,7 @@ CTP_HOST_FUN bool Future<TaskT, AllocT>::WaitGpu2Cpu(float max_sec,
   // system-scope atomics. The GPU kernel uses IpcGpu2Cpu::ClientRecv
   // (device-side) which polls gpu::FutureShm instead.
   ctp::ipc::FullPtr<FutureShm> future_full =
-      CHI_CPU_IPC->ToFullPtr(future_shm_);
+      CLIO_CPU_IPC->ToFullPtr(future_shm_);
   if (future_full.IsNull()) {
     HLOG(kError, "Future::WaitGpu2Cpu: ToFullPtr returned null");
     return false;
@@ -1911,7 +1911,7 @@ CTP_HOST_FUN bool Future<TaskT, AllocT>::WaitGpu2Cpu(float max_sec,
     ctp::lbm::LbmContext ctx;
     ctx.copy_space = future_full->copy_space;
     ctx.shm_info_ = &future_full->output_;
-    chi::priv::vector<char> load_buf(CHI_PRIV_ALLOC);
+    chi::priv::vector<char> load_buf(CLIO_PRIV_ALLOC);
     load_buf.reserve(256);
     DefaultLoadArchive load_ar(load_buf);
     load_ar.SetMsgType(LocalMsgType::kSerializeOut);
@@ -1948,7 +1948,7 @@ CTP_CROSS_FUN void Future<TaskT, AllocT>::DelTask() {
   task_ptr_.SetNull();
 #else
   if (!task_ptr_.IsNull()) {
-    CHI_CPU_IPC->DelTask(task_ptr_);
+    CLIO_CPU_IPC->DelTask(task_ptr_);
     task_ptr_.SetNull();
   }
 #endif

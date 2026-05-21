@@ -299,7 +299,7 @@ class CTEScoreBenchmark {
     double total_demotion_time_ms = 0.0;
 
     // Allocate shared memory buffer for Put operations
-    auto shm_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+    auto shm_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
     std::memset(shm_buffer.ptr_, rank_ & 0xFF, kBlobSize);
     ctp::ipc::ShmPtr<> shm_ptr = shm_buffer.shm_.template Cast<void>();
 
@@ -374,7 +374,7 @@ class CTEScoreBenchmark {
     }
 
     // Free shared memory buffer
-    CHI_IPC->FreeBuffer(shm_buffer);
+    CLIO_IPC->FreeBuffer(shm_buffer);
 
     // Gather timing results from all ranks
     double global_max_put_time_ms = 0.0;

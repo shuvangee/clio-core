@@ -372,7 +372,7 @@ static herr_t iowarp_dataset_write(size_t count, void *dset[],
       size_t this_size = std::min(chunk_size, total_size - offset);
 
       /* Allocate SHM buffer and copy data */
-      auto buffer = CHI_IPC->AllocateBuffer(this_size);
+      auto buffer = CLIO_IPC->AllocateBuffer(this_size);
       if (buffer.IsNull()) return -1;
       std::memcpy(buffer.ptr_, src + offset, this_size);
 
@@ -452,7 +452,7 @@ static herr_t iowarp_dataset_read(size_t count, void *dset[],
       size_t offset = i * chunk_size;
       size_t this_size = std::min(chunk_size, total_size - offset);
 
-      auto buffer = CHI_IPC->AllocateBuffer(this_size);
+      auto buffer = CLIO_IPC->AllocateBuffer(this_size);
       if (buffer.IsNull()) return -1;
 
       ctp::ipc::ShmPtr<> blob_data = buffer.shm_.template Cast<void>();

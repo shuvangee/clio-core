@@ -56,7 +56,7 @@
 
 namespace clio_cte::compressor {
 
-// Bring chi namespace items into scope for CHI_CUR_WORKER macro
+// Bring chi namespace items into scope for CLIO_CUR_WORKER macro
 using chi::chi_cur_worker_key_;
 using chi::Worker;
 
@@ -191,7 +191,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
   // container's consumer list and dispatches PollNodeLoad to each node.
   client_.AsyncPollConsumers(chi::PoolQuery::Local(), 5000000);
 
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task,
@@ -213,7 +213,7 @@ chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task,
   } catch (const std::exception& e) {
     HLOG(kError, "Exception during compressor destroy: {}", e.what());
   }
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 chi::PoolQuery Runtime::ScheduleTask(const ctp::ipc::FullPtr<chi::Task> &task) {
@@ -245,10 +245,10 @@ chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   if (!core_client_) {
     task->SetReturnCode(0);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   // Poll target states
   try {
@@ -285,8 +285,8 @@ chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
     HLOG(kError, "Compressor::Monitor failed: {}", e.what());
   }
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 // ==============================================================================
@@ -561,7 +561,7 @@ chi::TaskResume Runtime::DynamicSchedule(
     chi::u64 chunk_size = task->size_;
     // Convert ShmPtr to raw pointer via FullPtr
     auto blob_fullptr =
-        CHI_IPC->ToFullPtr<char>(task->blob_data_.template Cast<char>());
+        CLIO_IPC->ToFullPtr<char>(task->blob_data_.template Cast<char>());
     void* chunk_data = blob_fullptr.ptr_;
     Context& context = task->context_;
 
@@ -569,7 +569,7 @@ chi::TaskResume Runtime::DynamicSchedule(
     auto start_time = std::chrono::high_resolution_clock::now();
     if (context.trace_) {
       context.trace_key_ = g_trace_key_counter.fetch_add(1);
-      context.trace_node_ = static_cast<int>(CHI_IPC->GetNodeId());
+      context.trace_node_ = static_cast<int>(CLIO_IPC->GetNodeId());
     }
 
     // Check if we have valid chunk data
@@ -578,7 +578,7 @@ chi::TaskResume Runtime::DynamicSchedule(
       context.compress_lib_ = 0;
       context.dynamic_compress_ = 0;
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Get compression stats
@@ -589,7 +589,7 @@ chi::TaskResume Runtime::DynamicSchedule(
       context.compress_lib_ = 0;
       context.dynamic_compress_ = 0;
       task->return_code_ = 0;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Log predicted compression stats if tracing enabled
@@ -644,7 +644,7 @@ chi::TaskResume Runtime::DynamicSchedule(
     task->return_code_ = 1;
   }
 
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 chi::TaskResume Runtime::Compress(ctp::ipc::FullPtr<CompressTask> task,
@@ -657,7 +657,7 @@ chi::TaskResume Runtime::Compress(ctp::ipc::FullPtr<CompressTask> task,
     // Validate inputs
     if (task->blob_data_.IsNull() || input_size == 0) {
       task->return_code_ = 1;  // Invalid input
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Initialize core client if needed (from compose next_pool_id or task param)
@@ -690,7 +690,7 @@ chi::TaskResume Runtime::Compress(ctp::ipc::FullPtr<CompressTask> task,
       put_task.Wait();
       task->context_ = put_task->context_;
       task->return_code_ = put_task->return_code_;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Map compress_lib_ ID to library name
@@ -717,7 +717,7 @@ chi::TaskResume Runtime::Compress(ctp::ipc::FullPtr<CompressTask> task,
       HLOG(kWarning, "Failed to create compressor for library: {}",
            library_name);
       task->return_code_ = 3;  // Compressor creation failed
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     auto compress_start = std::chrono::high_resolution_clock::now();
@@ -730,7 +730,7 @@ chi::TaskResume Runtime::Compress(ctp::ipc::FullPtr<CompressTask> task,
     size_t compressed_size = compressed_buffer.size();
     // Convert ShmPtr to raw pointer via FullPtr
     auto input_fullptr =
-        CHI_IPC->ToFullPtr<char>(task->blob_data_.template Cast<char>());
+        CLIO_IPC->ToFullPtr<char>(task->blob_data_.template Cast<char>());
     char* input_ptr = input_fullptr.ptr_;
     bool success = compressor->Compress(compressed_buffer.data(),
                                         compressed_size, input_ptr, input_size);
@@ -758,11 +758,11 @@ chi::TaskResume Runtime::Compress(ctp::ipc::FullPtr<CompressTask> task,
       context.actual_compress_time_ms_ = compress_time;
 
       // Allocate shared memory for header + compressed data
-      auto compressed_shm = CHI_IPC->AllocateBuffer(total_stored_size);
+      auto compressed_shm = CLIO_IPC->AllocateBuffer(total_stored_size);
       if (compressed_shm.IsNull()) {
         HLOG(kError, "Failed to allocate shared memory for compressed data");
         task->return_code_ = 4;  // Memory allocation failed
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
 
       // Write compression header
@@ -784,7 +784,7 @@ chi::TaskResume Runtime::Compress(ctp::ipc::FullPtr<CompressTask> task,
       put_task.Wait();
 
       // Free compressed data buffer
-      CHI_IPC->FreeBuffer(compressed_shm);
+      CLIO_IPC->FreeBuffer(compressed_shm);
 
       // Log compression telemetry
       CompressionTelemetry telemetry(
@@ -822,7 +822,7 @@ chi::TaskResume Runtime::Compress(ctp::ipc::FullPtr<CompressTask> task,
     task->return_code_ = 6;  // Exception occurred
   }
 
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 chi::TaskResume Runtime::Decompress(ctp::ipc::FullPtr<DecompressTask> task,
@@ -842,7 +842,7 @@ chi::TaskResume Runtime::Decompress(ctp::ipc::FullPtr<DecompressTask> task,
     // Validate output buffer
     if (task->blob_data_.IsNull()) {
       task->return_code_ = 1;  // Invalid output buffer
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Initialize core client if needed (from compose next_pool_id or task param)
@@ -857,10 +857,10 @@ chi::TaskResume Runtime::Decompress(ctp::ipc::FullPtr<DecompressTask> task,
     // Allocate temporary buffer to receive compressed data from GetBlob
     // We don't know the compressed size, so allocate expected_size as upper
     // bound
-    auto temp_buffer = CHI_IPC->AllocateBuffer(expected_size);
+    auto temp_buffer = CLIO_IPC->AllocateBuffer(expected_size);
     if (temp_buffer.IsNull()) {
       task->return_code_ = 2;  // Memory allocation failed
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
     ctp::ipc::ShmPtr<> temp_buffer_ptr = temp_buffer.shm_.template Cast<void>();
 
@@ -871,9 +871,9 @@ chi::TaskResume Runtime::Decompress(ctp::ipc::FullPtr<DecompressTask> task,
     get_task.Wait();
 
     if (get_task->return_code_ != 0) {
-      CHI_IPC->FreeBuffer(temp_buffer);
+      CLIO_IPC->FreeBuffer(temp_buffer);
       task->return_code_ = 10 + get_task->return_code_;  // GetBlob failed
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Check for compression header
@@ -906,11 +906,11 @@ chi::TaskResume Runtime::Decompress(ctp::ipc::FullPtr<DecompressTask> task,
       auto decompressor =
           ctp::CompressionFactory::GetPreset(library_name, preset);
       if (!decompressor) {
-        CHI_IPC->FreeBuffer(temp_buffer);
+        CLIO_IPC->FreeBuffer(temp_buffer);
         HLOG(kWarning, "Failed to create decompressor for library: {}",
              library_name);
         task->return_code_ = 3;  // Decompressor creation failed
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
 
       auto decompress_start = std::chrono::high_resolution_clock::now();
@@ -921,7 +921,7 @@ chi::TaskResume Runtime::Decompress(ctp::ipc::FullPtr<DecompressTask> task,
 
       // Decompress to output buffer
       auto output_fullptr =
-          CHI_IPC->ToFullPtr<char>(task->blob_data_.template Cast<char>());
+          CLIO_IPC->ToFullPtr<char>(task->blob_data_.template Cast<char>());
       size_t decompressed_size = original_size;
       bool success =
           decompressor->Decompress(output_fullptr.ptr_, decompressed_size,
@@ -932,7 +932,7 @@ chi::TaskResume Runtime::Decompress(ctp::ipc::FullPtr<DecompressTask> task,
                                    decompress_end - decompress_start)
                                    .count();
 
-      CHI_IPC->FreeBuffer(temp_buffer);
+      CLIO_IPC->FreeBuffer(temp_buffer);
 
       if (success) {
         task->output_size_ = decompressed_size;
@@ -959,9 +959,9 @@ chi::TaskResume Runtime::Decompress(ctp::ipc::FullPtr<DecompressTask> task,
       // No compression header - data is uncompressed
       // Copy directly to output buffer
       auto output_fullptr =
-          CHI_IPC->ToFullPtr<char>(task->blob_data_.template Cast<char>());
+          CLIO_IPC->ToFullPtr<char>(task->blob_data_.template Cast<char>());
       std::memcpy(output_fullptr.ptr_, temp_buffer.ptr_, expected_size);
-      CHI_IPC->FreeBuffer(temp_buffer);
+      CLIO_IPC->FreeBuffer(temp_buffer);
 
       task->output_size_ = expected_size;
       task->decompress_time_ms_ = 0.0;
@@ -975,7 +975,7 @@ chi::TaskResume Runtime::Decompress(ctp::ipc::FullPtr<DecompressTask> task,
     task->return_code_ = 6;  // Exception occurred
   }
 
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 void Runtime::LogCompressionTelemetry(const CompressionTelemetry& telemetry) {
@@ -1085,7 +1085,7 @@ chi::TaskResume Runtime::PollNodeLoad(ctp::ipc::FullPtr<PollNodeLoadTask> task,
                                       chi::RunContext& ctx) {
   (void)ctx;
   NodeLoadSample sample;
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   sample.node_id_ = ipc_manager ? static_cast<chi::u32>(ipc_manager->GetNodeId())
                                 : 0;
 
@@ -1100,7 +1100,7 @@ chi::TaskResume Runtime::PollNodeLoad(ctp::ipc::FullPtr<PollNodeLoadTask> task,
   }
 
   // Aggregate worker load across all workers on this node.
-  auto* orchestrator = CHI_WORK_ORCHESTRATOR;
+  auto* orchestrator = CLIO_WORK_ORCHESTRATOR;
   if (orchestrator) {
     std::size_t num_workers = orchestrator->GetWorkerCount();
     sample.num_workers_ = static_cast<chi::u32>(num_workers);
@@ -1118,7 +1118,7 @@ chi::TaskResume Runtime::PollNodeLoad(ctp::ipc::FullPtr<PollNodeLoadTask> task,
 
   task->sample_ = sample;
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 chi::TaskResume Runtime::PollConsumers(ctp::ipc::FullPtr<PollConsumersTask> task,
@@ -1127,7 +1127,7 @@ chi::TaskResume Runtime::PollConsumers(ctp::ipc::FullPtr<PollConsumersTask> task
   (void)ctx;
   // No-op when tracking is disabled.
   if (!config_.tracking_enabled_) {
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   // Snapshot the union of consumers across all tags under the reader
   // lock so the periodic poll does not hold the lock while issuing
@@ -1147,7 +1147,7 @@ chi::TaskResume Runtime::PollConsumers(ctp::ipc::FullPtr<PollConsumersTask> task
   }
 
   if (snapshot.empty()) {
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Fan out one PollNodeLoad task per consumer node, then await each.
@@ -1174,10 +1174,10 @@ chi::TaskResume Runtime::PollConsumers(ctp::ipc::FullPtr<PollConsumersTask> task
     }
   }
 
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 }  // namespace clio_cte::compressor
 
-// Define ChiMod entry points using CHI_TASK_CC macro
-CHI_TASK_CC(clio_cte::compressor::Runtime)
+// Define ChiMod entry points using CLIO_TASK_CC macro
+CLIO_TASK_CC(clio_cte::compressor::Runtime)

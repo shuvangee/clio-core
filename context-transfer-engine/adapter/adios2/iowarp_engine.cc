@@ -372,9 +372,9 @@ void IowarpEngine::DoPutDeferred_(const adios2::core::Variable<T> &variable,
 
   // Put blob asynchronously
   try {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     if (ipc_manager == nullptr) {
-      throw std::runtime_error("IowarpEngine::DoPutDeferred_: CHI_IPC is null");
+      throw std::runtime_error("IowarpEngine::DoPutDeferred_: CLIO_IPC is null");
     }
 
     // Allocate shared memory buffer and copy data

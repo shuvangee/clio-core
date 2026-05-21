@@ -34,7 +34,7 @@
 /**
  * Admin ChiMod singleton
  *
- * Provides global access to the admin ChiMod client via CHI_ADMIN macro.
+ * Provides global access to the admin ChiMod client via CLIO_ADMIN macro.
  * The admin container is automatically created by the runtime and accessed
  * by clients without requiring explicit Create() calls.
  */

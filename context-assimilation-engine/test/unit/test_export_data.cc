@@ -128,7 +128,7 @@ class ExportDataFixture {
     tag_fut.Wait();
     auto tag_id = tag_fut->tag_id_;
 
-    auto buf = CHI_IPC->AllocateBuffer(data.size());
+    auto buf = CLIO_IPC->AllocateBuffer(data.size());
     std::memcpy(buf.ptr_, data.data(), data.size());
     ctp::ipc::ShmPtr<> shm_ptr = buf.shm_.template Cast<void>();
 
@@ -136,7 +136,7 @@ class ExportDataFixture {
                                      static_cast<chi::u64>(data.size()),
                                      shm_ptr);
     put_fut.Wait();
-    CHI_IPC->FreeBuffer(buf);
+    CLIO_IPC->FreeBuffer(buf);
 
     return tag_id;
   }
@@ -150,7 +150,7 @@ class ExportDataFixture {
 TEST_CASE("ExportData - Task default constructor", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto task = ipc->NewTask<ExportDataTask>();
   REQUIRE(task->result_code_ == 0);
   REQUIRE(task->bytes_exported_ == 0);
@@ -165,7 +165,7 @@ TEST_CASE("ExportData - Task default constructor", "[cae][export][task]") {
 TEST_CASE("ExportData - Task emplace constructor", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   chi::TaskId tid = chi::CreateTaskId();
   auto task = ipc->NewTask<ExportDataTask>(tid, clio_cae::core::kCaePoolId,
                                            chi::PoolQuery::Local(),
@@ -185,7 +185,7 @@ TEST_CASE("ExportData - Task emplace constructor", "[cae][export][task]") {
 TEST_CASE("ExportData - Task Copy", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto src = ipc->NewTask<ExportDataTask>(chi::CreateTaskId(),
                                           clio_cae::core::kCaePoolId,
                                           chi::PoolQuery::Local(),
@@ -212,7 +212,7 @@ TEST_CASE("ExportData - Task Copy", "[cae][export][task]") {
 TEST_CASE("ExportData - Task Aggregate", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto orig = ipc->NewTask<ExportDataTask>(chi::CreateTaskId(),
                                            clio_cae::core::kCaePoolId,
                                            chi::PoolQuery::Local(),
@@ -241,7 +241,7 @@ TEST_CASE("ExportData - Task Aggregate", "[cae][export][task]") {
 TEST_CASE("ExportData - Task SerializeIn roundtrip", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto task = ipc->NewTask<ExportDataTask>(chi::CreateTaskId(),
                                            clio_cae::core::kCaePoolId,
                                            chi::PoolQuery::Local(),
@@ -274,7 +274,7 @@ TEST_CASE("ExportData - Task SerializeIn roundtrip", "[cae][export][task]") {
 TEST_CASE("ExportData - Task SerializeOut roundtrip", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto task = ipc->NewTask<ExportDataTask>();
   task->result_code_ = 3;
   task->bytes_exported_ = 777;
@@ -468,7 +468,7 @@ TEST_CASE("ExportData - HDF5 not compiled returns -3",
 TEST_CASE("ParseOmni - Task default constructor", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto task = ipc->NewTask<ParseOmniTask>();
   REQUIRE(task->serialized_ctx_.str() == "");
   REQUIRE(task->num_tasks_scheduled_ == 0);
@@ -482,7 +482,7 @@ TEST_CASE("ParseOmni - Task default constructor", "[cae][export][task]") {
 TEST_CASE("ParseOmni - Task emplace constructor", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   std::vector<clio_cae::core::AssimilationCtx> contexts;
   contexts.emplace_back("file::/tmp/a.bin", "iowarp::tag_a", "binary");
 
@@ -502,7 +502,7 @@ TEST_CASE("ParseOmni - Task emplace constructor", "[cae][export][task]") {
 TEST_CASE("ParseOmni - Task Copy", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   std::vector<clio_cae::core::AssimilationCtx> contexts;
   contexts.emplace_back("file::/tmp/b.bin", "iowarp::tag_b", "binary");
 
@@ -530,7 +530,7 @@ TEST_CASE("ParseOmni - Task Copy", "[cae][export][task]") {
 TEST_CASE("ParseOmni - Task Aggregate", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   std::vector<clio_cae::core::AssimilationCtx> ctxs;
   ctxs.emplace_back("file::/tmp/c.bin", "iowarp::tag_c", "binary");
 
@@ -559,7 +559,7 @@ TEST_CASE("ParseOmni - Task Aggregate", "[cae][export][task]") {
 TEST_CASE("ParseOmni - Task SerializeIn roundtrip", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   std::vector<clio_cae::core::AssimilationCtx> ctxs;
   ctxs.emplace_back("file::/tmp/d.bin", "iowarp::ser_tag", "binary");
 
@@ -591,7 +591,7 @@ TEST_CASE("ParseOmni - Task SerializeIn roundtrip", "[cae][export][task]") {
 TEST_CASE("ParseOmni - Task SerializeOut roundtrip", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto task = ipc->NewTask<ParseOmniTask>();
   task->num_tasks_scheduled_ = 7;
   task->result_code_ = 4;
@@ -627,7 +627,7 @@ TEST_CASE("ProcessHdf5Dataset - Task default constructor",
           "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto task = ipc->NewTask<ProcessHdf5DatasetTask>();
   REQUIRE(task->file_path_.str() == "");
   REQUIRE(task->dataset_path_.str() == "");
@@ -643,7 +643,7 @@ TEST_CASE("ProcessHdf5Dataset - Task emplace constructor",
           "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto task = ipc->NewTask<ProcessHdf5DatasetTask>(chi::CreateTaskId(),
                                                     clio_cae::core::kCaePoolId,
                                                     chi::PoolQuery::Local(),
@@ -663,7 +663,7 @@ TEST_CASE("ProcessHdf5Dataset - Task emplace constructor",
 TEST_CASE("ProcessHdf5Dataset - Task Copy", "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto src = ipc->NewTask<ProcessHdf5DatasetTask>(chi::CreateTaskId(),
                                                    clio_cae::core::kCaePoolId,
                                                    chi::PoolQuery::Local(),
@@ -691,7 +691,7 @@ TEST_CASE("ProcessHdf5Dataset - Task Aggregate keeps first error",
           "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto orig = ipc->NewTask<ProcessHdf5DatasetTask>(chi::CreateTaskId(),
                                                     clio_cae::core::kCaePoolId,
                                                     chi::PoolQuery::Local(),
@@ -721,7 +721,7 @@ TEST_CASE("ProcessHdf5Dataset - Task Aggregate adopts replica error",
           "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto orig = ipc->NewTask<ProcessHdf5DatasetTask>(chi::CreateTaskId(),
                                                     clio_cae::core::kCaePoolId,
                                                     chi::PoolQuery::Local(),
@@ -750,7 +750,7 @@ TEST_CASE("ProcessHdf5Dataset - Task SerializeIn roundtrip",
           "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto task = ipc->NewTask<ProcessHdf5DatasetTask>(chi::CreateTaskId(),
                                                     clio_cae::core::kCaePoolId,
                                                     chi::PoolQuery::Local(),
@@ -783,7 +783,7 @@ TEST_CASE("ProcessHdf5Dataset - Task SerializeOut roundtrip",
           "[cae][export][task]") {
   ExportDataFixture f;
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto task = ipc->NewTask<ProcessHdf5DatasetTask>();
   task->result_code_ = 8;
   task->error_message_ = chi::priv::string("ds_err", CTP_MALLOC);

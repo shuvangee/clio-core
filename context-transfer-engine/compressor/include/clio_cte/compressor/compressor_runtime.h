@@ -83,7 +83,7 @@ struct CompressionStats {
  */
 class Runtime : public chi::Container {
 public:
-  using CreateParams = CompressorConfig; // Required for CHI_TASK_CC (defined in compressor_tasks.h)
+  using CreateParams = CompressorConfig; // Required for CLIO_TASK_CC (defined in compressor_tasks.h)
 
   Runtime() = default;
   ~Runtime() override = default;
@@ -190,7 +190,7 @@ private:
 #endif
 
   // Compression telemetry ring buffer for performance monitoring
-  using CompressionTelemetryLog = ctp::ipc::ring_buffer<CompressionTelemetry, CHI_TASK_ALLOC_T>;
+  using CompressionTelemetryLog = ctp::ipc::ring_buffer<CompressionTelemetry, CLIO_TASK_ALLOC_T>;
   ctp::ipc::ShmPtr<CompressionTelemetryLog> compression_telemetry_log_;
   std::atomic<std::uint64_t> compression_logical_time_;
 

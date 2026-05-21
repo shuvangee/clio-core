@@ -158,7 +158,7 @@ bool IpcManager::ClientInit() {
 
   // Create lightbeam transport for client-server communication
   {
-    auto *config = CHI_CONFIG_MANAGER;
+    auto *config = CLIO_CONFIG_MANAGER;
     u32 port = config->GetPort();
 
     if (ipc_mode_ == IpcMode::kIpc) {
@@ -238,7 +238,7 @@ bool IpcManager::ClientInit() {
     }
 
     // Create per-process shared memory for client allocations
-    auto *config = CHI_CONFIG_MANAGER;
+    auto *config = CLIO_CONFIG_MANAGER;
     size_t initial_size =
         config && config->IsValid()
             ? config->GetMemorySegmentSize(kClientDataSegment)
@@ -265,7 +265,7 @@ bool IpcManager::ClientInit() {
   // causes all TLS operations to collide on key 0.
 
   // Create scheduler using factory
-  auto *config = CHI_CONFIG_MANAGER;
+  auto *config = CLIO_CONFIG_MANAGER;
   if (config && config->IsValid()) {
     std::string sched_name = config->GetLocalSched();
     scheduler_ = SchedulerFactory::Get(sched_name);
@@ -314,7 +314,7 @@ bool IpcManager::ServerInit() {
   // IsDevicePointer hooks. Source lives in src/gpu/gpu2cpu_init_hip.cc
   // and is compiled by nvcc/hipcc so the kernel launch syntax resolves.
   {
-    ConfigManager *config = CHI_CONFIG_MANAGER;
+    ConfigManager *config = CLIO_CONFIG_MANAGER;
     u32 queue_depth = config->GetQueueDepth();
     constexpr size_t kHipClientBackendBytes = 64 * 1024 * 1024;  // 64 MB
     extern bool ChiServerBootstrapHipGpu(IpcManager *self, u32 queue_depth,
@@ -331,7 +331,7 @@ bool IpcManager::ServerInit() {
   // see the same IpcManager layout because CTP_ENABLE_SYCL=1 is set
   // on both.
   {
-    ConfigManager *config = CHI_CONFIG_MANAGER;
+    ConfigManager *config = CLIO_CONFIG_MANAGER;
     u32 queue_depth = config->GetQueueDepth();
     constexpr size_t kSyclClientBackendBytes = 64 * 1024 * 1024;  // 64 MB
     extern bool ChiServerBootstrapSyclGpu(IpcManager *self, u32 queue_depth,
@@ -356,7 +356,7 @@ bool IpcManager::ServerInit() {
   CTP_THREAD_MODEL->CreateTls<TaskCounter>(chi_task_counter_key_, nullptr);
 
   // Create scheduler using factory
-  auto *config = CHI_CONFIG_MANAGER;
+  auto *config = CLIO_CONFIG_MANAGER;
   if (config && config->IsValid()) {
     std::string sched_name = config->GetLocalSched();
     scheduler_ = SchedulerFactory::Get(sched_name);
@@ -512,7 +512,7 @@ void IpcManager::AwakenWorker(TaskLane *lane) {
 }
 
 bool IpcManager::ServerInitShm() {
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
 
   try {
     // Set allocator ID for main segment
@@ -535,13 +535,13 @@ bool IpcManager::ServerInitShm() {
       return false;
     }
 
-    // Create main allocator (CHI_TASK_ALLOC_T = BuddyAllocator) for task data
-    main_allocator_ = main_backend_.MakeAlloc<CHI_TASK_ALLOC_T>();
+    // Create main allocator (CLIO_TASK_ALLOC_T = BuddyAllocator) for task data
+    main_allocator_ = main_backend_.MakeAlloc<CLIO_TASK_ALLOC_T>();
     if (!main_allocator_) {
       return false;
     }
 
-    // Initialize queue segment (CHI_QUEUE_ALLOC_T = ArenaAllocator) for TaskQueues
+    // Initialize queue segment (CLIO_QUEUE_ALLOC_T = ArenaAllocator) for TaskQueues
     queue_allocator_id_ = ctp::ipc::AllocatorId::Get(2, 0);
     std::string queue_segment_name =
         config->GetSharedMemorySegmentName(kQueueSegment);
@@ -553,7 +553,7 @@ bool IpcManager::ServerInitShm() {
                                  queue_segment_name)) {
       return false;
     }
-    queue_allocator_ = queue_backend_.MakeAlloc<CHI_QUEUE_ALLOC_T>();
+    queue_allocator_ = queue_backend_.MakeAlloc<CLIO_QUEUE_ALLOC_T>();
     if (!queue_allocator_) {
       return false;
     }
@@ -565,7 +565,7 @@ bool IpcManager::ServerInitShm() {
 }
 
 bool IpcManager::ClientInitShm() {
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
 
   try {
     // Set allocator IDs (must match server)
@@ -583,17 +583,17 @@ bool IpcManager::ClientInitShm() {
       return false;
     }
 
-    // Attach to main allocator (CHI_TASK_ALLOC_T = BuddyAllocator)
-    main_allocator_ = main_backend_.AttachAlloc<CHI_TASK_ALLOC_T>();
+    // Attach to main allocator (CLIO_TASK_ALLOC_T = BuddyAllocator)
+    main_allocator_ = main_backend_.AttachAlloc<CLIO_TASK_ALLOC_T>();
     if (!main_allocator_) {
       return false;
     }
 
-    // Attach to queue segment (CHI_QUEUE_ALLOC_T = ArenaAllocator)
+    // Attach to queue segment (CLIO_QUEUE_ALLOC_T = ArenaAllocator)
     if (!queue_backend_.shm_attach(queue_segment_name)) {
       return false;
     }
-    queue_allocator_ = queue_backend_.AttachAlloc<CHI_QUEUE_ALLOC_T>();
+    queue_allocator_ = queue_backend_.AttachAlloc<CLIO_QUEUE_ALLOC_T>();
     if (!queue_allocator_) {
       return false;
     }
@@ -618,7 +618,7 @@ bool IpcManager::ServerInitQueues() {
         std::memory_order_release);
 
     // Get worker counts from ConfigManager
-    ConfigManager *config = CHI_CONFIG_MANAGER;
+    ConfigManager *config = CLIO_CONFIG_MANAGER;
     u32 thread_count = config->GetNumThreads();
     // Note: Last worker serves dual roles as both task worker and network
     // worker
@@ -636,7 +636,7 @@ bool IpcManager::ServerInitQueues() {
          "role)",
          total_workers, queue_depth);
 
-    // Allocate TaskQueue in queue segment (CHI_QUEUE_ALLOC_T = ArenaAllocator)
+    // Allocate TaskQueue in queue segment (CLIO_QUEUE_ALLOC_T = ArenaAllocator)
     worker_queues_ = queue_allocator_->NewObj<TaskQueue>(
         queue_allocator_,
         total_workers,  // num_lanes equals total worker count
@@ -717,7 +717,7 @@ bool IpcManager::ClientInitQueues() {
 }
 
 bool IpcManager::StartLocalServer() {
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
 
   try {
     // Start local ZeroMQ server using CTP Lightbeam
@@ -799,7 +799,7 @@ retry_attempt:
     HLOG(kWarning, "Attempt {} timed out after {:.1f}s; recreating DEALER",
          attempt_idx, per_attempt);
     if (ipc_mode_ == IpcMode::kTcp) {
-      auto *config = CHI_CONFIG_MANAGER;
+      auto *config = CLIO_CONFIG_MANAGER;
       u32 port = config->GetPort();
       if (zmq_recv_running_.load()) {
         zmq_recv_running_.store(false);
@@ -894,7 +894,7 @@ u64 IpcManager::GetNodeId() const {
 }
 
 bool IpcManager::LoadHostfile() {
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
   std::string hostfile_path = config->GetHostfilePath();
 
   // Clear existing hostfile map
@@ -1008,7 +1008,7 @@ void IpcManager::SetDead(u64 node_id) {
   // Remove cached client connections to the dead node
   {
     std::lock_guard<std::mutex> lock(client_pool_mutex_);
-    auto *config_manager = CHI_CONFIG_MANAGER;
+    auto *config_manager = CLIO_CONFIG_MANAGER;
     int port = static_cast<int>(config_manager->GetPort());
     std::string key = it->second.ip_address + ":" + std::to_string(port);
     client_pool_.erase(key);
@@ -1197,7 +1197,7 @@ bool IpcManager::IdentifyThisHost() {
        hostfile_map_.size());
 
   // Get port number for error reporting
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
   u32 port = config->GetPort();
 
   // Collect list of attempted hosts for error reporting
@@ -1312,7 +1312,7 @@ const std::string &IpcManager::GetCurrentHostname() const {
 }
 
 bool IpcManager::TryStartMainServer(const std::string &hostname) {
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
 
   try {
     // Create main server using Lightbeam TransportFactory
@@ -1366,7 +1366,7 @@ FullPtr<char> IpcManager::AllocateBuffer(size_t size) {
 
   // RUNTIME PATH: Use private memory (CTP_MALLOC) — runtime never uses
   // per-process shared memory segments
-  if (CHI_CHIMAERA_MANAGER && CHI_CHIMAERA_MANAGER->IsRuntime()) {
+  if (CLIO_CHIMAERA_MANAGER && CLIO_CHIMAERA_MANAGER->IsRuntime()) {
     // Use CTP_MALLOC allocator for private memory allocation
     FullPtr<char> buffer = CTP_MALLOC->AllocateObjs<char>(size);
     if (buffer.IsNull()) {
@@ -2099,7 +2099,7 @@ bool IpcManager::ReconnectToOriginalHost() {
   // failing on every retry. Tear the DEALER fully down and rebuild it
   // so the next WaitForLocalServer goes through a fresh socket.
   if (ipc_mode_ == IpcMode::kTcp) {
-    auto *config = CHI_CONFIG_MANAGER;
+    auto *config = CLIO_CONFIG_MANAGER;
     u32 port = config->GetPort();
 
     if (zmq_recv_running_.load()) {
@@ -2138,7 +2138,7 @@ bool IpcManager::ReconnectToOriginalHost() {
 
 bool IpcManager::ReconnectToNewHost(const std::string &new_addr) {
   HLOG(kInfo, "ReconnectToNewHost: Switching to {}", new_addr);
-  auto *config = CHI_CONFIG_MANAGER;
+  auto *config = CLIO_CONFIG_MANAGER;
   u32 port = config->GetPort();
 
   // Stop recv thread
@@ -2420,7 +2420,7 @@ ctp::ipc::AllocatorId IpcManager::AllocateAndRegisterGpuBackend(
   // (kServer mode), short-circuit the admin RegisterMemoryTask round-trip
   // and call gpu_ipc_->RegisterClientBackend directly. Otherwise send the
   // admin task over the wire so the runtime can register it on our behalf.
-  if (CHI_CHIMAERA_MANAGER->IsRuntime() && gpu_ipc_) {
+  if (CLIO_CHIMAERA_MANAGER->IsRuntime() && gpu_ipc_) {
     gpu::IpcManager::ClientBackend b;
     b.alloc_id = alloc_id;
     b.gpu_id = gpu_id;
@@ -2484,7 +2484,7 @@ void IpcManager::BeginTask(Future<Task> &future, Container *container,
     return;
   }
 #if CTP_IS_HOST
-  Worker *worker = CHI_CUR_WORKER;
+  Worker *worker = CLIO_CUR_WORKER;
 
   // Initialize or reset the task's owned RunContext
   task_ptr->SetRunCtx(new RunContext());
@@ -2540,7 +2540,7 @@ RouteResult IpcManager::RouteTask(Future<Task> &future, bool force_enqueue) {
   FullPtr<Task> task_ptr = future.GetTaskPtr();
 
   if (task_ptr.IsNull()) {
-    Worker *worker = CHI_CUR_WORKER;
+    Worker *worker = CLIO_CUR_WORKER;
     HLOG(kWarning, "Worker {}: RouteTask - task_ptr is null",
          worker ? worker->GetId() : 0);
     return RouteResult::Dne;
@@ -2558,7 +2558,7 @@ RouteResult IpcManager::RouteTask(Future<Task> &future, bool force_enqueue) {
   // not be overridden — doing so would cause infinite re-broadcast loops
   // when tasks arrive at remote nodes (e.g., GetOrCreatePool returns
   // Broadcast on every node since the pool doesn't exist yet).
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   Container *static_container =
       pool_manager->GetStaticContainer(task_ptr->pool_id_);
   PoolQuery resolved_query = task_ptr->pool_query_;
@@ -2573,7 +2573,7 @@ RouteResult IpcManager::RouteTask(Future<Task> &future, bool force_enqueue) {
 
   // Check if pool_queries is empty - this indicates an error in resolution
   if (pool_queries.empty()) {
-    Worker *worker = CHI_CUR_WORKER;
+    Worker *worker = CLIO_CUR_WORKER;
     HLOG(kError,
          "Worker {}: Task routing failed - no pool queries resolved. "
          "Pool ID: {}, Method: {}",
@@ -2587,7 +2587,7 @@ RouteResult IpcManager::RouteTask(Future<Task> &future, bool force_enqueue) {
     RouteResult result = RouteLocal(future, force_enqueue);
     // If container is plugged or gone, add to retry queue
     if (result == RouteResult::Retry || result == RouteResult::Dne) {
-      Worker *worker = CHI_CUR_WORKER;
+      Worker *worker = CLIO_CUR_WORKER;
       HLOG(kError, "RouteTask: RouteLocal returned {} for pool={} method={}, worker={}",
            (int)result, task_ptr->pool_id_, task_ptr->method_,
            worker ? (int)worker->GetId() : -1);
@@ -2664,7 +2664,7 @@ RouteResult IpcManager::RouteLocal(Future<Task> &future, bool force_enqueue) {
   task_ptr->SetFlags(TASK_ROUTED);
 
   // Resolve the actual execution container
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   bool is_plugged = false;
   ContainerId container_id = task_ptr->pool_query_.GetContainerId();
   Container *exec_container =
@@ -2693,7 +2693,7 @@ RouteResult IpcManager::RouteLocal(Future<Task> &future, bool force_enqueue) {
   }
 
   // Use scheduler to pick the destination worker
-  Worker *worker = CHI_CUR_WORKER;
+  Worker *worker = CLIO_CUR_WORKER;
   u32 dest_worker_id =
       scheduler_->RuntimeMapTask(worker, future, exec_container);
 
@@ -2719,7 +2719,7 @@ RouteResult IpcManager::RouteGlobal(Future<Task> &future,
 
   // Log the global routing for debugging
   if (!pool_queries.empty()) {
-    Worker *worker = CHI_CUR_WORKER;
+    Worker *worker = CLIO_CUR_WORKER;
     const auto &query = pool_queries[0];
     HLOG(kDebug,
          "Worker {}: RouteGlobal - routing task method={}, pool_id={} to node "
@@ -2752,7 +2752,7 @@ RouteResult IpcManager::RouteGlobal(Future<Task> &future,
   // Set TASK_ROUTED flag on original task
   task_ptr->SetFlags(TASK_ROUTED);
 
-  Worker *worker = CHI_CUR_WORKER;
+  Worker *worker = CLIO_CUR_WORKER;
   HLOG(kDebug, "Worker {}: RouteGlobal - task enqueued to net_queue",
        worker ? worker->GetId() : 0);
 
@@ -2818,7 +2818,7 @@ std::vector<PoolQuery> IpcManager::ResolveLocalQuery(
 
 std::vector<PoolQuery> IpcManager::ResolveDirectIdQuery(
     const PoolQuery &query, PoolId pool_id, const FullPtr<Task> &task_ptr) {
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   if (pool_manager == nullptr) {
     return {query};  // Fallback to original query
   }
@@ -2841,7 +2841,7 @@ std::vector<PoolQuery> IpcManager::ResolveDirectIdQuery(
 
 std::vector<PoolQuery> IpcManager::ResolveDirectHashQuery(
     const PoolQuery &query, PoolId pool_id, const FullPtr<Task> &task_ptr) {
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   if (pool_manager == nullptr) {
     return {query};  // Fallback to original query
   }
@@ -2881,12 +2881,12 @@ std::vector<PoolQuery> IpcManager::ResolveDirectHashQuery(
 
 std::vector<PoolQuery> IpcManager::ResolveRangeQuery(
     const PoolQuery &query, PoolId pool_id, const FullPtr<Task> &task_ptr) {
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   if (pool_manager == nullptr) {
     return {query};  // Fallback to original query
   }
 
-  auto *config_manager = CHI_CONFIG_MANAGER;
+  auto *config_manager = CLIO_CONFIG_MANAGER;
   if (config_manager == nullptr) {
     return {query};  // Fallback to original query
   }
@@ -2950,7 +2950,7 @@ std::vector<PoolQuery> IpcManager::ResolveRangeQuery(
 
 std::vector<PoolQuery> IpcManager::ResolveBroadcastQuery(
     const PoolQuery &query, PoolId pool_id, const FullPtr<Task> &task_ptr) {
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   if (pool_manager == nullptr) {
     return {query};  // Fallback to original query
   }

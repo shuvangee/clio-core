@@ -60,14 +60,14 @@ int Compose(int argc, char** argv) {
   // (via GetGlobalPtrVar) and its destructor is never invoked by the runtime.
   struct ClientFinalizeGuard {
     ~ClientFinalizeGuard() {
-      auto* mgr = CHI_CHIMAERA_MANAGER;
+      auto* mgr = CLIO_CHIMAERA_MANAGER;
       if (mgr) {
         mgr->ClientFinalize();
       }
     }
   } finalize_guard;
 
-  auto* config_manager = CHI_CONFIG_MANAGER;
+  auto* config_manager = CLIO_CONFIG_MANAGER;
   if (!config_manager->LoadYaml(config_path)) {
     HLOG(kError, "Failed to load configuration from {}", config_path);
     return 1;
@@ -82,7 +82,7 @@ int Compose(int argc, char** argv) {
   HLOG(kInfo, "Found {} pools to {}",
        compose_config.pools_.size(), (unregister ? "destroy" : "create"));
 
-  auto* admin_client = CHI_ADMIN;
+  auto* admin_client = CLIO_ADMIN;
   if (!admin_client) {
     HLOG(kError, "Failed to get admin client");
     return 1;

@@ -230,7 +230,7 @@ TEST_CASE("ReorganizeBlob - PutBlob to DRAM", "[reorganize][put][dram]") {
   INFO("Putting blob with score=1.0 (should go to DRAM)");
 
   // Allocate shared memory buffer
-  auto shm_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto shm_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!shm_buffer.IsNull());
   ctp::ipc::ShmPtr<> shm_ptr = shm_buffer.shm_.template Cast<void>();
 
@@ -269,7 +269,7 @@ TEST_CASE("ReorganizeBlob - PutBlob to DRAM", "[reorganize][put][dram]") {
   REQUIRE(size_task->size_ == kBlobSize);
   INFO("Blob size: " << size_task->size_);
 
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
   INFO("SUCCESS: Blob placed with score=1.0");
 }
 
@@ -334,7 +334,7 @@ TEST_CASE("ReorganizeBlob - Verify Data Integrity", "[reorganize][integrity]") {
   INFO("Verifying data integrity after reorganization");
 
   // Allocate buffer for reading
-  auto read_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!read_buffer.IsNull());
 
   // Read blob data
@@ -347,7 +347,7 @@ TEST_CASE("ReorganizeBlob - Verify Data Integrity", "[reorganize][integrity]") {
   bool data_valid = g_fixture->VerifyTestData(read_data, 'D');  // 'D' pattern from put
   REQUIRE(data_valid);
 
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
   INFO("SUCCESS: Data integrity verified after reorganization");
 }
 
@@ -395,7 +395,7 @@ TEST_CASE("ReorganizeBlob - Promote to DRAM", "[reorganize][promote][dram]") {
   INFO("SUCCESS: Score changed from " << score_before << " to " << score_after);
 
   // Verify data integrity after promotion
-  auto read_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!read_buffer.IsNull());
 
   tag.GetBlob(blob_name, read_buffer.shm_.template Cast<void>(), kBlobSize, 0);
@@ -406,7 +406,7 @@ TEST_CASE("ReorganizeBlob - Promote to DRAM", "[reorganize][promote][dram]") {
   bool data_valid = g_fixture->VerifyTestData(read_data, 'D');
   REQUIRE(data_valid);
 
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
   INFO("SUCCESS: Blob promoted back to DRAM with data integrity");
 }
 

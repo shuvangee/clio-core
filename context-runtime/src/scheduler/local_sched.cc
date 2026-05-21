@@ -48,7 +48,7 @@ void LocalScheduler::DivideWorkers(WorkOrchestrator *work_orch) {
     return;
   }
 
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
   if (!config) {
     HLOG(kError,
          "LocalScheduler::DivideWorkers: ConfigManager not available");
@@ -76,7 +76,7 @@ void LocalScheduler::DivideWorkers(WorkOrchestrator *work_orch) {
     }
   }
 
-  IpcManager *ipc = CHI_IPC;
+  IpcManager *ipc = CLIO_IPC;
   if (ipc) {
     ipc->SetNumSchedQueues(num_sched_workers);
     if (net_worker_) {

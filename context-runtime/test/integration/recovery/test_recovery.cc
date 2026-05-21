@@ -90,10 +90,10 @@ class RecoveryTestFixture {
         g_initialized = true;
         SimpleTest::g_test_finalize = chi::CHIMAERA_FINALIZE;
         std::this_thread::sleep_for(500ms);
-        REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-        REQUIRE(CHI_IPC != nullptr);
-        REQUIRE(CHI_POOL_MANAGER != nullptr);
-        REQUIRE(CHI_IPC->IsInitialized());
+        REQUIRE(CLIO_CHIMAERA_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC != nullptr);
+        REQUIRE(CLIO_POOL_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC->IsInitialized());
         INFO("Chimaera initialization successful");
       } else {
         FAIL("Failed to initialize Chimaera");

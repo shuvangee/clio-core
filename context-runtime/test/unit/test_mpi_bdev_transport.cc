@@ -145,7 +145,7 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
   }
 
   // Write
-  auto write_buffer = CHI_IPC->AllocateBuffer(write_data.size());
+  auto write_buffer = CLIO_IPC->AllocateBuffer(write_data.size());
   if (write_buffer.IsNull()) {
     HLOG(kError, "[Rank {}] AllocateBuffer for write failed", rank);
     return false;
@@ -158,16 +158,16 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
   write_task.Wait();
   if (write_task->return_code_ != 0) {
     HLOG(kError, "[Rank {}] Write failed: {}", rank, write_task->return_code_);
-    CHI_IPC->FreeBuffer(write_buffer);
+    CLIO_IPC->FreeBuffer(write_buffer);
     return false;
   }
   size_t actual_written = write_task->bytes_written_;
 
   // Read
-  auto read_buffer = CHI_IPC->AllocateBuffer(io_size);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(io_size);
   if (read_buffer.IsNull()) {
     HLOG(kError, "[Rank {}] AllocateBuffer for read failed", rank);
-    CHI_IPC->FreeBuffer(write_buffer);
+    CLIO_IPC->FreeBuffer(write_buffer);
     return false;
   }
   auto read_task = client.AsyncRead(
@@ -177,18 +177,18 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
   read_task.Wait();
   if (read_task->return_code_ != 0) {
     HLOG(kError, "[Rank {}] Read failed: {}", rank, read_task->return_code_);
-    CHI_IPC->FreeBuffer(write_buffer);
-    CHI_IPC->FreeBuffer(read_buffer);
+    CLIO_IPC->FreeBuffer(write_buffer);
+    CLIO_IPC->FreeBuffer(read_buffer);
     return false;
   }
 
   // Verify data
   ctp::ipc::FullPtr<char> data_ptr =
-      CHI_IPC->ToFullPtr(read_task->data_.template Cast<char>());
+      CLIO_IPC->ToFullPtr(read_task->data_.template Cast<char>());
   if (data_ptr.IsNull()) {
     HLOG(kError, "[Rank {}] Read data pointer is null", rank);
-    CHI_IPC->FreeBuffer(write_buffer);
-    CHI_IPC->FreeBuffer(read_buffer);
+    CLIO_IPC->FreeBuffer(write_buffer);
+    CLIO_IPC->FreeBuffer(read_buffer);
     return false;
   }
   size_t actual_read = read_task->bytes_read_;
@@ -205,8 +205,8 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
     }
   }
 
-  CHI_IPC->FreeBuffer(write_buffer);
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(write_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
 
   if (mismatches > 0) {
     HLOG(kError, "[Rank {}] {} mismatches in {} bytes", rank, mismatches, verify_size);

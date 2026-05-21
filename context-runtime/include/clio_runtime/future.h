@@ -233,9 +233,9 @@ struct FutureShm {
  * the caller to check completion status and retrieve results.
  *
  * @tparam TaskT The task type (e.g., CreateTask, CustomTask)
- * @tparam AllocT The allocator type (defaults to CHI_QUEUE_ALLOC_T)
+ * @tparam AllocT The allocator type (defaults to CLIO_QUEUE_ALLOC_T)
  */
-template <typename TaskT, typename AllocT = CHI_QUEUE_ALLOC_T>
+template <typename TaskT, typename AllocT = CLIO_QUEUE_ALLOC_T>
 class Future {
  public:
   using FutureT = FutureShm;
@@ -310,18 +310,18 @@ class Future {
   /**
    * Destructor - frees the task if this Future was consumed (via
    * Wait/await_resume). Defined out-of-line in ipc_manager.h where
-   * CHI_IPC is available.
+   * CLIO_IPC is available.
    */
   CTP_CROSS_FUN ~Future();
 
   /**
-   * Destroy the task using CHI_IPC->DelTask if not null
+   * Destroy the task using CLIO_IPC->DelTask if not null
    * Sets the task pointer to null afterwards
    */
   CTP_CROSS_FUN void Destroy(bool post_wait = false);
 
   /**
-   * Explicitly delete the underlying task via CHI_IPC->DelTask
+   * Explicitly delete the underlying task via CLIO_IPC->DelTask
    */
   CTP_CROSS_FUN void DelTask();
 
@@ -569,7 +569,7 @@ class Future {
    * Get the FutureShm FullPtr (for access to copy_space and flags_)
    * Converts the internal ShmPtr to FullPtr using IpcManager
    * @return FullPtr to the FutureShm object
-   * Note: Implementation provided in ipc_manager.h where CHI_IPC is defined
+   * Note: Implementation provided in ipc_manager.h where CLIO_IPC is defined
    */
   CTP_CROSS_FUN ctp::ipc::FullPtr<FutureT> GetFutureShm() const;
 

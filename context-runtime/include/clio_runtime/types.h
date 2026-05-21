@@ -649,39 +649,39 @@ enum class IpcMode : u32 {
 }  // namespace chi
 
 namespace chi::priv {
-typedef ctp::priv::string<CHI_PRIV_ALLOC_T> string;
+typedef ctp::priv::string<CLIO_PRIV_ALLOC_T> string;
 
 template <typename T>
-using vector = ctp::priv::vector<T, CHI_PRIV_ALLOC_T>;
+using vector = ctp::priv::vector<T, CLIO_PRIV_ALLOC_T>;
 
 template <typename Key, typename T>
-using unordered_map = ctp::priv::unordered_map_ll<Key, T, CHI_PRIV_ALLOC_T>;
+using unordered_map = ctp::priv::unordered_map_ll<Key, T, CLIO_PRIV_ALLOC_T>;
 
 // Shared-scope types for cross-warp GPU data structures.
 // On CPU these are identical to the private types above.
 // On GPU, AllocT = PartitionedAllocator which dispatches to the correct
 // warp partition, avoiding concurrent access to a single BuddyAllocator.
-typedef ctp::priv::string<CHI_PRIV_SHARED_ALLOC_T> shared_string;
+typedef ctp::priv::string<CLIO_PRIV_SHARED_ALLOC_T> shared_string;
 
 template <typename T>
-using shared_vector = ctp::priv::vector<T, CHI_PRIV_SHARED_ALLOC_T>;
+using shared_vector = ctp::priv::vector<T, CLIO_PRIV_SHARED_ALLOC_T>;
 
 template <typename Key, typename T>
 using shared_unordered_map =
-    ctp::priv::unordered_map_ll<Key, T, CHI_PRIV_SHARED_ALLOC_T>;
+    ctp::priv::unordered_map_ll<Key, T, CLIO_PRIV_SHARED_ALLOC_T>;
 }  // namespace chi::priv
 
 namespace chi::ipc {
-// Queue structures use CHI_QUEUE_ALLOC_T (BuddyAllocator)
+// Queue structures use CLIO_QUEUE_ALLOC_T (BuddyAllocator)
 template <typename T>
 using multi_mpsc_ring_buffer =
-    ctp::ipc::multi_mpsc_ring_buffer<T, CHI_QUEUE_ALLOC_T>;
+    ctp::ipc::multi_mpsc_ring_buffer<T, CLIO_QUEUE_ALLOC_T>;
 
 template <typename T>
-using mpsc_ring_buffer = ctp::ipc::mpsc_ring_buffer<T, CHI_QUEUE_ALLOC_T>;
+using mpsc_ring_buffer = ctp::ipc::mpsc_ring_buffer<T, CLIO_QUEUE_ALLOC_T>;
 
 template <typename T>
-using vector = ctp::ipc::vector<T, CHI_QUEUE_ALLOC_T>;
+using vector = ctp::ipc::vector<T, CLIO_QUEUE_ALLOC_T>;
 }  // namespace chi::ipc
 
 // Hash function specializations for std::unordered_map

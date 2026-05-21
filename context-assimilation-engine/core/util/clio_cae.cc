@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Verify CLIO Runtime IPC is available
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Error: Chimaera IPC not initialized. Is the runtime running?");
       return 1;

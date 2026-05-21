@@ -113,12 +113,12 @@ bool Worker::Init() {
   event_queue_ =
       CTP_MALLOC
           ->template NewObj<ctp::ipc::mpsc_ring_buffer<
-              Future<Task, CHI_QUEUE_ALLOC_T>, ctp::ipc::MallocAllocator>>(
+              Future<Task, CLIO_QUEUE_ALLOC_T>, ctp::ipc::MallocAllocator>>(
               CTP_MALLOC, EVENT_QUEUE_DEPTH)
           .ptr_;
 
   // Get scheduler from IpcManager (IpcManager is the single owner)
-  scheduler_ = CHI_IPC->GetScheduler();
+  scheduler_ = CLIO_IPC->GetScheduler();
   HLOG(kDebug, "Worker {}: Using scheduler from IpcManager", worker_id_);
 
   // Create SHM lightbeam transports for worker-side transport
@@ -395,7 +395,7 @@ bool Worker::ProcessNewTaskGpu(GpuTaskLane *gpu_lane) {
 
   ctp::ipc::FullPtr<Task> task_full_ptr(task_raw);
 
-  Future<Task> future = CHI_IPC->MakePointerFuture(task_full_ptr);
+  Future<Task> future = CLIO_IPC->MakePointerFuture(task_full_ptr);
   if (future.GetFutureShmPtr().IsNull()) {
     HLOG(kError,
          "Worker {}: ProcessNewTaskGpu: MakePointerFuture failed "
@@ -421,7 +421,7 @@ bool Worker::ProcessNewTaskGpu(GpuTaskLane *gpu_lane) {
       task_on_device ? reinterpret_cast<uintptr_t>(gpu_task_raw) : 0;
   chi_fshm->gpu_task_size_ = task_pod_size;
 
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   Container *container = pool_manager->GetStaticContainer(pool_id);
   if (!container) {
     HLOG(kError,
@@ -451,7 +451,7 @@ bool Worker::ProcessNewTaskGpu(GpuTaskLane *gpu_lane) {
   }
 
   if (!task_full_ptr->task_flags_.Any(TASK_RUN_CTX_EXISTS)) {
-    CHI_IPC->BeginTask(future, container, assigned_lane_);
+    CLIO_IPC->BeginTask(future, container, assigned_lane_);
   } else {
     RunContext *run_ctx = task_full_ptr->GetRunCtx();
     if (run_ctx) {
@@ -461,7 +461,7 @@ bool Worker::ProcessNewTaskGpu(GpuTaskLane *gpu_lane) {
     }
   }
 
-  RouteResult route_result = CHI_IPC->RouteTask(future, /*force_enqueue=*/true);
+  RouteResult route_result = CLIO_IPC->RouteTask(future, /*force_enqueue=*/true);
   HLOG(kDebug, "Worker {}: ProcessNewTaskGpu: RouteTask returned {} "
        "pool={} method={}",
        worker_id_, (int)route_result, pool_id, method_id);
@@ -471,7 +471,7 @@ bool Worker::ProcessNewTaskGpu(GpuTaskLane *gpu_lane) {
 ctp::ipc::FullPtr<Task> Worker::GetOrCopyTaskFromFuture(Future<Task> &future,
                                                     Container *container,
                                                     u32 method_id) {
-  return CHI_IPC->RecvRuntime(future, container, method_id,
+  return CLIO_IPC->RecvRuntime(future, container, method_id,
                               shm_recv_transport_.get());
 }
 
@@ -519,7 +519,7 @@ bool Worker::ProcessNewTask(TaskLane *lane) {
        worker_id_, pool_id, method_id);
 
   // Get static container for task deserialization (stateless operation)
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   Container *container = pool_manager->GetStaticContainer(pool_id);
 
   if (!container) {
@@ -547,7 +547,7 @@ bool Worker::ProcessNewTask(TaskLane *lane) {
 
   // Allocate RunContext before routing (skip if already created)
   if (!task_full_ptr->task_flags_.Any(TASK_RUN_CTX_EXISTS)) {
-    CHI_IPC->BeginTask(future, container, lane);
+    CLIO_IPC->BeginTask(future, container, lane);
   } else {
     // Task was re-enqueued from another worker (e.g., by RouteLocal).
     // Update worker-specific RunContext fields to match this worker,
@@ -562,7 +562,7 @@ bool Worker::ProcessNewTask(TaskLane *lane) {
 
   // Route task using consolidated routing function
   // RouteTask handles Retry/Dne internally via AddToRetryQueue
-  RouteResult route_result = CHI_IPC->RouteTask(future);
+  RouteResult route_result = CLIO_IPC->RouteTask(future);
   if (route_result == RouteResult::ExecHere) {
 #if CTP_IS_HOST
     // Re-fetch task pointer from future in case RouteTask changed it
@@ -624,7 +624,7 @@ void Worker::SuspendMe() {
   }
 
   // Get configuration parameters
-  auto *config = CHI_CONFIG_MANAGER;
+  auto *config = CLIO_CONFIG_MANAGER;
   u32 first_busy_wait = config->GetFirstBusyWait();
   u32 max_sleep = config->GetMaxSleep();
 
@@ -886,7 +886,7 @@ void Worker::ExecTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
   }
 
   // Resolve the container fresh each time (may change during migration)
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   bool is_plugged = false;
   ContainerId container_id = task_ptr->pool_query_.GetContainerId();
   Container *exec_container =
@@ -1009,7 +1009,7 @@ void Worker::EndTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
     NetQueuePriority prio = (io_size >= kNetQueueIoThreshold)
                                 ? NetQueuePriority::kSendOutIO
                                 : NetQueuePriority::kSendOutLatency;
-    CHI_IPC->EnqueueNetTask(run_ctx->future_, prio);
+    CLIO_IPC->EnqueueNetTask(run_ctx->future_, prio);
     return;
   }
 
@@ -1134,7 +1134,7 @@ void Worker::ProcessPeriodicQueue(std::queue<RunContext *> &queue,
 
       // Route task again - this will handle both local and distributed routing
       // RouteTask handles Retry/Dne internally via AddToRetryQueue
-      if (CHI_IPC->RouteTask(run_ctx->future_) == RouteResult::ExecHere) {
+      if (CLIO_IPC->RouteTask(run_ctx->future_) == RouteResult::ExecHere) {
         ExecTask(run_ctx->task_, run_ctx, is_started);
 
         // If task re-yielded with a polling interval, ExecTask already
@@ -1153,7 +1153,7 @@ void Worker::ProcessEventQueue() {
   // FUTURE_COMPLETE on it here (on the parent worker's thread), then resume
   // the parent coroutine. This avoids stale RunContext* pointers since
   // FUTURE_COMPLETE is never set before the event is consumed.
-  Future<Task, CHI_QUEUE_ALLOC_T> future;
+  Future<Task, CLIO_QUEUE_ALLOC_T> future;
   while (event_queue_->Pop(future)) {
     HLOG(kDebug, "Worker {}: ProcessEventQueue popped subtask future",
          worker_id_);
@@ -1337,7 +1337,7 @@ void Worker::ProcessRetryQueue() {
     // RouteTask handles Retry/Dne internally via AddToRetryQueue.
     task_ptr->ClearFlags(TASK_ROUTED);
     RouteResult result =
-        CHI_IPC->RouteTask(run_ctx->future_, /*force_enqueue=*/true);
+        CLIO_IPC->RouteTask(run_ctx->future_, /*force_enqueue=*/true);
     if (result == RouteResult::ExecHere) {
       // force_enqueue=true means this shouldn't happen, but handle it
       ExecTask(task_ptr, run_ctx, false);
@@ -1384,7 +1384,7 @@ void Worker::ReschedulePeriodicTask(RunContext *run_ctx,
 }
 
 RunContext *GetCurrentRunContextFromWorker() {
-  Worker *worker = CHI_CUR_WORKER;
+  Worker *worker = CLIO_CUR_WORKER;
   if (worker) {
     return worker->GetCurrentRunContext();
   }

@@ -32,7 +32,7 @@
  */
 
 /**
- * Unit tests for CHI_IPC->AllocateBuffer functionality
+ * Unit tests for CLIO_IPC->AllocateBuffer functionality
  * Tests the IPC manager's buffer allocation for shared memory operations
  */
 
@@ -53,12 +53,12 @@ bool initialize_chimaera() {
 }
 }  // namespace
 
-TEST_CASE("CHI_IPC AllocateBuffer basic functionality",
+TEST_CASE("CLIO_IPC AllocateBuffer basic functionality",
           "[ipc][allocate_buffer][basic]") {
   // Initialize CLIO Runtime client for testing
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Allocate char buffer") {
@@ -88,7 +88,7 @@ TEST_CASE("CHI_IPC AllocateBuffer basic functionality",
     REQUIRE(char_buffer.ptr_ != nullptr);
 
     // Test typed buffer access
-    const char* test_string = "CHI_IPC AllocateBuffer test";
+    const char* test_string = "CLIO_IPC AllocateBuffer test";
     size_t test_len = strlen(test_string);
     REQUIRE(test_len < buffer_size);
 
@@ -120,11 +120,11 @@ TEST_CASE("CHI_IPC AllocateBuffer basic functionality",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer return type verification",
+TEST_CASE("CLIO_IPC AllocateBuffer return type verification",
           "[ipc][allocate_buffer][types]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Return type is FullPtr<char>, not ctp::ipc::ShmPtr<>") {
@@ -148,11 +148,11 @@ TEST_CASE("CHI_IPC AllocateBuffer return type verification",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer size variations",
+TEST_CASE("CLIO_IPC AllocateBuffer size variations",
           "[ipc][allocate_buffer][sizes]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Various buffer sizes") {
@@ -186,11 +186,11 @@ TEST_CASE("CHI_IPC AllocateBuffer size variations",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer multiple allocations",
+TEST_CASE("CLIO_IPC AllocateBuffer multiple allocations",
           "[ipc][allocate_buffer][multiple]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Multiple simultaneous allocations") {
@@ -227,14 +227,14 @@ TEST_CASE("CHI_IPC AllocateBuffer multiple allocations",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer client vs runtime behavior",
+TEST_CASE("CLIO_IPC AllocateBuffer client vs runtime behavior",
           "[ipc][allocate_buffer][client_runtime]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
-  auto* chimaera_manager = CHI_CHIMAERA_MANAGER;
+  auto* chimaera_manager = CLIO_CHIMAERA_MANAGER;
   REQUIRE(chimaera_manager != nullptr);
 
   SECTION("Colocated client mode allocation") {
@@ -256,11 +256,11 @@ TEST_CASE("CHI_IPC AllocateBuffer client vs runtime behavior",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer memory alignment",
+TEST_CASE("CLIO_IPC AllocateBuffer memory alignment",
           "[ipc][allocate_buffer][alignment]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Pointer alignment for different types") {
@@ -290,7 +290,7 @@ TEST_CASE("CHI_IPC AllocateBuffer memory alignment",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer documentation examples",
+TEST_CASE("CLIO_IPC AllocateBuffer documentation examples",
           "[ipc][allocate_buffer][documentation]") {
   REQUIRE(initialize_chimaera());
 
@@ -298,7 +298,7 @@ TEST_CASE("CHI_IPC AllocateBuffer documentation examples",
     // Test the exact examples from the documentation
 
     // Get the IPC manager singleton
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     REQUIRE(ipc_manager != nullptr);
 
     // Allocate a buffer in shared memory (returns FullPtr<T>, not

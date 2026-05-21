@@ -265,9 +265,9 @@ class IpcManager {
 //
 // CUDA/ROCm: per-block IpcManager lives in __shared__ storage so any
 // CTP_GPU_FUN helper reachable from the kernel can look it up via
-// CHI_IPC = GetBlockIpcManager(). SYCL: kernel functor captures a
+// CLIO_IPC = GetBlockIpcManager(). SYCL: kernel functor captures a
 // pointer to a host-allocated USM IpcManager; the macro names that
-// pointer `g_ipc_manager_ptr` so the SYCL CHI_IPC macro (in ipc_manager.h)
+// pointer `g_ipc_manager_ptr` so the SYCL CLIO_IPC macro (in ipc_manager.h)
 // can resolve it via plain C++ name lookup.
 
 #if CTP_IS_SYCL_COMPILER

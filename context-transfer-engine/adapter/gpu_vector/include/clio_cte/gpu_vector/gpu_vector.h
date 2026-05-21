@@ -51,7 +51,7 @@ enum class CacheMode {
 /**
  * Producer-only GPU-resident vector backed by CTE blob storage. See
  * the file-level comment in gpu_vector_page.h for the data layout and
- * AGENTS.md "GPU Producer-Only Model" for the CHI_IPC->Send model.
+ * AGENTS.md "GPU Producer-Only Model" for the CLIO_IPC->Send model.
  *
  * Lifecycle:
  *   - Caller must have already initialized the CLIO Runtime runtime and
@@ -867,7 +867,7 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
   impl_->mode = mode;
   impl_->gpu_id = gpu_id;
 
-  auto *cpu_ipc = CHI_CPU_IPC;
+  auto *cpu_ipc = CLIO_CPU_IPC;
 
   chi::u32 total_ppb = gpu_pages_per_block + host_pages_per_block;
 
@@ -1077,7 +1077,7 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
   //     IT doesn't hit the same first-launch deadlock from the cache
   //     thread.
   if (mode == CacheMode::kAsync) {
-    auto *gpu_ipc_mgr0 = CHI_CPU_IPC->GetGpuIpcManager();
+    auto *gpu_ipc_mgr0 = CLIO_CPU_IPC->GetGpuIpcManager();
     chi::IpcManagerGpuInfo info0 = gpu_ipc_mgr0->GetGpuInfo(gpu_id);
     detail::CacheManagerKernel<<<nblocks, manager_threads_per_block>>>(
         info0, view_.base);
@@ -1103,7 +1103,7 @@ inline Vector<T>::Vector(const std::string &tag_name, chi::u32 nblocks,
   impl_->cache_thread_run.store(true);
   Vector<T> *self = this;
   impl_->cache_thread = std::thread([self]() {
-    auto *gpu_ipc_mgr = CHI_CPU_IPC->GetGpuIpcManager();
+    auto *gpu_ipc_mgr = CLIO_CPU_IPC->GetGpuIpcManager();
     chi::IpcManagerGpuInfo info =
         gpu_ipc_mgr->GetGpuInfo(self->impl_->gpu_id);
     cudaFree(0);
@@ -1160,7 +1160,7 @@ inline Vector<T>::~Vector() {
       std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
   }
-  auto *cpu_ipc = CHI_CPU_IPC;
+  auto *cpu_ipc = CLIO_CPU_IPC;
   if (impl_->pages_base)
     cpu_ipc->FreeGpuBackend(impl_->gpu_id, impl_->pages_alloc_id);
   if (impl_->host_pages_base)

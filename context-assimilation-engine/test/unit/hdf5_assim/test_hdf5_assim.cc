@@ -320,7 +320,7 @@ bool VerifyDatasetData(const std::string& file_path,
     }
 
     // Allocate shared memory buffer for this blob
-    auto blob_buffer = CHI_IPC->AllocateBuffer(blob_size);
+    auto blob_buffer = CLIO_IPC->AllocateBuffer(blob_size);
 
     // Read blob into shared memory buffer
     ctp::ipc::ShmPtr<> blob_shm_ptr = blob_buffer.shm_.template Cast<void>();
@@ -329,7 +329,7 @@ bool VerifyDatasetData(const std::string& file_path,
     bool success = (get_blob_task->GetReturnCode() == 0);
     if (!success) {
       HLOG(kError, "Failed to read blob '{}'", blob_name);
-      CHI_IPC->FreeBuffer(blob_buffer);
+      CLIO_IPC->FreeBuffer(blob_buffer);
       H5Tclose(datatype_id);
       H5Sclose(dataspace_id);
       H5Dclose(dataset_id);
@@ -341,7 +341,7 @@ bool VerifyDatasetData(const std::string& file_path,
     std::memcpy(cte_data.data() + bytes_read, blob_buffer.ptr_, blob_size);
 
     // Free the shared memory buffer
-    CHI_IPC->FreeBuffer(blob_buffer);
+    CLIO_IPC->FreeBuffer(blob_buffer);
 
     bytes_read += blob_size;
   }
@@ -486,7 +486,7 @@ int main(int argc, char* argv[]) {
     HLOG(kSuccess, "Chimaera initialized successfully");
 
     // Verify CLIO Runtime IPC is available
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Chimaera IPC not initialized");
       return 1;

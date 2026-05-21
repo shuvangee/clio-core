@@ -72,7 +72,7 @@ TEST_CASE("ADIOS2 transparent compress - PutBlob float array",
   const size_t num_elements = 16 * 1024;  // 16K floats = 64KB
   const size_t data_size = num_elements * sizeof(float);
 
-  auto buffer = CHI_IPC->AllocateBuffer(data_size);
+  auto buffer = CLIO_IPC->AllocateBuffer(data_size);
   REQUIRE(!buffer.IsNull());
 
   // Fill with a compressible pattern (repeating values compress well)
@@ -107,7 +107,7 @@ TEST_CASE("ADIOS2 transparent compress - GetBlob float array",
   const size_t num_elements = 16 * 1024;
   const size_t data_size = num_elements * sizeof(float);
 
-  auto get_buffer = CHI_IPC->AllocateBuffer(data_size);
+  auto get_buffer = CLIO_IPC->AllocateBuffer(data_size);
   REQUIRE(!get_buffer.IsNull());
   memset(get_buffer.ptr_, 0, data_size);
 
@@ -145,7 +145,7 @@ TEST_CASE("ADIOS2 transparent compress - multi-step workflow",
 
   // Write multiple steps
   for (int step = 0; step < num_steps; ++step) {
-    auto buffer = CHI_IPC->AllocateBuffer(data_size);
+    auto buffer = CLIO_IPC->AllocateBuffer(data_size);
     REQUIRE(!buffer.IsNull());
 
     double *ddata = reinterpret_cast<double *>(buffer.ptr_);
@@ -171,7 +171,7 @@ TEST_CASE("ADIOS2 transparent compress - multi-step workflow",
 
   // Read back and verify each step
   for (int step = 0; step < num_steps; ++step) {
-    auto get_buffer = CHI_IPC->AllocateBuffer(data_size);
+    auto get_buffer = CLIO_IPC->AllocateBuffer(data_size);
     REQUIRE(!get_buffer.IsNull());
     memset(get_buffer.ptr_, 0, data_size);
 

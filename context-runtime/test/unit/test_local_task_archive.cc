@@ -58,8 +58,8 @@ public:
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Verify initialization
-    REQUIRE(CHI_IPC != nullptr);
-    REQUIRE(CHI_IPC->IsInitialized());
+    REQUIRE(CLIO_IPC != nullptr);
+    REQUIRE(CLIO_IPC->IsInitialized());
   }
 
   ~LocalTaskArchiveTest() {

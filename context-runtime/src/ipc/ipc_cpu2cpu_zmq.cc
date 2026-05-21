@@ -15,7 +15,7 @@ namespace chi {
 //==============================================================================
 
 bool IpcCpu2CpuZmq::RuntimeRecv(IpcManager *ipc, u32 &tasks_received) {
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   bool did_work = false;
   tasks_received = 0;
 
@@ -168,7 +168,7 @@ void IpcCpu2CpuZmq::EnqueueRuntimeSend(IpcManager *ipc, RunContext *run_ctx,
 bool IpcCpu2CpuZmq::RuntimeSend(
     IpcManager *ipc, u32 &tasks_sent,
     std::vector<ctp::ipc::FullPtr<Task>> &deferred_deletes) {
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   bool did_work = false;
   tasks_sent = 0;
   static std::atomic<size_t> send_counter{0};

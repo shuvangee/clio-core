@@ -116,8 +116,8 @@ class CTEBenchmark {
   void Worker(Mode mode, size_t tid, std::atomic<bool> &err,
               std::vector<long long> &times, std::vector<clio_bench::u64> &ops) {
     auto *cte = CLIO_CTE_CLIENT;
-    auto put_shm = CHI_IPC->AllocateBuffer(a_.io_size);
-    auto get_shm = CHI_IPC->AllocateBuffer(a_.io_size);
+    auto put_shm = CLIO_IPC->AllocateBuffer(a_.io_size);
+    auto get_shm = CLIO_IPC->AllocateBuffer(a_.io_size);
     std::memset(put_shm.ptr_, static_cast<int>(tid & 0xFF), a_.io_size);
     std::memset(get_shm.ptr_, 0, a_.io_size);  // pre-fault dest pages
     ctp::ipc::ShmPtr<> put_ptr = put_shm.shm_.template Cast<void>();
@@ -139,8 +139,8 @@ class CTEBenchmark {
         t.Wait();
         if (t->return_code_.load() != 0) {
           err.store(true, std::memory_order_relaxed);
-          CHI_IPC->FreeBuffer(put_shm);
-          CHI_IPC->FreeBuffer(get_shm);
+          CLIO_IPC->FreeBuffer(put_shm);
+          CLIO_IPC->FreeBuffer(get_shm);
           return;
         }
       }
@@ -190,8 +190,8 @@ class CTEBenchmark {
     times[tid] =
         duration_cast<microseconds>(steady_clock::now() - start).count();
     ops[tid] = done;
-    CHI_IPC->FreeBuffer(put_shm);
-    CHI_IPC->FreeBuffer(get_shm);
+    CLIO_IPC->FreeBuffer(put_shm);
+    CLIO_IPC->FreeBuffer(get_shm);
   }
 
   bool RunGeneric(Mode mode) {
@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
   }
   struct ClientFinalizeGuard {
     ~ClientFinalizeGuard() {
-      auto *mgr = CHI_CHIMAERA_MANAGER;
+      auto *mgr = CLIO_CHIMAERA_MANAGER;
       if (mgr) mgr->ClientFinalize();
     }
   } finalize_guard;

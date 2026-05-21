@@ -127,7 +127,7 @@ __global__ void GpuVectorReadKernel(chi::IpcManagerGpuInfo info,
 TEST_CASE("gpu_vector: write then read round-trip",
           "[gpu_vector][cte][stress]") {
   EnsureInit();
-  auto *ipc = CHI_CPU_IPC;
+  auto *ipc = CLIO_CPU_IPC;
   const chi::u32 nblocks = 4;
   const chi::u32 pages_per_block = 4;
   const chi::u64 page_size_bytes = 4096;

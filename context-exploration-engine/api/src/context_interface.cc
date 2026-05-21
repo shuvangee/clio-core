@@ -72,7 +72,7 @@ bool ContextInterface::EnsureInitialized() {
   }
 
   // Verify CLIO Runtime IPC is available
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) {
     HLOG(kError, "Chimaera IPC not initialized. Is the runtime running?");
     return false;
@@ -185,7 +185,7 @@ std::vector<std::string> ContextInterface::ContextRetrieve(
     }
 
     // Get IPC manager for buffer allocation
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Chimaera IPC not initialized");
       return std::vector<std::string>();

@@ -379,7 +379,7 @@ int main(int argc, char *argv[]) {
                opts.do_read ? "yes" : "no");
 
   EnsureInit(opts, bdev_capacity_bytes);
-  auto *ipc = CHI_CPU_IPC;
+  auto *ipc = CLIO_CPU_IPC;
 
   using clock = std::chrono::steady_clock;
   auto us_since = [](clock::time_point t0) -> long long {

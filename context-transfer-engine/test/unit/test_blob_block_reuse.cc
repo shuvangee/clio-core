@@ -163,7 +163,7 @@ TEST_CASE("BlockReuse - Put(1MB)+Del(1MB) frees back to its partition",
   clio_cte::core::Tag tag("block_reuse_tag");
   clio_cte::core::TagId tag_id = tag.GetTagId();
 
-  auto shm = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto shm = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!shm.IsNull());
   std::memset(shm.ptr_, 0xAB, kBlobSize);
   ctp::ipc::ShmPtr<> shm_ptr = shm.shm_.template Cast<void>();
@@ -198,7 +198,7 @@ TEST_CASE("BlockReuse - Put(1MB)+Del(1MB) frees back to its partition",
     }
   }
 
-  CHI_IPC->FreeBuffer(shm);
+  CLIO_IPC->FreeBuffer(shm);
 
   INFO("Completed Put/Del cycles before any failure: "
        << (failed_cycle < 0 ? kCycles : failed_cycle)

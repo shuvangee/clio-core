@@ -51,7 +51,7 @@ bool ContentTransferEngine::ClientInit(const chi::PoolQuery &pool_query) {
   if (is_initializing_) {
     return true;
   }
-  auto *chimaera_manager = CHI_CHIMAERA_MANAGER;
+  auto *chimaera_manager = CLIO_CHIMAERA_MANAGER;
   if (chimaera_manager->IsInitializing()) {
     return true;
   }

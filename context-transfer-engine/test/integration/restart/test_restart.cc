@@ -83,7 +83,7 @@ int PutBlobs() {
     std::string blob_name = "restart_blob_" + std::to_string(i);
 
     // Allocate SHM buffer
-    ctp::ipc::FullPtr<char> buf = CHI_IPC->AllocateBuffer(kBlobSize);
+    ctp::ipc::FullPtr<char> buf = CLIO_IPC->AllocateBuffer(kBlobSize);
     if (buf.IsNull()) {
       HLOG(kError, "Phase 1: Failed to allocate SHM buffer for blob {}", i);
       return 1;
@@ -183,7 +183,7 @@ int VerifyBlobs() {
     std::string blob_name = "restart_blob_" + std::to_string(i);
     char expected_pattern = static_cast<char>('A' + i);
 
-    ctp::ipc::FullPtr<char> buf = CHI_IPC->AllocateBuffer(kBlobSize);
+    ctp::ipc::FullPtr<char> buf = CLIO_IPC->AllocateBuffer(kBlobSize);
     if (buf.IsNull()) {
       ++failed;
       continue;

@@ -273,13 +273,13 @@ CUresult GpuVirtualMemoryManager::touchPage(size_t page_index) {
     if (use_cte_ && entry.evicted_to_host) {
       // Restore from CTE: AsyncGetBlob → SHM → cudaMemcpy → GPU
       std::string blob_name = "page_" + std::to_string(page_index);
-      ctp::ipc::FullPtr<char> shm = CHI_CPU_IPC->AllocateBuffer(page_size_);
+      ctp::ipc::FullPtr<char> shm = CLIO_CPU_IPC->AllocateBuffer(page_size_);
       auto future = CLIO_CTE_CLIENT->AsyncGetBlob(
           cte_tag_->GetTagId(), blob_name, 0, page_size_, 0, shm.shm_);
       future.Wait();
       cudaMemcpy((void *)page_addr, shm.ptr_, page_size_,
                  cudaMemcpyHostToDevice);
-      CHI_CPU_IPC->FreeBuffer(shm);
+      CLIO_CPU_IPC->FreeBuffer(shm);
       entry.evicted_to_host = false;
       restored = true;
     }
@@ -342,14 +342,14 @@ CUresult GpuVirtualMemoryManager::touchPageAsync(size_t page_index) {
   if (use_cte_ && entry.evicted_to_host) {
     // Restore from CTE (sync get, then async H2D)
     std::string blob_name = "page_" + std::to_string(page_index);
-    ctp::ipc::FullPtr<char> shm = CHI_CPU_IPC->AllocateBuffer(page_size_);
+    ctp::ipc::FullPtr<char> shm = CLIO_CPU_IPC->AllocateBuffer(page_size_);
     auto future = CLIO_CTE_CLIENT->AsyncGetBlob(
         cte_tag_->GetTagId(), blob_name, 0, page_size_, 0, shm.shm_);
     future.Wait();
     cudaMemcpyAsync((void *)page_addr, shm.ptr_, page_size_,
                     cudaMemcpyHostToDevice, transfer_stream_);
     // SHM freed after transfer completes (caller must syncTransfer)
-    CHI_CPU_IPC->FreeBuffer(shm);
+    CLIO_CPU_IPC->FreeBuffer(shm);
     entry.evicted_to_host = false;
     restored = true;
   }
@@ -442,11 +442,11 @@ CUresult GpuVirtualMemoryManager::evictPage(size_t page_index) {
   if (use_cte_) {
     // Copy pinned host → SHM → AsyncPutBlob → Wait → free both
     std::string blob_name = "page_" + std::to_string(page_index);
-    ctp::ipc::FullPtr<char> shm = CHI_CPU_IPC->AllocateBuffer(page_size_);
+    ctp::ipc::FullPtr<char> shm = CLIO_CPU_IPC->AllocateBuffer(page_size_);
     memcpy(shm.ptr_, host_buf, page_size_);
     auto future = cte_tag_->AsyncPutBlob(blob_name, shm.shm_, page_size_);
     future.Wait();
-    CHI_CPU_IPC->FreeBuffer(shm);
+    CLIO_CPU_IPC->FreeBuffer(shm);
     cudaFreeHost(host_buf);
   } else
 #endif
@@ -515,11 +515,11 @@ CUresult GpuVirtualMemoryManager::evictPageAsync(size_t page_index) {
 #ifdef CLIO_CTE_AVAILABLE
   if (use_cte_) {
     std::string blob_name = "page_" + std::to_string(page_index);
-    ctp::ipc::FullPtr<char> shm = CHI_CPU_IPC->AllocateBuffer(page_size_);
+    ctp::ipc::FullPtr<char> shm = CLIO_CPU_IPC->AllocateBuffer(page_size_);
     memcpy(shm.ptr_, host_buf, page_size_);
     auto future = cte_tag_->AsyncPutBlob(blob_name, shm.shm_, page_size_);
     future.Wait();
-    CHI_CPU_IPC->FreeBuffer(shm);
+    CLIO_CPU_IPC->FreeBuffer(shm);
     cudaFreeHost(host_buf);
   } else
 #endif

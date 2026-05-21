@@ -298,7 +298,7 @@ Runtime::~Runtime() {
 
 bool Runtime::InitializeWorkerIOContexts() {
   // Pre-allocate vector based on actual number of workers
-  chi::WorkOrchestrator *work_orchestrator = CHI_WORK_ORCHESTRATOR;
+  chi::WorkOrchestrator *work_orchestrator = CLIO_WORK_ORCHESTRATOR;
   size_t num_workers =
       work_orchestrator ? work_orchestrator->GetWorkerCount() : 16;
   worker_io_contexts_.resize(num_workers);
@@ -332,7 +332,7 @@ WorkerIOContext *Runtime::GetWorkerIOContext(size_t worker_id) {
 
     // Register the eventfd with the worker's EventManager for completion notification
     int event_fd = ctx->async_io_ ? ctx->async_io_->GetEventFd() : -1;
-    chi::Worker *worker = CHI_CUR_WORKER;
+    chi::Worker *worker = CLIO_CUR_WORKER;
     if (worker != nullptr && event_fd >= 0) {
       auto &em = worker->GetEventManager();
       if (em.AddEvent(event_fd) < 0) {
@@ -379,7 +379,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Get the creation parameters
   CreateParams params = task->GetParams();
 
@@ -409,13 +409,13 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
     if (!setup_io) {
       HLOG(kError, "Failed to create setup async I/O backend");
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     if (!setup_io->Open(pool_name, O_RDWR | O_CREAT, 0644)) {
       HLOG(kError, "Failed to open file: {}", pool_name);
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Get file size
@@ -423,7 +423,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
     if (current_size < 0) {
       task->return_code_ = 2;
       setup_io->Close();
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     file_size_ = static_cast<chi::u64>(current_size);
@@ -445,7 +445,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
         task->return_code_ = 3;
         HLOG(kError, "Failed to truncate file: {}", pool_name);
         setup_io->Close();
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
       HLOG(kDebug, "Truncate succeeded, file_size_={}", file_size_);
     }
@@ -538,14 +538,14 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
 
   // Set success result
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::AllocateBlocks(ctp::ipc::FullPtr<AllocateBlocksTask> task,
                                         chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug,
        "bdev::AllocateBlocks: ENTER - pool_id_=({},{}), size={}, "
        "container_id={}",
@@ -560,7 +560,7 @@ chi::TaskResume Runtime::AllocateBlocks(ctp::ipc::FullPtr<AllocateBlocksTask> ta
     HLOG(kDebug, "bdev::AllocateBlocks: size is 0, returning empty blocks");
     task->blocks_.clear();
     task->return_code_ = 0;  // Nothing to allocate
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Create local vector in private memory to build up the block list
@@ -622,7 +622,7 @@ chi::TaskResume Runtime::AllocateBlocks(ctp::ipc::FullPtr<AllocateBlocksTask> ta
       task->blocks_.clear();
       // HLOG(kError, "Out of space: {} bytes requested", total_size);
       task->return_code_ = 1;  // Out of space
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Add the allocated block to the local vector
@@ -648,14 +648,14 @@ chi::TaskResume Runtime::AllocateBlocks(ctp::ipc::FullPtr<AllocateBlocksTask> ta
        local_blocks.size(), task->blocks_.size());
 
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::FreeBlocks(ctp::ipc::FullPtr<FreeBlocksTask> task,
                                     chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Get worker ID for free operation
   int worker_id = static_cast<int>(GetWorkerID(rctx));
 
@@ -699,17 +699,17 @@ chi::TaskResume Runtime::FreeBlocks(ctp::ipc::FullPtr<FreeBlocksTask> task,
   }
 
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Write(ctp::ipc::FullPtr<WriteTask> task,
                                chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   switch (bdev_type_) {
     case BdevType::kFile:
-      CHI_CO_AWAIT(WriteToFile(task, rctx));
+      CLIO_CO_AWAIT(WriteToFile(task, rctx));
       break;
     case BdevType::kRam:
       WriteToRam(task);
@@ -729,17 +729,17 @@ chi::TaskResume Runtime::Write(ctp::ipc::FullPtr<WriteTask> task,
       task->bytes_written_ = 0;
       break;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Read(ctp::ipc::FullPtr<ReadTask> task,
                               chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   switch (bdev_type_) {
     case BdevType::kFile:
-      CHI_CO_AWAIT(ReadFromFile(task, rctx));
+      CLIO_CO_AWAIT(ReadFromFile(task, rctx));
       break;
     case BdevType::kRam:
       ReadFromRam(task);
@@ -759,18 +759,18 @@ chi::TaskResume Runtime::Read(ctp::ipc::FullPtr<ReadTask> task,
       task->bytes_read_ = 0;
       break;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::WriteToFile(ctp::ipc::FullPtr<WriteTask> task,
                                      chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   size_t worker_id = GetWorkerID(rctx);
   WorkerIOContext *io_ctx = GetWorkerIOContext(worker_id);
 
-  auto *ipc_mgr = CHI_IPC;
+  auto *ipc_mgr = CLIO_IPC;
   ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
 
   // libaio / POSIX-AIO can't dereference device USM, so stage through
@@ -802,7 +802,7 @@ chi::TaskResume Runtime::WriteToFile(ctp::ipc::FullPtr<WriteTask> task,
       HLOG(kError, "WriteToFile called with invalid I/O context");
       task->return_code_ = 1;
       task->bytes_written_ = total_bytes_written;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     ctp::IoToken token = io_ctx->async_io_->Write(
@@ -813,19 +813,19 @@ chi::TaskResume Runtime::WriteToFile(ctp::ipc::FullPtr<WriteTask> task,
            block.offset_, block_write_size);
       task->return_code_ = 2;
       task->bytes_written_ = total_bytes_written;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     ctp::IoResult result;
     while (!io_ctx->async_io_->IsComplete(token, result)) {
-      CHI_CO_AWAIT(chi::yield(10.0));
+      CLIO_CO_AWAIT(chi::yield(10.0));
     }
 
     if (result.error_code != 0) {
       HLOG(kError, "Async write failed: error_code={}", result.error_code);
       task->return_code_ = 4;
       task->bytes_written_ = total_bytes_written;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     chi::u64 actual_bytes = std::min(
@@ -838,18 +838,18 @@ chi::TaskResume Runtime::WriteToFile(ctp::ipc::FullPtr<WriteTask> task,
   task->bytes_written_ = total_bytes_written;
   total_writes_.fetch_add(1);
   total_bytes_written_.fetch_add(task->bytes_written_);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::ReadFromFile(ctp::ipc::FullPtr<ReadTask> task,
                                       chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   size_t worker_id = GetWorkerID(rctx);
   WorkerIOContext *io_ctx = GetWorkerIOContext(worker_id);
 
-  auto *ipc_mgr = CHI_IPC;
+  auto *ipc_mgr = CLIO_IPC;
   ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
 
   // libaio / POSIX-AIO can't write into device USM. When the dest is
@@ -879,7 +879,7 @@ chi::TaskResume Runtime::ReadFromFile(ctp::ipc::FullPtr<ReadTask> task,
       HLOG(kError, "ReadFromFile called with invalid I/O context");
       task->return_code_ = 1;
       task->bytes_read_ = total_bytes_read;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     ctp::IoToken token = io_ctx->async_io_->Read(
@@ -890,19 +890,19 @@ chi::TaskResume Runtime::ReadFromFile(ctp::ipc::FullPtr<ReadTask> task,
            block.offset_, block_read_size);
       task->return_code_ = 2;
       task->bytes_read_ = total_bytes_read;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     ctp::IoResult result;
     while (!io_ctx->async_io_->IsComplete(token, result)) {
-      CHI_CO_AWAIT(chi::yield(10.0));
+      CLIO_CO_AWAIT(chi::yield(10.0));
     }
 
     if (result.error_code != 0) {
       HLOG(kError, "Async read failed: error_code={}", result.error_code);
       task->return_code_ = 4;
       task->bytes_read_ = total_bytes_read;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     chi::u64 actual_bytes = std::min(
@@ -921,8 +921,8 @@ chi::TaskResume Runtime::ReadFromFile(ctp::ipc::FullPtr<ReadTask> task,
   task->bytes_read_ = total_bytes_read;
   total_reads_.fetch_add(1);
   total_bytes_read_.fetch_add(total_bytes_read);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Update(ctp::ipc::FullPtr<UpdateTask> task,
@@ -942,7 +942,7 @@ chi::TaskResume Runtime::GetStats(ctp::ipc::FullPtr<GetStatsTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Predict wall time from learned model using a synthetic 1 MiB R/W
   // task as the reference size for the bandwidth/latency estimate.
   ReadTask r_synthetic;
@@ -974,8 +974,8 @@ chi::TaskResume Runtime::GetStats(ctp::ipc::FullPtr<GetStatsTask> task,
   chi::u64 remaining = (file_size_ > live) ? (file_size_ - live) : 0;
   task->remaining_size_ = remaining;
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task,
@@ -985,18 +985,18 @@ chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Worker I/O contexts (and their AsyncIO instances) are cleaned up by destructor
   // Note: GlobalBlockMap and Heap cleanup is handled by their destructors
 
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::InitializeAllocator() {
   // Initialize global block map with actual number of workers
-  chi::WorkOrchestrator *work_orchestrator = CHI_WORK_ORCHESTRATOR;
+  chi::WorkOrchestrator *work_orchestrator = CLIO_WORK_ORCHESTRATOR;
   size_t num_workers =
       work_orchestrator ? work_orchestrator->GetWorkerCount() : 16;
   global_block_map_.Init(num_workers);
@@ -1014,8 +1014,8 @@ size_t Runtime::GetBlockSize(int block_type) {
 }
 
 size_t Runtime::GetWorkerID(chi::RunContext &ctx) {
-  // Get current worker from thread-local storage using CHI_CUR_WORKER macro
-  chi::Worker *worker = CHI_CUR_WORKER;
+  // Get current worker from thread-local storage using CLIO_CUR_WORKER macro
+  chi::Worker *worker = CLIO_CUR_WORKER;
   if (worker == nullptr) {
     return 0;  // Fallback to worker 0 if not in worker context
   }
@@ -1076,7 +1076,7 @@ void Runtime::WriteToRam(ctp::ipc::FullPtr<WriteTask> task) {
   ctp::Timer timer;
 
   timer.Resume();
-  auto *ipc_mgr = CHI_IPC;
+  auto *ipc_mgr = CLIO_IPC;
   ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
   timer.Pause();
   t_resolve_ms += timer.GetMsec();
@@ -1164,7 +1164,7 @@ void Runtime::ReadFromRam(ctp::ipc::FullPtr<ReadTask> task) {
   ctp::Timer rtimer;
 
   rtimer.Resume();
-  auto *ipc_mgr = CHI_IPC;
+  auto *ipc_mgr = CLIO_IPC;
   ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
   rtimer.Pause();
   tr_resolve_ms += rtimer.GetMsec();
@@ -1260,7 +1260,7 @@ chi::u64 Runtime::GetWorkRemaining() const { return 0; }
 
 chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
                                  chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   (void)rctx;
   if (task->query_ == "stats") {
     // Predict wall time from learned model using a synthetic 1 MiB R/W
@@ -1303,8 +1303,8 @@ chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
     task->results_[container_id_] = std::string(sbuf.data(), sbuf.size());
   }
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::PostGpuContainerCreate() {
@@ -1316,5 +1316,5 @@ void Runtime::PostGpuContainerCreate() {
 
 }  // namespace clio_run::bdev
 
-// Define ChiMod entry points using CHI_TASK_CC macro
-CHI_TASK_CC(clio_run::bdev::Runtime)
+// Define ChiMod entry points using CLIO_TASK_CC macro
+CLIO_TASK_CC(clio_run::bdev::Runtime)

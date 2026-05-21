@@ -36,7 +36,7 @@ TEST_CASE("GPU producer-only stress: kernel submits N tasks (SYCL)",
           "[gpu2cpu][stress][sycl]") {
   using namespace chi_test_gpu_stress;
   EnsureInit();
-  auto *ipc = CHI_CPU_IPC;
+  auto *ipc = CLIO_CPU_IPC;
   const chi::u32 gpu_id = 0;
 
   char *base = nullptr;
@@ -121,7 +121,7 @@ TEST_CASE("GPU producer-only stress: kernel submits N tasks (SYCL)",
           auto fp = handle_storage[slot];
           if (!fp.IsNull()) {
             *marker_storage = 3;
-            auto fut = CHI_IPC->Send(fp);
+            auto fut = CLIO_IPC->Send(fp);
             *marker_storage = 4;
             fut.Wait();
             *marker_storage = 5;

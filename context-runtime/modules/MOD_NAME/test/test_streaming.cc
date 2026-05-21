@@ -109,14 +109,14 @@ public:
         std::this_thread::sleep_for(500ms);
 
         // Verify core managers are available
-        REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-        REQUIRE(CHI_IPC != nullptr);
-        REQUIRE(CHI_POOL_MANAGER != nullptr);
-        REQUIRE(CHI_MODULE_MANAGER != nullptr);
-        REQUIRE(CHI_WORK_ORCHESTRATOR != nullptr);
+        REQUIRE(CLIO_CHIMAERA_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC != nullptr);
+        REQUIRE(CLIO_POOL_MANAGER != nullptr);
+        REQUIRE(CLIO_MODULE_MANAGER != nullptr);
+        REQUIRE(CLIO_WORK_ORCHESTRATOR != nullptr);
 
         // Verify client can access IPC manager
-        REQUIRE(CHI_IPC->IsInitialized());
+        REQUIRE(CLIO_IPC->IsInitialized());
 
         INFO("Chimaera initialization successful");
       } else {
@@ -183,7 +183,7 @@ public:
   bool createModNamePool() {
     try {
       // Initialize admin client
-      // Admin client is automatically initialized via CHI_ADMIN singleton
+      // Admin client is automatically initialized via CLIO_ADMIN singleton
       chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
 
       // Create MOD_NAME client and container directly with dynamic pool ID

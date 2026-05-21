@@ -58,7 +58,7 @@ struct SubtaskTestTask;
  */
 class Runtime : public chi::Container {
 public:
-  // CreateParams type used by CHI_TASK_CC macro for lib_name access
+  // CreateParams type used by CLIO_TASK_CC macro for lib_name access
   using CreateParams = clio_run::MOD_NAME::CreateParams;
 
 private:

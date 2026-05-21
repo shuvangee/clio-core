@@ -245,7 +245,7 @@ TEST_CASE("DramDefault - Put 96MB into 0g RAM tier",
 
   clio_cte::core::Tag tag("dram_default_tag");
 
-  auto shm_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto shm_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!shm_buffer.IsNull());
   ctp::ipc::ShmPtr<> shm_ptr = shm_buffer.shm_.template Cast<void>();
 
@@ -267,7 +267,7 @@ TEST_CASE("DramDefault - Put 96MB into 0g RAM tier",
                                   << put_task->GetReturnCode());
     }
   }
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
 
   INFO("Put results: " << success_count << " ok, " << failure_count
                        << " failed");
@@ -327,7 +327,7 @@ TEST_CASE("DramDefault - Verify integrity after migration",
 
   clio_cte::core::Tag tag("dram_default_tag");
 
-  auto read_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!read_buffer.IsNull());
 
   int verified = 0;
@@ -345,7 +345,7 @@ TEST_CASE("DramDefault - Verify integrity after migration",
       INFO("Corruption in blob " << i);
     }
   }
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
 
   INFO("Integrity: " << verified << " ok, " << corrupted << " corrupted");
   REQUIRE(corrupted == 0);

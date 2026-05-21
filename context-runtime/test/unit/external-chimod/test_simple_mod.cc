@@ -125,7 +125,7 @@ int main() {
   HIPRINT("install_chimod() CMake function usage");
   HIPRINT("find_package(chimaera) linking");
   HIPRINT("External module directory structure");
-  HIPRINT("CHI_TASK_CC macro with external library name");
+  HIPRINT("CLIO_TASK_CC macro with external library name");
 
   HIPRINT("\nNOTE: This test demonstrates successful external ChiMod development patterns.");
   HIPRINT("For full functionality, run chimaera runtime start in another terminal.");

@@ -199,7 +199,7 @@ struct TaskStat {
  */
 class Task {
  public:
-  typedef CHI_QUEUE_ALLOC_T AllocT;
+  typedef CLIO_QUEUE_ALLOC_T AllocT;
   IN PoolId pool_id_;       /**< Pool identifier for task execution */
   IN TaskId task_id_;       /**< Task identifier for task routing */
   IN PoolQuery pool_query_; /**< Pool query for execution location */
@@ -361,12 +361,12 @@ class Task {
 
   /**
    * Serialize data structures to chi::priv::string using GlobalSerialize
-   * @param alloc Allocator for memory management (CHI_PRIV_ALLOC_T)
+   * @param alloc Allocator for memory management (CLIO_PRIV_ALLOC_T)
    * @param output_str The string to store serialized data
    * @param args The arguments to serialize
    */
   template <typename... Args>
-  static void Serialize(CHI_PRIV_ALLOC_T* alloc,
+  static void Serialize(CLIO_PRIV_ALLOC_T* alloc,
                         chi::priv::string& output_str, const Args&... args) {
     std::vector<char> buffer;
     ctp::ipc::GlobalSerialize<std::vector<char>> ar(buffer);
@@ -554,7 +554,7 @@ struct TaskQueueHeader {
 // TaskQueue class) Worker queues store Future<Task> objects directly
 using TaskLane =
     ctp::ipc::multi_mpsc_ring_buffer<Future<Task>,
-                                 CHI_QUEUE_ALLOC_T>::ring_buffer_type;
+                                 CLIO_QUEUE_ALLOC_T>::ring_buffer_type;
 
 /**
  * Simple wrapper around ctp::ipc::multi_mpsc_ring_buffer
@@ -563,7 +563,7 @@ using TaskLane =
  * compatibility with existing code that expects the multi_mpsc_ring_buffer
  * interface.
  */
-typedef ctp::ipc::multi_mpsc_ring_buffer<Future<Task>, CHI_QUEUE_ALLOC_T> TaskQueue;
+typedef ctp::ipc::multi_mpsc_ring_buffer<Future<Task>, CLIO_QUEUE_ALLOC_T> TaskQueue;
 
 }  // namespace chi
 
@@ -608,7 +608,7 @@ struct RunContext {
   // as a writer hang under heavy 4n+ FPP load.
   std::atomic<u32> completed_replicas_;
   u32 yield_count_;                     /**< Number of times task has yielded */
-  Future<Task, CHI_QUEUE_ALLOC_T>
+  Future<Task, CLIO_QUEUE_ALLOC_T>
       future_;                    /**< Future for async completion tracking */
   std::atomic<bool> is_notified_; /**< Atomic flag to prevent duplicate event
                                      queue additions */

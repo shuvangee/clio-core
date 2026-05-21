@@ -68,7 +68,7 @@ TEST_CASE("Transparent PutBlob through compressor",
 
   // Create compressible data (repeating pattern compresses well)
   const size_t data_size = 64 * 1024;  // 64 KB
-  auto buffer = CHI_IPC->AllocateBuffer(data_size);
+  auto buffer = CLIO_IPC->AllocateBuffer(data_size);
   REQUIRE(!buffer.IsNull());
   char *data_ptr = buffer.ptr_;
   const char pattern[] = "ABCDEFGH";
@@ -106,7 +106,7 @@ TEST_CASE("Transparent GetBlob through compressor",
 
   // Allocate receive buffer
   const size_t data_size = 64 * 1024;
-  auto get_buffer = CHI_IPC->AllocateBuffer(data_size);
+  auto get_buffer = CLIO_IPC->AllocateBuffer(data_size);
   REQUIRE(!get_buffer.IsNull());
   memset(get_buffer.ptr_, 0, data_size);
 

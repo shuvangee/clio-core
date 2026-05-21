@@ -227,7 +227,7 @@ TEST_CASE("TieredStorage - Put 128MB with 64MB DRAM", "[tiered][stress][put]") {
                   << " MB total) with only 64MB DRAM available");
 
   // Allocate shared memory buffer (reuse for all blobs)
-  auto shm_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto shm_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!shm_buffer.IsNull());
   ctp::ipc::ShmPtr<> shm_ptr = shm_buffer.shm_.template Cast<void>();
 
@@ -257,7 +257,7 @@ TEST_CASE("TieredStorage - Put 128MB with 64MB DRAM", "[tiered][stress][put]") {
     }
   }
 
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
 
   INFO("Put results: " << success_count << " succeeded, " << failure_count
                        << " failed");
@@ -335,7 +335,7 @@ TEST_CASE("TieredStorage - Verify data integrity",
   INFO("Verifying data integrity for all " << kNumBlobs << " blobs");
 
   // Allocate buffer for reading
-  auto read_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!read_buffer.IsNull());
 
   int verified_count = 0;
@@ -359,7 +359,7 @@ TEST_CASE("TieredStorage - Verify data integrity",
     }
   }
 
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
 
   INFO("Integrity results: " << verified_count << " verified, " << corrupted_count
                              << " corrupted");

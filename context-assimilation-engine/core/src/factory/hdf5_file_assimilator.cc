@@ -64,7 +64,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
   chi::RunContext* _fp = chi::GetCurrentRunContextFromWorker();
   chi::RunContext& rctx = _fp ? *_fp : _fb_rctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "Hdf5FileAssimilator::Schedule() - ENTRY");
   HLOG(kDebug, "  ctx.src: '{}'", ctx.src);
   HLOG(kDebug, "  ctx.dst: '{}'", ctx.dst);
@@ -79,7 +79,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
          "Hdf5FileAssimilator: Destination protocol must be 'iowarp', got '{}'",
          dst_protocol);
     error_code = -1;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Extract tag prefix from destination URL (remove iowarp:: prefix)
@@ -89,7 +89,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
     HLOG(kError,
          "Hdf5FileAssimilator: Invalid destination URL, no tag name found");
     error_code = -2;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Handle dependency-based scheduling
@@ -101,7 +101,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
          "(depends_on: {})",
          ctx.depends_on);
     error_code = 0;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Extract source file path
@@ -111,7 +111,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
   if (src_path.empty()) {
     HLOG(kError, "Hdf5FileAssimilator: Invalid source URL, no file path found");
     error_code = -3;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Open HDF5 file
@@ -121,7 +121,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
     HLOG(kError, "Hdf5FileAssimilator: Failed to open HDF5 file '{}'",
          src_path);
     error_code = -4;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug,
        "Hdf5FileAssimilator: HDF5 file opened successfully (file_id: {})",
@@ -136,7 +136,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
          src_path);
     CloseHdf5File(file_id);
     error_code = -5;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   HLOG(kDebug, "Hdf5FileAssimilator: Discovered {} dataset(s) in '{}'",
@@ -180,7 +180,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
 
   // Get distributed processing info from CTE/IPC manager
   size_t num_nodes = 1;
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   std::vector<chi::Host> all_hosts;
   if (ipc_manager) {
     all_hosts = ipc_manager->GetAllHosts();
@@ -246,7 +246,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
          "Hdf5FileAssimilator: Waiting for {} distributed tasks to complete...",
          futures.size());
     for (size_t i = 0; i < futures.size(); ++i) {
-      CHI_CO_AWAIT(futures[i]);  // Yield coroutine, allow other tasks to run
+      CLIO_CO_AWAIT(futures[i]);  // Yield coroutine, allow other tasks to run
       if (futures[i]->result_code_ != 0) {
         HLOG(kError, "Hdf5FileAssimilator: Dataset {} failed (error: {})",
              filtered_paths[i], futures[i]->result_code_);
@@ -265,7 +265,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
            "Hdf5FileAssimilator: Failed to re-open HDF5 file for local "
            "processing");
       error_code = -8;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     for (size_t i = 0; i < filtered_paths.size(); ++i) {
@@ -273,7 +273,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
       HLOG(kDebug, "Hdf5FileAssimilator: Processing dataset {}/{}: '{}'", i + 1,
            filtered_paths.size(), dataset_path);
       int result = 0;
-      CHI_CO_AWAIT(ProcessDataset(file_id, dataset_path, tag_prefix, result));
+      CLIO_CO_AWAIT(ProcessDataset(file_id, dataset_path, tag_prefix, result));
       if (result != 0) {
         HLOG(kError,
              "Hdf5FileAssimilator: Failed to process dataset '{}' (error code: "
@@ -297,7 +297,7 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
          "Hdf5FileAssimilator: Completed with {} error(s) out of {} dataset(s)",
          total_errors, filtered_paths.size());
     error_code = -6;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   HLOG(
@@ -307,8 +307,8 @@ chi::TaskResume Hdf5FileAssimilator::Schedule(const AssimilationCtx& ctx,
   HLOG(kDebug, "Hdf5FileAssimilator::Schedule() - EXIT (success)");
 
   error_code = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 hid_t Hdf5FileAssimilator::OpenHdf5File(const std::string& file_path) {
@@ -403,7 +403,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
   chi::RunContext* _fp = chi::GetCurrentRunContextFromWorker();
   chi::RunContext& rctx = _fp ? *_fp : _fb_rctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "ProcessDataset: ENTRY - dataset: '{}', tag_prefix: '{}'",
        dataset_path, tag_prefix);
 
@@ -414,7 +414,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
     HLOG(kError, "Hdf5FileAssimilator: Failed to open dataset '{}'",
          dataset_path);
     error_code = -1;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "ProcessDataset: Dataset opened, dataset_id: {}", dataset_id);
 
@@ -427,7 +427,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
          dataset_path);
     H5Dclose(dataset_id);
     error_code = -2;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "ProcessDataset: Got dataspace, dataspace_id: {}", dataspace_id);
 
@@ -439,7 +439,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
     H5Sclose(dataspace_id);
     H5Dclose(dataset_id);
     error_code = -3;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "ProcessDataset: Got datatype, datatype_id: {}", datatype_id);
 
@@ -453,7 +453,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
     H5Sclose(dataspace_id);
     H5Dclose(dataset_id);
     error_code = -4;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "ProcessDataset: Rank: {}", rank);
 
@@ -484,7 +484,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
   // Get or create the tag in CTE
   HLOG(kDebug, "ProcessDataset: Calling GetOrCreateTag for '{}'...", tag_name);
   auto tag_task = cte_client_->AsyncGetOrCreateTag(tag_name);
-  CHI_CO_AWAIT(tag_task);
+  CLIO_CO_AWAIT(tag_task);
   clio_cte::core::TagId tag_id = tag_task->tag_id_;
   if (tag_id.IsNull()) {
     HLOG(kError, "Hdf5FileAssimilator: Failed to get or create tag '{}'",
@@ -493,7 +493,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
     H5Sclose(dataspace_id);
     H5Dclose(dataset_id);
     error_code = -5;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "ProcessDataset: Tag created/retrieved, tag_id: {}", tag_id);
 
@@ -501,7 +501,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
   std::string description = FormatTensorDescription(datatype_id, dims);
   HLOG(kDebug, "ProcessDataset: Tensor description: '{}'", description);
   size_t desc_size = description.size();
-  auto desc_buffer = CHI_IPC->AllocateBuffer(desc_size);
+  auto desc_buffer = CLIO_IPC->AllocateBuffer(desc_size);
   std::memcpy(desc_buffer.ptr_, description.c_str(), desc_size);
 
   HLOG(kDebug,
@@ -512,7 +512,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
                                 desc_buffer.shm_.template Cast<void>(), 1.0f,
                                 clio_cte::core::Context(), 0);
   HLOG(kDebug, "ProcessDataset: Waiting for description blob task...");
-  CHI_CO_AWAIT(desc_task);
+  CLIO_CO_AWAIT(desc_task);
 
   if (desc_task->return_code_ != 0) {
     HLOG(kError,
@@ -523,7 +523,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
     H5Sclose(dataspace_id);
     H5Dclose(dataset_id);
     error_code = -6;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "ProcessDataset: Description blob stored successfully");
 
@@ -557,7 +557,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
     H5Sclose(dataspace_id);
     H5Dclose(dataset_id);
     error_code = -7;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Read the entire dataset in one H5Dread call
@@ -572,7 +572,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
     H5Sclose(dataspace_id);
     H5Dclose(dataset_id);
     error_code = -8;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "ProcessDataset: Dataset read successfully ({} bytes)",
        total_bytes);
@@ -603,7 +603,7 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
            blob_name, current_chunk_size, chunk_idx + 1, num_chunks);
 
       // Allocate IPC buffer for this chunk and copy data
-      auto chunk_buffer = CHI_IPC->AllocateBuffer(current_chunk_size);
+      auto chunk_buffer = CLIO_IPC->AllocateBuffer(current_chunk_size);
       std::memcpy(chunk_buffer.ptr_, dataset_buffer + bytes_processed,
                   current_chunk_size);
 
@@ -622,21 +622,21 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
     // Wait for at least one task to complete before continuing
     if (!active_tasks.empty()) {
       auto& first_task = active_tasks.front();
-      CHI_CO_AWAIT(first_task);
+      CLIO_CO_AWAIT(first_task);
 
       if (first_task->return_code_ != 0) {
         HLOG(kError, "Hdf5FileAssimilator: PutBlob task failed with code {}",
              first_task->return_code_);
-        CHI_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
+        CLIO_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
         free(dataset_buffer);
         H5Tclose(datatype_id);
         H5Sclose(dataspace_id);
         H5Dclose(dataset_id);
         error_code = -9;
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
 
-      CHI_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
+      CLIO_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
       active_tasks.erase(active_tasks.begin());
     }
   }
@@ -645,19 +645,19 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
   HLOG(kDebug, "ProcessDataset: Waiting for {} remaining tasks to complete...",
        active_tasks.size());
   for (auto& task : active_tasks) {
-    CHI_CO_AWAIT(task);
+    CLIO_CO_AWAIT(task);
     if (task->return_code_ != 0) {
       HLOG(kError, "Hdf5FileAssimilator: PutBlob task failed with code {}",
            task->return_code_);
-      CHI_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
+      CLIO_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
       free(dataset_buffer);
       H5Tclose(datatype_id);
       H5Sclose(dataspace_id);
       H5Dclose(dataset_id);
       error_code = -10;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
-    CHI_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
+    CLIO_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
   }
 
   HLOG(kDebug, "ProcessDataset: All tasks completed, cleaning up resources...");
@@ -677,8 +677,8 @@ chi::TaskResume Hdf5FileAssimilator::ProcessDataset(
   HLOG(kDebug, "ProcessDataset: EXIT - success");
 
   error_code = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 std::string Hdf5FileAssimilator::GetTypeName(hid_t datatype) {

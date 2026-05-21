@@ -62,7 +62,7 @@
 
 namespace clio_cte::core {
 
-// Bring chi namespace items into scope for CHI_CUR_WORKER macro
+// Bring chi namespace items into scope for CLIO_CUR_WORKER macro
 using chi::chi_cur_worker_key_;
 using chi::Worker;
 
@@ -139,7 +139,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Initialize unordered_map_ll instances with appropriately sized bucket
   // counts. Tag/blob maps are large to avoid excessive collisions at scale.
   // Target maps stay small — target counts are O(1–10), not O(100K) — so
@@ -165,7 +165,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
   }
 
   // Get IPC manager for later use
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
 
   // Initialize telemetry ring buffer using unique_ptr with CTP_MALLOC
   telemetry_log_ = std::make_unique<
@@ -271,7 +271,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
              target_node, i, bdev_id.major_, bdev_id.minor_);
         auto reg_task = client_.AsyncRegisterTarget(
             target_path, bdev_type, capacity_bytes, target_query, bdev_id);
-        CHI_CO_AWAIT(reg_task);
+        CLIO_CO_AWAIT(reg_task);
         chi::u32 result = reg_task->GetReturnCode();
         if (result == 0) {
           HLOG(kDebug, "  - Registered target: {} on node {}", target_path,
@@ -310,7 +310,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
   // Open WAL files if metadata_log_path is configured
   if (!config_.performance_.metadata_log_path_.empty()) {
     chi::u32 num_workers =
-        std::max(CHI_WORK_ORCHESTRATOR->GetTotalWorkerCount(), (chi::u32)1);
+        std::max(CLIO_WORK_ORCHESTRATOR->GetTotalWorkerCount(), (chi::u32)1);
     chi::u64 per_worker_capacity = std::max(
         config_.performance_.transaction_log_capacity_bytes_ / num_workers,
         (chi::u64)4096);
@@ -363,10 +363,10 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
   out_params.gpu_cache_ptr_ =
       GpuCacheCreate() ? reinterpret_cast<chi::u64>(gpu_cache_)
                        : static_cast<chi::u64>(0);
-  chi::Task::Serialize(CHI_PRIV_ALLOC, task->chimod_params_, out_params);
+  chi::Task::Serialize(CLIO_PRIV_ALLOC, task->chimod_params_, out_params);
 
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task,
@@ -376,7 +376,7 @@ chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Close WAL files before clearing data structures
     for (auto &log : blob_txn_logs_) {
@@ -414,8 +414,8 @@ chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task,
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::PoolQuery Runtime::ScheduleTask(const ctp::ipc::FullPtr<chi::Task> &task) {
@@ -495,7 +495,7 @@ chi::TaskResume Runtime::RegisterTarget(ctp::ipc::FullPtr<RegisterTargetTask> ta
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     std::string target_name = task->target_name_.str();
     clio_run::bdev::BdevType bdev_type = task->bdev_type_;
@@ -521,7 +521,7 @@ chi::TaskResume Runtime::RegisterTarget(ctp::ipc::FullPtr<RegisterTargetTask> ta
          bdev_pool_id.major_, bdev_pool_id.minor_, target_name);
     auto create_task = bdev_client.AsyncCreate(
         pool_query, target_name, bdev_pool_id, bdev_type, total_size);
-    CHI_CO_AWAIT(create_task);
+    CLIO_CO_AWAIT(create_task);
     HLOG(kDebug,
          "RegisterTarget: After create, create_task->new_pool_id_=({},{}), "
          "create_task->return_code_={}",
@@ -538,7 +538,7 @@ chi::TaskResume Runtime::RegisterTarget(ctp::ipc::FullPtr<RegisterTargetTask> ta
       HLOG(kError, "Failed to create bdev container {} : {}", target_name,
            bdev_client.return_code_);
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Get the TargetId (bdev_client's pool_id) for indexing
@@ -549,14 +549,14 @@ chi::TaskResume Runtime::RegisterTarget(ctp::ipc::FullPtr<RegisterTargetTask> ta
       chi::ScopedCoRwReadLock read_lock(target_lock_);
       TargetInfo *existing_target = registered_targets_.find(target_id);
       if (existing_target != nullptr) {
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
     }
 
     // Get actual statistics from bdev using AsyncGetStats method
     chi::u64 remaining_size;
     auto stats_task = bdev_client.AsyncGetStats();
-    CHI_CO_AWAIT(stats_task);
+    CLIO_CO_AWAIT(stats_task);
     clio_run::bdev::PerfMetrics perf_metrics = stats_task->metrics_;
     remaining_size = stats_task->remaining_size_;
 
@@ -636,8 +636,8 @@ chi::TaskResume Runtime::RegisterTarget(ctp::ipc::FullPtr<RegisterTargetTask> ta
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::UnregisterTarget(
@@ -647,7 +647,7 @@ chi::TaskResume Runtime::UnregisterTarget(
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     std::string target_name = task->target_name_.str();
 
@@ -659,13 +659,13 @@ chi::TaskResume Runtime::UnregisterTarget(
       chi::PoolId *target_id_ptr = target_name_to_id_.find(target_name);
       if (target_id_ptr == nullptr) {
         task->return_code_ = 1;
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
 
       const chi::PoolId &target_id = *target_id_ptr;
       if (!registered_targets_.contains(target_id)) {
         task->return_code_ = 1;
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
 
       registered_targets_.erase(target_id);
@@ -688,8 +688,8 @@ chi::TaskResume Runtime::UnregisterTarget(
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::ListTargets(ctp::ipc::FullPtr<ListTargetsTask> task,
@@ -699,7 +699,7 @@ chi::TaskResume Runtime::ListTargets(ctp::ipc::FullPtr<ListTargetsTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Clear the output vector and populate with current target names
     task->target_names_.clear();
@@ -717,8 +717,8 @@ chi::TaskResume Runtime::ListTargets(ctp::ipc::FullPtr<ListTargetsTask> task,
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::StatTargets(ctp::ipc::FullPtr<StatTargetsTask> task,
@@ -728,7 +728,7 @@ chi::TaskResume Runtime::StatTargets(ctp::ipc::FullPtr<StatTargetsTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Collect all target IDs under read lock (can't co_await inside lambda)
     std::vector<chi::PoolId> target_ids;
@@ -759,7 +759,7 @@ chi::TaskResume Runtime::StatTargets(ctp::ipc::FullPtr<StatTargetsTask> task,
       // Perform async stats query WITHOUT holding lock
       chi::u64 remaining_size;
       auto stats_task = bdev_client_copy.AsyncGetStats();
-      CHI_CO_AWAIT(stats_task);
+      CLIO_CO_AWAIT(stats_task);
       clio_run::bdev::PerfMetrics perf_metrics = stats_task->metrics_;
       remaining_size = stats_task->remaining_size_;
 
@@ -807,8 +807,8 @@ chi::TaskResume Runtime::StatTargets(ctp::ipc::FullPtr<StatTargetsTask> task,
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 template <typename CreateParamsT>
@@ -820,11 +820,11 @@ chi::TaskResume Runtime::GetOrCreateTag(
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     std::string tag_name = task->tag_name_.str();
     TagId preferred_id = task->tag_id_;
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     chi::u32 local_node_id = ipc_manager->GetNodeId();
 
     // Check if this is a returning task from a remote canonical node
@@ -840,7 +840,7 @@ chi::TaskResume Runtime::GetOrCreateTag(
       task->tag_id_ = preferred_id;
       GpuCacheOnGetOrCreateTag(preferred_id, tag_name);
       task->return_code_ = 0;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     TagId tag_id = GetOrAssignTagId(tag_name, preferred_id);
@@ -863,8 +863,8 @@ chi::TaskResume Runtime::GetOrCreateTag(
     HLOG(kError, "GetOrCreateTag: Exception: {}", e.what());
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::GetTargetInfo(ctp::ipc::FullPtr<GetTargetInfoTask> task,
@@ -874,7 +874,7 @@ chi::TaskResume Runtime::GetTargetInfo(ctp::ipc::FullPtr<GetTargetInfoTask> task
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     std::string target_name = task->target_name_.str();
 
@@ -883,7 +883,7 @@ chi::TaskResume Runtime::GetTargetInfo(ctp::ipc::FullPtr<GetTargetInfoTask> task
     chi::PoolId *target_id_ptr = target_name_to_id_.find(target_name);
     if (target_id_ptr == nullptr) {
       task->return_code_ = 1;  // Target not found
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     chi::PoolId target_id = *target_id_ptr;
@@ -892,7 +892,7 @@ chi::TaskResume Runtime::GetTargetInfo(ctp::ipc::FullPtr<GetTargetInfoTask> task
     auto target_ptr = registered_targets_.find(target_id);
     if (!target_ptr) {
       task->return_code_ = 2;  // Target not in registered list
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Copy target information to task output
@@ -908,8 +908,8 @@ chi::TaskResume Runtime::GetTargetInfo(ctp::ipc::FullPtr<GetTargetInfoTask> task
   } catch (const std::exception &e) {
     task->return_code_ = 3;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::PutBlob(ctp::ipc::FullPtr<PutBlobTask> task,
@@ -919,7 +919,7 @@ chi::TaskResume Runtime::PutBlob(ctp::ipc::FullPtr<PutBlobTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Per-PutBlob diagnostic logging — disabled in perf builds. Was burning
   // an atomic fetch_add + clock_gettime + branch on every 64 KB chunk plus
   // an HLOG every 8th chunk (300+/s at FUSE saturation), measurably slowing
@@ -1001,15 +1001,15 @@ chi::TaskResume Runtime::PutBlob(ctp::ipc::FullPtr<PutBlobTask> task,
     // Validate inputs
     if (size == 0) {
       task->return_code_ = 2;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
     if (blob_data.IsNull()) {
       task->return_code_ = 3;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
     if (blob_name.empty()) {
       task->return_code_ = 4;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Check if blob exists and resolve score
@@ -1020,18 +1020,18 @@ chi::TaskResume Runtime::PutBlob(ctp::ipc::FullPtr<PutBlobTask> task,
     }
     if (blob_score > 1.0f) {
       task->return_code_ = 5;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 1: ClearBlob — free blocks if full replacement
     chi::u64 old_blob_size = 0;
     if (blob_found) {
       bool cleared = false;
-      CHI_CO_AWAIT(ClearBlob(*blob_info_ptr, blob_score, offset, size, cleared));
+      CLIO_CO_AWAIT(ClearBlob(*blob_info_ptr, blob_score, offset, size, cleared));
       if (cleared) {
         // WAL: log blob clear
         if (!blob_txn_logs_.empty()) {
-          chi::u32 wid = CHI_CUR_WORKER->GetWorkerStats().worker_id_;
+          chi::u32 wid = CLIO_CUR_WORKER->GetWorkerStats().worker_id_;
           TxnClearBlob txn;
           txn.tag_major_ = tag_id.major_;
           txn.tag_minor_ = tag_id.minor_;
@@ -1049,22 +1049,22 @@ chi::TaskResume Runtime::PutBlob(ctp::ipc::FullPtr<PutBlobTask> task,
       blob_info_ptr = CreateNewBlob(blob_name, tag_id, blob_score);
       if (!blob_info_ptr) {
         task->return_code_ = 5;
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
     }
 
     // Step 2: ExtendBlob — allocate new blocks if needed
     chi::u32 alloc_result = 0;
-    CHI_CO_AWAIT(ExtendBlob(*blob_info_ptr, offset, size, blob_score, alloc_result,
+    CLIO_CO_AWAIT(ExtendBlob(*blob_info_ptr, offset, size, blob_score, alloc_result,
                         task->context_.min_persistence_level_));
     if (alloc_result != 0) {
       task->return_code_ = 10 + alloc_result;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // WAL: log all current blocks (full replacement semantics)
     if (!blob_txn_logs_.empty() && !blob_info_ptr->blocks_.empty()) {
-      chi::u32 wid = CHI_CUR_WORKER->GetWorkerStats().worker_id_;
+      chi::u32 wid = CLIO_CUR_WORKER->GetWorkerStats().worker_id_;
       TxnExtendBlob txn;
       txn.tag_major_ = tag_id.major_;
       txn.tag_minor_ = tag_id.minor_;
@@ -1084,11 +1084,11 @@ chi::TaskResume Runtime::PutBlob(ctp::ipc::FullPtr<PutBlobTask> task,
 
     // Step 3: ModifyExistingData — write data to blocks
     chi::u32 write_result = 0;
-    CHI_CO_AWAIT(ModifyExistingData(blob_info_ptr->blocks_, blob_data, size, offset,
+    CLIO_CO_AWAIT(ModifyExistingData(blob_info_ptr->blocks_, blob_data, size, offset,
                                 write_result));
     if (write_result != 0) {
       task->return_code_ = 20 + write_result;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
 #if CTP_ENABLE_COMPRESS
@@ -1152,8 +1152,8 @@ chi::TaskResume Runtime::PutBlob(ctp::ipc::FullPtr<PutBlobTask> task,
     HLOG(kError, "PutBlob failed with exception: {}", e.what());
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::GetBlob(ctp::ipc::FullPtr<GetBlobTask> task,
@@ -1163,7 +1163,7 @@ chi::TaskResume Runtime::GetBlob(ctp::ipc::FullPtr<GetBlobTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Extract input parameters
     TagId tag_id = task->tag_id_;
@@ -1181,13 +1181,13 @@ chi::TaskResume Runtime::GetBlob(ctp::ipc::FullPtr<GetBlobTask> task,
     // Validate input parameters
     if (size == 0) {
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Validate that blob_name is provided
     if (blob_name.empty()) {
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 1: Check if blob exists
@@ -1196,7 +1196,7 @@ chi::TaskResume Runtime::GetBlob(ctp::ipc::FullPtr<GetBlobTask> task,
     // If blob doesn't exist, error
     if (blob_info_ptr == nullptr) {
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Use the pre-provided data pointer from the task
@@ -1204,11 +1204,11 @@ chi::TaskResume Runtime::GetBlob(ctp::ipc::FullPtr<GetBlobTask> task,
 
     // Step 2: Read data from blob blocks (no lock held during I/O)
     chi::u32 read_result = 0;
-    CHI_CO_AWAIT(ReadData(blob_info_ptr->blocks_, blob_data_ptr, size, offset,
+    CLIO_CO_AWAIT(ReadData(blob_info_ptr->blocks_, blob_data_ptr, size, offset,
                       read_result));
     if (read_result != 0) {
       task->return_code_ = read_result;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 3: Update timestamp (no lock needed - just updating values, not
@@ -1227,8 +1227,8 @@ chi::TaskResume Runtime::GetBlob(ctp::ipc::FullPtr<GetBlobTask> task,
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::ReorganizeBlob(ctp::ipc::FullPtr<ReorganizeBlobTask> task,
@@ -1238,7 +1238,7 @@ chi::TaskResume Runtime::ReorganizeBlob(ctp::ipc::FullPtr<ReorganizeBlobTask> ta
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Extract input parameters
     TagId tag_id = task->tag_id_;
@@ -1248,12 +1248,12 @@ chi::TaskResume Runtime::ReorganizeBlob(ctp::ipc::FullPtr<ReorganizeBlobTask> ta
     // Validate inputs
     if (blob_name.empty()) {
       task->return_code_ = 1;  // Invalid input - empty blob name
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     if (new_score < 0.0f || new_score > 1.0f) {
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Get configuration for score difference threshold
@@ -1265,7 +1265,7 @@ chi::TaskResume Runtime::ReorganizeBlob(ctp::ipc::FullPtr<ReorganizeBlobTask> ta
     BlobInfo *blob_info_ptr = CheckBlobExists(blob_name, tag_id);
     if (blob_info_ptr == nullptr) {
       task->return_code_ = 3;  // Blob not found
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 2: Check if score needs updating
@@ -1281,7 +1281,7 @@ chi::TaskResume Runtime::ReorganizeBlob(ctp::ipc::FullPtr<ReorganizeBlobTask> ta
       task->return_code_ = 0;
       HLOG(kDebug,
            "ReorganizeBlob: score difference below threshold, skipping");
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 3: Get blob info (don't update score yet - PutBlob will handle it)
@@ -1296,29 +1296,29 @@ chi::TaskResume Runtime::ReorganizeBlob(ctp::ipc::FullPtr<ReorganizeBlobTask> ta
     if (blob_size == 0) {
       // Empty blob, no data to reorganize
       task->return_code_ = 0;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 5: Allocate buffer for blob data
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     ctp::ipc::FullPtr<char> blob_data_buffer =
         ipc_manager->AllocateBuffer(blob_size);
     if (blob_data_buffer.IsNull()) {
       HLOG(kError, "Failed to allocate buffer for blob during reorganization");
       task->return_code_ = 5;  // Buffer allocation failed
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 6: Get blob data
     auto get_task =
         client_.AsyncGetBlob(tag_id, blob_name, 0, blob_size, 0,
                              blob_data_buffer.shm_.template Cast<void>());
-    CHI_CO_AWAIT(get_task);
+    CLIO_CO_AWAIT(get_task);
 
     if (get_task->return_code_ != 0u) {
       HLOG(kWarning, "Failed to get blob data during reorganization");
       task->return_code_ = 6;  // Get blob failed
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 7: Put blob with new score (data reorganization)
@@ -1328,12 +1328,12 @@ chi::TaskResume Runtime::ReorganizeBlob(ctp::ipc::FullPtr<ReorganizeBlobTask> ta
     auto put_task = client_.AsyncPutBlob(
         tag_id, blob_name, 0, blob_size,
         blob_data_buffer.shm_.template Cast<void>(), new_score, Context(), 0);
-    CHI_CO_AWAIT(put_task);
+    CLIO_CO_AWAIT(put_task);
 
     if (put_task->return_code_ != 0) {
       HLOG(kWarning, "Failed to put blob during reorganization");
       task->return_code_ = 7;  // Put blob failed
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Success
@@ -1347,8 +1347,8 @@ chi::TaskResume Runtime::ReorganizeBlob(ctp::ipc::FullPtr<ReorganizeBlobTask> ta
     HLOG(kError, "ReorganizeBlob failed: {}", e.what());
     task->return_code_ = 1;  // Error during reorganization
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::DelBlob(ctp::ipc::FullPtr<DelBlobTask> task,
@@ -1358,7 +1358,7 @@ chi::TaskResume Runtime::DelBlob(ctp::ipc::FullPtr<DelBlobTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Extract input parameters
     TagId tag_id = task->tag_id_;
@@ -1367,7 +1367,7 @@ chi::TaskResume Runtime::DelBlob(ctp::ipc::FullPtr<DelBlobTask> task,
     // Validate that blob_name is provided
     if (blob_name.empty()) {
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 1: Check if blob exists
@@ -1375,7 +1375,7 @@ chi::TaskResume Runtime::DelBlob(ctp::ipc::FullPtr<DelBlobTask> task,
 
     if (blob_info_ptr == nullptr) {
       task->return_code_ = 1;  // Blob not found
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 2: Get blob size before deletion for tag size accounting
@@ -1383,7 +1383,7 @@ chi::TaskResume Runtime::DelBlob(ctp::ipc::FullPtr<DelBlobTask> task,
 
     // Step 2.5: Free all blocks back to their targets before removing blob
     chi::u32 free_result = 0;
-    CHI_CO_AWAIT(FreeAllBlobBlocks(*blob_info_ptr, free_result));
+    CLIO_CO_AWAIT(FreeAllBlobBlocks(*blob_info_ptr, free_result));
     if (free_result != 0) {
       HLOG(kWarning,
            "Failed to free some blocks for blob={}, continuing with deletion",
@@ -1420,7 +1420,7 @@ chi::TaskResume Runtime::DelBlob(ctp::ipc::FullPtr<DelBlobTask> task,
 
     // WAL: log blob deletion
     if (!blob_txn_logs_.empty()) {
-      chi::u32 wid = CHI_CUR_WORKER->GetWorkerStats().worker_id_;
+      chi::u32 wid = CLIO_CUR_WORKER->GetWorkerStats().worker_id_;
       TxnDelBlob txn;
       txn.tag_major_ = tag_id.major_;
       txn.tag_minor_ = tag_id.minor_;
@@ -1437,8 +1437,8 @@ chi::TaskResume Runtime::DelBlob(ctp::ipc::FullPtr<DelBlobTask> task,
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::DelTag(ctp::ipc::FullPtr<DelTagTask> task,
@@ -1448,7 +1448,7 @@ chi::TaskResume Runtime::DelTag(ctp::ipc::FullPtr<DelTagTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     TagId tag_id = task->tag_id_;
     std::string tag_name = task->tag_name_.str();
@@ -1459,13 +1459,13 @@ chi::TaskResume Runtime::DelTag(ctp::ipc::FullPtr<DelTagTask> task,
       TagId *found_tag_id_ptr = tag_name_to_id_.find(tag_name);
       if (found_tag_id_ptr == nullptr) {
         task->return_code_ = 1;  // Tag not found by name
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
       tag_id = *found_tag_id_ptr;
       task->tag_id_ = tag_id;
     } else if (tag_id.IsNull() && tag_name.empty()) {
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 2: Find the tag by ID
@@ -1475,7 +1475,7 @@ chi::TaskResume Runtime::DelTag(ctp::ipc::FullPtr<DelTagTask> task,
       TagInfo *tag_info_ptr = tag_id_to_info_.find(tag_id);
       if (tag_info_ptr == nullptr) {
         task->return_code_ = 1;  // Tag not found by ID
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
       cached_tag_name = tag_info_ptr->tag_name_.str();
     }
@@ -1517,7 +1517,7 @@ chi::TaskResume Runtime::DelTag(ctp::ipc::FullPtr<DelTagTask> task,
 
       // Wait for all async DelBlob operations in this batch to complete
       for (auto task : async_tasks) {
-        CHI_CO_AWAIT(task);
+        CLIO_CO_AWAIT(task);
 
         // Check if DelBlob succeeded
         if (task->return_code_ != 0) {
@@ -1567,7 +1567,7 @@ chi::TaskResume Runtime::DelTag(ctp::ipc::FullPtr<DelTagTask> task,
 
     // WAL: log tag deletion
     if (!tag_txn_logs_.empty()) {
-      chi::u32 wid = CHI_CUR_WORKER->GetWorkerStats().worker_id_;
+      chi::u32 wid = CLIO_CUR_WORKER->GetWorkerStats().worker_id_;
       TxnDelTag txn;
       txn.tag_name_ = cached_tag_name;
       txn.tag_major_ = tag_id.major_;
@@ -1590,8 +1590,8 @@ chi::TaskResume Runtime::DelTag(ctp::ipc::FullPtr<DelTagTask> task,
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::GetTagSize(ctp::ipc::FullPtr<GetTagSizeTask> task,
@@ -1601,7 +1601,7 @@ chi::TaskResume Runtime::GetTagSize(ctp::ipc::FullPtr<GetTagSizeTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     TagId tag_id = task->tag_id_;
 
@@ -1611,7 +1611,7 @@ chi::TaskResume Runtime::GetTagSize(ctp::ipc::FullPtr<GetTagSizeTask> task,
     if (tag_info_ptr == nullptr) {
       task->return_code_ = 1;  // Tag not found
       task->tag_size_ = 0;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Update timestamp and return the total size
@@ -1632,8 +1632,8 @@ chi::TaskResume Runtime::GetTagSize(ctp::ipc::FullPtr<GetTagSizeTask> task,
     task->return_code_ = 1;
     task->tag_size_ = 0;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 // Private helper methods
@@ -1715,7 +1715,7 @@ TagId Runtime::GetOrAssignTagId(const std::string &tag_name,
 
   // WAL: log tag creation
   if (!tag_txn_logs_.empty()) {
-    chi::u32 wid = CHI_CUR_WORKER->GetWorkerStats().worker_id_;
+    chi::u32 wid = CLIO_CUR_WORKER->GetWorkerStats().worker_id_;
     TxnCreateTag txn;
     txn.tag_name_ = tag_name;
     txn.tag_major_ = tag_id.major_;
@@ -1733,13 +1733,13 @@ chi::TaskResume Runtime::FlushMetadata(ctp::ipc::FullPtr<FlushMetadataTask> task
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   task->entries_flushed_ = 0;
 
   const std::string &log_path = config_.performance_.metadata_log_path_;
   if (log_path.empty()) {
     task->return_code_ = 0;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   try {
@@ -1750,7 +1750,7 @@ chi::TaskResume Runtime::FlushMetadata(ctp::ipc::FullPtr<FlushMetadataTask> task
     if (!ofs.is_open()) {
       HLOG(kError, "FlushMetadata: Failed to open log file: {}", log_path);
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Write TagInfo entries (entry_type 0)
@@ -1855,8 +1855,8 @@ chi::TaskResume Runtime::FlushMetadata(ctp::ipc::FullPtr<FlushMetadataTask> task
     HLOG(kError, "FlushMetadata: Exception: {}", e.what());
     task->return_code_ = 99;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::FlushData(ctp::ipc::FullPtr<FlushDataTask> task,
@@ -1866,7 +1866,7 @@ chi::TaskResume Runtime::FlushData(ctp::ipc::FullPtr<FlushDataTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   task->bytes_flushed_ = 0;
   task->blobs_flushed_ = 0;
 
@@ -1887,7 +1887,7 @@ chi::TaskResume Runtime::FlushData(ctp::ipc::FullPtr<FlushDataTask> task,
     HLOG(kDebug, "FlushData: No non-volatile targets available at level >= {}",
          target_level);
     task->return_code_ = 0;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Collect blobs that have volatile blocks
@@ -1951,7 +1951,7 @@ chi::TaskResume Runtime::FlushData(ctp::ipc::FullPtr<FlushDataTask> task,
     if (total_size == 0) continue;
 
     // Step 1: Allocate buffer and read data from current blocks
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     ctp::ipc::FullPtr<char> buffer = ipc_manager->AllocateBuffer(total_size);
     if (buffer.IsNull()) {
       HLOG(kError,
@@ -1962,7 +1962,7 @@ chi::TaskResume Runtime::FlushData(ctp::ipc::FullPtr<FlushDataTask> task,
 
     ctp::ipc::ShmPtr<> shm_ptr(buffer.shm_);
     chi::u32 read_error = 0;
-    CHI_CO_AWAIT(ReadData(blob_info_ptr->blocks_, shm_ptr, total_size, 0,
+    CLIO_CO_AWAIT(ReadData(blob_info_ptr->blocks_, shm_ptr, total_size, 0,
                       read_error));
     if (read_error != 0) {
       HLOG(kError, "FlushData: Failed to read blob data for {}",
@@ -1972,7 +1972,7 @@ chi::TaskResume Runtime::FlushData(ctp::ipc::FullPtr<FlushDataTask> task,
     }
 
     // Step 2: Free only volatile blocks
-    chi::priv::vector<BlobBlock> nonvolatile_blocks(CHI_PRIV_ALLOC);
+    chi::priv::vector<BlobBlock> nonvolatile_blocks(CLIO_PRIV_ALLOC);
     std::unordered_map<
         chi::PoolId,
         std::pair<chi::PoolQuery, std::vector<clio_run::bdev::Block>>>
@@ -2017,7 +2017,7 @@ chi::TaskResume Runtime::FlushData(ctp::ipc::FullPtr<FlushDataTask> task,
 
       clio_run::bdev::Client bdev_client(pool_id);
       auto free_task = bdev_client.AsyncFreeBlocks(target_query, blocks);
-      CHI_CO_AWAIT(free_task);
+      CLIO_CO_AWAIT(free_task);
       if (free_task->GetReturnCode() == 0) {
         chi::ScopedCoRwWriteLock write_lock(target_lock_);
         TargetInfo *target_info = registered_targets_.find(pool_id);
@@ -2036,7 +2036,7 @@ chi::TaskResume Runtime::FlushData(ctp::ipc::FullPtr<FlushDataTask> task,
     auto put_task =
         client_.AsyncPutBlob(entry.tag_id, entry.blob_name, 0, total_size,
                              shm_ptr, entry.score, flush_ctx);
-    CHI_CO_AWAIT(put_task);
+    CLIO_CO_AWAIT(put_task);
 
     if (put_task->GetReturnCode() != 0) {
       HLOG(kError, "FlushData: PutBlob failed for blob {} (error {})",
@@ -2052,8 +2052,8 @@ chi::TaskResume Runtime::FlushData(ctp::ipc::FullPtr<FlushDataTask> task,
   task->return_code_ = 0;
   HLOG(kDebug, "FlushData: Flushed {} blobs ({} bytes)", task->blobs_flushed_,
        task->bytes_flushed_);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::RestoreMetadataFromLog() {
@@ -2416,7 +2416,7 @@ size_t Runtime::GetTagLockIndex(const TagId &tag_id) const {
 
 TagId Runtime::GenerateNewTagId() {
   // Get node_id from IPC manager as the major component
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   chi::u32 node_id = ipc_manager->GetNodeId();
 
   // Get next minor component from atomic counter
@@ -2481,7 +2481,7 @@ BlobInfo *Runtime::CreateNewBlob(const std::string &blob_name,
 
   // WAL: log blob creation
   if (!blob_txn_logs_.empty()) {
-    chi::u32 wid = CHI_CUR_WORKER->GetWorkerStats().worker_id_;
+    chi::u32 wid = CLIO_CUR_WORKER->GetWorkerStats().worker_id_;
     TxnCreateNewBlob txn;
     txn.tag_major_ = tag_id.major_;
     txn.tag_minor_ = tag_id.minor_;
@@ -2510,7 +2510,7 @@ chi::TaskResume Runtime::ExtendBlob(BlobInfo &blob_info, chi::u64 offset,
   if (required_size <= current_blob_size) {
     // No additional allocation needed
     error_code = 0;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   chi::u64 additional_size = required_size - current_blob_size;
@@ -2525,7 +2525,7 @@ chi::TaskResume Runtime::ExtendBlob(BlobInfo &blob_info, chi::u64 offset,
   }
   if (available_targets.empty()) {
     error_code = 1;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Use cached Data Placement Engine (built once in Create() from config)
@@ -2545,7 +2545,7 @@ chi::TaskResume Runtime::ExtendBlob(BlobInfo &blob_info, chi::u64 offset,
 
   if (ordered_targets.empty()) {
     error_code = 2;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Allocate from pre-selected targets in order
@@ -2583,7 +2583,7 @@ chi::TaskResume Runtime::ExtendBlob(BlobInfo &blob_info, chi::u64 offset,
     // Allocate space using bdev client
     chi::u64 allocated_offset;
     bool alloc_success = false;
-    CHI_CO_AWAIT(AllocateFromTarget(target_info_copy, allocate_size,
+    CLIO_CO_AWAIT(AllocateFromTarget(target_info_copy, allocate_size,
                                 allocated_offset, alloc_success));
     if (!alloc_success) {
       // Allocation failed, try next target
@@ -2627,11 +2627,11 @@ chi::TaskResume Runtime::ExtendBlob(BlobInfo &blob_info, chi::u64 offset,
   // space
   if (remaining_to_allocate > 0) {
     error_code = 3;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   error_code = 0;  // Success
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 chi::TaskResume Runtime::ModifyExistingData(
@@ -2730,10 +2730,10 @@ chi::TaskResume Runtime::ModifyExistingData(
   for (size_t task_idx = 0; task_idx < write_tasks.size(); ++task_idx) {
     auto &task = write_tasks[task_idx];
     size_t expected_size = expected_write_sizes[task_idx];
-    CHI_CO_AWAIT(task);
+    CLIO_CO_AWAIT(task);
     if (task->bytes_written_ != expected_size) {
       error_code = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
   }
   timer.Pause();
@@ -2750,7 +2750,7 @@ chi::TaskResume Runtime::ModifyExistingData(
   }
 
   error_code = 0;  // Success
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 chi::TaskResume Runtime::ReadData(const chi::priv::vector<BlobBlock> &blocks,
@@ -2846,7 +2846,7 @@ chi::TaskResume Runtime::ReadData(const chi::priv::vector<BlobBlock> &blocks,
     auto &task = read_tasks[task_idx];
     size_t expected_size = expected_read_sizes[task_idx];
 
-    CHI_CO_AWAIT(task);
+    CLIO_CO_AWAIT(task);
 
     HLOG(kDebug,
          "ReadData: task[{}] completed - bytes_read={}, expected={}, status={}",
@@ -2863,13 +2863,13 @@ chi::TaskResume Runtime::ReadData(const chi::priv::vector<BlobBlock> &blocks,
         co_await read_tasks[j];
       }
       error_code = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
   }
 
   HLOG(kDebug, "ReadData: All read tasks completed successfully");
   error_code = 0;  // Success
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 // Block management helper functions
@@ -2896,7 +2896,7 @@ chi::TaskResume Runtime::AllocateFromTarget(TargetInfo &target_info,
          "AllocateFromTarget: Insufficient space - remaining={} < size={}",
          target_info.remaining_space_, size);
     success = false;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   try {
@@ -2915,7 +2915,7 @@ chi::TaskResume Runtime::AllocateFromTarget(TargetInfo &target_info,
          "co_awaiting...",
          alloc_task.IsComplete() ? "true" : "false");
 
-    CHI_CO_AWAIT(alloc_task);
+    CLIO_CO_AWAIT(alloc_task);
 
     HLOG(kDebug,
          "AllocateFromTarget: co_await complete, "
@@ -2931,7 +2931,7 @@ chi::TaskResume Runtime::AllocateFromTarget(TargetInfo &target_info,
     if (allocated_blocks.empty()) {
       HLOG(kDebug, "AllocateFromTarget: FAILED - allocated_blocks is empty");
       success = false;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Use the first block (for single allocation case)
@@ -2946,11 +2946,11 @@ chi::TaskResume Runtime::AllocateFromTarget(TargetInfo &target_info,
     //       target_info.remaining_space_);
 
     success = true;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   } catch (const std::exception &e) {
     // Allocation failed
     success = false;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 }
 
@@ -2965,20 +2965,20 @@ chi::TaskResume Runtime::ClearBlob(BlobInfo &blob_info, float blob_score,
   cleared = false;
   // Score must be in [0, 1]
   if (blob_score < 0.0f || blob_score > 1.0f) {
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   // Must be full-blob replacement (offset == 0 with non-empty blob)
   chi::u64 current_size = blob_info.GetTotalSize();
   if (offset != 0 || current_size == 0) {
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   // Free all existing blocks
   chi::u32 free_result = 0;
-  CHI_CO_AWAIT(FreeAllBlobBlocks(blob_info, free_result));
+  CLIO_CO_AWAIT(FreeAllBlobBlocks(blob_info, free_result));
   if (free_result == 0) {
     cleared = true;
   }
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 chi::TaskResume Runtime::FreeAllBlobBlocks(BlobInfo &blob_info,
@@ -3027,7 +3027,7 @@ chi::TaskResume Runtime::FreeAllBlobBlocks(BlobInfo &blob_info,
     // Get bdev client for this pool from first blob block
     clio_run::bdev::Client bdev_client(pool_id);
     auto free_task = bdev_client.AsyncFreeBlocks(target_query, blocks);
-    CHI_CO_AWAIT(free_task);
+    CLIO_CO_AWAIT(free_task);
     chi::u32 free_result = free_task->GetReturnCode();
     if (free_result != 0) {
       HLOG(kWarning, "Failed to free blocks from pool {}", pool_id.major_);
@@ -3052,7 +3052,7 @@ chi::TaskResume Runtime::FreeAllBlobBlocks(BlobInfo &blob_info,
   // Clear all blocks
   blob_info.blocks_.clear();
   error_code = 0;
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 void Runtime::LogTelemetry(CteOp op, size_t off, size_t size,
@@ -3112,7 +3112,7 @@ chi::TaskResume Runtime::PollTelemetryLog(
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     std::uint64_t minimum_logical_time = task->minimum_logical_time_;
 
@@ -3139,8 +3139,8 @@ chi::TaskResume Runtime::PollTelemetryLog(
     task->return_code_ = 1;
     task->last_logical_time_ = 0;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::GetBlobScore(ctp::ipc::FullPtr<GetBlobScoreTask> task,
@@ -3150,7 +3150,7 @@ chi::TaskResume Runtime::GetBlobScore(ctp::ipc::FullPtr<GetBlobScoreTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Extract input parameters
     TagId tag_id = task->tag_id_;
@@ -3159,7 +3159,7 @@ chi::TaskResume Runtime::GetBlobScore(ctp::ipc::FullPtr<GetBlobScoreTask> task,
     // Validate that blob_name is provided
     if (blob_name.empty()) {
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 1: Check if blob exists
@@ -3167,7 +3167,7 @@ chi::TaskResume Runtime::GetBlobScore(ctp::ipc::FullPtr<GetBlobScoreTask> task,
 
     if (blob_info_ptr == nullptr) {
       task->return_code_ = 1;  // Blob not found
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 2: Return the blob score
@@ -3190,8 +3190,8 @@ chi::TaskResume Runtime::GetBlobScore(ctp::ipc::FullPtr<GetBlobScoreTask> task,
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::GetBlobSize(ctp::ipc::FullPtr<GetBlobSizeTask> task,
@@ -3201,7 +3201,7 @@ chi::TaskResume Runtime::GetBlobSize(ctp::ipc::FullPtr<GetBlobSizeTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Extract input parameters
     TagId tag_id = task->tag_id_;
@@ -3210,14 +3210,14 @@ chi::TaskResume Runtime::GetBlobSize(ctp::ipc::FullPtr<GetBlobSizeTask> task,
     // Validate that blob_name is provided
     if (blob_name.empty()) {
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 1: Check if blob exists
     BlobInfo *blob_info_ptr = CheckBlobExists(blob_name, tag_id);
     if (blob_info_ptr == nullptr) {
       task->return_code_ = 1;  // Blob not found
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 2: Calculate and return the blob size
@@ -3240,8 +3240,8 @@ chi::TaskResume Runtime::GetBlobSize(ctp::ipc::FullPtr<GetBlobSizeTask> task,
   } catch (const std::exception &e) {
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::GetBlobInfo(ctp::ipc::FullPtr<GetBlobInfoTask> task,
@@ -3251,7 +3251,7 @@ chi::TaskResume Runtime::GetBlobInfo(ctp::ipc::FullPtr<GetBlobInfoTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Extract input parameters
     TagId tag_id = task->tag_id_;
@@ -3260,14 +3260,14 @@ chi::TaskResume Runtime::GetBlobInfo(ctp::ipc::FullPtr<GetBlobInfoTask> task,
     // Validate that blob_name is provided
     if (blob_name.empty()) {
       task->return_code_ = 1;  // Error: empty blob name
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 1: Check if blob exists
     BlobInfo *blob_info_ptr = CheckBlobExists(blob_name, tag_id);
     if (blob_info_ptr == nullptr) {
       task->return_code_ = 2;  // Blob not found
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Step 2: Populate output fields
@@ -3299,8 +3299,8 @@ chi::TaskResume Runtime::GetBlobInfo(ctp::ipc::FullPtr<GetBlobInfoTask> task,
     HLOG(kError, "GetBlobInfo failed: {}", e.what());
     task->return_code_ = 1;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::GetContainedBlobs(
@@ -3310,7 +3310,7 @@ chi::TaskResume Runtime::GetContainedBlobs(
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     // Extract input parameters
     TagId tag_id = task->tag_id_;
@@ -3319,7 +3319,7 @@ chi::TaskResume Runtime::GetContainedBlobs(
     TagInfo *tag_info_ptr = tag_id_to_info_.find(tag_id);
     if (tag_info_ptr == nullptr) {
       task->return_code_ = 1;  // Tag not found
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Clear output vector
@@ -3356,8 +3356,8 @@ chi::TaskResume Runtime::GetContainedBlobs(
     task->return_code_ = 1;  // Error during operation
     HLOG(kError, "GetContainedBlobs failed: {}", e.what());
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::TagQuery(ctp::ipc::FullPtr<TagQueryTask> task,
@@ -3367,7 +3367,7 @@ chi::TaskResume Runtime::TagQuery(ctp::ipc::FullPtr<TagQueryTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     std::string tag_regex = task->tag_regex_.str();
 
@@ -3407,8 +3407,8 @@ chi::TaskResume Runtime::TagQuery(ctp::ipc::FullPtr<TagQueryTask> task,
     task->return_code_ = 1;
     HLOG(kError, "TagQuery failed: {}", e.what());
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::BlobQuery(ctp::ipc::FullPtr<BlobQueryTask> task,
@@ -3418,7 +3418,7 @@ chi::TaskResume Runtime::BlobQuery(ctp::ipc::FullPtr<BlobQueryTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   try {
     std::string tag_regex = task->tag_regex_.str();
     std::string blob_regex = task->blob_regex_.str();
@@ -3484,8 +3484,8 @@ chi::TaskResume Runtime::BlobQuery(ctp::ipc::FullPtr<BlobQueryTask> task,
     task->return_code_ = 1;
     HLOG(kError, "BlobQuery failed: {}", e.what());
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 // ==============================================================================
@@ -3512,7 +3512,7 @@ chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
                                  chi::RunContext &rctx) {
   task->SetReturnCode(0);
   (void)rctx;
-  CHI_CO_RETURN;
+  CLIO_CO_RETURN;
 }
 
 // =====================================================================
@@ -3663,5 +3663,5 @@ void Runtime::GpuCacheOnDelTag(const TagId &tag_id) {
 
 }  // namespace clio_cte::core
 
-// Define ChiMod entry points using CHI_TASK_CC macro
-CHI_TASK_CC(clio_cte::core::Runtime)
+// Define ChiMod entry points using CLIO_TASK_CC macro
+CLIO_TASK_CC(clio_cte::core::Runtime)

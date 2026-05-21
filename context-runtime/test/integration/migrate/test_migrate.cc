@@ -87,10 +87,10 @@ class MigrateTestFixture {
         g_initialized = true;
         SimpleTest::g_test_finalize = chi::CHIMAERA_FINALIZE;
         std::this_thread::sleep_for(500ms);
-        REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-        REQUIRE(CHI_IPC != nullptr);
-        REQUIRE(CHI_POOL_MANAGER != nullptr);
-        REQUIRE(CHI_IPC->IsInitialized());
+        REQUIRE(CLIO_CHIMAERA_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC != nullptr);
+        REQUIRE(CLIO_POOL_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC->IsInitialized());
         INFO("Chimaera initialization successful");
       } else {
         FAIL("Failed to initialize Chimaera");
@@ -156,7 +156,7 @@ TEST_CASE("Migrate container and verify task re-routing",
     // Node IDs are 1-indexed in the hostfile (node 0 -> node_id 1, etc.)
     // Container 0 is on node_id 1 (first node), migrate to node_id 2 (second)
     INFO("Step 2: Migrating container 0 from node 1 to node 2");
-    auto *admin_client = CHI_ADMIN;
+    auto *admin_client = CLIO_ADMIN;
     REQUIRE(admin_client != nullptr);
 
     std::vector<chi::MigrateInfo> migrations;
@@ -214,7 +214,7 @@ TEST_CASE("Migrate container during broadcast event",
 
     // Step 2: Migrate container 0 from node 1 to node 2
     INFO("Step 2: Migrating container 0 from node 1 to node 2");
-    auto *admin_client = CHI_ADMIN;
+    auto *admin_client = CLIO_ADMIN;
     REQUIRE(admin_client != nullptr);
 
     std::vector<chi::MigrateInfo> migrations;

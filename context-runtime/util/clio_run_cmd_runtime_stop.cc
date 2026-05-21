@@ -24,7 +24,7 @@ int RuntimeStop(int argc, char* argv[]) {
     // ZMQ shared-context static destructor runs.
     struct ClientFinalizeGuard {
       ~ClientFinalizeGuard() {
-        auto* mgr = CHI_CHIMAERA_MANAGER;
+        auto* mgr = CLIO_CHIMAERA_MANAGER;
         if (mgr) {
           mgr->ClientFinalize();
         }
@@ -34,7 +34,7 @@ int RuntimeStop(int argc, char* argv[]) {
     HLOG(kDebug, "Creating admin client connection...");
     clio_run::admin::Client admin_client(chi::kAdminPoolId);
 
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager || !ipc_manager->IsInitialized()) {
       HLOG(kError, "IPC manager not available - is Chimaera runtime running?");
       return 1;

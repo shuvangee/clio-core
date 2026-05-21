@@ -55,7 +55,7 @@ class Client : public chi::ContainerClient {
       const std::string& pool_name,
       const chi::PoolId& custom_pool_id,
       const CreateParams& params = CreateParams()) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // CRITICAL: CreateTask MUST use admin pool for GetOrCreatePool processing
     // Pass 'this' as client pointer for PostWait callback
@@ -78,7 +78,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<MonitorTask> AsyncMonitor(const chi::PoolQuery &pool_query,
                                         const std::string &query) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<MonitorTask>(
         chi::CreateTaskId(), pool_id_, pool_query, query);
     return ipc_manager->Send(task);
@@ -91,7 +91,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<ParseOmniTask> AsyncParseOmni(
       const std::vector<AssimilationCtx>& contexts) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<ParseOmniTask>(
         chi::CreateTaskId(),
@@ -122,7 +122,7 @@ class Client : public chi::ContainerClient {
       const std::string &output_path,
       const std::string &format,
       const chi::PoolQuery &pool_query = chi::PoolQuery::Local()) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<ExportDataTask>(
         chi::CreateTaskId(), pool_id_, pool_query,
         tag_name, output_path, format);
@@ -134,7 +134,7 @@ class Client : public chi::ContainerClient {
       const std::string& file_path,
       const std::string& dataset_path,
       const std::string& tag_prefix) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     HLOG(kInfo, "AsyncProcessHdf5Dataset: Creating task for pool_id={}, file={}, dataset={}",
          pool_id_, file_path, dataset_path);

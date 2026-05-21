@@ -101,26 +101,26 @@ CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN void RunImpl(
 
 CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN ctp::ipc::FullPtr<chi::Task> AllocTaskImpl(
     chi::gpu::Container *self_, chi::u32 method) {
-  // Phase 10: bind g_ipc_manager_ptr so CHI_IPC under SYCL resolves
+  // Phase 10: bind g_ipc_manager_ptr so CLIO_IPC under SYCL resolves
   // to the kernel-scope IpcManager (set by the worker via
   // container->ipc_mgr_ before dispatch).
   [[maybe_unused]] auto *g_ipc_manager_ptr = self_->ipc_mgr_;
   (void)self_;
   switch (method) {
     case Method::kAllocateBlocks: {
-      auto _tp = CHI_IPC->NewTaskBase<AllocateBlocksTask>(0); return _tp.template Cast<chi::Task>();
+      auto _tp = CLIO_IPC->NewTaskBase<AllocateBlocksTask>(0); return _tp.template Cast<chi::Task>();
     }
     case Method::kFreeBlocks: {
-      auto _tp = CHI_IPC->NewTaskBase<FreeBlocksTask>(0); return _tp.template Cast<chi::Task>();
+      auto _tp = CLIO_IPC->NewTaskBase<FreeBlocksTask>(0); return _tp.template Cast<chi::Task>();
     }
     case Method::kWrite: {
-      auto _tp = CHI_IPC->NewTaskBase<WriteTask>(0); return _tp.template Cast<chi::Task>();
+      auto _tp = CLIO_IPC->NewTaskBase<WriteTask>(0); return _tp.template Cast<chi::Task>();
     }
     case Method::kRead: {
-      auto _tp = CHI_IPC->NewTaskBase<ReadTask>(0); return _tp.template Cast<chi::Task>();
+      auto _tp = CLIO_IPC->NewTaskBase<ReadTask>(0); return _tp.template Cast<chi::Task>();
     }
     case Method::kUpdate: {
-      auto _tp = CHI_IPC->NewTaskBase<UpdateTask>(0); return _tp.template Cast<chi::Task>();
+      auto _tp = CLIO_IPC->NewTaskBase<UpdateTask>(0); return _tp.template Cast<chi::Task>();
     }
     default: return ctp::ipc::FullPtr<chi::Task>::GetNull();
   }

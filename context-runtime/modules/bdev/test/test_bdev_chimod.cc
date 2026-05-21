@@ -464,7 +464,7 @@ TEST_CASE("bdev_write_read_basic", "[bdev][io][basic]") {
           fixture.generateTestData(k4KB, 0xCD + i);
 
       // Write data - allocate buffer and copy data
-      auto write_buffer = CHI_IPC->AllocateBuffer(write_data.size());
+      auto write_buffer = CLIO_IPC->AllocateBuffer(write_data.size());
       REQUIRE_FALSE(write_buffer.IsNull());
       memcpy(write_buffer.ptr_, write_data.data(), write_data.size());
 
@@ -482,7 +482,7 @@ TEST_CASE("bdev_write_read_basic", "[bdev][io][basic]") {
            i, write_task->GetCompleter(), expected_completer);
 
       // Read data back - allocate buffer for reading
-      auto read_buffer = CHI_IPC->AllocateBuffer(k4KB);
+      auto read_buffer = CLIO_IPC->AllocateBuffer(k4KB);
       REQUIRE_FALSE(read_buffer.IsNull());
 
       auto read_task = client.AsyncRead(
@@ -507,8 +507,8 @@ TEST_CASE("bdev_write_read_basic", "[bdev][io][basic]") {
       }
 
       // Free buffers
-      CHI_IPC->FreeBuffer(write_buffer);
-      CHI_IPC->FreeBuffer(read_buffer);
+      CLIO_IPC->FreeBuffer(write_buffer);
+      CLIO_IPC->FreeBuffer(read_buffer);
 
       HLOG(kInfo, "Iteration {}: Successfully wrote and read {} bytes", i,
            write_data.size());
@@ -549,7 +549,7 @@ TEST_CASE("bdev_async_operations", "[bdev][async][io]") {
           fixture.generateTestData(k64KB, 0xEF + i);
 
       // Async write - allocate buffer and copy data
-      auto async_write_buffer = CHI_IPC->AllocateBuffer(write_data.size());
+      auto async_write_buffer = CLIO_IPC->AllocateBuffer(write_data.size());
       REQUIRE_FALSE(async_write_buffer.IsNull());
       memcpy(async_write_buffer.ptr_, write_data.data(), write_data.size());
 
@@ -562,7 +562,7 @@ TEST_CASE("bdev_async_operations", "[bdev][async][io]") {
       REQUIRE(write_task->bytes_written_ == write_data.size());
 
       // Async read - allocate buffer for reading
-      auto async_read_buffer = CHI_IPC->AllocateBuffer(k64KB);
+      auto async_read_buffer = CLIO_IPC->AllocateBuffer(k64KB);
       REQUIRE_FALSE(async_read_buffer.IsNull());
 
       auto read_task = client.AsyncRead(
@@ -584,8 +584,8 @@ TEST_CASE("bdev_async_operations", "[bdev][async][io]") {
       }
 
       // Free buffers
-      CHI_IPC->FreeBuffer(async_write_buffer);
-      CHI_IPC->FreeBuffer(async_read_buffer);
+      CLIO_IPC->FreeBuffer(async_write_buffer);
+      CLIO_IPC->FreeBuffer(async_read_buffer);
 
       HLOG(kInfo,
            "Iteration {}: Successfully completed async allocate/write/read "
@@ -651,7 +651,7 @@ TEST_CASE("bdev_performance_metrics", "[bdev][performance][metrics]") {
       std::vector<ctp::u8> data2 = fixture.generateTestData(k256KB, 0x34 + i);
 
       // Allocate buffers for data1 write
-      auto data1_write_buffer = CHI_IPC->AllocateBuffer(data1.size());
+      auto data1_write_buffer = CLIO_IPC->AllocateBuffer(data1.size());
       REQUIRE_FALSE(data1_write_buffer.IsNull());
       memcpy(data1_write_buffer.ptr_, data1.data(), data1.size());
 
@@ -663,7 +663,7 @@ TEST_CASE("bdev_performance_metrics", "[bdev][performance][metrics]") {
       REQUIRE(write_task1->return_code_ == 0);
 
       // Allocate buffers for data2 write
-      auto data2_write_buffer = CHI_IPC->AllocateBuffer(data2.size());
+      auto data2_write_buffer = CLIO_IPC->AllocateBuffer(data2.size());
       REQUIRE_FALSE(data2_write_buffer.IsNull());
       memcpy(data2_write_buffer.ptr_, data2.data(), data2.size());
 
@@ -675,7 +675,7 @@ TEST_CASE("bdev_performance_metrics", "[bdev][performance][metrics]") {
       REQUIRE(write_task2->return_code_ == 0);
 
       // Allocate buffers for reads
-      auto data1_read_buffer = CHI_IPC->AllocateBuffer(k1MB);
+      auto data1_read_buffer = CLIO_IPC->AllocateBuffer(k1MB);
       REQUIRE_FALSE(data1_read_buffer.IsNull());
 
       auto read_task1 = client.AsyncRead(
@@ -685,7 +685,7 @@ TEST_CASE("bdev_performance_metrics", "[bdev][performance][metrics]") {
       read_task1.Wait();
       REQUIRE(read_task1->return_code_ == 0);
 
-      auto data2_read_buffer = CHI_IPC->AllocateBuffer(k256KB);
+      auto data2_read_buffer = CLIO_IPC->AllocateBuffer(k256KB);
       REQUIRE_FALSE(data2_read_buffer.IsNull());
 
       auto read_task2 = client.AsyncRead(
@@ -696,10 +696,10 @@ TEST_CASE("bdev_performance_metrics", "[bdev][performance][metrics]") {
       REQUIRE(read_task2->return_code_ == 0);
 
       // Free buffers
-      CHI_IPC->FreeBuffer(data1_write_buffer);
-      CHI_IPC->FreeBuffer(data2_write_buffer);
-      CHI_IPC->FreeBuffer(data1_read_buffer);
-      CHI_IPC->FreeBuffer(data2_read_buffer);
+      CLIO_IPC->FreeBuffer(data1_write_buffer);
+      CLIO_IPC->FreeBuffer(data2_write_buffer);
+      CLIO_IPC->FreeBuffer(data1_read_buffer);
+      CLIO_IPC->FreeBuffer(data2_read_buffer);
 
       HLOG(kInfo, "Iteration {}: Completed I/O operations", i);
     }
@@ -757,7 +757,7 @@ TEST_CASE("bdev_ram_container_creation", "[bdev][ram][create]") {
   BdevChimodFixture fixture;
   REQUIRE(g_initialized);
 
-  // Admin client is automatically initialized via CHI_ADMIN singleton
+  // Admin client is automatically initialized via CLIO_ADMIN singleton
   std::this_thread::sleep_for(100ms);
 
   // Create bdev client for RAM backend
@@ -783,7 +783,7 @@ TEST_CASE("bdev_ram_allocation_and_io", "[bdev][ram][io]") {
   BdevChimodFixture fixture;
   REQUIRE(g_initialized);
 
-  // Admin client is automatically initialized via CHI_ADMIN singleton
+  // Admin client is automatically initialized via CLIO_ADMIN singleton
   std::this_thread::sleep_for(100ms);
 
   // Create bdev client for RAM backend
@@ -824,7 +824,7 @@ TEST_CASE("bdev_ram_allocation_and_io", "[bdev][ram][io]") {
     }
 
     // Write data to RAM - allocate buffer and copy data
-    auto write_buffer = CHI_IPC->AllocateBuffer(write_data.size());
+    auto write_buffer = CLIO_IPC->AllocateBuffer(write_data.size());
     REQUIRE_FALSE(write_buffer.IsNull());
     memcpy(write_buffer.ptr_, write_data.data(), write_data.size());
 
@@ -837,7 +837,7 @@ TEST_CASE("bdev_ram_allocation_and_io", "[bdev][ram][io]") {
     REQUIRE(write_task->bytes_written_ == k4KB);
 
     // Read data back from RAM - allocate buffer for reading
-    auto read_buffer = CHI_IPC->AllocateBuffer(k4KB);
+    auto read_buffer = CLIO_IPC->AllocateBuffer(k4KB);
     REQUIRE_FALSE(read_buffer.IsNull());
 
     auto read_task = bdev_client.AsyncRead(
@@ -857,8 +857,8 @@ TEST_CASE("bdev_ram_allocation_and_io", "[bdev][ram][io]") {
     REQUIRE(data_matches);
 
     // Free buffers
-    CHI_IPC->FreeBuffer(write_buffer);
-    CHI_IPC->FreeBuffer(read_buffer);
+    CLIO_IPC->FreeBuffer(write_buffer);
+    CLIO_IPC->FreeBuffer(read_buffer);
 
     // Free the block
     std::vector<clio_run::bdev::Block> free_blocks;
@@ -876,7 +876,7 @@ TEST_CASE("bdev_ram_large_blocks", "[bdev][ram][large]") {
   BdevChimodFixture fixture;
   REQUIRE(g_initialized);
 
-  // Admin client is automatically initialized via CHI_ADMIN singleton
+  // Admin client is automatically initialized via CLIO_ADMIN singleton
   std::this_thread::sleep_for(100ms);
 
   // Create bdev client for RAM backend
@@ -926,7 +926,7 @@ TEST_CASE("bdev_ram_large_blocks", "[bdev][ram][large]") {
       }
 
       // Write and read - allocate buffers
-      auto test_write_buffer = CHI_IPC->AllocateBuffer(test_data.size());
+      auto test_write_buffer = CLIO_IPC->AllocateBuffer(test_data.size());
       REQUIRE_FALSE(test_write_buffer.IsNull());
       memcpy(test_write_buffer.ptr_, test_data.data(), test_data.size());
 
@@ -939,7 +939,7 @@ TEST_CASE("bdev_ram_large_blocks", "[bdev][ram][large]") {
       REQUIRE(write_task->return_code_ == 0);
       REQUIRE(write_task->bytes_written_ == block_size);
 
-      auto test_read_buffer = CHI_IPC->AllocateBuffer(block_size);
+      auto test_read_buffer = CLIO_IPC->AllocateBuffer(block_size);
       REQUIRE_FALSE(test_read_buffer.IsNull());
 
       // Pass all allocated blocks to Read
@@ -961,8 +961,8 @@ TEST_CASE("bdev_ram_large_blocks", "[bdev][ram][large]") {
       }
 
       // Free buffers
-      CHI_IPC->FreeBuffer(test_write_buffer);
-      CHI_IPC->FreeBuffer(test_read_buffer);
+      CLIO_IPC->FreeBuffer(test_write_buffer);
+      CLIO_IPC->FreeBuffer(test_read_buffer);
 
       // Free all allocated blocks
       auto free_task = bdev_client.AsyncFreeBlocks(pool_query, blocks);
@@ -978,7 +978,7 @@ TEST_CASE("bdev_ram_bounds_checking", "[bdev][ram][bounds]") {
   BdevChimodFixture fixture;
   REQUIRE(g_initialized);
 
-  // Admin client is automatically initialized via CHI_ADMIN singleton
+  // Admin client is automatically initialized via CLIO_ADMIN singleton
   std::this_thread::sleep_for(100ms);
 
   // Create bdev client for RAM backend
@@ -1009,7 +1009,7 @@ TEST_CASE("bdev_ram_bounds_checking", "[bdev][ram][bounds]") {
     std::vector<ctp::u8> test_data(2048, 0xEF + i);
 
     // Write should fail with bounds check - allocate buffer
-    auto error_write_buffer = CHI_IPC->AllocateBuffer(test_data.size());
+    auto error_write_buffer = CLIO_IPC->AllocateBuffer(test_data.size());
     REQUIRE_FALSE(error_write_buffer.IsNull());
     memcpy(error_write_buffer.ptr_, test_data.data(), test_data.size());
 
@@ -1021,7 +1021,7 @@ TEST_CASE("bdev_ram_bounds_checking", "[bdev][ram][bounds]") {
     REQUIRE(write_task->bytes_written_ == 0);  // Should fail
 
     // Read should also fail with bounds check - allocate buffer
-    auto error_read_buffer = CHI_IPC->AllocateBuffer(2048);
+    auto error_read_buffer = CLIO_IPC->AllocateBuffer(2048);
     REQUIRE_FALSE(error_read_buffer.IsNull());
 
     auto read_task = bdev_client.AsyncRead(
@@ -1039,8 +1039,8 @@ TEST_CASE("bdev_ram_bounds_checking", "[bdev][ram][bounds]") {
     REQUIRE(read_data.empty());  // Should fail
 
     // Free buffers
-    CHI_IPC->FreeBuffer(error_write_buffer);
-    CHI_IPC->FreeBuffer(error_read_buffer);
+    CLIO_IPC->FreeBuffer(error_write_buffer);
+    CLIO_IPC->FreeBuffer(error_read_buffer);
 
     HLOG(kInfo, "Iteration {}: RAM backend bounds checking working correctly",
          i);
@@ -1056,7 +1056,7 @@ TEST_CASE("bdev_file_vs_ram_comparison", "[bdev][file][ram][comparison]") {
   REQUIRE(g_initialized);
   REQUIRE(fixture.createTestFile(kDefaultFileSize));
 
-  // Admin client is automatically initialized via CHI_ADMIN singleton
+  // Admin client is automatically initialized via CLIO_ADMIN singleton
   std::this_thread::sleep_for(100ms);
 
   // Create two bdev clients - one for file, one for RAM
@@ -1116,7 +1116,7 @@ TEST_CASE("bdev_file_vs_ram_comparison", "[bdev][file][ram][comparison]") {
     }
 
     // Allocate buffer for file write
-    auto file_write_buffer = CHI_IPC->AllocateBuffer(test_data.size());
+    auto file_write_buffer = CLIO_IPC->AllocateBuffer(test_data.size());
     REQUIRE_FALSE(file_write_buffer.IsNull());
     memcpy(file_write_buffer.ptr_, test_data.data(), test_data.size());
 
@@ -1133,7 +1133,7 @@ TEST_CASE("bdev_file_vs_ram_comparison", "[bdev][file][ram][comparison]") {
     REQUIRE(file_write_task->bytes_written_ == test_size);
 
     // Allocate buffer for ram write
-    auto ram_write_buffer = CHI_IPC->AllocateBuffer(test_data.size());
+    auto ram_write_buffer = CLIO_IPC->AllocateBuffer(test_data.size());
     REQUIRE_FALSE(ram_write_buffer.IsNull());
     memcpy(ram_write_buffer.ptr_, test_data.data(), test_data.size());
 
@@ -1149,7 +1149,7 @@ TEST_CASE("bdev_file_vs_ram_comparison", "[bdev][file][ram][comparison]") {
     REQUIRE(ram_write_task->bytes_written_ == test_size);
 
     // Allocate buffer for file read
-    auto file_read_buffer = CHI_IPC->AllocateBuffer(test_size);
+    auto file_read_buffer = CLIO_IPC->AllocateBuffer(test_size);
     REQUIRE_FALSE(file_read_buffer.IsNull());
 
     // Read from file backend and measure time
@@ -1170,7 +1170,7 @@ TEST_CASE("bdev_file_vs_ram_comparison", "[bdev][file][ram][comparison]") {
            file_read_task->bytes_read_);
 
     // Allocate buffer for ram read
-    auto ram_read_buffer = CHI_IPC->AllocateBuffer(test_size);
+    auto ram_read_buffer = CLIO_IPC->AllocateBuffer(test_size);
     REQUIRE_FALSE(ram_read_buffer.IsNull());
 
     auto ram_read_start = std::chrono::high_resolution_clock::now();
@@ -1223,10 +1223,10 @@ TEST_CASE("bdev_file_vs_ram_comparison", "[bdev][file][ram][comparison]") {
     // in distributed tests.
 
     // Free buffers
-    CHI_IPC->FreeBuffer(file_write_buffer);
-    CHI_IPC->FreeBuffer(ram_write_buffer);
-    CHI_IPC->FreeBuffer(file_read_buffer);
-    CHI_IPC->FreeBuffer(ram_read_buffer);
+    CLIO_IPC->FreeBuffer(file_write_buffer);
+    CLIO_IPC->FreeBuffer(ram_write_buffer);
+    CLIO_IPC->FreeBuffer(file_read_buffer);
+    CLIO_IPC->FreeBuffer(ram_read_buffer);
 
     // Clean up
     std::vector<clio_run::bdev::Block> file_free_blocks;
@@ -1303,7 +1303,7 @@ void run_bdev_file_explicit_backend_test(const char *mode_name) {
 
     // Write data
     std::vector<ctp::u8> test_data(k4KB, 0x42 + i);
-    auto final_write_buffer = CHI_IPC->AllocateBuffer(test_data.size());
+    auto final_write_buffer = CLIO_IPC->AllocateBuffer(test_data.size());
     REQUIRE_FALSE(final_write_buffer.IsNull());
     memcpy(final_write_buffer.ptr_, test_data.data(), test_data.size());
 
@@ -1316,7 +1316,7 @@ void run_bdev_file_explicit_backend_test(const char *mode_name) {
     REQUIRE(write_task->bytes_written_ == k4KB);
 
     // Read data back
-    auto final_read_buffer = CHI_IPC->AllocateBuffer(k4KB);
+    auto final_read_buffer = CLIO_IPC->AllocateBuffer(k4KB);
     REQUIRE_FALSE(final_read_buffer.IsNull());
 
     auto read_task = bdev_client.AsyncRead(
@@ -1338,8 +1338,8 @@ void run_bdev_file_explicit_backend_test(const char *mode_name) {
     REQUIRE(data_ok);
 
     // Free buffers
-    CHI_IPC->FreeBuffer(final_write_buffer);
-    CHI_IPC->FreeBuffer(final_read_buffer);
+    CLIO_IPC->FreeBuffer(final_write_buffer);
+    CLIO_IPC->FreeBuffer(final_read_buffer);
 
     // Free blocks
     std::vector<clio_run::bdev::Block> free_blocks;
@@ -1392,7 +1392,7 @@ TEST_CASE("bdev_error_conditions_enhanced", "[bdev][error][enhanced]") {
   BdevChimodFixture fixture;
   REQUIRE(g_initialized);
 
-  // Admin client is automatically initialized via CHI_ADMIN singleton
+  // Admin client is automatically initialized via CLIO_ADMIN singleton
   std::this_thread::sleep_for(100ms);
 
   // Test 1: RAM backend without size specification
@@ -1494,7 +1494,7 @@ TEST_CASE("bdev_parallel_io_operations", "[bdev][parallel][io]") {
       clio_run::bdev::Client thread_client(custom_pool_id);
 
       // Allocate write buffer in shared memory
-      auto write_buffer = CHI_IPC->AllocateBuffer(io_size);
+      auto write_buffer = CLIO_IPC->AllocateBuffer(io_size);
       std::memset(write_buffer.ptr_, static_cast<int>(thread_id), io_size);
 
       // Perform I/O operations with DirectHash
@@ -1533,7 +1533,7 @@ TEST_CASE("bdev_parallel_io_operations", "[bdev][parallel][io]") {
       }
 
       // Free buffer after all operations complete
-      CHI_IPC->FreeBuffer(write_buffer);
+      CLIO_IPC->FreeBuffer(write_buffer);
     };
 
     // Launch worker threads
@@ -1672,7 +1672,7 @@ TEST_CASE("bdev_force_net_flag", "[bdev][network][force_net]") {
       // Create write task with TASK_FORCE_NET flag
       HLOG(kInfo,
            "[bdev_force_net_flag] Iteration {}: Allocating write buffer...", i);
-      auto write_buffer = CHI_IPC->AllocateBuffer(write_data.size());
+      auto write_buffer = CLIO_IPC->AllocateBuffer(write_data.size());
       REQUIRE_FALSE(write_buffer.IsNull());
       memcpy(write_buffer.ptr_, write_data.data(), write_data.size());
       HLOG(kInfo,
@@ -1681,7 +1681,7 @@ TEST_CASE("bdev_force_net_flag", "[bdev][network][force_net]") {
            i);
 
       // Use NewTask directly to create write task
-      auto* ipc_manager = CHI_IPC;
+      auto* ipc_manager = CLIO_IPC;
       HLOG(kInfo,
            "[bdev_force_net_flag] Iteration {}: Creating WriteTask with "
            "NewTask...",
@@ -1735,7 +1735,7 @@ TEST_CASE("bdev_force_net_flag", "[bdev][network][force_net]") {
       // Create read task with TASK_FORCE_NET flag
       HLOG(kInfo,
            "[bdev_force_net_flag] Iteration {}: Allocating read buffer...", i);
-      auto read_buffer = CHI_IPC->AllocateBuffer(k64KB);
+      auto read_buffer = CLIO_IPC->AllocateBuffer(k64KB);
       REQUIRE_FALSE(read_buffer.IsNull());
       HLOG(kInfo, "[bdev_force_net_flag] Iteration {}: Read buffer allocated",
            i);
@@ -1805,10 +1805,10 @@ TEST_CASE("bdev_force_net_flag", "[bdev][network][force_net]") {
       // Free buffers
       HLOG(kInfo, "[bdev_force_net_flag] Iteration {}: Freeing write buffer...",
            i);
-      CHI_IPC->FreeBuffer(write_buffer);
+      CLIO_IPC->FreeBuffer(write_buffer);
       HLOG(kInfo, "[bdev_force_net_flag] Iteration {}: Freeing read buffer...",
            i);
-      CHI_IPC->FreeBuffer(read_buffer);
+      CLIO_IPC->FreeBuffer(read_buffer);
       HLOG(kInfo, "[bdev_force_net_flag] Iteration {}: Buffers freed", i);
 
       HLOG(kInfo,

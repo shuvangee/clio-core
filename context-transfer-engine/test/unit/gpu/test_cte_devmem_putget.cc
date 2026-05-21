@@ -165,7 +165,7 @@ chi::u32 VerifyDevicePattern(const char *device_buf, chi::u32 size,
 TEST_CASE("CTE PutBlob+GetBlob round trip with device-memory task & data",
           "[cte][devmem][putblob][getblob]") {
   EnsureInit();
-  auto *ipc = CHI_CPU_IPC;
+  auto *ipc = CLIO_CPU_IPC;
   REQUIRE(ipc->GetGpuIpcManager() != nullptr);
   REQUIRE(ipc->GetGpuQueueCount() >= 1u);
 

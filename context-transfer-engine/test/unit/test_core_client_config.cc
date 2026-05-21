@@ -429,7 +429,7 @@ TEST_CASE("Client - AsyncPutBlob Direct", "[core][client][blob]") {
 
   // Create test data in SHM
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   REQUIRE(!shm_ptr.IsNull());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
@@ -458,7 +458,7 @@ TEST_CASE("Client - AsyncGetBlob Direct", "[core][client][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> put_ptr = ipc->AllocateBuffer(data.size());
   memcpy(put_ptr.ptr_, data.data(), data.size());
   ctp::ipc::ShmPtr<> put_ref(put_ptr.shm_);
@@ -496,7 +496,7 @@ TEST_CASE("Client - AsyncDelBlob", "[core][client][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
   ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
@@ -527,7 +527,7 @@ TEST_CASE("Client - AsyncReorganizeBlob Direct", "[core][client][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
   ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
@@ -560,7 +560,7 @@ TEST_CASE("Client - AsyncGetBlobScore Direct", "[core][client][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
   ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
@@ -594,7 +594,7 @@ TEST_CASE("Client - AsyncGetBlobSize Direct", "[core][client][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
   ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
@@ -627,7 +627,7 @@ TEST_CASE("Client - AsyncGetContainedBlobs Direct", "[core][client][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   // Put multiple blobs
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   for (int i = 0; i < 3; ++i) {
     auto data = fixture.CreateTestData(fixture.kTestDataSize);
     ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
@@ -689,7 +689,7 @@ TEST_CASE("Client - AsyncBlobQuery", "[core][client][query]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
   ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);

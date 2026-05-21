@@ -100,7 +100,7 @@ void SubmitTasksForMode(const std::string &mode_name) {
   }
 
   // Write 1MB
-  auto write_buffer = CHI_IPC->AllocateBuffer(write_data.size());
+  auto write_buffer = CLIO_IPC->AllocateBuffer(write_data.size());
   REQUIRE_FALSE(write_buffer.IsNull());
   memcpy(write_buffer.ptr_, write_data.data(), write_data.size());
   auto write_task = client.AsyncWrite(
@@ -114,7 +114,7 @@ void SubmitTasksForMode(const std::string &mode_name) {
   size_t actual_written = write_task->bytes_written_;
 
   // Read back using actual written size
-  auto read_buffer = CHI_IPC->AllocateBuffer(kIoSize);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(kIoSize);
   REQUIRE_FALSE(read_buffer.IsNull());
   auto read_task = client.AsyncRead(
       chi::PoolQuery::Local(), WrapBlock(block),
@@ -125,7 +125,7 @@ void SubmitTasksForMode(const std::string &mode_name) {
 
   // Verify data up to actual_written
   ctp::ipc::FullPtr<char> data_ptr =
-      CHI_IPC->ToFullPtr(read_task->data_.template Cast<char>());
+      CLIO_IPC->ToFullPtr(read_task->data_.template Cast<char>());
   REQUIRE_FALSE(data_ptr.IsNull());
   size_t actual_read = read_task->bytes_read_;
   std::vector<ctp::u8> read_data(actual_read);
@@ -137,8 +137,8 @@ void SubmitTasksForMode(const std::string &mode_name) {
   }
 
   // Cleanup buffers
-  CHI_IPC->FreeBuffer(write_buffer);
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(write_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
 }
 
 /**
@@ -261,7 +261,7 @@ TEST_CASE("IpcTransportMode - SHM Client Connection",
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
   REQUIRE(ipc->IsInitialized());
   REQUIRE(ipc->GetIpcMode() == IpcMode::kShm);
@@ -290,7 +290,7 @@ TEST_CASE("IpcTransportMode - TCP Client Connection",
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
   REQUIRE(ipc->IsInitialized());
   REQUIRE(ipc->GetIpcMode() == IpcMode::kTcp);
@@ -319,7 +319,7 @@ TEST_CASE("IpcTransportMode - IPC Client Connection",
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
   REQUIRE(ipc->IsInitialized());
   REQUIRE(ipc->GetIpcMode() == IpcMode::kIpc);
@@ -348,7 +348,7 @@ TEST_CASE("IpcTransportMode - Default Mode Is TCP",
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
   REQUIRE(ipc->IsInitialized());
   REQUIRE(ipc->GetIpcMode() == IpcMode::kTcp);

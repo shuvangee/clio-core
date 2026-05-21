@@ -425,7 +425,7 @@ public:
         chi::Future<clio_cte::core::PutBlobTask> fut;
         bool in_flight = false;
       };
-      auto *ipc_manager = CHI_IPC;
+      auto *ipc_manager = CLIO_IPC;
       std::vector<Slot> slots(depth);
       size_t allocated = 0;
       for (; allocated < depth; ++allocated) {
@@ -703,7 +703,7 @@ public:
   size_t Wait(FsAsyncTask *fstask) {
     // chi::Future::Wait() blocks until the task completes and the
     // Future destructor cleans up the underlying task ptr — no
-    // explicit CHI_IPC->DelTask call needed any more.
+    // explicit CLIO_IPC->DelTask call needed any more.
     for (auto &fut : fstask->put_tasks_) {
       fut.Wait();
     }

@@ -343,7 +343,7 @@ TEST_CASE("wait_test_async_functionality", "[wait_test][async]") {
          " completed in " + std::to_string(elapsed_time) + "ms");
 
     // Clean up
-    (void)CHI_IPC;
+    (void)CLIO_IPC;
   }
   
   SECTION("Multiple concurrent async WaitTest tasks") {
@@ -376,7 +376,7 @@ TEST_CASE("wait_test_async_functionality", "[wait_test][async]") {
          std::to_string(elapsed_time) + "ms");
 
     // Clean up all tasks
-    (void)CHI_IPC;
+    (void)CLIO_IPC;
     for (auto& task : tasks) {
       (void)task;
     }

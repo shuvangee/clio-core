@@ -99,7 +99,7 @@ void Tag::PutBlob(const std::string &blob_name, const char *data, size_t data_si
   auto t0 = clk::now();
 
   // Allocate shared memory for the data
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_fullptr = ipc_manager->AllocateBuffer(data_size);
 
   if (shm_fullptr.IsNull()) {
@@ -162,7 +162,7 @@ void Tag::PutBlob(const std::string &blob_name, const ctp::ipc::ShmPtr<> &data, 
 
 // NOTE: AsyncPutBlob(const char*) overload removed due to memory management issues.
 // For async operations, the caller must manage shared memory lifecycle by:
-// 1. Allocating: ctp::ipc::FullPtr<char> shm_ptr = CHI_IPC->AllocateBuffer(data_size);
+// 1. Allocating: ctp::ipc::FullPtr<char> shm_ptr = CLIO_IPC->AllocateBuffer(data_size);
 // 2. Copying data: memcpy(shm_ptr.ptr_, data, data_size);
 // 3. Calling: AsyncPutBlob(blob_name, shm_ptr.shm_, data_size, off, score);
 // 4. Keeping shm_ptr alive until task completes
@@ -186,7 +186,7 @@ void Tag::GetBlob(const std::string &blob_name, char *data, size_t data_size, si
   }
 
   // Allocate shared memory for the data
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_fullptr = ipc_manager->AllocateBuffer(data_size);
 
   if (shm_fullptr.IsNull()) {
@@ -214,7 +214,7 @@ void Tag::GetBlob(const std::string &blob_name, ctp::ipc::ShmPtr<> data, size_t 
 
   if (data.IsNull()) {
     throw std::invalid_argument("data pointer must be pre-allocated by caller. "
-                               "Use CHI_IPC->AllocateBuffer(data_size) to allocate shared memory.");
+                               "Use CLIO_IPC->AllocateBuffer(data_size) to allocate shared memory.");
   }
 
   auto *cte_client = CLIO_CTE_CLIENT;

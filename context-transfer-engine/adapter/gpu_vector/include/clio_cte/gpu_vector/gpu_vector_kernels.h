@@ -138,8 +138,8 @@ CTP_GPU_FUN chi::u32 RescoreRemaining(const RescoreQueue *q) {
  *  registered by nvcc's launch glue).
  *
  *  Caller must pass the kernel-scope `g_ipc_manager_ptr` from
- *  CHIMAERA_GPU_INIT — going through CHI_IPC in this device function
- *  trips the host-pass typing check (CHI_IPC expands to chi::IpcManager*
+ *  CHIMAERA_GPU_INIT — going through CLIO_IPC in this device function
+ *  trips the host-pass typing check (CLIO_IPC expands to chi::IpcManager*
  *  on host pass, which returns chi::Future, not gpu::Future). */
 CTP_GPU_FUN void FlushPageBase(::chi::gpu::IpcManager *ipc,
                                  const DeviceViewBase &v, chi::u32 block_idx,

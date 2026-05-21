@@ -87,23 +87,23 @@ CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN void RunImpl(
 
 CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN ctp::ipc::FullPtr<chi::Task> AllocTaskImpl(
     chi::gpu::Container *self_, chi::u32 method) {
-  // Phase 10: bind g_ipc_manager_ptr so CHI_IPC under SYCL resolves
+  // Phase 10: bind g_ipc_manager_ptr so CLIO_IPC under SYCL resolves
   // to the kernel-scope IpcManager (set by the worker via
   // container->ipc_mgr_ before dispatch).
   [[maybe_unused]] auto *g_ipc_manager_ptr = self_->ipc_mgr_;
   (void)self_;
   switch (method) {
     case Method::kRegisterTarget: {
-      auto _tp = CHI_IPC->NewTaskBase<RegisterTargetTask>(0); return _tp.template Cast<chi::Task>();
+      auto _tp = CLIO_IPC->NewTaskBase<RegisterTargetTask>(0); return _tp.template Cast<chi::Task>();
     }
     case Method::kGetOrCreateTag: {
-      auto _tp = CHI_IPC->NewTaskBase<core::GetOrCreateTagTask<core::CreateParams>>(0); return _tp.template Cast<chi::Task>();
+      auto _tp = CLIO_IPC->NewTaskBase<core::GetOrCreateTagTask<core::CreateParams>>(0); return _tp.template Cast<chi::Task>();
     }
     case Method::kPutBlob: {
-      auto _tp = CHI_IPC->NewTaskBase<PutBlobTask>(0); return _tp.template Cast<chi::Task>();
+      auto _tp = CLIO_IPC->NewTaskBase<PutBlobTask>(0); return _tp.template Cast<chi::Task>();
     }
     case Method::kGetBlob: {
-      auto _tp = CHI_IPC->NewTaskBase<GetBlobTask>(0); return _tp.template Cast<chi::Task>();
+      auto _tp = CLIO_IPC->NewTaskBase<GetBlobTask>(0); return _tp.template Cast<chi::Task>();
     }
     default: return ctp::ipc::FullPtr<chi::Task>::GetNull();
   }

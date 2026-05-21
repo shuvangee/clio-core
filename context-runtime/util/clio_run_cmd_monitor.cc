@@ -186,7 +186,7 @@ int Monitor(int argc, char* argv[]) {
   }
 
   HLOG(kInfo, "Getting admin client...");
-  auto* admin_client = CHI_ADMIN;
+  auto* admin_client = CLIO_ADMIN;
   if (!admin_client) {
     HLOG(kError, "Failed to get admin client");
     return 1;

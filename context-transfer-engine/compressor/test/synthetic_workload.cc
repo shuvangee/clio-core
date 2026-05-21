@@ -332,7 +332,7 @@ int main(int argc, char** argv) {
       pending_futures.clear();
       // Release SHM buffers now that operations are complete
       for (auto& buf : pending_buffers) {
-        CHI_IPC->FreeBuffer(buf);
+        CLIO_IPC->FreeBuffer(buf);
       }
       pending_buffers.clear();
     }
@@ -369,7 +369,7 @@ int main(int argc, char** argv) {
                               "_chunk" + std::to_string(bytes_written / config.transfer_size);
 
       // Allocate shared memory for async operation
-      auto shm_buffer = CHI_IPC->AllocateBuffer(chunk_size);
+      auto shm_buffer = CLIO_IPC->AllocateBuffer(chunk_size);
 
       // Copy data to shared memory
       const char* chunk_ptr = reinterpret_cast<const char*>(
@@ -413,7 +413,7 @@ int main(int argc, char** argv) {
     future.Wait();
   }
   for (auto& buf : pending_buffers) {
-    CHI_IPC->FreeBuffer(buf);
+    CLIO_IPC->FreeBuffer(buf);
   }
   pending_futures.clear();
   pending_buffers.clear();

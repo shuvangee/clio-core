@@ -226,7 +226,7 @@ class Heap {
  */
 class Runtime : public chi::Container {
  public:
-  // Required typedef for CHI_TASK_CC macro
+  // Required typedef for CLIO_TASK_CC macro
   using CreateParams = clio_run::bdev::CreateParams;
   
   Runtime() : bdev_type_(BdevType::kFile), file_size_(0), alignment_(4096),

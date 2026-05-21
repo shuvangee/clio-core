@@ -64,7 +64,7 @@ std::string UniqueId::ToString() const {
 
 LockOwnerId GetCurrentLockOwnerId() {
   LockOwnerId id;
-  Worker *worker = CHI_CUR_WORKER;
+  Worker *worker = CLIO_CUR_WORKER;
   if (!worker) return id;
   FullPtr<Task> task = worker->GetCurrentTask();
   if (task.ptr_ == nullptr) return id;

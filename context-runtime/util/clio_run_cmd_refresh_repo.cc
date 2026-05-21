@@ -468,7 +468,7 @@ class ChiModGenerator {
     oss << "}\n";
     oss << "\n";
     oss << "ctp::ipc::FullPtr<chi::Task> Runtime::NewCopyTask(chi::u32 method, ctp::ipc::FullPtr<chi::Task> orig_task_ptr, bool deep) {\n";
-    oss << "  auto* ipc_manager = CHI_IPC;\n";
+    oss << "  auto* ipc_manager = CLIO_IPC;\n";
     oss << "  if (!ipc_manager) {\n";
     oss << "    return ctp::ipc::FullPtr<chi::Task>();\n";
     oss << "  }\n";
@@ -507,7 +507,7 @@ class ChiModGenerator {
     oss << "}\n";
     oss << "\n";
     oss << "ctp::ipc::FullPtr<chi::Task> Runtime::NewTask(chi::u32 method) {\n";
-    oss << "  auto* ipc_manager = CHI_IPC;\n";
+    oss << "  auto* ipc_manager = CLIO_IPC;\n";
     oss << "  if (!ipc_manager) {\n";
     oss << "    return ctp::ipc::FullPtr<chi::Task>();\n";
     oss << "  }\n";
@@ -554,7 +554,7 @@ class ChiModGenerator {
 
     // Generate DelTask method - dispatches to typed task deletion
     oss << "void Runtime::DelTask(chi::u32 method, ctp::ipc::FullPtr<chi::Task> task_ptr) {\n";
-    oss << "  auto* ipc_manager = CHI_IPC;\n";
+    oss << "  auto* ipc_manager = CLIO_IPC;\n";
     oss << "  if (!ipc_manager) return;\n";
     oss << "  switch (method) {\n";
 
@@ -690,12 +690,12 @@ class ChiModGenerator {
     oss << "CTP_INDIRECTLY_CALLABLE static CTP_GPU_FUN chi::gpu::TaskContextBlock AllocTaskImpl(\n";
     oss << "    chi::gpu::Container *self_, chi::u32 method, size_t stack_size) {\n";
     if (!gpu_methods.empty()) {
-      // Phase 10: bind g_ipc_manager_ptr from self_->ipc_mgr_ so CHI_IPC\n
+      // Phase 10: bind g_ipc_manager_ptr from self_->ipc_mgr_ so CLIO_IPC\n
       // under SYCL resolves to the kernel-scope IpcManager. Worker writes\n
       // self_->ipc_mgr_ before each dispatch. CUDA falls back to the\n
       // __shared__ singleton via GetBlockIpcManager and ignores this.\n
       oss << "  [[maybe_unused]] auto *g_ipc_manager_ptr = self_->ipc_mgr_;\n";
-      oss << "  auto *ipc = CHI_IPC;\n";
+      oss << "  auto *ipc = CLIO_IPC;\n";
       oss << "  switch (method) {\n";
       for (const auto& method : gpu_methods) {
         std::string task_type = GetTaskTypeName(method.method_name, chimod_name);
@@ -824,7 +824,7 @@ class ChiModGenerator {
     oss << "\n";
 
     // gpu/gpu_ipc_manager.h must be visible BEFORE any chimod's _tasks.h,\n
-    // since CHI_IPC->NewTask<...> dereferences chi::gpu::IpcManager, which\n
+    // since CLIO_IPC->NewTask<...> dereferences chi::gpu::IpcManager, which\n
     // ipc_manager.h only forward-declares. Required by the SYCL build path;\n
     // CUDA TUs typically pulled it in via the GPU compiler's include order.
     oss << "#include \"chimaera/gpu/gpu_ipc_manager.h\"\n";

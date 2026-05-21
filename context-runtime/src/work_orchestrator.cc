@@ -78,7 +78,7 @@ bool WorkOrchestrator::Init() {
   auto thread_model = CTP_THREAD_MODEL;
   thread_group_ = thread_model->CreateThreadGroup({});
 
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
   if (!config) {
     return false;  // Configuration manager not initialized
   }
@@ -109,7 +109,7 @@ bool WorkOrchestrator::Init() {
   is_initialized_ = true;
 
   // Get scheduler from IpcManager (IpcManager is the single owner)
-  scheduler_ = CHI_IPC->GetScheduler();
+  scheduler_ = CLIO_IPC->GetScheduler();
   HLOG(kDebug, "WorkOrchestrator: Using scheduler from IpcManager");
 
   // Let the scheduler partition workers into groups (sched, slow, net)
@@ -249,7 +249,7 @@ bool WorkOrchestrator::AreWorkersRunning() const { return workers_running_; }
 
 bool WorkOrchestrator::SpawnWorkerThreads() {
   // Get IPC Manager to access worker queues
-  IpcManager *ipc = CHI_IPC;
+  IpcManager *ipc = CLIO_IPC;
   if (!ipc) {
     return false;
   }
@@ -392,7 +392,7 @@ bool WorkOrchestrator::HasWorkRemaining(u64 &total_work_remaining) const {
   total_work_remaining = 0;
 
   // Get PoolManager to access all containers in the system
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   if (!pool_manager || !pool_manager->IsInitialized()) {
     return false; // No pool manager means no work
   }

@@ -136,10 +136,10 @@ CTP_CROSS_FUN void load(Ar &ar, chi::LocalTaskInfo &info) {
 
 namespace chi {
 
-// Base type for LbmMeta inheritance: use CHI_PRIV_ALLOC_T so that
+// Base type for LbmMeta inheritance: use CLIO_PRIV_ALLOC_T so that
 // ShmTransport::Recv can allocate internal buffers on GPU (BuddyAllocator)
 // and on host (MallocAllocator).
-using LocalLbmBase = ctp::lbm::LbmMeta<CHI_PRIV_ALLOC_T>;
+using LocalLbmBase = ctp::lbm::LbmMeta<CLIO_PRIV_ALLOC_T>;
 
 using LocalTaskInfoVec = chi::priv::vector<LocalTaskInfo>;
 
@@ -345,8 +345,8 @@ class LocalSaveTaskArchive : public LocalLbmBase {
    */
   CTP_CROSS_FUN LocalSaveTaskArchive(LocalMsgType msg_type,
                                        BufferT &buffer)
-      : Base(CHI_PRIV_ALLOC),
-        task_infos_(CHI_PRIV_ALLOC),
+      : Base(CLIO_PRIV_ALLOC),
+        task_infos_(CLIO_PRIV_ALLOC),
         msg_type_(msg_type),
         buffer_(buffer),
         serializer_(buffer) {
@@ -567,8 +567,8 @@ class LocalLoadTaskArchive : public LocalLbmBase {
    * Constructor with default allocator and external buffer reference.
    */
   CTP_CROSS_FUN explicit LocalLoadTaskArchive(BufferT &buffer)
-      : Base(CHI_PRIV_ALLOC),
-        task_infos_(CHI_PRIV_ALLOC),
+      : Base(CLIO_PRIV_ALLOC),
+        task_infos_(CLIO_PRIV_ALLOC),
         msg_type_(LocalMsgType::kSerializeIn),
         data_(buffer),
         deserializer_(buffer),

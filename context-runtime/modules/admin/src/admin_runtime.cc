@@ -201,7 +201,7 @@ Runtime::~Runtime() {
 
 chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
                                 chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Admin container creation logic (IS_ADMIN=true)
   HLOG(kDebug, "Admin: Initializing admin container");
 
@@ -231,7 +231,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
   //   - RecvOut -> direct worker_queues_->GetLane(...).Push(future)
   //   - RuntimeRecv (client TCP/IPC) -> direct lane push
   //
-  // None of these go through CHI_CUR_WORKER (TLS) for anything that matters.
+  // None of these go through CLIO_CUR_WORKER (TLS) for anything that matters.
   // The outbound Send path is unchanged: still served by the net_send_worker
   // via the AsyncSendPoll / AsyncClientSend periodics below.
   // ===========================================================================
@@ -248,7 +248,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
   // (port 9413 by default) and dispatches inbound task forwards/responses.
   peer_recv_thread_ = std::thread([this]() {
     pthread_setname_np(pthread_self(), "chi-peer-recv");
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     ctp::lbm::Transport *lbm_transport = nullptr;
     for (int spin = 0; spin < 1000 && !recv_shutdown_.load(); ++spin) {
       lbm_transport = ipc_manager->GetMainTransport();
@@ -299,7 +299,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
   // (unix socket) client transports via IpcCpu2CpuZmq::RuntimeRecv.
   client_recv_thread_ = std::thread([this]() {
     pthread_setname_np(pthread_self(), "chi-client-recv");
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     HLOG(kInfo, "[ClientRecvThread] started");
     while (!recv_shutdown_.load(std::memory_order_acquire)) {
       chi::u32 tasks_received = 0;
@@ -334,8 +334,8 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
        "Admin: Spawned periodic Recv, Send, ClientConnect, ClientRecv, "
        "ClientSend tasks");
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::PoolQuery Runtime::ScheduleTask(const ctp::ipc::FullPtr<chi::Task> &task) {
@@ -343,7 +343,7 @@ chi::PoolQuery Runtime::ScheduleTask(const ctp::ipc::FullPtr<chi::Task> &task) {
   switch (task->method_) {
     case Method::kGetOrCreatePool: {
       auto typed = task.template Cast<GetOrCreatePoolTask<CreateParams>>();
-      auto *pool_manager = CHI_POOL_MANAGER;
+      auto *pool_manager = CLIO_POOL_MANAGER;
       std::string pool_name = typed->pool_name_.str();
       chi::PoolId existing_pool_id = pool_manager->FindPoolByName(pool_name);
       if (!existing_pool_id.IsNull()) {
@@ -361,14 +361,14 @@ chi::TaskResume Runtime::GetOrCreatePool(
         clio_run::admin::GetOrCreatePoolTask<clio_run::admin::CreateParams>>
         task,
     chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Debug: Log do_compose_ value
   HLOG(kDebug,
        "Admin::GetOrCreatePool ENTRY: task->do_compose_={}, task->is_admin_={}",
        task->do_compose_, task->is_admin_);
 
   // Get pool manager and pool name
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   std::string pool_name = task->pool_name_.str();
 
   // Pool get-or-create operation logic (IS_ADMIN=false)
@@ -382,12 +382,12 @@ chi::TaskResume Runtime::GetOrCreatePool(
   try {
     // Use the simplified PoolManager API that extracts all parameters from the
     // task. CreatePool is now a coroutine that co_awaits nested Create methods.
-    CHI_CO_AWAIT(pool_manager->CreatePool(task.Cast<chi::Task>(), &rctx));
+    CLIO_CO_AWAIT(pool_manager->CreatePool(task.Cast<chi::Task>(), &rctx));
 
     // Check if CreatePool set an error (return code is set on the task)
     if (task->return_code_ != 0) {
       // Error already set by CreatePool
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Set success results (task->new_pool_id_ is already updated by CreatePool)
@@ -406,22 +406,22 @@ chi::TaskResume Runtime::GetOrCreatePool(
     task->error_message_ = chi::priv::string(CTP_MALLOC, error_msg);
     HLOG(kError, "Admin: Pool creation failed with exception: {}", e.what());
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task,
                                  chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // DestroyTask is aliased to DestroyPoolTask, so delegate to DestroyPool
-  CHI_CO_AWAIT(DestroyPool(task, rctx));
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_AWAIT(DestroyPool(task, rctx));
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::DestroyPool(ctp::ipc::FullPtr<DestroyPoolTask> task,
                                      chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "Admin: Executing DestroyPool task - Pool ID: {}",
        task->target_pool_id_);
 
@@ -433,16 +433,16 @@ chi::TaskResume Runtime::DestroyPool(ctp::ipc::FullPtr<DestroyPoolTask> task,
     chi::PoolId target_pool = task->target_pool_id_;
 
     // Get pool manager to handle pool destruction
-    auto *pool_manager = CHI_POOL_MANAGER;
+    auto *pool_manager = CLIO_POOL_MANAGER;
     if (!pool_manager || !pool_manager->IsInitialized()) {
       task->return_code_ = 1;
       task->error_message_ = "Pool manager not available";
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Use PoolManager to destroy the complete pool including metadata
     // DestroyPool is now a coroutine for consistency
-    CHI_CO_AWAIT(pool_manager->DestroyPool(target_pool));
+    CLIO_CO_AWAIT(pool_manager->DestroyPool(target_pool));
 
     // Set success results
     task->return_code_ = 0;
@@ -460,13 +460,13 @@ chi::TaskResume Runtime::DestroyPool(ctp::ipc::FullPtr<DestroyPoolTask> task,
     task->error_message_ = chi::priv::string(CTP_MALLOC, error_msg);
     HLOG(kError, "Admin: Pool destruction failed with exception: {}", e.what());
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::StopRuntime(ctp::ipc::FullPtr<StopRuntimeTask> task,
                                      chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "Admin: Executing StopRuntime task - Grace period: {}ms",
        task->grace_period_ms_);
 
@@ -479,8 +479,8 @@ chi::TaskResume Runtime::StopRuntime(ctp::ipc::FullPtr<StopRuntimeTask> task,
   HLOG(kInfo, "Admin: Runtime shutdown initiated successfully");
   InitiateShutdown(task->grace_period_ms_);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::InitiateShutdown(chi::u32 grace_period_ms) {
@@ -497,7 +497,7 @@ void Runtime::InitiateShutdown(chi::u32 grace_period_ms) {
   is_shutdown_requested_ = true;
 
   // Get CLIO Runtime manager to initiate shutdown
-  auto *chimaera_manager = CHI_CHIMAERA_MANAGER;
+  auto *chimaera_manager = CLIO_CHIMAERA_MANAGER;
   if (chimaera_manager) {
     // chimaera_manager->InitiateShutdown(grace_period_ms);
   }
@@ -506,7 +506,7 @@ void Runtime::InitiateShutdown(chi::u32 grace_period_ms) {
 
 chi::TaskResume Runtime::Flush(ctp::ipc::FullPtr<FlushTask> task,
                                chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "Admin: Executing Flush task");
 
   // Initialize output values
@@ -515,10 +515,10 @@ chi::TaskResume Runtime::Flush(ctp::ipc::FullPtr<FlushTask> task,
 
   try {
     // Get WorkOrchestrator to check work remaining across all containers
-    auto *work_orchestrator = CHI_WORK_ORCHESTRATOR;
+    auto *work_orchestrator = CLIO_WORK_ORCHESTRATOR;
     if (!work_orchestrator || !work_orchestrator->IsInitialized()) {
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Loop until all work is complete
@@ -529,7 +529,7 @@ chi::TaskResume Runtime::Flush(ctp::ipc::FullPtr<FlushTask> task,
            total_work_remaining);
 
       // Brief yield to avoid busy waiting
-      CHI_CO_AWAIT(chi::yield(25));
+      CLIO_CO_AWAIT(chi::yield(25));
     }
 
     // Store the final work count (should be 0)
@@ -543,8 +543,8 @@ chi::TaskResume Runtime::Flush(ctp::ipc::FullPtr<FlushTask> task,
     task->return_code_ = 99;
     HLOG(kError, "Admin: Flush failed with exception: {}", e.what());
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 //===========================================================================
@@ -558,8 +558,8 @@ chi::TaskResume Runtime::Flush(ctp::ipc::FullPtr<FlushTask> task,
  */
 void Runtime::SendIn(ctp::ipc::FullPtr<chi::Task> origin_task,
                      chi::RunContext &rctx) {
-  auto *ipc_manager = CHI_IPC;
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *ipc_manager = CLIO_IPC;
+  auto *pool_manager = CLIO_POOL_MANAGER;
 
   // Validate origin_task
   if (origin_task.IsNull()) {
@@ -689,7 +689,7 @@ void Runtime::SendIn(ctp::ipc::FullPtr<chi::Task> origin_task,
     }
 
     // Get or create persistent Lightbeam client using connection pool
-    auto *config_manager = CHI_CONFIG_MANAGER;
+    auto *config_manager = CLIO_CONFIG_MANAGER;
     int port = static_cast<int>(config_manager->GetPort());
     ctp::lbm::Transport *lbm_transport =
         ipc_manager->GetOrCreateClient(target_host->ip_address, port);
@@ -770,8 +770,8 @@ void Runtime::SendIn(ctp::ipc::FullPtr<chi::Task> origin_task,
  * @param origin_task Completed task whose outputs need to be sent back
  */
 void Runtime::SendOut(ctp::ipc::FullPtr<chi::Task> origin_task) {
-  auto *ipc_manager = CHI_IPC;
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *ipc_manager = CLIO_IPC;
+  auto *pool_manager = CLIO_POOL_MANAGER;
 
   // Flush deferred deletes from previous invocation (zero-copy send safety).
   // SendOut runs only from net_send_worker SendPoll; static is fine.
@@ -837,7 +837,7 @@ void Runtime::SendOut(ctp::ipc::FullPtr<chi::Task> origin_task) {
     return;
   }
 
-  auto *config_manager = CHI_CONFIG_MANAGER;
+  auto *config_manager = CLIO_CONFIG_MANAGER;
   int port = static_cast<int>(config_manager->GetPort());
   ctp::lbm::Transport *lbm_transport =
       ipc_manager->GetOrCreateClient(target_host->ip_address, port);
@@ -936,8 +936,8 @@ void Runtime::SendOut(ctp::ipc::FullPtr<chi::Task> origin_task) {
  */
 chi::TaskResume Runtime::Send(ctp::ipc::FullPtr<SendTask> task,
                               chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
-  auto *ipc_manager = CHI_IPC;
+  CLIO_TASK_BODY_BEGIN
+  auto *ipc_manager = CLIO_IPC;
   chi::Future<chi::Task> queued_future;
   bool did_send = false;
 
@@ -1023,12 +1023,12 @@ chi::TaskResume Runtime::Send(ctp::ipc::FullPtr<SendTask> task,
 
   rctx.did_work_ = did_send;
   {
-    auto *cfg_ipc = CHI_IPC;
+    auto *cfg_ipc = CLIO_IPC;
     DumpNetStatsIfDue(cfg_ipc->GetNodeId(), cfg_ipc->GetNumHosts());
   }
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 /**
@@ -1040,8 +1040,8 @@ chi::TaskResume Runtime::Send(ctp::ipc::FullPtr<SendTask> task,
 void Runtime::RecvIn(ctp::ipc::FullPtr<RecvTask> task,
                      chi::LoadTaskArchive &archive,
                      ctp::lbm::Transport *lbm_transport) {
-  auto *ipc_manager = CHI_IPC;
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *ipc_manager = CLIO_IPC;
+  auto *pool_manager = CLIO_POOL_MANAGER;
 
   const auto &task_infos = archive.GetTaskInfos();
 
@@ -1146,7 +1146,7 @@ void Runtime::RecvIn(ctp::ipc::FullPtr<RecvTask> task,
     // Dispatch the received task directly onto a worker lane.
     //
     // We deliberately do NOT call ipc_manager->Send here because RecvIn now
-    // runs on a dedicated std::thread (CHI_CUR_WORKER == nullptr). Send's
+    // runs on a dedicated std::thread (CLIO_CUR_WORKER == nullptr). Send's
     // non-worker branch routes through IpcManager::RouteTask, which respects
     // pool_query_ and may re-broadcast a task that arrived at us because
     // we cleared TASK_ROUTED above. Mirror IpcCpu2Self::ClientSend's worker
@@ -1193,7 +1193,7 @@ void Runtime::RecvIn(ctp::ipc::FullPtr<RecvTask> task,
 void Runtime::RecvOut(ctp::ipc::FullPtr<RecvTask> task,
                       chi::LoadTaskArchive &archive,
                       ctp::lbm::Transport *lbm_transport) {
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
 
   const auto &task_infos = archive.GetTaskInfos();
 
@@ -1335,7 +1335,7 @@ void Runtime::RecvOut(ctp::ipc::FullPtr<RecvTask> task,
     // If all replicas completed
     if (completed == origin_rctx->subtasks_.size()) {
       // Get pool manager to access container
-      auto *pool_manager = CHI_POOL_MANAGER;
+      auto *pool_manager = CLIO_POOL_MANAGER;
       chi::Container *container =
           pool_manager->GetStaticContainer(origin_task->pool_id_);
 
@@ -1364,17 +1364,17 @@ void Runtime::RecvOut(ctp::ipc::FullPtr<RecvTask> task,
       }
 
       // Complete the origin task via EndTask. When RecvOut runs on the
-      // dedicated peer recv thread (CHI_CUR_WORKER == nullptr), borrow the
+      // dedicated peer recv thread (CLIO_CUR_WORKER == nullptr), borrow the
       // net_recv_worker pointer for the call. EndTask's per-worker state
       // updates (num_tasks_processed_, load_) are stats only — the
       // correctness-bearing paths (EnqueueNetTask for remote origin,
       // IpcCpu2Self::RuntimeSend for local origin) are thread-safe and
-      // don't depend on CHI_CUR_WORKER being correct. The net_recv_worker
+      // don't depend on CLIO_CUR_WORKER being correct. The net_recv_worker
       // already serialized incoming network responses pre-split, so this
       // approximates the prior accounting.
-      auto *worker = CHI_CUR_WORKER;
+      auto *worker = CLIO_CUR_WORKER;
       if (worker == nullptr) {
-        auto *scheduler = CHI_IPC->GetScheduler();
+        auto *scheduler = CLIO_IPC->GetScheduler();
         worker = scheduler ? scheduler->GetNetRecvWorker() : nullptr;
       }
       if (worker) {
@@ -1396,13 +1396,13 @@ void Runtime::RecvOut(ctp::ipc::FullPtr<RecvTask> task,
  */
 chi::TaskResume Runtime::Recv(ctp::ipc::FullPtr<RecvTask> task,
                               chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
-  // Get the main server from CHI_IPC (already bound during initialization)
-  auto *ipc_manager = CHI_IPC;
+  CLIO_TASK_BODY_BEGIN
+  // Get the main server from CLIO_IPC (already bound during initialization)
+  auto *ipc_manager = CLIO_IPC;
 
   ctp::lbm::Transport *lbm_transport = ipc_manager->GetMainTransport();
   if (lbm_transport == nullptr) {
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Note: No socket lock needed - single net worker processes all Recv tasks
@@ -1415,7 +1415,7 @@ chi::TaskResume Runtime::Recv(ctp::ipc::FullPtr<RecvTask> task,
     // No message available - this is normal for polling, mark as no work done
     task->SetReturnCode(0);
     rctx.did_work_ = false;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   if (rc != 0) {
@@ -1424,7 +1424,7 @@ chi::TaskResume Runtime::Recv(ctp::ipc::FullPtr<RecvTask> task,
     }
     task->SetReturnCode(2);
     rctx.did_work_ = false;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Mark that we received data (did work)
@@ -1467,8 +1467,8 @@ chi::TaskResume Runtime::Recv(ctp::ipc::FullPtr<RecvTask> task,
       break;
   }
 
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 /**
@@ -1479,11 +1479,11 @@ chi::TaskResume Runtime::Recv(ctp::ipc::FullPtr<RecvTask> task,
  */
 chi::TaskResume Runtime::ClientConnect(ctp::ipc::FullPtr<ClientConnectTask> task,
                                        chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   task->response_ = 0;
-  task->server_generation_ = CHI_IPC->GetServerGeneration();
+  task->server_generation_ = CLIO_IPC->GetServerGeneration();
   task->server_pid_ = static_cast<int32_t>(getpid());
-  task->worker_queues_off_ = CHI_IPC->GetWorkerQueuesOffset();
+  task->worker_queues_off_ = CLIO_IPC->GetWorkerQueuesOffset();
 
   // GPU queue info for client attachment.
   //
@@ -1496,8 +1496,8 @@ chi::TaskResume Runtime::ClientConnect(ctp::ipc::FullPtr<ClientConnectTask> task
 
   task->SetReturnCode(0);
   rctx.did_work_ = true;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 /**
@@ -1507,13 +1507,13 @@ chi::TaskResume Runtime::ClientConnect(ctp::ipc::FullPtr<ClientConnectTask> task
 chi::TaskResume Runtime::ClientRecv(ctp::ipc::FullPtr<ClientRecvTask> task,
                                     chi::RunContext &rctx) {
   chi::u32 tasks_received = 0;
-  bool did_work = chi::IpcCpu2CpuZmq::RuntimeRecv(CHI_IPC, tasks_received);
+  bool did_work = chi::IpcCpu2CpuZmq::RuntimeRecv(CLIO_IPC, tasks_received);
   task->tasks_received_ = tasks_received;
 
   rctx.did_work_ = did_work;
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 /**
@@ -1525,26 +1525,26 @@ chi::TaskResume Runtime::ClientSend(ctp::ipc::FullPtr<ClientSendTask> task,
   static std::vector<ctp::ipc::FullPtr<chi::Task>> deferred_deletes;
   chi::u32 tasks_sent = 0;
   bool did_work = chi::IpcCpu2CpuZmq::RuntimeSend(
-      CHI_IPC, tasks_sent, deferred_deletes);
+      CLIO_IPC, tasks_sent, deferred_deletes);
   task->tasks_sent_ = tasks_sent;
 
   rctx.did_work_ = did_work;
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
                                  chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   if (task->query_ == "worker_stats") {
     MonitorWorkerStats(task);
   } else if (task->query_.rfind("pool_stats://", 0) == 0) {
-    CHI_CO_AWAIT(MonitorPoolStats(task));
+    CLIO_CO_AWAIT(MonitorPoolStats(task));
   } else if (task->query_.rfind("system_stats", 0) == 0) {
     MonitorSystemStats(task);
   } else if (task->query_ == "bdev_stats") {
-    CHI_CO_AWAIT(MonitorBdevStats(task));
+    CLIO_CO_AWAIT(MonitorBdevStats(task));
   } else if (task->query_ == "container_stats") {
     MonitorContainerStats(task);
   } else if (task->query_ == "get_host_info") {
@@ -1554,12 +1554,12 @@ chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
     task->SetReturnCode(0);
   }
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::MonitorWorkerStats(ctp::ipc::FullPtr<MonitorTask> task) {
-  auto *work_orchestrator = CHI_WORK_ORCHESTRATOR;
+  auto *work_orchestrator = CLIO_WORK_ORCHESTRATOR;
   if (!work_orchestrator) {
     task->SetReturnCode(1);
     HLOG(kError, "Monitor(worker_stats): WorkOrchestrator not available");
@@ -1609,7 +1609,7 @@ void Runtime::MonitorWorkerStats(ctp::ipc::FullPtr<MonitorTask> task) {
 }
 
 void Runtime::MonitorContainerStats(ctp::ipc::FullPtr<MonitorTask> task) {
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   if (!pool_manager) {
     task->SetReturnCode(1);
     return;
@@ -1686,7 +1686,7 @@ chi::TaskResume Runtime::MonitorPoolStats(ctp::ipc::FullPtr<MonitorTask> task) {
   chi::RunContext _dummy_rctx;
   chi::RunContext& rctx = _dummy_rctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Parse pool_stats://PoolId:PoolQuery:selector
   // Format: pool_stats://<major.minor>:<routing_mode[:params...]>:<selector>
   std::string uri_body = task->query_.substr(13);  // skip "pool_stats://"
@@ -1697,7 +1697,7 @@ chi::TaskResume Runtime::MonitorPoolStats(ctp::ipc::FullPtr<MonitorTask> task) {
     task->SetReturnCode(2);
     HLOG(kError, "Monitor(pool_stats): missing ':' after PoolId in '{}'",
          task->query_);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   std::string pool_id_str = uri_body.substr(0, first_colon);
   chi::PoolId target_pool_id;
@@ -1707,7 +1707,7 @@ chi::TaskResume Runtime::MonitorPoolStats(ctp::ipc::FullPtr<MonitorTask> task) {
     task->SetReturnCode(2);
     HLOG(kError, "Monitor(pool_stats): invalid PoolId '{}': {}", pool_id_str,
          e.what());
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // 2. Token-based parse of routing mode and its parameters
@@ -1746,7 +1746,7 @@ chi::TaskResume Runtime::MonitorPoolStats(ctp::ipc::FullPtr<MonitorTask> task) {
            "Monitor(pool_stats): not enough tokens for routing mode '{}' "
            "in '{}'",
            routing_token, task->query_);
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
     size_t next_colon = remainder.find(':', parse_pos);
     std::string token =
@@ -1772,24 +1772,24 @@ chi::TaskResume Runtime::MonitorPoolStats(ctp::ipc::FullPtr<MonitorTask> task) {
     task->SetReturnCode(2);
     HLOG(kError, "Monitor(pool_stats): invalid PoolQuery '{}': {}",
          pool_query_str, e.what());
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // 4. Verify the target pool exists
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   chi::Container *container = pool_manager->GetStaticContainer(target_pool_id);
   if (!container) {
     task->SetReturnCode(3);
     HLOG(kError, "Monitor(pool_stats): pool {} not found", target_pool_id);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // 5. Create sub-MonitorTask targeting the pool and dispatch it
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto sub_task = ipc_manager->NewTask<MonitorTask>(
       chi::CreateTaskId(), target_pool_id, target_pool_query, selector);
   chi::Future<MonitorTask> sub_future = ipc_manager->Send(sub_task);
-  CHI_CO_AWAIT(sub_future);
+  CLIO_CO_AWAIT(sub_future);
 
   // 6. Copy results from sub-task into this task
   if (sub_future->GetReturnCode() != 0) {
@@ -1800,8 +1800,8 @@ chi::TaskResume Runtime::MonitorPoolStats(ctp::ipc::FullPtr<MonitorTask> task) {
     task->results_ = sub_future->results_;
     task->SetReturnCode(0);
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::MonitorSystemStats(ctp::ipc::FullPtr<MonitorTask> task) {
@@ -1860,13 +1860,13 @@ void Runtime::MonitorSystemStats(ctp::ipc::FullPtr<MonitorTask> task) {
       pk.pack("hbm_total_bytes");
       pk.pack(s.hbm_total_bytes_);
       pk.pack("hostname");
-      pk.pack(CHI_IPC->GetCurrentHostname());
+      pk.pack(CLIO_IPC->GetCurrentHostname());
       pk.pack("ip_address");
-      pk.pack(CHI_IPC->GetThisHost().ip_address);
+      pk.pack(CLIO_IPC->GetThisHost().ip_address);
       pk.pack("node_id");
-      pk.pack(CHI_IPC->GetNodeId());
+      pk.pack(CLIO_IPC->GetNodeId());
       pk.pack("is_leader");
-      pk.pack(CHI_IPC->IsLeader());
+      pk.pack(CLIO_IPC->IsLeader());
     } else {
       pk.pack_map(0);
     }
@@ -1881,20 +1881,20 @@ void Runtime::MonitorGetHostInfo(ctp::ipc::FullPtr<MonitorTask> task) {
   msgpack::packer<msgpack::sbuffer> pk(sbuf);
   pk.pack_map(3);
   pk.pack("hostname");
-  pk.pack(CHI_IPC->GetCurrentHostname());
+  pk.pack(CLIO_IPC->GetCurrentHostname());
   pk.pack("ip_address");
-  pk.pack(CHI_IPC->GetThisHost().ip_address);
+  pk.pack(CLIO_IPC->GetThisHost().ip_address);
   pk.pack("node_id");
-  pk.pack(CHI_IPC->GetNodeId());
+  pk.pack(CLIO_IPC->GetNodeId());
   task->results_[container_id_] = std::string(sbuf.data(), sbuf.size());
   task->SetReturnCode(0);
 }
 
 chi::TaskResume Runtime::AnnounceShutdown(
     ctp::ipc::FullPtr<AnnounceShutdownTask> task, chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   chi::u64 dead_node_id = task->shutting_down_node_id_;
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
 
   HLOG(kInfo, "Admin: Received shutdown announcement for node {}",
        dead_node_id);
@@ -1904,13 +1904,13 @@ chi::TaskResume Runtime::AnnounceShutdown(
 
   // If we are the new leader, trigger recovery for the departing node
   if (ipc_manager->IsLeader()) {
-    CHI_CO_AWAIT(TriggerRecovery(dead_node_id));
+    CLIO_CO_AWAIT(TriggerRecovery(dead_node_id));
   }
 
   task->SetReturnCode(0);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::MonitorBdevStats(ctp::ipc::FullPtr<MonitorTask> task) {
@@ -1918,10 +1918,10 @@ chi::TaskResume Runtime::MonitorBdevStats(ctp::ipc::FullPtr<MonitorTask> task) {
   chi::RunContext _dummy_rctx;
   chi::RunContext& rctx = _dummy_rctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Collect stats from all bdev pools on this node
-  auto *pool_manager = CHI_POOL_MANAGER;
-  auto *ipc_manager = CHI_IPC;
+  auto *pool_manager = CLIO_POOL_MANAGER;
+  auto *ipc_manager = CLIO_IPC;
   auto all_pool_ids = pool_manager->GetAllPoolIds();
   msgpack::sbuffer sbuf;
   msgpack::packer<msgpack::sbuffer> pk(sbuf);
@@ -1945,7 +1945,7 @@ chi::TaskResume Runtime::MonitorBdevStats(ctp::ipc::FullPtr<MonitorTask> task) {
     auto sub_task = ipc_manager->NewTask<MonitorTask>(chi::CreateTaskId(), pid,
                                                       bdev_query, "stats");
     chi::Future<MonitorTask> sub_future = ipc_manager->Send(sub_task);
-    CHI_CO_AWAIT(sub_future);
+    CLIO_CO_AWAIT(sub_future);
 
     if (sub_future->GetReturnCode() == 0 && !sub_future->results_.empty()) {
       // Wrap bdev stats with pool_id metadata
@@ -1967,18 +1967,18 @@ chi::TaskResume Runtime::MonitorBdevStats(ctp::ipc::FullPtr<MonitorTask> task) {
 
   task->results_[container_id_] = std::string(sbuf.data(), sbuf.size());
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::SubmitBatch(ctp::ipc::FullPtr<SubmitBatchTask> task,
                                      chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kInfo, "Admin: Executing SubmitBatch task with {} tasks",
        task->task_infos_.size());
 
-  auto *ipc_manager = CHI_IPC;
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *ipc_manager = CLIO_IPC;
+  auto *pool_manager = CLIO_POOL_MANAGER;
 
   // Initialize output values
   task->tasks_completed_ = 0;
@@ -1988,11 +1988,11 @@ chi::TaskResume Runtime::SubmitBatch(ctp::ipc::FullPtr<SubmitBatchTask> task,
   if (task->task_infos_.empty()) {
     task->SetReturnCode(0);
     HLOG(kInfo, "SubmitBatch: No tasks to submit");
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Create DefaultLoadArchive from the serialized data
-  chi::priv::vector<char> load_buf(CHI_PRIV_ALLOC);
+  chi::priv::vector<char> load_buf(CLIO_PRIV_ALLOC);
   load_buf.reserve(task->serialized_data_.size());
   for (size_t i = 0; i < task->serialized_data_.size(); ++i) {
     load_buf.push_back(task->serialized_data_[i]);
@@ -2038,9 +2038,9 @@ chi::TaskResume Runtime::SubmitBatch(ctp::ipc::FullPtr<SubmitBatchTask> task,
       pending_futures.push_back(std::move(future));
     }
 
-    // CHI_CO_AWAIT all pending futures in this batch
+    // CLIO_CO_AWAIT all pending futures in this batch
     for (auto &future : pending_futures) {
-      CHI_CO_AWAIT(future);
+      CLIO_CO_AWAIT(future);
       task->tasks_completed_++;
     }
 
@@ -2053,14 +2053,14 @@ chi::TaskResume Runtime::SubmitBatch(ctp::ipc::FullPtr<SubmitBatchTask> task,
        total_tasks);
 
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::RegisterMemory(ctp::ipc::FullPtr<RegisterMemoryTask> task,
                                         chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
-  auto *ipc_manager = CHI_IPC;
+  CLIO_TASK_BODY_BEGIN
+  auto *ipc_manager = CLIO_IPC;
   MemoryType mem_type = static_cast<MemoryType>(task->memory_type_);
 
   switch (mem_type) {
@@ -2128,27 +2128,27 @@ chi::TaskResume Runtime::RegisterMemory(ctp::ipc::FullPtr<RegisterMemoryTask> ta
 
   task->SetReturnCode(task->success_ ? 0 : 1);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::RestartContainers(
     ctp::ipc::FullPtr<RestartContainersTask> task, chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug, "Admin: Executing RestartContainers task");
 
   task->containers_restarted_ = 0;
   task->error_message_ = "";
 
   try {
-    auto *config_manager = CHI_CONFIG_MANAGER;
+    auto *config_manager = CLIO_CONFIG_MANAGER;
     std::string restart_dir = config_manager->GetConfDir() + "/restart";
 
     namespace fs = std::filesystem;
     if (!fs::exists(restart_dir) || !fs::is_directory(restart_dir)) {
       HLOG(kDebug, "Admin: No restart directory found at {}", restart_dir);
       task->SetReturnCode(0);
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     for (const auto &entry : fs::directory_iterator(restart_dir)) {
@@ -2168,7 +2168,7 @@ chi::TaskResume Runtime::RestartContainers(
              pool_config.pool_name_, pool_config.mod_name_);
 
         auto future = client_.AsyncCompose(pool_config);
-        CHI_CO_AWAIT(future);
+        CLIO_CO_AWAIT(future);
 
         chi::u32 rc = future->GetReturnCode();
         if (rc != 0) {
@@ -2194,19 +2194,19 @@ chi::TaskResume Runtime::RestartContainers(
     HLOG(kError, "Admin: RestartContainers failed: {}", e.what());
   }
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::AddNode(ctp::ipc::FullPtr<AddNodeTask> task,
                                  chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   (void)rctx;
   HLOG(kInfo, "Admin: Executing AddNode for {}:{}", task->new_node_ip_.str(),
        task->new_node_port_);
 
-  auto *ipc_manager = CHI_IPC;
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *ipc_manager = CLIO_IPC;
+  auto *pool_manager = CLIO_POOL_MANAGER;
 
   // Add the new node to the IpcManager's hostfile
   chi::u64 new_node_id =
@@ -2227,14 +2227,14 @@ chi::TaskResume Runtime::AddNode(ctp::ipc::FullPtr<AddNodeTask> task,
 
   HLOG(kInfo, "Admin: AddNode complete, assigned node_id={}", new_node_id);
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::WreapDeadIpcs(ctp::ipc::FullPtr<WreapDeadIpcsTask> task,
                                        chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
-  auto *ipc_manager = CHI_IPC;
+  CLIO_TASK_BODY_BEGIN
+  auto *ipc_manager = CLIO_IPC;
 
   // Call IpcManager::WreapDeadIpcs to reap shared memory from dead processes
   // task->reaped_count_ = ipc_manager->WreapDeadIpcs();
@@ -2250,15 +2250,15 @@ chi::TaskResume Runtime::WreapDeadIpcs(ctp::ipc::FullPtr<WreapDeadIpcsTask> task
   }
 
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::ChangeAddressTable(
     ctp::ipc::FullPtr<ChangeAddressTableTask> task, chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   (void)rctx;
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
 
   chi::PoolId target_pool_id = task->target_pool_id_;
   chi::ContainerId container_id = task->container_id_;
@@ -2283,17 +2283,17 @@ chi::TaskResume Runtime::ChangeAddressTable(
         CTP_MALLOC, "Failed to update container node mapping");
     task->SetReturnCode(1);
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::MigrateContainers(
     ctp::ipc::FullPtr<MigrateContainersTask> task, chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   (void)rctx;
   HLOG(kInfo, "Admin: Executing MigrateContainers task");
 
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   task->num_migrated_ = 0;
   task->error_message_ = "";
 
@@ -2326,7 +2326,7 @@ chi::TaskResume Runtime::MigrateContainers(
     auto change_task = client_.AsyncChangeAddressTable(
         chi::PoolQuery::Broadcast(), info.pool_id_, info.container_id_,
         info.dest_);
-    CHI_CO_AWAIT(change_task);
+    CLIO_CO_AWAIT(change_task);
 
     if (change_task->GetReturnCode() != 0) {
       HLOG(kError,
@@ -2349,8 +2349,8 @@ chi::TaskResume Runtime::MigrateContainers(
   task->SetReturnCode(0);
   HLOG(kInfo, "Admin: MigrateContainers completed, {} migrated",
        task->num_migrated_);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 /**
@@ -2360,9 +2360,9 @@ chi::TaskResume Runtime::MigrateContainers(
  * @return true if send succeeded
  */
 bool Runtime::RetrySendToNode(RetryEntry &entry, chi::u64 node_id) {
-  auto *ipc_manager = CHI_IPC;
-  auto *pool_manager = CHI_POOL_MANAGER;
-  auto *config_manager = CHI_CONFIG_MANAGER;
+  auto *ipc_manager = CLIO_IPC;
+  auto *pool_manager = CLIO_POOL_MANAGER;
+  auto *config_manager = CLIO_CONFIG_MANAGER;
 
   const chi::Host *target_host = ipc_manager->GetHost(node_id);
   if (!target_host) {
@@ -2394,7 +2394,7 @@ bool Runtime::RetrySendToNode(RetryEntry &entry, chi::u64 node_id) {
  * @return New node ID, or 0 if re-resolution failed
  */
 chi::u64 Runtime::RerouteRetryEntry(RetryEntry &entry) {
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   const chi::PoolQuery &query = entry.task->pool_query_;
 
   if (query.IsDirectIdMode()) {
@@ -2417,7 +2417,7 @@ chi::u64 Runtime::RerouteRetryEntry(RetryEntry &entry) {
 }
 
 void Runtime::ProcessRetryQueues() {
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto now = std::chrono::steady_clock::now();
 
   // Sender threads push to send_*_retry_ on EAGAIN / failure.
@@ -2504,7 +2504,7 @@ void Runtime::ProcessRetryQueues() {
 }
 
 void Runtime::ScanSendMapTimeouts() {
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto now = std::chrono::steady_clock::now();
 
   // Iterate dead nodes and check if any send_map_ entries target them
@@ -2573,7 +2573,7 @@ void Runtime::ScanSendMapTimeouts() {
          "[ScanSendMapTimeouts] Task {} timed out waiting for dead node",
          origin_task->task_id_);
     origin_task->SetReturnCode(kNetworkTimeoutRC);
-    auto *worker = CHI_CUR_WORKER;
+    auto *worker = CLIO_CUR_WORKER;
     worker->EndTask(origin_task, rctx, true);
   }
 
@@ -2629,18 +2629,18 @@ void Runtime::FlushStaleStateForNode(chi::u64 node_id) {
 
 chi::TaskResume Runtime::Heartbeat(ctp::ipc::FullPtr<HeartbeatTask> task,
                                    chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   task->SetReturnCode(0);
   rctx.did_work_ = true;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::HeartbeatProbe(ctp::ipc::FullPtr<HeartbeatProbeTask> task,
                                         chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
-  auto *ipc_manager = CHI_IPC;
-  auto *config_manager = CHI_CONFIG_MANAGER;
+  CLIO_TASK_BODY_BEGIN
+  auto *ipc_manager = CLIO_IPC;
+  auto *config_manager = CLIO_CONFIG_MANAGER;
 
   // Master kill-switch: when disabled, the failure-detector is a no-op.
   // Used for bring-up / perf debugging where we want to take SWIM out
@@ -2652,7 +2652,7 @@ chi::TaskResume Runtime::HeartbeatProbe(ctp::ipc::FullPtr<HeartbeatProbeTask> ta
   if (!config_manager->GetSwimEnabled()) {
     rctx.did_work_ = false;
     task->SetReturnCode(0);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Pull SWIM timeouts from config each tick so the values are
@@ -2796,7 +2796,7 @@ chi::TaskResume Runtime::HeartbeatProbe(ctp::ipc::FullPtr<HeartbeatProbeTask> ta
                h.node_id);
           ipc_manager->SetDead(h.node_id);
           did_work = true;
-          CHI_CO_AWAIT(TriggerRecovery(h.node_id));
+          CLIO_CO_AWAIT(TriggerRecovery(h.node_id));
         }
       }
     }
@@ -2881,26 +2881,26 @@ chi::TaskResume Runtime::HeartbeatProbe(ctp::ipc::FullPtr<HeartbeatProbeTask> ta
 
   rctx.did_work_ = did_work;
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::ProbeRequest(ctp::ipc::FullPtr<ProbeRequestTask> task,
                                       chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Probe the target node on behalf of the requester using cooperative yield
   auto future =
       client_.AsyncHeartbeat(chi::PoolQuery::Physical(task->target_node_id_));
   auto start = std::chrono::steady_clock::now();
 
   const float indirect_probe_timeout_sec =
-      CHI_CONFIG_MANAGER->GetSwimIndirectProbeTimeoutSec();
+      CLIO_CONFIG_MANAGER->GetSwimIndirectProbeTimeoutSec();
   while (!future.IsComplete()) {
     float elapsed =
         std::chrono::duration<float>(std::chrono::steady_clock::now() - start)
             .count();
     if (elapsed >= indirect_probe_timeout_sec) break;
-    CHI_CO_AWAIT(chi::yield(1000.0));
+    CLIO_CO_AWAIT(chi::yield(1000.0));
   }
 
   if (future.IsComplete()) {
@@ -2912,8 +2912,8 @@ chi::TaskResume Runtime::ProbeRequest(ctp::ipc::FullPtr<ProbeRequestTask> task,
 
   task->SetReturnCode(0);
   rctx.did_work_ = true;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskStat Runtime::GetTaskStats(const chi::Task *task) const {
@@ -2928,7 +2928,7 @@ chi::TaskStat Runtime::GetTaskStats(const chi::Task *task) const {
       // them as zero-cost metadata. compute_ reflects the current
       // net_queue backlog so periodic schedulers can throttle if needed.
       chi::TaskStat stat;
-      auto *net_queue = CHI_IPC->GetNetQueue();
+      auto *net_queue = CLIO_IPC->GetNetQueue();
       size_t total = 0;
       if (net_queue) {
         for (chi::u32 p = 0; p < 4; ++p)
@@ -2963,8 +2963,8 @@ chi::u64 Runtime::GetWorkRemaining() const {
 
 std::vector<chi::RecoveryAssignment> Runtime::ComputeRecoveryPlan(
     chi::u64 dead_node_id) {
-  auto *pool_manager = CHI_POOL_MANAGER;
-  auto *ipc_manager = CHI_IPC;
+  auto *pool_manager = CLIO_POOL_MANAGER;
+  auto *ipc_manager = CLIO_IPC;
 
   // Collect alive nodes for round-robin assignment
   std::vector<chi::u64> alive_nodes;
@@ -3010,15 +3010,15 @@ chi::TaskResume Runtime::TriggerRecovery(chi::u64 dead_node_id) {
   chi::RunContext _dummy_rctx;
   chi::RunContext& rctx = _dummy_rctx;
 #endif
-  CHI_TASK_BODY_BEGIN
-  auto *ipc_manager = CHI_IPC;
-  if (!ipc_manager->IsLeader()) CHI_CO_RETURN;
-  if (recovery_initiated_.count(dead_node_id)) CHI_CO_RETURN;
+  CLIO_TASK_BODY_BEGIN
+  auto *ipc_manager = CLIO_IPC;
+  if (!ipc_manager->IsLeader()) CLIO_CO_RETURN;
+  if (recovery_initiated_.count(dead_node_id)) CLIO_CO_RETURN;
   recovery_initiated_.insert(dead_node_id);
   if (ipc_manager->IsSelfFenced()) {
     HLOG(kWarning, "Recovery: Skipping for node {} - self-fenced",
          dead_node_id);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   HLOG(kInfo, "Recovery: Leader initiating for dead node {}", dead_node_id);
@@ -3026,22 +3026,22 @@ chi::TaskResume Runtime::TriggerRecovery(chi::u64 dead_node_id) {
   if (assignments.empty()) {
     HLOG(kInfo, "Recovery: No containers to recover from node {}",
          dead_node_id);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   HLOG(kInfo, "Recovery: {} containers to redistribute from node {}",
        assignments.size(), dead_node_id);
-  CHI_CO_AWAIT(client_.AsyncRecoverContainers(chi::PoolQuery::Broadcast(0),
+  CLIO_CO_AWAIT(client_.AsyncRecoverContainers(chi::PoolQuery::Broadcast(0),
                                           assignments, dead_node_id));
-  CHI_TASK_BODY_END
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::RecoverContainers(
     ctp::ipc::FullPtr<RecoverContainersTask> task, chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
-  auto *ipc_manager = CHI_IPC;
-  auto *pool_manager = CHI_POOL_MANAGER;
-  auto *module_manager = CHI_MODULE_MANAGER;
+  CLIO_TASK_BODY_BEGIN
+  auto *ipc_manager = CLIO_IPC;
+  auto *pool_manager = CLIO_POOL_MANAGER;
+  auto *module_manager = CLIO_MODULE_MANAGER;
   chi::u64 self_node_id = ipc_manager->GetNodeId();
   task->num_recovered_ = 0;
 
@@ -3081,8 +3081,8 @@ chi::TaskResume Runtime::RecoverContainers(
 
   task->SetReturnCode(0);
   rctx.did_work_ = true;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 //===========================================================================
@@ -3091,7 +3091,7 @@ chi::TaskResume Runtime::RecoverContainers(
 
 chi::TaskResume Runtime::SystemMonitor(ctp::ipc::FullPtr<SystemMonitorTask> task,
                                        chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   SystemStats stats;
 
   // Timestamps
@@ -3131,8 +3131,8 @@ chi::TaskResume Runtime::SystemMonitor(ctp::ipc::FullPtr<SystemMonitorTask> task
 
   rctx.did_work_ = true;
   (void)task;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::RegisterGpuContainer(
@@ -3156,5 +3156,5 @@ chi::TaskResume Runtime::RegisterGpuContainer(
 
 }  // namespace clio_run::admin
 
-// Define ChiMod entry points using CHI_TASK_CC macro
-CHI_TASK_CC(clio_run::admin::Runtime)
+// Define ChiMod entry points using CLIO_TASK_CC macro
+CLIO_TASK_CC(clio_run::admin::Runtime)

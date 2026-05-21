@@ -148,7 +148,7 @@ TEST_CASE("Per-process shared memory GetClientShmInfo",
     if (!chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, false)) {
       _exit(1);
     }
-    auto *client_ipc = CHI_IPC;
+    auto *client_ipc = CLIO_IPC;
     if (!client_ipc) _exit(2);
 
     auto buffer = client_ipc->AllocateBuffer(k1MB);
@@ -180,7 +180,7 @@ TEST_CASE("Per-process shared memory AllocateBuffer medium sizes",
           "[ipc][per_process_shm][allocate][medium]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Allocate 100MB buffer") {
@@ -220,7 +220,7 @@ TEST_CASE("Per-process shared memory AllocateBuffer exceeding 1GB",
           "[ipc][per_process_shm][allocate][large]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Allocate 1.5GB buffer triggers IncreaseMemory") {
@@ -259,7 +259,7 @@ TEST_CASE("Per-process shared memory multiple large allocations",
           "[ipc][per_process_shm][allocate][multiple_large]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Multiple allocations spanning segments") {
@@ -305,7 +305,7 @@ TEST_CASE("Per-process shared memory allocation patterns",
           "[ipc][per_process_shm][allocate][patterns]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Mixed small and large allocations") {
@@ -361,7 +361,7 @@ TEST_CASE("Per-process shared memory FreeBuffer",
           "[ipc][per_process_shm][free]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Free allocated buffer") {
@@ -405,7 +405,7 @@ TEST_CASE("Per-process shared memory ToFullPtr conversion",
           "[ipc][per_process_shm][tofullptr]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("ToFullPtr from raw pointer") {
@@ -439,7 +439,7 @@ TEST_CASE("Per-process shared memory stress test",
           "[ipc][per_process_shm][stress]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Many small allocations") {
@@ -482,7 +482,7 @@ TEST_CASE("Per-process shared memory ClientShmInfo",
           "[ipc][per_process_shm][shm_info]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("ClientShmInfo struct creation") {

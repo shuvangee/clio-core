@@ -57,7 +57,7 @@ int Migrate(int argc, char** argv) {
     return 1;
   }
 
-  auto* admin_client = CHI_ADMIN;
+  auto* admin_client = CLIO_ADMIN;
   if (!admin_client) {
     HLOG(kError, "Failed to get admin client");
     return 1;

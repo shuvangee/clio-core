@@ -143,7 +143,7 @@ class PyMonitorTask {
  */
 inline PyMonitorTask py_async_monitor(const std::string& pool_query_str,
                                       const std::string& query) {
-  auto* admin = CHI_ADMIN;
+  auto* admin = CLIO_ADMIN;
   chi::PoolQuery pq = chi::PoolQuery::FromString(pool_query_str);
   auto future = admin->AsyncMonitor(pq, query);
   return PyMonitorTask(std::move(future));
@@ -164,7 +164,7 @@ inline PyMonitorTask py_async_monitor(const std::string& pool_query_str,
  */
 inline void py_stop_runtime(const std::string& pool_query_str,
                             uint32_t grace_period_ms = 5000) {
-  auto* admin = CHI_ADMIN;
+  auto* admin = CLIO_ADMIN;
   chi::PoolQuery pq = chi::PoolQuery::FromString(pool_query_str);
   admin->AsyncStopRuntime(pq, 0, grace_period_ms);
 }

@@ -121,11 +121,11 @@ TEST_CASE("SaveTask and LoadTask - Admin CreateTask full flow",
           "[save_load_task][admin][create]") {
   ChimaeraTestFixture fixture;
 
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto alloc = GetTestAllocator();
 
   // Get container for SaveTask/LoadTask
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   auto *container = pool_manager->GetStaticContainer(chi::kAdminPoolId);
   REQUIRE(container != nullptr);
 
@@ -239,12 +239,12 @@ TEST_CASE("SaveTask and LoadTask - Admin FlushTask full flow",
           "[save_load_task][admin][flush]") {
   ChimaeraTestFixture fixture;
 
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto alloc = GetTestAllocator();
   (void)alloc;  // Suppress unused variable warning
 
   // Get container
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   auto *container = pool_manager->GetStaticContainer(chi::kAdminPoolId);
   REQUIRE(container != nullptr);
 
@@ -319,11 +319,11 @@ TEST_CASE("SaveTask and LoadTask - Admin SendTask full flow",
           "[save_load_task][admin][send]") {
   ChimaeraTestFixture fixture;
 
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto alloc = GetTestAllocator();
 
   // Get container
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   auto *container = pool_manager->GetStaticContainer(chi::kAdminPoolId);
   REQUIRE(container != nullptr);
 
@@ -400,11 +400,11 @@ TEST_CASE("SaveTask and LoadTask - Admin DestroyPoolTask full flow",
           "[save_load_task][admin][destroy]") {
   ChimaeraTestFixture fixture;
 
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   auto alloc = GetTestAllocator();
 
   // Get container
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   auto *container = pool_manager->GetStaticContainer(chi::kAdminPoolId);
   REQUIRE(container != nullptr);
 

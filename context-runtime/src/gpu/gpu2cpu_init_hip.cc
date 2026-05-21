@@ -92,7 +92,7 @@ bool gpu::IpcManager::ServerInitGpuQueues(u32 queue_depth) {
       ctp::ipc::MemoryBackend proxy;
       proxy.data_ = dev.queue_backend;
       proxy.data_capacity_ = kQueueBackendBytes;
-      CHI_QUEUE_ALLOC_T *alloc = proxy.MakeAlloc<CHI_QUEUE_ALLOC_T>();
+      CLIO_QUEUE_ALLOC_T *alloc = proxy.MakeAlloc<CLIO_QUEUE_ALLOC_T>();
       if (alloc) {
         ctp::ipc::FullPtr<chi::GpuTaskQueue> queue =
             alloc->NewObj<chi::GpuTaskQueue>(

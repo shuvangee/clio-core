@@ -200,7 +200,7 @@ struct CTETestFixture {
    * Allocate shared memory and copy data to it
    */
   ctp::ipc::FullPtr<char> AllocateAndCopyData(const std::vector<char>& data) {
-    auto shm_buffer = CHI_IPC->AllocateBuffer(data.size());
+    auto shm_buffer = CLIO_IPC->AllocateBuffer(data.size());
     if (!shm_buffer.IsNull()) {
       std::memcpy(shm_buffer.ptr_, data.data(), data.size());
     }
@@ -258,7 +258,7 @@ TEST_CASE("Basic Compress and Store", "[compressor][functional][basic]") {
   INFO("Compression completed successfully");
 
   // Cleanup
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
 }
 
 /**
@@ -294,10 +294,10 @@ TEST_CASE("Decompress and Retrieve", "[compressor][functional][basic]") {
   compress_task.Wait();
   REQUIRE(compress_task->return_code_ == 0);
 
-  CHI_IPC->FreeBuffer(put_buffer);
+  CLIO_IPC->FreeBuffer(put_buffer);
 
   // Now retrieve and decompress
-  auto get_buffer = CHI_IPC->AllocateBuffer(original_data.size());
+  auto get_buffer = CLIO_IPC->AllocateBuffer(original_data.size());
   REQUIRE(!get_buffer.IsNull());
 
   ctp::ipc::ShmPtr<> get_blob_data = get_buffer.shm_.template Cast<void>();
@@ -321,7 +321,7 @@ TEST_CASE("Decompress and Retrieve", "[compressor][functional][basic]") {
   REQUIRE(std::memcmp(original_data.data(), retrieved_data.data(), original_data.size()) == 0);
 
   INFO("Round-trip compression/decompression verified");
-  CHI_IPC->FreeBuffer(get_buffer);
+  CLIO_IPC->FreeBuffer(get_buffer);
 }
 
 /**
@@ -359,7 +359,7 @@ TEST_CASE("Dynamic Schedule Compression", "[compressor][functional][dynamic]") {
   INFO("DynamicSchedule selected compression library: " << task->context_.compress_lib_);
   INFO("Tier score: " << task->tier_score_);
 
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
 }
 
 /**
@@ -405,7 +405,7 @@ TEST_CASE("Multiple Compression Libraries", "[compressor][functional][libraries]
       REQUIRE(task->return_code_ == 0);
       INFO(lib_name << " compression completed successfully");
 
-      CHI_IPC->FreeBuffer(shm_buffer);
+      CLIO_IPC->FreeBuffer(shm_buffer);
     }
   }
 }
@@ -443,7 +443,7 @@ TEST_CASE("No Compression Passthrough", "[compressor][functional][passthrough]")
   REQUIRE(task->return_code_ == 0);
   INFO("Passthrough (no compression) completed successfully");
 
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
 }
 
 /**
@@ -502,7 +502,7 @@ TEST_CASE("Error Handling - Invalid Parameters", "[compressor][functional][error
     REQUIRE(task->return_code_ != 0);
     INFO("Correctly handled zero size");
 
-    CHI_IPC->FreeBuffer(shm_buffer);
+    CLIO_IPC->FreeBuffer(shm_buffer);
   }
 }
 

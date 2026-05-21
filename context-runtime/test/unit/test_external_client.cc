@@ -161,7 +161,7 @@ TEST_CASE("ExternalClient - Basic Connection", "[external_client][ipc]") {
   REQUIRE(success);
 
   // Verify client initialized successfully
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
   REQUIRE(ipc->IsInitialized());
 
@@ -210,7 +210,7 @@ TEST_CASE("ExternalClient - Multiple Clients", "[external_client][ipc]") {
         _exit(1);
       }
 
-      auto *ipc = CHI_IPC;
+      auto *ipc = CLIO_IPC;
       if (!ipc || !ipc->IsInitialized()) {
         _exit(1);
       }
@@ -270,7 +270,7 @@ TEST_CASE("ExternalClient - Client Operations", "[external_client][ipc]") {
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // In TCP mode (default), num_sched_queues_ is not set so

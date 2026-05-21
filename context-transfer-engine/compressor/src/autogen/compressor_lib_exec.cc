@@ -32,52 +32,52 @@ void Runtime::Init(const chi::PoolId &pool_id, const std::string &pool_name,
 }
 
 chi::TaskResume Runtime::Run(chi::u32 method, ctp::ipc::FullPtr<chi::Task> task_ptr, chi::RunContext& rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   switch (method) {
     case Method::kCreate: {
       // Cast task FullPtr to specific type
       ctp::ipc::FullPtr<CreateTask> typed_task = task_ptr.template Cast<CreateTask>();
-      CHI_CO_AWAIT(Create(typed_task, rctx));
+      CLIO_CO_AWAIT(Create(typed_task, rctx));
       break;
     }
     case Method::kDestroy: {
       // Cast task FullPtr to specific type
       ctp::ipc::FullPtr<DestroyTask> typed_task = task_ptr.template Cast<DestroyTask>();
-      CHI_CO_AWAIT(Destroy(typed_task, rctx));
+      CLIO_CO_AWAIT(Destroy(typed_task, rctx));
       break;
     }
     case Method::kMonitor: {
       // Cast task FullPtr to specific type
       ctp::ipc::FullPtr<MonitorTask> typed_task = task_ptr.template Cast<MonitorTask>();
-      CHI_CO_AWAIT(Monitor(typed_task, rctx));
+      CLIO_CO_AWAIT(Monitor(typed_task, rctx));
       break;
     }
     case Method::kDynamicSchedule: {
       // Cast task FullPtr to specific type
       ctp::ipc::FullPtr<DynamicScheduleTask> typed_task = task_ptr.template Cast<DynamicScheduleTask>();
-      CHI_CO_AWAIT(DynamicSchedule(typed_task, rctx));
+      CLIO_CO_AWAIT(DynamicSchedule(typed_task, rctx));
       break;
     }
     case Method::kCompress: {
       // Cast task FullPtr to specific type
       ctp::ipc::FullPtr<CompressTask> typed_task = task_ptr.template Cast<CompressTask>();
-      CHI_CO_AWAIT(Compress(typed_task, rctx));
+      CLIO_CO_AWAIT(Compress(typed_task, rctx));
       break;
     }
     case Method::kDecompress: {
       // Cast task FullPtr to specific type
       ctp::ipc::FullPtr<DecompressTask> typed_task = task_ptr.template Cast<DecompressTask>();
-      CHI_CO_AWAIT(Decompress(typed_task, rctx));
+      CLIO_CO_AWAIT(Decompress(typed_task, rctx));
       break;
     }
     case Method::kPollNodeLoad: {
       ctp::ipc::FullPtr<PollNodeLoadTask> typed_task = task_ptr.template Cast<PollNodeLoadTask>();
-      CHI_CO_AWAIT(PollNodeLoad(typed_task, rctx));
+      CLIO_CO_AWAIT(PollNodeLoad(typed_task, rctx));
       break;
     }
     case Method::kPollConsumers: {
       ctp::ipc::FullPtr<PollConsumersTask> typed_task = task_ptr.template Cast<PollConsumersTask>();
-      CHI_CO_AWAIT(PollConsumers(typed_task, rctx));
+      CLIO_CO_AWAIT(PollConsumers(typed_task, rctx));
       break;
     }
     default: {
@@ -85,8 +85,8 @@ chi::TaskResume Runtime::Run(chi::u32 method, ctp::ipc::FullPtr<chi::Task> task_
       break;
     }
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::SaveTask(chi::u32 method, chi::SaveTaskArchive& archive, 
@@ -318,7 +318,7 @@ void Runtime::LocalSaveTask(chi::u32 method, chi::DefaultSaveArchive& archive,
 }
 
 ctp::ipc::FullPtr<chi::Task> Runtime::NewCopyTask(chi::u32 method, ctp::ipc::FullPtr<chi::Task> orig_task_ptr, bool deep) {
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) {
     return ctp::ipc::FullPtr<chi::Task>();
   }
@@ -424,7 +424,7 @@ ctp::ipc::FullPtr<chi::Task> Runtime::NewCopyTask(chi::u32 method, ctp::ipc::Ful
 }
 
 ctp::ipc::FullPtr<chi::Task> Runtime::NewTask(chi::u32 method) {
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) {
     return ctp::ipc::FullPtr<chi::Task>();
   }
@@ -520,7 +520,7 @@ void Runtime::Aggregate(chi::u32 method, ctp::ipc::FullPtr<chi::Task> orig_task,
 }
 
 void Runtime::DelTask(chi::u32 method, ctp::ipc::FullPtr<chi::Task> task_ptr) {
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) return;
   switch (method) {
     case Method::kCreate: {

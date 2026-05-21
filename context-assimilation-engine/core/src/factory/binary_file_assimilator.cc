@@ -60,7 +60,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
   chi::RunContext* _fp = chi::GetCurrentRunContextFromWorker();
   chi::RunContext& rctx = _fp ? *_fp : _fb_rctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug,
        "BinaryFileAssimilator::Schedule ENTRY: src='{}', dst='{}', "
        "range_off={}, range_size={}",
@@ -77,7 +77,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
          "'{}'",
          dst_protocol);
     error_code = -1;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Extract tag name from destination URL
@@ -88,19 +88,19 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
     HLOG(kError,
          "BinaryFileAssimilator: Invalid destination URL, no tag name found");
     error_code = -2;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Get or create the tag in CTE
   HLOG(kDebug, "BinaryFileAssimilator: Getting or creating tag '{}'", tag_name);
   auto tag_task = cte_client_->AsyncGetOrCreateTag(tag_name);
-  CHI_CO_AWAIT(tag_task);
+  CLIO_CO_AWAIT(tag_task);
   clio_cte::core::TagId tag_id = tag_task->tag_id_;
   if (tag_id.IsNull()) {
     HLOG(kError, "BinaryFileAssimilator: Failed to get or create tag '{}'",
          tag_name);
     error_code = -3;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "BinaryFileAssimilator: Tag '{}' obtained/created successfully",
        tag_name);
@@ -114,7 +114,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
          "(depends_on: {})",
          ctx.depends_on);
     error_code = 0;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Extract source file path
@@ -125,7 +125,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
     HLOG(kError,
          "BinaryFileAssimilator: Invalid source URL, no file path found");
     error_code = -4;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Determine file size and chunk parameters
@@ -144,7 +144,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
       HLOG(kError, "BinaryFileAssimilator: Failed to get file size for '{}'",
            src_path);
       error_code = -5;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
     HLOG(kDebug, "BinaryFileAssimilator: File size={} bytes", file_size);
     // Validate range
@@ -154,7 +154,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
            "{}, file_size: {})",
            chunk_offset, total_size, file_size);
       error_code = -6;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
   } else {
     HLOG(kDebug, "BinaryFileAssimilator: Using full file mode");
@@ -164,7 +164,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
       HLOG(kError, "BinaryFileAssimilator: Failed to get file size for '{}'",
            src_path);
       error_code = -5;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
     HLOG(kDebug, "BinaryFileAssimilator: File size={} bytes", file_size);
     chunk_offset = 0;
@@ -175,7 +175,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
   std::string description = "binary<size=" + std::to_string(total_size) +
                             ", offset=" + std::to_string(chunk_offset) + ">";
   size_t desc_size = description.size();
-  auto desc_buffer = CHI_IPC->AllocateBuffer(desc_size);
+  auto desc_buffer = CLIO_IPC->AllocateBuffer(desc_size);
   std::memcpy(desc_buffer.ptr_, description.c_str(), desc_size);
 
   HLOG(kDebug, "BinaryFileAssimilator: Storing description blob: '{}'",
@@ -184,7 +184,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
       cte_client_->AsyncPutBlob(tag_id, "description", 0, desc_size,
                                 desc_buffer.shm_.template Cast<void>(), 1.0f,
                                 clio_cte::core::Context(), 0);
-  CHI_CO_AWAIT(desc_task);
+  CLIO_CO_AWAIT(desc_task);
 
   if (desc_task->return_code_ != 0) {
     HLOG(kError,
@@ -192,7 +192,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
          "return_code: {}",
          tag_name, desc_task->return_code_);
     error_code = -9;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "BinaryFileAssimilator: Description blob stored successfully");
 
@@ -213,7 +213,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
   if (!file.is_open()) {
     HLOG(kError, "BinaryFileAssimilator: Failed to open file '{}'", src_path);
     error_code = -7;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Seek to the starting offset
@@ -224,7 +224,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
          "BinaryFileAssimilator: Failed to seek to offset {} in file '{}'",
          chunk_offset, src_path);
     error_code = -8;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Process chunks in batches
@@ -242,7 +242,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
           std::min(kMaxChunkSize, total_size - bytes_processed);
 
       // Allocate buffer in shared memory
-      auto buffer_ptr = CHI_IPC->AllocateBuffer(current_chunk_size);
+      auto buffer_ptr = CLIO_IPC->AllocateBuffer(current_chunk_size);
       char* buffer = buffer_ptr.ptr_;
 
       // Read chunk from file
@@ -278,9 +278,9 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
                "BinaryFileAssimilator: File position: {}, bytes_processed: {}, "
                "total_size: {}",
                file.tellg(), bytes_processed, total_size);
-          CHI_IPC->FreeBuffer(buffer_ptr);
+          CLIO_IPC->FreeBuffer(buffer_ptr);
           error_code = -9;
-          CHI_CO_RETURN;
+          CLIO_CO_RETURN;
         }
       }
 
@@ -316,19 +316,19 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
     if (!active_tasks.empty()) {
       // Wait for the first task to complete
       auto& first_task = active_tasks.front();
-      CHI_CO_AWAIT(first_task);
+      CLIO_CO_AWAIT(first_task);
 
       if (first_task->return_code_ != 0) {
         HLOG(kError, "BinaryFileAssimilator: PutBlob task failed with code {}",
              first_task->return_code_);
         // Free the buffer before deleting the task
-        CHI_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
+        CLIO_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
         error_code = -10;
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
 
       // Free the buffer before deleting the task
-      CHI_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
+      CLIO_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
       active_tasks.erase(active_tasks.begin());
     }
   }
@@ -338,17 +338,17 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
        "BinaryFileAssimilator: Waiting for {} remaining tasks to complete",
        active_tasks.size());
   for (auto& task : active_tasks) {
-    CHI_CO_AWAIT(task);
+    CLIO_CO_AWAIT(task);
     if (task->return_code_ != 0) {
       HLOG(kError, "BinaryFileAssimilator: PutBlob task failed with code {}",
            task->return_code_);
       // Free the buffer before deleting the task
-      CHI_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
+      CLIO_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
       error_code = -10;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
     // Free the buffer before deleting the task
-    CHI_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
+    CLIO_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
   }
 
   file.close();
@@ -360,8 +360,8 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
   HLOG(kDebug, "BinaryFileAssimilator::Schedule EXIT: Success");
 
   error_code = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 std::string BinaryFileAssimilator::GetUrlProtocol(const std::string& url) {

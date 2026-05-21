@@ -138,7 +138,7 @@ public:
    */
   bool createModNamePool() {
     try {
-      // Admin client is automatically initialized via CHI_ADMIN singleton
+      // Admin client is automatically initialized via CLIO_ADMIN singleton
       chi::DomainQuery pool_query; // Default domain query
 
       // Create MOD_NAME pool parameters
@@ -177,9 +177,9 @@ TEST_CASE("Chimaera Initialization", "[runtime][initialization]") {
     REQUIRE(g_initialized);
 
     // Verify runtime state
-    REQUIRE(CHI_CHIMAERA_MANAGER->IsInitialized());
-    REQUIRE(CHI_CHIMAERA_MANAGER->IsRuntime());
-    REQUIRE(CHI_CHIMAERA_MANAGER->IsClient());
+    REQUIRE(CLIO_CHIMAERA_MANAGER->IsInitialized());
+    REQUIRE(CLIO_CHIMAERA_MANAGER->IsRuntime());
+    REQUIRE(CLIO_CHIMAERA_MANAGER->IsClient());
   }
 
   SECTION("Multiple initializations should be safe") {

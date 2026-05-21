@@ -173,8 +173,8 @@ void TestServerRestart(const std::string &mode) {
   setenv("CLIO_WITH_RUNTIME", "0", 1);
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
-  REQUIRE(CHI_IPC != nullptr);
-  REQUIRE(CHI_IPC->IsInitialized());
+  REQUIRE(CLIO_IPC != nullptr);
+  REQUIRE(CLIO_IPC->IsInitialized());
 
   // 3. Baseline task: submit + complete a bdev Create
   {
@@ -201,7 +201,7 @@ void TestServerRestart(const std::string &mode) {
   INFO("New server started");
 
   // 7. ReconnectToOriginalHost to re-attach to new server
-  bool reconnected = CHI_IPC->ReconnectToOriginalHost();
+  bool reconnected = CLIO_IPC->ReconnectToOriginalHost();
   REQUIRE(reconnected);
   INFO("ReconnectToOriginalHost succeeded for mode " + mode);
 
@@ -275,8 +275,8 @@ void TestClientDeath(const std::string &mode) {
   setenv("CLIO_WITH_RUNTIME", "0", 1);
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
-  REQUIRE(CHI_IPC != nullptr);
-  REQUIRE(CHI_IPC->IsInitialized());
+  REQUIRE(CLIO_IPC != nullptr);
+  REQUIRE(CLIO_IPC->IsInitialized());
 
   // 5. Submit + complete parent's own task
   {

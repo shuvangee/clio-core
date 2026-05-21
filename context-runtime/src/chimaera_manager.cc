@@ -74,13 +74,13 @@ TaskId CreateTaskId() {
   }
 
   // Get node_id from IpcManager
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   u64 node_id = ipc_manager ? ipc_manager->GetNodeId() : 0;
 
   // In runtime mode, check if we have a current worker
-  auto *chimaera_manager = CHI_CHIMAERA_MANAGER;
+  auto *chimaera_manager = CLIO_CHIMAERA_MANAGER;
   if (chimaera_manager && chimaera_manager->IsRuntime()) {
-    Worker *current_worker = CHI_CUR_WORKER;
+    Worker *current_worker = CLIO_CUR_WORKER;
     if (current_worker) {
       // Get current task from worker
       FullPtr<Task> current_task = current_worker->GetCurrentTask();
@@ -137,7 +137,7 @@ bool Chimaera::ClientInit() {
 
   HLOG(kDebug, "IpcManager::ClientInit");
   // Initialize configuration manager
-  auto *config_manager = CHI_CONFIG_MANAGER;
+  auto *config_manager = CLIO_CONFIG_MANAGER;
   if (!config_manager->Init()) {
     is_client_mode_ = false;
     client_is_initializing_ = false;
@@ -146,7 +146,7 @@ bool Chimaera::ClientInit() {
 
   HLOG(kDebug, "IpcManager::ClientInit");
   // Initialize IPC manager for client
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   if (!ipc_manager->ClientInit()) {
     is_client_mode_ = false;
     client_is_initializing_ = false;
@@ -156,12 +156,12 @@ bool Chimaera::ClientInit() {
   // Pool manager is not initialized in client mode
   // It's only needed for server/runtime mode
 
-  // Initialize CHI_ADMIN singleton
+  // Initialize CLIO_ADMIN singleton
   // The admin container is already created by the runtime, so we just
   // construct the admin client directly with the admin pool ID
-  HLOG(kDebug, "Initializing CHI_ADMIN singleton");
-  // IMPORTANT: Check g_admin directly, NOT CHI_ADMIN macro
-  // CHI_ADMIN uses GetGlobalPtrVar which auto-creates with default constructor!
+  HLOG(kDebug, "Initializing CLIO_ADMIN singleton");
+  // IMPORTANT: Check g_admin directly, NOT CLIO_ADMIN macro
+  // CLIO_ADMIN uses GetGlobalPtrVar which auto-creates with default constructor!
   if (g_admin == nullptr) {
     HLOG(kInfo, "ClientInit: Creating admin client with kAdminPoolId={}",
          chi::kAdminPoolId);
@@ -192,7 +192,7 @@ bool Chimaera::ServerInit() {
   runtime_is_initializing_ = true;
 
   // Initialize configuration manager first
-  auto *config_manager = CHI_CONFIG_MANAGER;
+  auto *config_manager = CLIO_CONFIG_MANAGER;
   if (!config_manager->Init()) {
     is_runtime_mode_ = false;
     runtime_is_initializing_ = false;
@@ -200,7 +200,7 @@ bool Chimaera::ServerInit() {
   }
 
   // Initialize IPC manager for server
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   if (!ipc_manager->ServerInit()) {
     is_runtime_mode_ = false;
     runtime_is_initializing_ = false;
@@ -211,7 +211,7 @@ bool Chimaera::ServerInit() {
        ipc_manager->GetCurrentHostname());
 
   // Initialize module manager first (needed for admin chimod)
-  auto *module_manager = CHI_MODULE_MANAGER;
+  auto *module_manager = CLIO_MODULE_MANAGER;
   if (!module_manager->Init()) {
     is_runtime_mode_ = false;
     runtime_is_initializing_ = false;
@@ -219,7 +219,7 @@ bool Chimaera::ServerInit() {
   }
 
   // Initialize work orchestrator before pool manager
-  auto *work_orchestrator = CHI_WORK_ORCHESTRATOR;
+  auto *work_orchestrator = CLIO_WORK_ORCHESTRATOR;
   if (!work_orchestrator->Init()) {
     is_runtime_mode_ = false;
     runtime_is_initializing_ = false;
@@ -234,7 +234,7 @@ bool Chimaera::ServerInit() {
   }
 
   // Initialize pool manager (server mode only) after work orchestrator
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   if (!pool_manager->ServerInit()) {
     is_runtime_mode_ = false;
     runtime_is_initializing_ = false;
@@ -248,7 +248,7 @@ bool Chimaera::ServerInit() {
          compose_config.pools_.size());
 
     // Get admin client to process compose
-    auto *admin_client = CHI_ADMIN;
+    auto *admin_client = CLIO_ADMIN;
     if (!admin_client) {
       HLOG(kError, "Failed to get admin client for compose processing");
       return false;
@@ -326,9 +326,9 @@ void Chimaera::ClientFinalize() {
   }
 
   // Finalize client components
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   pool_manager->Finalize();
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   ipc_manager->ClientFinalize();
 
   is_client_mode_ = false;
@@ -345,16 +345,16 @@ void Chimaera::ServerFinalize() {
   }
 
   // Stop workers and finalize server components
-  auto *work_orchestrator = CHI_WORK_ORCHESTRATOR;
+  auto *work_orchestrator = CLIO_WORK_ORCHESTRATOR;
   work_orchestrator->StopWorkers();
   work_orchestrator->Finalize();
-  auto *module_manager = CHI_MODULE_MANAGER;
+  auto *module_manager = CLIO_MODULE_MANAGER;
   module_manager->Finalize();
 
   // Finalize shared components
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   pool_manager->Finalize();
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
 
   // Reap all shared memory segments before finalizing IPC
   size_t reaped = ipc_manager->WreapAllIpcs();
@@ -379,12 +379,12 @@ bool Chimaera::IsClient() const { return is_client_mode_; }
 bool Chimaera::IsRuntime() const { return is_runtime_mode_; }
 
 const std::string &Chimaera::GetCurrentHostname() const {
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   return ipc_manager->GetCurrentHostname();
 }
 
 u64 Chimaera::GetNodeId() const {
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   return ipc_manager->GetNodeId();
 }
 

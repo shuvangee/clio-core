@@ -112,7 +112,7 @@ bool ShouldInitializeRuntime() {
  * - Uses chi::kAdminPoolId for all CreateTask operations
  * - Pool queries always use Local() (never null)
  * - Proper error handling and result code checking
- * - CHI_IPC->DelTask() for task cleanup
+ * - CLIO_IPC->DelTask() for task cleanup
  * - Google C++ Style Guide compliant naming and patterns
  */
 class CTECoreFunctionalTestFixture {
@@ -285,7 +285,7 @@ class CTECoreFunctionalTestFixture {
     // Get raw pointer from shared memory using ToFullPtr
     // Cast to char first, then use ToFullPtr to get proper FullPtr with ptr_ set
     auto char_ptr = ptr.template Cast<char>();
-    ctp::ipc::FullPtr<char> buffer_fullptr = CHI_IPC->ToFullPtr<char>(char_ptr);
+    ctp::ipc::FullPtr<char> buffer_fullptr = CLIO_IPC->ToFullPtr<char>(char_ptr);
     if (buffer_fullptr.ptr_ == nullptr) {
       INFO("Failed to get buffer data from ctp::ipc::ShmPtr<>");
       return result;
@@ -644,8 +644,8 @@ TEST_CASE("FUNCTIONAL - PutBlob Operations",
     REQUIRE(fixture->VerifyTestData(test_data, 'B'));
 
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    // Using CHI_IPC->AllocateBuffer() which returns ctp::ipc::FullPtr<char>
-    ctp::ipc::FullPtr<char> blob_data_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    // Using CLIO_IPC->AllocateBuffer() which returns ctp::ipc::FullPtr<char>
+    ctp::ipc::FullPtr<char> blob_data_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
     if (blob_data_fullptr.IsNull()) {
       INFO(
           "Memory context allocation failed - unable to allocate shared "
@@ -702,7 +702,7 @@ TEST_CASE("FUNCTIONAL - PutBlob Operations",
       // Allocate and copy to shared memory using CHI_CLIENT pattern
       // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
       ctp::ipc::FullPtr<char> blob_data_fullptr =
-          CHI_IPC->AllocateBuffer(blob_size);
+          CLIO_IPC->AllocateBuffer(blob_size);
       if (blob_data_fullptr.IsNull()) {
         INFO("Skipping " << blob_name
                          << " due to memory context allocation failure");
@@ -744,7 +744,7 @@ TEST_CASE("FUNCTIONAL - PutBlob Operations",
 
       auto chunk_data = fixture->CreateTestData(chunk_size, pattern);
       // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-      ctp::ipc::FullPtr<char> chunk_fullptr = CHI_IPC->AllocateBuffer(chunk_size);
+      ctp::ipc::FullPtr<char> chunk_fullptr = CLIO_IPC->AllocateBuffer(chunk_size);
 
       if (chunk_fullptr.IsNull()) {
         INFO("Skipping chunk at offset "
@@ -779,7 +779,7 @@ TEST_CASE("FUNCTIONAL - PutBlob Operations",
 
     auto test_data = fixture->CreateTestData(blob_size, 'A');  // 'A' for Async
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    ctp::ipc::FullPtr<char> blob_data_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> blob_data_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
 
     if (blob_data_fullptr.IsNull()) {
       INFO("Skipping async test due to memory context allocation failure");
@@ -817,7 +817,7 @@ TEST_CASE("FUNCTIONAL - PutBlob Operations",
     INFO("Testing empty blob name error case...");
     auto test_data = fixture->CreateTestData(512);
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    ctp::ipc::FullPtr<char> data_fullptr = CHI_IPC->AllocateBuffer(512);
+    ctp::ipc::FullPtr<char> data_fullptr = CLIO_IPC->AllocateBuffer(512);
     ctp::ipc::ShmPtr<> data_ptr =
         data_fullptr.IsNull()
             ? ctp::ipc::ShmPtr<>::GetNull()
@@ -916,7 +916,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
 
     // Store the blob first
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    ctp::ipc::FullPtr<char> put_data_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> put_data_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
     if (put_data_fullptr.IsNull()) {
       INFO(
           "Memory context allocation failed - unable to allocate shared "
@@ -945,7 +945,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
     INFO("Calling fixture->GetBlobAsync() to retrieve stored data...");
 
     // Allocate buffer for retrieved data
-    ctp::ipc::FullPtr<char> get_data_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> get_data_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
     if (get_data_fullptr.IsNull()) {
       INFO("Failed to allocate buffer for GetBlob");
       return;
@@ -996,7 +996,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
       original_data_set.push_back(blob_data);
 
       // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-      ctp::ipc::FullPtr<char> put_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+      ctp::ipc::FullPtr<char> put_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
       if (put_fullptr.IsNull()) {
         INFO("Skipping " << blob_name
                          << " due to memory context allocation failure");
@@ -1030,7 +1030,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
       INFO("Retrieving blob: " << blob_name);
 
       // Allocate buffer for retrieved data
-      ctp::ipc::FullPtr<char> buffer_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+      ctp::ipc::FullPtr<char> buffer_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
       if (buffer_fullptr.IsNull()) {
         INFO("Failed to allocate buffer for GetBlob");
         continue;
@@ -1070,7 +1070,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
 
     // Store the full blob
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    ctp::ipc::FullPtr<char> put_fullptr = CHI_IPC->AllocateBuffer(total_size);
+    ctp::ipc::FullPtr<char> put_fullptr = CLIO_IPC->AllocateBuffer(total_size);
     if (put_fullptr.IsNull()) {
       INFO(
           "Skipping partial retrieval test due to memory context allocation "
@@ -1097,7 +1097,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
 
     // Allocate buffer for retrieved data
     ctp::ipc::FullPtr<char> partial_buffer_fullptr =
-        CHI_IPC->AllocateBuffer(partial_size);
+        CLIO_IPC->AllocateBuffer(partial_size);
     if (partial_buffer_fullptr.IsNull()) {
       INFO("Failed to allocate buffer for partial GetBlob");
       return;
@@ -1142,7 +1142,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
     // Store blob for async retrieval
     auto test_data = fixture->CreateTestData(blob_size, 'A');  // 'A' for Async
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    ctp::ipc::FullPtr<char> put_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> put_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
 
     if (put_fullptr.IsNull()) {
       INFO("Skipping async test due to memory context allocation failure");
@@ -1168,7 +1168,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
 
     // Allocate buffer for retrieved data
     ctp::ipc::FullPtr<char> async_buffer_fullptr =
-        CHI_IPC->AllocateBuffer(blob_size);
+        CLIO_IPC->AllocateBuffer(blob_size);
     if (async_buffer_fullptr.IsNull()) {
       INFO("Failed to allocate buffer for AsyncGetBlob");
       return;
@@ -1211,7 +1211,7 @@ TEST_CASE("FUNCTIONAL - GetBlob Operations",
     INFO("=== Testing REAL GetBlob error handling ===\n");
 
     // Allocate buffer for error case testing
-    ctp::ipc::FullPtr<char> error_buffer_fullptr = CHI_IPC->AllocateBuffer(1024);
+    ctp::ipc::FullPtr<char> error_buffer_fullptr = CLIO_IPC->AllocateBuffer(1024);
     if (error_buffer_fullptr.IsNull()) {
       INFO("Failed to allocate buffer for error case testing");
       return;
@@ -1305,7 +1305,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
 
     // Allocate shared memory and store data using CHI_CLIENT pattern
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    ctp::ipc::FullPtr<char> put_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> put_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
     if (put_fullptr.IsNull()) {
       INFO("Skipping Put-Get cycle due to memory context allocation failure");
       return;
@@ -1329,7 +1329,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
     INFO("Step 2: Retrieving blob with GetBlob...");
 
     // Allocate buffer for retrieved data
-    ctp::ipc::FullPtr<char> get_buffer_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> get_buffer_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
     if (get_buffer_fullptr.IsNull()) {
       INFO("Failed to allocate buffer for GetBlob");
       return;
@@ -1397,7 +1397,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
       stored_data.push_back(blob_data);
 
       // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-      ctp::ipc::FullPtr<char> put_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+      ctp::ipc::FullPtr<char> put_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
       if (put_fullptr.IsNull()) {
         INFO("Skipping " << blob_name
                          << " due to memory context allocation failure");
@@ -1434,7 +1434,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
 
       // Allocate buffer for retrieved data
       ctp::ipc::FullPtr<char> multi_buffer_fullptr =
-          CHI_IPC->AllocateBuffer(blob_size);
+          CLIO_IPC->AllocateBuffer(blob_size);
       if (multi_buffer_fullptr.IsNull()) {
         INFO("Failed to allocate buffer for GetBlob");
         continue;
@@ -1490,7 +1490,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
 
     // Store in tag1
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    ctp::ipc::FullPtr<char> put1_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> put1_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
     ctp::ipc::ShmPtr<> put1_ptr = put1_fullptr.IsNull()
                                   ? ctp::ipc::ShmPtr<>::GetNull()
                                   : put1_fullptr.shm_.template Cast<void>();
@@ -1509,7 +1509,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
 
     // Store in tag2
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    ctp::ipc::FullPtr<char> put2_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> put2_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
     ctp::ipc::ShmPtr<> put2_ptr = put2_fullptr.IsNull()
                                   ? ctp::ipc::ShmPtr<>::GetNull()
                                   : put2_fullptr.shm_.template Cast<void>();
@@ -1532,7 +1532,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
     // Retrieve from tag1 using blob name
     // Allocate buffer for tag1 retrieval
     ctp::ipc::FullPtr<char> tag1_buffer_fullptr =
-        CHI_IPC->AllocateBuffer(blob_size);
+        CLIO_IPC->AllocateBuffer(blob_size);
     if (!tag1_buffer_fullptr.IsNull() && tag1_stored) {
       ctp::ipc::ShmPtr<> tag1_buffer_ptr =
           tag1_buffer_fullptr.shm_.template Cast<void>();
@@ -1555,7 +1555,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
     // Retrieve from tag2 using blob name
     // Allocate buffer for tag2 retrieval
     ctp::ipc::FullPtr<char> tag2_buffer_fullptr =
-        CHI_IPC->AllocateBuffer(blob_size);
+        CLIO_IPC->AllocateBuffer(blob_size);
     if (!tag2_buffer_fullptr.IsNull() && tag2_stored) {
       ctp::ipc::ShmPtr<> tag2_buffer_ptr =
           tag2_buffer_fullptr.shm_.template Cast<void>();
@@ -1587,7 +1587,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
 
     auto test_data = fixture->CreateTestData(blob_size, 'A');  // 'A' for Async
     // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-    ctp::ipc::FullPtr<char> put_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> put_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
 
     if (put_fullptr.IsNull() ||
         !fixture->CopyToSharedMemory(put_fullptr, test_data)) {
@@ -1616,7 +1616,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
 
     // Allocate buffer for retrieved data
     ctp::ipc::FullPtr<char> sync_get_buffer_fullptr =
-        CHI_IPC->AllocateBuffer(blob_size);
+        CLIO_IPC->AllocateBuffer(blob_size);
     if (sync_get_buffer_fullptr.IsNull()) {
       INFO("Failed to allocate buffer for sync GetBlob");
       return;
@@ -1672,7 +1672,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
                             << pattern << "'");
 
       // Following MODULE_DEVELOPMENT_GUIDE.md AllocateBuffer<T> specification
-      ctp::ipc::FullPtr<char> chunk_fullptr = CHI_IPC->AllocateBuffer(chunk_size);
+      ctp::ipc::FullPtr<char> chunk_fullptr = CLIO_IPC->AllocateBuffer(chunk_size);
       if (chunk_fullptr.IsNull() ||
           !fixture->CopyToSharedMemory(chunk_fullptr, chunk_data[i])) {
         INFO("Skipping chunk " << i
@@ -1709,7 +1709,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
 
       // Allocate buffer for chunk retrieval
       ctp::ipc::FullPtr<char> chunk_get_buffer_fullptr =
-          CHI_IPC->AllocateBuffer(chunk_size);
+          CLIO_IPC->AllocateBuffer(chunk_size);
       if (chunk_get_buffer_fullptr.IsNull()) {
         INFO("Failed to allocate buffer for chunk GetBlob");
         continue;
@@ -1737,7 +1737,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Integration Cycles",
 
     // Allocate buffer for full blob retrieval
     ctp::ipc::FullPtr<char> full_buffer_fullptr =
-        CHI_IPC->AllocateBuffer(total_size);
+        CLIO_IPC->AllocateBuffer(total_size);
     if (full_buffer_fullptr.IsNull()) {
       INFO("Failed to allocate buffer for full blob GetBlob");
       return;
@@ -1823,11 +1823,11 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Comprehensive Integration",
 
   // Verify runtime initialization (test should FAIL if not properly
   // initialized)
-  REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-  REQUIRE(CHI_IPC != nullptr);
-  REQUIRE(CHI_POOL_MANAGER != nullptr);
-  REQUIRE(CHI_MODULE_MANAGER != nullptr);
-  REQUIRE(CHI_IPC->IsInitialized());
+  REQUIRE(CLIO_CHIMAERA_MANAGER != nullptr);
+  REQUIRE(CLIO_IPC != nullptr);
+  REQUIRE(CLIO_POOL_MANAGER != nullptr);
+  REQUIRE(CLIO_MODULE_MANAGER != nullptr);
+  REQUIRE(CLIO_IPC->IsInitialized());
   INFO("✓ Chimaera runtime initialization verified");
 
   // Step 4: PutBlob with blob_name="test_blob"
@@ -1837,7 +1837,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Comprehensive Integration",
   const float blob_score = 0.75f;
 
   // Allocate shared memory for PutBlob
-  ctp::ipc::FullPtr<char> put_data_buffer = CHI_IPC->AllocateBuffer(test_data_size);
+  ctp::ipc::FullPtr<char> put_data_buffer = CLIO_IPC->AllocateBuffer(test_data_size);
   REQUIRE(!put_data_buffer.IsNull());
   ctp::ipc::ShmPtr<> put_data_ptr = put_data_buffer.shm_.template Cast<void>();
 
@@ -1867,7 +1867,7 @@ TEST_CASE("FUNCTIONAL - PutBlob-GetBlob Comprehensive Integration",
   INFO("Step 5: Executing GetBlob with blob_name...");
 
   // Allocate shared memory for GetBlob
-  ctp::ipc::FullPtr<char> get_data_buffer = CHI_IPC->AllocateBuffer(test_data_size);
+  ctp::ipc::FullPtr<char> get_data_buffer = CLIO_IPC->AllocateBuffer(test_data_size);
   REQUIRE(!get_data_buffer.IsNull());
   ctp::ipc::ShmPtr<> get_data_ptr = get_data_buffer.shm_.template Cast<void>();
 
@@ -1994,7 +1994,7 @@ TEST_CASE("FUNCTIONAL - ReorganizeBlob Operations",
       blob_data.push_back(data);
 
       // Allocate shared memory and store blob
-      ctp::ipc::FullPtr<char> put_buffer = CHI_IPC->AllocateBuffer(blob_size);
+      ctp::ipc::FullPtr<char> put_buffer = CLIO_IPC->AllocateBuffer(blob_size);
       REQUIRE(!put_buffer.IsNull());
       REQUIRE(fixture->CopyToSharedMemory(put_buffer, data));
 
@@ -2044,7 +2044,7 @@ TEST_CASE("FUNCTIONAL - ReorganizeBlob Operations",
     // Phase 5: Verify data integrity after reorganization
     INFO("Phase 5: Verifying data integrity after reorganization...");
     for (size_t i = 0; i < num_blobs; ++i) {
-      ctp::ipc::FullPtr<char> get_buffer = CHI_IPC->AllocateBuffer(blob_size);
+      ctp::ipc::FullPtr<char> get_buffer = CLIO_IPC->AllocateBuffer(blob_size);
       REQUIRE(!get_buffer.IsNull());
 
       bool get_success =
@@ -2085,7 +2085,7 @@ TEST_CASE("FUNCTIONAL - ReorganizeBlob Operations",
 
       auto data =
           fixture->CreateTestData(blob_size, static_cast<char>('T' + i));
-      ctp::ipc::FullPtr<char> put_buffer = CHI_IPC->AllocateBuffer(blob_size);
+      ctp::ipc::FullPtr<char> put_buffer = CLIO_IPC->AllocateBuffer(blob_size);
       REQUIRE(!put_buffer.IsNull());
       REQUIRE(fixture->CopyToSharedMemory(put_buffer, data));
 
@@ -2151,7 +2151,7 @@ TEST_CASE("FUNCTIONAL - ReorganizeBlob Operations",
       batch_blob_names.push_back(blob_name);
 
       auto data = fixture->CreateTestData(blob_size, static_cast<char>('B'));
-      ctp::ipc::FullPtr<char> put_buffer = CHI_IPC->AllocateBuffer(blob_size);
+      ctp::ipc::FullPtr<char> put_buffer = CLIO_IPC->AllocateBuffer(blob_size);
       REQUIRE(!put_buffer.IsNull());
       REQUIRE(fixture->CopyToSharedMemory(put_buffer, data));
 
@@ -2380,7 +2380,7 @@ TEST_CASE("FUNCTIONAL - Distributed Execution Validation",
     REQUIRE(fixture->VerifyTestData(test_data, pattern));
 
     // Allocate shared memory for blob data
-    ctp::ipc::FullPtr<char> blob_data_fullptr = CHI_IPC->AllocateBuffer(blob_size);
+    ctp::ipc::FullPtr<char> blob_data_fullptr = CLIO_IPC->AllocateBuffer(blob_size);
     REQUIRE(!blob_data_fullptr.IsNull());
     ctp::ipc::ShmPtr<> blob_data_ptr = blob_data_fullptr.shm_.template Cast<void>();
 
@@ -2405,7 +2405,7 @@ TEST_CASE("FUNCTIONAL - Distributed Execution Validation",
 
     // Allocate buffer for GetBlob result
     ctp::ipc::FullPtr<char> get_blob_data_fullptr =
-        CHI_IPC->AllocateBuffer(blob_size);
+        CLIO_IPC->AllocateBuffer(blob_size);
     REQUIRE(!get_blob_data_fullptr.IsNull());
     ctp::ipc::ShmPtr<> get_blob_data_ptr =
         get_blob_data_fullptr.shm_.template Cast<void>();

@@ -48,18 +48,18 @@
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_tasks.h>
 
-// Define ChiMod entry points using CHI_TASK_CC macro
-CHI_TASK_CC(clio_cae::core::Runtime)
+// Define ChiMod entry points using CLIO_TASK_CC macro
+CLIO_TASK_CC(clio_cae::core::Runtime)
 
 namespace clio_cae::core {
 
 chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
                                  chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   task->SetReturnCode(0);
   (void)rctx;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task, chi::RunContext& ctx) {
@@ -68,7 +68,7 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task, chi::RunCont
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Container is already initialized via Init() before Create is called
   // Do NOT call Init() here
 
@@ -79,8 +79,8 @@ chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task, chi::RunCont
   // Additional container-specific initialization logic here
   HLOG(kInfo, "Core container created and initialized for pool: {} (ID: {})",
        pool_name_, pool_id_);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::u64 Runtime::GetWorkRemaining() const {
@@ -96,7 +96,7 @@ chi::TaskResume Runtime::ParseOmni(ctp::ipc::FullPtr<ParseOmniTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kInfo, "ParseOmni called with {} bytes of serialized data",
        task->serialized_ctx_.size());
 
@@ -113,7 +113,7 @@ chi::TaskResume Runtime::ParseOmni(ctp::ipc::FullPtr<ParseOmniTask> task,
     task->result_code_ = -1;
     task->error_message_ = e.what();
     task->num_tasks_scheduled_ = 0;
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   HLOG(kInfo, "ParseOmni: Processing {} assimilation contexts",
@@ -141,12 +141,12 @@ chi::TaskResume Runtime::ParseOmni(ctp::ipc::FullPtr<ParseOmniTask> task,
       task->error_message_ =
           "No assimilator found for source: " + assimilation_ctx.src;
       task->num_tasks_scheduled_ = tasks_scheduled;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Schedule the assimilation using co_await
     int result = 0;
-    CHI_CO_AWAIT(assimilator->Schedule(assimilation_ctx, result));
+    CLIO_CO_AWAIT(assimilator->Schedule(assimilation_ctx, result));
     if (result != 0) {
       HLOG(
           kError,
@@ -155,7 +155,7 @@ chi::TaskResume Runtime::ParseOmni(ctp::ipc::FullPtr<ParseOmniTask> task,
       task->result_code_ = result;
       task->error_message_ = std::string("Assimilator failed");
       task->num_tasks_scheduled_ = tasks_scheduled;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     tasks_scheduled++;
@@ -168,8 +168,8 @@ chi::TaskResume Runtime::ParseOmni(ctp::ipc::FullPtr<ParseOmniTask> task,
 
   HLOG(kInfo, "ParseOmni: Successfully scheduled {} assimilations",
        tasks_scheduled);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::ProcessHdf5Dataset(
@@ -179,7 +179,7 @@ chi::TaskResume Runtime::ProcessHdf5Dataset(
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
 #ifdef CLIO_CAE_ENABLE_HDF5
   HLOG(kInfo, "ProcessHdf5Dataset: file='{}', dataset='{}', tag_prefix='{}'",
        task->file_path_.str(), task->dataset_path_.str(),
@@ -194,13 +194,13 @@ chi::TaskResume Runtime::ProcessHdf5Dataset(
     task->result_code_ = -1;
     task->error_message_ =
         chi::priv::string("Failed to open HDF5 file", CTP_MALLOC);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Create assimilator and process the dataset
   clio_cae::core::Hdf5FileAssimilator assimilator(cte_client_);
   int result = 0;
-  CHI_CO_AWAIT(assimilator.ProcessDataset(file_id, task->dataset_path_.str(),
+  CLIO_CO_AWAIT(assimilator.ProcessDataset(file_id, task->dataset_path_.str(),
                                       task->tag_prefix_.str(), result));
 
   // Close the HDF5 file
@@ -223,8 +223,8 @@ chi::TaskResume Runtime::ProcessHdf5Dataset(
   task->error_message_ =
       chi::priv::string("HDF5 support not compiled in", CTP_MALLOC);
 #endif
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 chi::TaskResume Runtime::ExportData(ctp::ipc::FullPtr<ExportDataTask> task,
@@ -234,7 +234,7 @@ chi::TaskResume Runtime::ExportData(ctp::ipc::FullPtr<ExportDataTask> task,
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   task->result_code_ = 0;
   task->bytes_exported_ = 0;
 
@@ -247,23 +247,23 @@ chi::TaskResume Runtime::ExportData(ctp::ipc::FullPtr<ExportDataTask> task,
 
   // Step 1: resolve the tag ID
   auto tag_future = cte_client_->AsyncGetOrCreateTag(tag_name);
-  CHI_CO_AWAIT(tag_future);
+  CLIO_CO_AWAIT(tag_future);
   const auto &tag_id = tag_future->tag_id_;
   if (tag_id.IsNull()) {
     HLOG(kError, "ExportData: tag '{}' not found", tag_name);
     task->result_code_ = -1;
     task->error_message_ = chi::priv::string("Tag not found", CTP_MALLOC);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Step 2: list all blobs in the tag
   auto blobs_future = cte_client_->AsyncGetContainedBlobs(tag_id);
-  CHI_CO_AWAIT(blobs_future);
+  CLIO_CO_AWAIT(blobs_future);
   const auto &blob_names = blobs_future->blob_names_;
 
   if (blob_names.empty()) {
     HLOG(kInfo, "ExportData: tag '{}' has no blobs", tag_name);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   if (format == "hdf5") {
@@ -275,18 +275,18 @@ chi::TaskResume Runtime::ExportData(ctp::ipc::FullPtr<ExportDataTask> task,
       task->result_code_ = -2;
       task->error_message_ =
           chi::priv::string("Failed to create HDF5 file", CTP_MALLOC);
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     for (const auto &blob_name : blob_names) {
       // Get blob size
       auto size_future = cte_client_->AsyncGetBlobSize(tag_id, blob_name);
-      CHI_CO_AWAIT(size_future);
+      CLIO_CO_AWAIT(size_future);
       chi::u64 blob_size = size_future->size_;
       if (blob_size == 0) continue;
 
       // Allocate buffer and read blob
-      auto *ipc_manager = CHI_IPC;
+      auto *ipc_manager = CLIO_IPC;
       ctp::ipc::FullPtr<char> buf = ipc_manager->AllocateBuffer(blob_size);
       if (buf.IsNull()) {
         HLOG(kError, "ExportData: allocation failed for blob '{}'", blob_name);
@@ -295,7 +295,7 @@ chi::TaskResume Runtime::ExportData(ctp::ipc::FullPtr<ExportDataTask> task,
       ctp::ipc::ShmPtr<> shm_ptr(buf.shm_);
       auto get_future = cte_client_->AsyncGetBlob(tag_id, blob_name, 0,
                                                    blob_size, 0, shm_ptr);
-      CHI_CO_AWAIT(get_future);
+      CLIO_CO_AWAIT(get_future);
 
       if (get_future->GetReturnCode() == 0) {
         hsize_t dims[1] = {static_cast<hsize_t>(blob_size)};
@@ -329,16 +329,16 @@ chi::TaskResume Runtime::ExportData(ctp::ipc::FullPtr<ExportDataTask> task,
       task->result_code_ = -2;
       task->error_message_ =
           chi::priv::string("Failed to open output file", CTP_MALLOC);
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     for (const auto &blob_name : blob_names) {
       auto size_future = cte_client_->AsyncGetBlobSize(tag_id, blob_name);
-      CHI_CO_AWAIT(size_future);
+      CLIO_CO_AWAIT(size_future);
       chi::u64 blob_size = size_future->size_;
       if (blob_size == 0) continue;
 
-      auto *ipc_manager = CHI_IPC;
+      auto *ipc_manager = CLIO_IPC;
       ctp::ipc::FullPtr<char> buf = ipc_manager->AllocateBuffer(blob_size);
       if (buf.IsNull()) {
         HLOG(kError, "ExportData: allocation failed for blob '{}'", blob_name);
@@ -347,7 +347,7 @@ chi::TaskResume Runtime::ExportData(ctp::ipc::FullPtr<ExportDataTask> task,
       ctp::ipc::ShmPtr<> shm_ptr(buf.shm_);
       auto get_future = cte_client_->AsyncGetBlob(tag_id, blob_name, 0,
                                                    blob_size, 0, shm_ptr);
-      CHI_CO_AWAIT(get_future);
+      CLIO_CO_AWAIT(get_future);
 
       if (get_future->GetReturnCode() == 0) {
         // Header: name length (u32) + name + data length (u64) + data
@@ -365,8 +365,8 @@ chi::TaskResume Runtime::ExportData(ctp::ipc::FullPtr<ExportDataTask> task,
          task->bytes_exported_, output_path);
   }
 
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 }  // namespace clio_cae::core

@@ -62,7 +62,7 @@ namespace clio_cte::core {
  */
 class Runtime : public chi::Container {
 public:
-  using CreateParams = clio_cte::core::CreateParams; // Required for CHI_TASK_CC
+  using CreateParams = clio_cte::core::CreateParams; // Required for CLIO_TASK_CC
 
   Runtime() = default;
   ~Runtime() override = default;

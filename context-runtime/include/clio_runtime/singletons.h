@@ -58,41 +58,41 @@
  */
 
 // Core Framework Singleton Access
-// CHI_CHIMAERA_MANAGER - Main CLIO Runtime framework coordinator
-// CHI_CONFIG_MANAGER   - Configuration manager for YAML parsing
-// CHI_IPC              - IPC manager for shared memory and networking
-// CHI_POOL_MANAGER     - Pool manager for ChiPools and ChiContainers
-// CHI_MODULE_MANAGER   - Module manager for dynamic loading
-// CHI_WORK_ORCHESTRATOR - Work orchestrator for thread management
-// CHI_ADMIN            - Admin ChiMod client singleton
+// CLIO_CHIMAERA_MANAGER - Main CLIO Runtime framework coordinator
+// CLIO_CONFIG_MANAGER   - Configuration manager for YAML parsing
+// CLIO_IPC              - IPC manager for shared memory and networking
+// CLIO_POOL_MANAGER     - Pool manager for ChiPools and ChiContainers
+// CLIO_MODULE_MANAGER   - Module manager for dynamic loading
+// CLIO_WORK_ORCHESTRATOR - Work orchestrator for thread management
+// CLIO_ADMIN            - Admin ChiMod client singleton
 
 // All macros are defined in their respective header files:
-// - CHI_CHIMAERA_MANAGER defined in chimaera/chimaera_manager.h
-// - CHI_CONFIG_MANAGER defined in chimaera/config_manager.h
-// - CHI_IPC defined in chimaera/ipc_manager.h
-// - CHI_POOL_MANAGER defined in chimaera/pool_manager.h
-// - CHI_MODULE_MANAGER defined in chimaera/module_manager.h
-// - CHI_WORK_ORCHESTRATOR defined in chimaera/work_orchestrator.h
-// - CHI_ADMIN defined in chimaera/admin.h
+// - CLIO_CHIMAERA_MANAGER defined in chimaera/chimaera_manager.h
+// - CLIO_CONFIG_MANAGER defined in chimaera/config_manager.h
+// - CLIO_IPC defined in chimaera/ipc_manager.h
+// - CLIO_POOL_MANAGER defined in chimaera/pool_manager.h
+// - CLIO_MODULE_MANAGER defined in chimaera/module_manager.h
+// - CLIO_WORK_ORCHESTRATOR defined in chimaera/work_orchestrator.h
+// - CLIO_ADMIN defined in chimaera/admin.h
 
 /**
  * Example usage:
  * 
  * // Initialize the configuration manager
- * CHI_CONFIG_MANAGER->Init();
+ * CLIO_CONFIG_MANAGER->Init();
  *
  * // Get worker thread count from config
- * u32 workers = CHI_CONFIG_MANAGER->GetNumThreads();
+ * u32 workers = CLIO_CONFIG_MANAGER->GetNumThreads();
  *
  * // Initialize IPC components
- * CHI_IPC->ServerInit();
+ * CLIO_IPC->ServerInit();
  * 
  * // Start worker threads
- * CHI_WORK_ORCHESTRATOR->Init();
- * CHI_WORK_ORCHESTRATOR->StartWorkers();
+ * CLIO_WORK_ORCHESTRATOR->Init();
+ * CLIO_WORK_ORCHESTRATOR->StartWorkers();
  * 
  * // Register a pool
- * CHI_POOL_MANAGER->RegisterContainer(pool_id, container);
+ * CLIO_POOL_MANAGER->RegisterContainer(pool_id, container);
  */
 
 #endif  // CHIMAERA_INCLUDE_CHIMAERA_SINGLETONS_H_

@@ -22,7 +22,7 @@ void SignalHandler(int /*sig*/) {
 bool InitializeAdminChiMod() {
   HLOG(kDebug, "Initializing admin ChiMod...");
 
-  auto* module_manager = CHI_MODULE_MANAGER;
+  auto* module_manager = CLIO_MODULE_MANAGER;
   if (!module_manager) {
     HLOG(kError, "Module manager not available");
     return false;
@@ -34,7 +34,7 @@ bool InitializeAdminChiMod() {
     return false;
   }
 
-  auto* pool_manager = CHI_POOL_MANAGER;
+  auto* pool_manager = CLIO_POOL_MANAGER;
   if (!pool_manager) {
     HLOG(kError, "Pool manager not available");
     return false;
@@ -61,7 +61,7 @@ void ShutdownAdminChiMod() {
   HLOG(kDebug, "Shutting down admin ChiMod...");
 
   try {
-    auto* pool_manager = CHI_POOL_MANAGER;
+    auto* pool_manager = CLIO_POOL_MANAGER;
     if (pool_manager && pool_manager->HasPool(chi::kAdminPoolId)) {
       if (pool_manager->DestroyLocalPool(chi::kAdminPoolId)) {
         HLOG(kDebug, "Admin pool destroyed successfully");
@@ -78,9 +78,9 @@ void ShutdownAdminChiMod() {
 }
 
 bool InductNode() {
-  auto* ipc_manager = CHI_IPC;
-  auto* config = CHI_CONFIG_MANAGER;
-  auto* admin_client = CHI_ADMIN;
+  auto* ipc_manager = CLIO_IPC;
+  auto* config = CLIO_CONFIG_MANAGER;
+  auto* admin_client = CLIO_ADMIN;
 
   std::string my_ip = ipc_manager->GetCurrentHostname();
   chi::u32 my_port = config->GetPort();

@@ -40,7 +40,7 @@ namespace chi {
 
 Future<Task> IpcCpu2Self::ClientSend(IpcManager *ipc,
                                       const ctp::ipc::FullPtr<Task> &task_ptr) {
-  Worker *worker = CHI_CUR_WORKER;
+  Worker *worker = CLIO_CUR_WORKER;
 
   // Create pointer future (no serialization)
   Future<Task> future = ipc->MakePointerFuture(task_ptr);
@@ -96,7 +96,7 @@ void IpcCpu2Self::RuntimeSend(const FullPtr<Task> &task_ptr,
 
   // Delegate to origin-based SendRuntime for non-self origins
   if (was_copied || origin != FutureShm::FUTURE_CLIENT_SHM) {
-    CHI_IPC->SendRuntime(task_ptr, run_ctx, container, send_transport);
+    CLIO_IPC->SendRuntime(task_ptr, run_ctx, container, send_transport);
     return;
   }
 
@@ -106,13 +106,13 @@ void IpcCpu2Self::RuntimeSend(const FullPtr<Task> &task_ptr,
     // queue. FUTURE_COMPLETE is NOT set here — it will be set by
     // ProcessEventQueue on the parent's worker thread.
     auto *parent_event_queue =
-        reinterpret_cast<ctp::ipc::mpsc_ring_buffer<Future<Task, CHI_QUEUE_ALLOC_T>,
+        reinterpret_cast<ctp::ipc::mpsc_ring_buffer<Future<Task, CLIO_QUEUE_ALLOC_T>,
                                                 ctp::ipc::MallocAllocator> *>(
             parent_task->event_queue_);
     parent_event_queue->Emplace(run_ctx->future_);
     if (parent_task->lane_) {
       // Always signal — see ipc_cpu2cpu_impl.h for the race.
-      CHI_IPC->AwakenWorker(parent_task->lane_);
+      CLIO_IPC->AwakenWorker(parent_task->lane_);
     }
   } else {
     // Top-level client task: set FUTURE_COMPLETE directly.

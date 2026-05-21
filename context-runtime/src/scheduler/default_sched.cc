@@ -103,7 +103,7 @@ void DefaultScheduler::DivideWorkers(WorkOrchestrator *work_orch) {
 
   // Register both net workers' lanes with the IPC manager so
   // EnqueueNetTask wakes the correct one based on the priority enqueued.
-  IpcManager *ipc = CHI_IPC;
+  IpcManager *ipc = CLIO_IPC;
   if (ipc) {
     ipc->SetNumSchedQueues(1);
     if (net_send_worker_ && net_recv_worker_) {

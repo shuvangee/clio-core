@@ -576,7 +576,7 @@ class CTECompressBenchmark {
     std::vector<char> data(transfer_size_);
 
     // Allocate shared memory buffer
-    auto shm_buffer = CHI_IPC->AllocateBuffer(transfer_size_);
+    auto shm_buffer = CLIO_IPC->AllocateBuffer(transfer_size_);
     if (shm_buffer.IsNull()) {
       HLOG(kError, "Failed to allocate shared memory for thread {}", thread_id);
       error_flag.store(true);
@@ -645,7 +645,7 @@ class CTECompressBenchmark {
             : 1.0;
 
     // Free shared memory buffer
-    CHI_IPC->FreeBuffer(shm_buffer);
+    CLIO_IPC->FreeBuffer(shm_buffer);
   }
 
   void RunPutBenchmark() {
@@ -773,7 +773,7 @@ class CTECompressBenchmark {
     std::vector<char> get_data(transfer_size_);
 
     // Allocate shared memory buffer
-    auto shm_buffer = CHI_IPC->AllocateBuffer(transfer_size_);
+    auto shm_buffer = CLIO_IPC->AllocateBuffer(transfer_size_);
     if (shm_buffer.IsNull()) {
       HLOG(kError, "Failed to allocate shared memory for thread {}", thread_id);
       error_flag.store(true);
@@ -839,7 +839,7 @@ class CTECompressBenchmark {
     compression_ratios[thread_id] = 1.0;
 
     // Free shared memory buffer
-    CHI_IPC->FreeBuffer(shm_buffer);
+    CLIO_IPC->FreeBuffer(shm_buffer);
   }
 
   void RunPutGetBenchmark() {

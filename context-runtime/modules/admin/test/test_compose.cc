@@ -118,7 +118,7 @@ TEST_CASE("Parse compose configuration", "[compose]") {
   std::string config_path = CreateComposeConfig();
 
   // Load configuration
-  auto* config_manager = CHI_CONFIG_MANAGER;
+  auto* config_manager = CLIO_CONFIG_MANAGER;
   REQUIRE(config_manager != nullptr);
 
   REQUIRE(config_manager->LoadYaml(config_path));
@@ -156,13 +156,13 @@ TEST_CASE("Admin client Compose method", "[compose]") {
   std::string config_path = CreateComposeConfig();
 
   // Load configuration
-  auto* config_manager = CHI_CONFIG_MANAGER;
+  auto* config_manager = CLIO_CONFIG_MANAGER;
   REQUIRE(config_manager != nullptr);
 
   REQUIRE(config_manager->LoadYaml(config_path));
 
   // Get admin client
-  auto* admin_client = CHI_ADMIN;
+  auto* admin_client = CLIO_ADMIN;
   REQUIRE(admin_client != nullptr);
 
   // Get compose config

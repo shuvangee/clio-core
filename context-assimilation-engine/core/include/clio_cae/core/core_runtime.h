@@ -48,7 +48,7 @@ namespace clio_cae::core {
 
 class Runtime : public chi::Container {
  public:
-  // CreateParams type used by CHI_TASK_CC macro for lib_name access
+  // CreateParams type used by CLIO_TASK_CC macro for lib_name access
   using CreateParams = clio_cae::core::CreateParams;
 
   Runtime() = default;
@@ -99,9 +99,9 @@ class Runtime : public chi::Container {
 #ifdef __NVCOMPILER
     chi::RunContext& rctx = ctx;
 #endif
-    CHI_TASK_BODY_BEGIN
-    CHI_CO_RETURN;
-    CHI_TASK_BODY_END
+    CLIO_TASK_BODY_BEGIN
+    CLIO_CO_RETURN;
+    CLIO_TASK_BODY_END
   }
 
   /**

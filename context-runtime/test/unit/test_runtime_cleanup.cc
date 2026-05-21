@@ -77,14 +77,14 @@ TEST_CASE("Cleanup - Server Finalization", "[cleanup][ipc]") {
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, true);
   REQUIRE(success);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
   REQUIRE(ipc->IsInitialized());
 
   u64 node_id = ipc->GetNodeId();
   (void)node_id;
 
-  auto *chimaera = CHI_CHIMAERA_MANAGER;
+  auto *chimaera = CLIO_CHIMAERA_MANAGER;
   chimaera->ServerFinalize();
 
   REQUIRE(!ipc->IsInitialized());
@@ -114,12 +114,12 @@ TEST_CASE("Cleanup - Client Finalization", "[cleanup][ipc]") {
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(success);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
   REQUIRE(ipc->IsInitialized());
 
   // Explicitly call ClientFinalize through CLIO Runtime API
-  auto *chimaera = CHI_CHIMAERA_MANAGER;
+  auto *chimaera = CLIO_CHIMAERA_MANAGER;
   chimaera->ClientFinalize();
 
   // Note: After ClientFinalize(), IPC shared resources remain active
@@ -144,11 +144,11 @@ TEST_CASE("Cleanup - Repeated Init/Finalize", "[cleanup][ipc]") {
     bool success = CHIMAERA_INIT(ChimaeraMode::kClient, true);
     REQUIRE(success);
 
-    auto *ipc = CHI_IPC;
+    auto *ipc = CLIO_IPC;
     REQUIRE(ipc->IsInitialized());
 
     // Finalize using CLIO Runtime API
-    auto *chimaera = CHI_CHIMAERA_MANAGER;
+    auto *chimaera = CLIO_CHIMAERA_MANAGER;
     chimaera->ServerFinalize();
     REQUIRE(!ipc->IsInitialized());
 
@@ -161,7 +161,7 @@ TEST_CASE("Cleanup - Repeated Init/Finalize", "[cleanup][ipc]") {
 TEST_CASE("Cleanup - ClearClientPool", "[cleanup][ipc][memory]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Allocate some buffers to populate client pool
@@ -191,7 +191,7 @@ TEST_CASE("Cleanup - ClearClientPool", "[cleanup][ipc][memory]") {
 TEST_CASE("Cleanup - ClearUserIpcs", "[cleanup][ipc][shm]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Directly test ClearUserIpcs
@@ -203,7 +203,7 @@ TEST_CASE("Cleanup - ClearUserIpcs", "[cleanup][ipc][shm]") {
 TEST_CASE("Cleanup - WreapDeadIpcs", "[cleanup][ipc][shm]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Call WreapDeadIpcs (cleans up dead process IPCs)
@@ -214,7 +214,7 @@ TEST_CASE("Cleanup - WreapDeadIpcs", "[cleanup][ipc][shm]") {
 TEST_CASE("Cleanup - WreapAllIpcs", "[cleanup][ipc][shm]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Note: WreapAllIpcs is dangerous as it removes ALL IPCs
@@ -233,7 +233,7 @@ TEST_CASE("Cleanup - WreapAllIpcs", "[cleanup][ipc][shm]") {
 TEST_CASE("Cleanup - RegisterMemory", "[cleanup][ipc][memory]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Create a custom allocator ID
@@ -251,7 +251,7 @@ TEST_CASE("Cleanup - RegisterMemory", "[cleanup][ipc][memory]") {
 TEST_CASE("Cleanup - GetClientShmInfo", "[cleanup][ipc][memory]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Test GetClientShmInfo (retrieves per-process shm info)
@@ -266,7 +266,7 @@ TEST_CASE("Cleanup - GetClientShmInfo", "[cleanup][ipc][memory]") {
 TEST_CASE("Cleanup - Client Thread Flags", "[cleanup][ipc][threads]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Test SetIsClientThread / GetIsClientThread

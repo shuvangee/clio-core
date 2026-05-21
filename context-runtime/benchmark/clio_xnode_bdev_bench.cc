@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   const chi::u64 num_nodes = ipc->GetNumHosts();
   const chi::u64 my_node = ipc->GetNodeId();
   // Ring pattern: every rank's writes target the NEXT node's bdev
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
   MPI_Barrier(MPI_COMM_WORLD);
 
   // -------- Buffer setup --------
-  auto write_buf = CHI_IPC->AllocateBuffer(args.io_size);
+  auto write_buf = CLIO_IPC->AllocateBuffer(args.io_size);
   if (write_buf.IsNull()) {
     HLOG(kError, "rank={} AllocateBuffer failed", world_rank);
     MPI_Abort(MPI_COMM_WORLD, 4);
@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
          total_bytes / (1ULL << 30), max_secs, cluster_mibs);
   }
 
-  CHI_IPC->FreeBuffer(write_buf);
+  CLIO_IPC->FreeBuffer(write_buf);
   MPI_Finalize();
   return 0;
 }

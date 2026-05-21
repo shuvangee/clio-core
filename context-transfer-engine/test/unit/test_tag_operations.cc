@@ -311,7 +311,7 @@ TEST_CASE("Tag - PutBlob SHM Version", "[cte][tag][putblob]") {
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'M');
 
   // Allocate shared memory
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_fullptr = ipc->AllocateBuffer(data.size());
   REQUIRE(!shm_fullptr.IsNull());
 
@@ -396,7 +396,7 @@ TEST_CASE("Tag - GetBlob SHM Version", "[cte][tag][getblob]") {
   tag.PutBlob("shm_get_blob", original_data.data(), original_data.size());
 
   // Allocate shared memory for retrieval
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_fullptr = ipc->AllocateBuffer(original_data.size());
   REQUIRE(!shm_fullptr.IsNull());
 
@@ -604,7 +604,7 @@ TEST_CASE("Tag - AsyncPutBlob", "[cte][tag][async]") {
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'A');
 
   // Allocate shared memory (must remain alive until task completes)
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_fullptr = ipc->AllocateBuffer(data.size());
   REQUIRE(!shm_fullptr.IsNull());
   memcpy(shm_fullptr.ptr_, data.data(), data.size());

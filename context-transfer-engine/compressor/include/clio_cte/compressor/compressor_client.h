@@ -79,7 +79,7 @@ class Client : public clio_cte::core::Client {
   chi::Future<CreateTask> AsyncCreateCompressor(
       const chi::PoolQuery &pool_query, const std::string &pool_name,
       const chi::PoolId &custom_pool_id) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<CreateTask>(
         chi::CreateTaskId(), chi::kAdminPoolId, pool_query,
         "clio_cte_compressor", pool_name, custom_pool_id, this);
@@ -101,7 +101,7 @@ class Client : public clio_cte::core::Client {
       const clio_cte::core::Context &context = clio_cte::core::Context(),
       chi::u32 flags = 0,
       const chi::PoolQuery &pool_query = chi::PoolQuery::Dynamic()) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     // core_pool_id is a fallback — the runtime uses next_pool_id from
     // compose config when available.
     auto task = ipc_manager->NewTask<DynamicScheduleTask>(
@@ -132,7 +132,7 @@ class Client : public clio_cte::core::Client {
       chi::u64 offset, chi::u64 size, chi::u32 flags,
       ctp::ipc::ShmPtr<> blob_data,
       const chi::PoolQuery &pool_query = chi::PoolQuery::Dynamic()) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<DecompressTask>(
         chi::CreateTaskId(), compressor_pool_id_, pool_query, tag_id,
         blob_name, offset, size, flags, blob_data,
@@ -164,7 +164,7 @@ class Client : public clio_cte::core::Client {
       chi::u64 offset, chi::u64 size, ctp::ipc::ShmPtr<> blob_data,
       float score, const clio_cte::core::Context &context,
       chi::u32 flags, const chi::PoolId &core_pool_id) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<DynamicScheduleTask>(
         chi::CreateTaskId(), compressor_pool_id_, pool_query, tag_id,
         blob_name, offset, size, blob_data, score, context, flags,
@@ -181,7 +181,7 @@ class Client : public clio_cte::core::Client {
       chi::u64 offset, chi::u64 size, ctp::ipc::ShmPtr<> blob_data,
       float score, const clio_cte::core::Context &context,
       chi::u32 flags, const chi::PoolId &core_pool_id) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<CompressTask>(
         chi::CreateTaskId(), compressor_pool_id_, pool_query, tag_id,
         blob_name, offset, size, blob_data, score, context, flags,
@@ -197,7 +197,7 @@ class Client : public clio_cte::core::Client {
       const clio_cte::core::TagId &tag_id, const std::string &blob_name,
       chi::u64 offset, chi::u64 size, chi::u32 flags,
       ctp::ipc::ShmPtr<> blob_data, const chi::PoolId &core_pool_id) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<DecompressTask>(
         chi::CreateTaskId(), compressor_pool_id_, pool_query, tag_id,
         blob_name, offset, size, flags, blob_data, core_pool_id);
@@ -214,7 +214,7 @@ class Client : public clio_cte::core::Client {
    */
   chi::Future<PollNodeLoadTask> AsyncPollNodeLoad(
       const chi::PoolQuery &pool_query) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<PollNodeLoadTask>(
         chi::CreateTaskId(), compressor_pool_id_, pool_query);
     return ipc_manager->Send(task);
@@ -229,7 +229,7 @@ class Client : public clio_cte::core::Client {
    */
   chi::Future<PollConsumersTask> AsyncPollConsumers(
       const chi::PoolQuery &pool_query, double period_us = 5000000) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<PollConsumersTask>(
         chi::CreateTaskId(), compressor_pool_id_, pool_query);
     if (period_us > 0) {

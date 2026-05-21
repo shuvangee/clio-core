@@ -21,7 +21,7 @@
  *   4. Host placement-news N (Task + FutureShm) pairs back-to-back at
  *      stride `sizeof(TaskT) + sizeof(FutureShm)` inside the backend.
  *   5. Each backend launches its own kernel that, per task slot,
- *      mutates the POD test_value, calls CHI_IPC->Send(task_fp), then
+ *      mutates the POD test_value, calls CLIO_IPC->Send(task_fp), then
  *      future.Wait() on the FutureShm. Concurrent submissions stress
  *      the multi-producer gpu2cpu_queue.
  *   6. The host walks all N tasks and verifies result_value_ matches
@@ -82,7 +82,7 @@ inline void EnsureInit() {
   }
   initialized = true;
 
-  auto *ipc = CHI_CPU_IPC;
+  auto *ipc = CLIO_CPU_IPC;
   if (!ipc || !ipc->GetGpuIpcManager() ||
       ipc->GetGpuQueueCount() < 1u) {
     std::fprintf(stderr, "[INIT] no GPU queues registered\n");

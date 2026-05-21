@@ -327,13 +327,13 @@ struct AllocateBlocksTask : public chi::Task {
   OUT chi::priv::vector<Block> blocks_;  // Allocated blocks information
 
   /** SHM default constructor */
-  CTP_CROSS_FUN AllocateBlocksTask() : chi::Task(), size_(0), blocks_(CHI_PRIV_ALLOC) {}
+  CTP_CROSS_FUN AllocateBlocksTask() : chi::Task(), size_(0), blocks_(CLIO_PRIV_ALLOC) {}
 
   /** Emplace constructor */
   CTP_CROSS_FUN explicit AllocateBlocksTask(const chi::TaskId &task_node,
                               const chi::PoolId &pool_id,
                               const chi::PoolQuery &pool_query, chi::u64 size)
-      : chi::Task(task_node, pool_id, pool_query, Method::kAllocateBlocks), size_(size), blocks_(CHI_PRIV_ALLOC) {
+      : chi::Task(task_node, pool_id, pool_query, Method::kAllocateBlocks), size_(size), blocks_(CLIO_PRIV_ALLOC) {
   }
 
   /** Fix up priv::vector SVO pointer after cudaMemcpy D→H */
@@ -383,14 +383,14 @@ struct FreeBlocksTask : public chi::Task {
   IN chi::priv::vector<Block> blocks_;  // Blocks to free
 
   /** SHM default constructor */
-  CTP_CROSS_FUN FreeBlocksTask() : chi::Task(), blocks_(CHI_PRIV_ALLOC) {}
+  CTP_CROSS_FUN FreeBlocksTask() : chi::Task(), blocks_(CLIO_PRIV_ALLOC) {}
 
   /** Emplace constructor for multiple blocks */
   explicit FreeBlocksTask(const chi::TaskId &task_node,
                           const chi::PoolId &pool_id,
                           const chi::PoolQuery &pool_query,
                           const std::vector<Block> &blocks)
-      : chi::Task(task_node, pool_id, pool_query, 10), blocks_(CHI_PRIV_ALLOC) {
+      : chi::Task(task_node, pool_id, pool_query, 10), blocks_(CLIO_PRIV_ALLOC) {
     // Initialize task
     task_id_ = task_node;
     pool_id_ = pool_id;
@@ -461,7 +461,7 @@ struct WriteTask : public chi::Task {
   OUT chi::u64 bytes_written_;          // Number of bytes actually written
 
   /** SHM default constructor */
-  CTP_CROSS_FUN WriteTask() : chi::Task(), blocks_(CHI_PRIV_ALLOC), length_(0), bytes_written_(0) {}
+  CTP_CROSS_FUN WriteTask() : chi::Task(), blocks_(CLIO_PRIV_ALLOC), length_(0), bytes_written_(0) {}
 
   /** Emplace constructor */
   CTP_CROSS_FUN explicit WriteTask(const chi::TaskId &task_node, const chi::PoolId &pool_id,
@@ -479,7 +479,7 @@ struct WriteTask : public chi::Task {
   CTP_CROSS_FUN ~WriteTask() {
 #if !CTP_IS_DEVICE_PASS
     if (task_flags_.Any(TASK_DATA_OWNER) && !data_.IsNull()) {
-      auto *ipc_manager = CHI_CPU_IPC;
+      auto *ipc_manager = CLIO_CPU_IPC;
       if (ipc_manager) {
         ipc_manager->FreeBuffer(data_.Cast<char>());
       }
@@ -542,7 +542,7 @@ struct ReadTask : public chi::Task {
   OUT chi::u64 bytes_read_;  // Number of bytes actually read
 
   /** SHM default constructor */
-  CTP_CROSS_FUN ReadTask() : chi::Task(), blocks_(CHI_PRIV_ALLOC), length_(0), bytes_read_(0) {}
+  CTP_CROSS_FUN ReadTask() : chi::Task(), blocks_(CLIO_PRIV_ALLOC), length_(0), bytes_read_(0) {}
 
   /** Emplace constructor */
   CTP_CROSS_FUN explicit ReadTask(const chi::TaskId &task_node, const chi::PoolId &pool_id,
@@ -560,7 +560,7 @@ struct ReadTask : public chi::Task {
   CTP_CROSS_FUN ~ReadTask() {
 #if !CTP_IS_DEVICE_PASS
     if (task_flags_.Any(TASK_DATA_OWNER) && !data_.IsNull()) {
-      auto *ipc_manager = CHI_CPU_IPC;
+      auto *ipc_manager = CLIO_CPU_IPC;
       if (ipc_manager) {
         ipc_manager->FreeBuffer(data_.Cast<char>());
       }

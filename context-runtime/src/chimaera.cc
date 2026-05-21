@@ -50,7 +50,7 @@ bool CHIMAERA_INIT(ChimaeraMode mode, bool default_with_runtime, bool is_restart
     return true;  // Already initialized, return success
   }
 
-  auto* chimaera_manager = CHI_CHIMAERA_MANAGER;
+  auto* chimaera_manager = CLIO_CHIMAERA_MANAGER;
   chimaera_manager->is_restart_ = is_restart;
 
   // Check environment variable CHI_WITH_RUNTIME
@@ -107,7 +107,7 @@ void CHIMAERA_FINALIZE() {
     return;
   }
   s_finalized = true;
-  auto *mgr = CHI_CHIMAERA_MANAGER;
+  auto *mgr = CLIO_CHIMAERA_MANAGER;
   if (mgr) {
     // Server first: stop worker threads that may still be sending IPC
     mgr->ServerFinalize();

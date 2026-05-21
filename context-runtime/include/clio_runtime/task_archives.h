@@ -288,7 +288,7 @@ private:
 
 public:
   // Number of bulk buffers that LoadTaskArchive::bulk() allocated locally via
-  // CHI_IPC->AllocateBuffer (BULK_EXPOSE on receive). The receiver owns these
+  // CLIO_IPC->AllocateBuffer (BULK_EXPOSE on receive). The receiver owns these
   // and must FreeBuffer them after the task completes — otherwise cross-node
   // GetBlob responses leak the 1 MiB output buffer per call and the daemon's
   // SHM segment fills up after a few thousand cross-node reads.

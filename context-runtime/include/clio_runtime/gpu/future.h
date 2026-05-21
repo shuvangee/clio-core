@@ -86,7 +86,7 @@ struct FutureShm {
  * just polls FUTURE_COMPLETE; there is no allocator coupling, no cleanup
  * (the host owns the backend), and no coroutine/await machinery.
  */
-template <typename TaskT, typename AllocT = CHI_QUEUE_ALLOC_T>
+template <typename TaskT, typename AllocT = CLIO_QUEUE_ALLOC_T>
 class Future {
  public:
   using FutureT = FutureShm;
@@ -196,7 +196,7 @@ class Future {
 
 /** Queue type for the per-device gpu2cpu_queue (stores gpu::Future<Task>). */
 using GpuTaskQueue =
-    ctp::ipc::multi_mpsc_ring_buffer<gpu::Future<Task>, CHI_QUEUE_ALLOC_T>;
+    ctp::ipc::multi_mpsc_ring_buffer<gpu::Future<Task>, CLIO_QUEUE_ALLOC_T>;
 /** Single lane within a GpuTaskQueue. */
 using GpuTaskLane = GpuTaskQueue::ring_buffer_type;
 

@@ -75,7 +75,7 @@ class Client : public chi::ContainerClient {
   chi::Future<CreateTask> AsyncCreate(const chi::PoolQuery& pool_query,
                                       const std::string& pool_name,
                                       const chi::PoolId& custom_pool_id) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Allocate CreateTask for admin container creation
     // Note: Admin uses BaseCreateTask pattern, not GetOrCreatePoolTask
@@ -95,7 +95,7 @@ class Client : public chi::ContainerClient {
   chi::Future<DestroyPoolTask> AsyncDestroyPool(
       const chi::PoolQuery& pool_query, chi::PoolId target_pool_id,
       chi::u32 destruction_flags = 0) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Allocate DestroyPoolTask
     auto task = ipc_manager->NewTask<DestroyPoolTask>(
@@ -117,7 +117,7 @@ class Client : public chi::ContainerClient {
   chi::Future<SendTask> AsyncSendPoll(const chi::PoolQuery& pool_query,
                                       chi::u32 transfer_flags = 0,
                                       double period_us = 25) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Allocate SendTask for polling
     auto task = ipc_manager->NewTask<SendTask>(chi::CreateTaskId(), pool_id_,
@@ -141,7 +141,7 @@ class Client : public chi::ContainerClient {
   chi::Future<RecvTask> AsyncRecv(const chi::PoolQuery& pool_query,
                                   chi::u32 transfer_flags = 0,
                                   double period_us = 25) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Allocate RecvTask
     auto task = ipc_manager->NewTask<RecvTask>(chi::CreateTaskId(), pool_id_,
@@ -161,7 +161,7 @@ class Client : public chi::ContainerClient {
    * Flush administrative operations (asynchronous)
    */
   chi::Future<FlushTask> AsyncFlush(const chi::PoolQuery& pool_query) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Allocate FlushTask
     auto task = ipc_manager->NewTask<FlushTask>(chi::CreateTaskId(), pool_id_,
@@ -177,7 +177,7 @@ class Client : public chi::ContainerClient {
   chi::Future<StopRuntimeTask> AsyncStopRuntime(
       const chi::PoolQuery& pool_query, chi::u32 shutdown_flags = 0,
       chi::u32 grace_period_ms = 5000) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Allocate StopRuntimeTask
     auto task = ipc_manager->NewTask<StopRuntimeTask>(
@@ -195,7 +195,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<ComposeTask<chi::PoolConfig>> AsyncCompose(
       const chi::PoolConfig& pool_config) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Create ComposeTask with PoolConfig passed directly to constructor
     auto task_ptr =
@@ -217,7 +217,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<ClientConnectTask> AsyncClientConnect(
       const chi::PoolQuery& pool_query, double period_us = 5000) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<ClientConnectTask>(chi::CreateTaskId(),
                                                         pool_id_, pool_query);
@@ -239,7 +239,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<ClientRecvTask> AsyncClientRecv(const chi::PoolQuery& pool_query,
                                               double period_us = 100) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<ClientRecvTask>(chi::CreateTaskId(),
                                                      pool_id_, pool_query);
@@ -261,7 +261,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<ClientSendTask> AsyncClientSend(const chi::PoolQuery& pool_query,
                                               double period_us = 100) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<ClientSendTask>(chi::CreateTaskId(),
                                                      pool_id_, pool_query);
@@ -284,7 +284,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<WreapDeadIpcsTask> AsyncWreapDeadIpcs(
       const chi::PoolQuery& pool_query, double period_us = 1000000) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Allocate WreapDeadIpcsTask
     auto task = ipc_manager->NewTask<WreapDeadIpcsTask>(chi::CreateTaskId(),
@@ -310,7 +310,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<MonitorTask> AsyncMonitor(const chi::PoolQuery& pool_query,
                                         const std::string& query) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<MonitorTask>(
         chi::CreateTaskId(), pool_id_, pool_query, query);
     return ipc_manager->Send(task);
@@ -326,7 +326,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<SubmitBatchTask> AsyncSubmitBatch(
       const chi::PoolQuery& pool_query, const TaskBatch& batch) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Allocate SubmitBatchTask with batch data
     auto task = ipc_manager->NewTask<SubmitBatchTask>(
@@ -343,7 +343,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<RegisterMemoryTask> AsyncRegisterMemory(
       const chi::PoolQuery& pool_query, const ctp::ipc::AllocatorId& alloc_id) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<RegisterMemoryTask>(
         chi::CreateTaskId(), pool_id_, pool_query, alloc_id);
@@ -357,7 +357,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<RestartContainersTask> AsyncRestartContainers(
       const chi::PoolQuery& pool_query) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<RestartContainersTask>(
         chi::CreateTaskId(), pool_id_, pool_query);
@@ -375,7 +375,7 @@ class Client : public chi::ContainerClient {
   chi::Future<AddNodeTask> AsyncAddNode(const chi::PoolQuery& pool_query,
                                         const std::string& new_node_ip,
                                         chi::u32 new_node_port) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<AddNodeTask>(
         chi::CreateTaskId(), pool_id_, pool_query,
         new_node_ip, new_node_port);
@@ -395,7 +395,7 @@ class Client : public chi::ContainerClient {
       const chi::PoolId& target_pool_id,
       chi::ContainerId container_id,
       chi::u32 new_node_id) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<ChangeAddressTableTask>(
         chi::CreateTaskId(), pool_id_, pool_query,
         target_pool_id, container_id, new_node_id);
@@ -408,7 +408,7 @@ class Client : public chi::ContainerClient {
    * @return Future for the HeartbeatTask
    */
   chi::Future<HeartbeatTask> AsyncHeartbeat(const chi::PoolQuery& pool_query) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<HeartbeatTask>(
         chi::CreateTaskId(), pool_id_, pool_query);
     return ipc_manager->Send(task);
@@ -422,7 +422,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<HeartbeatProbeTask> AsyncHeartbeatProbe(
       const chi::PoolQuery& pool_query, double period_us = 2000000) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<HeartbeatProbeTask>(
         chi::CreateTaskId(), pool_id_, pool_query);
@@ -443,7 +443,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<ProbeRequestTask> AsyncProbeRequest(
       const chi::PoolQuery& pool_query, chi::u64 target_node_id) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<ProbeRequestTask>(
         chi::CreateTaskId(), pool_id_, pool_query, target_node_id);
@@ -460,7 +460,7 @@ class Client : public chi::ContainerClient {
   chi::Future<MigrateContainersTask> AsyncMigrateContainers(
       const chi::PoolQuery& pool_query,
       const std::vector<chi::MigrateInfo>& migrations) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     // Serialize migrations using GlobalSerialize
     std::vector<char> buf;
     {
@@ -483,7 +483,7 @@ class Client : public chi::ContainerClient {
       const chi::PoolQuery& pool_query,
       const std::vector<chi::RecoveryAssignment>& assignments,
       chi::u64 dead_node_id) {
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     std::vector<char> buf;
     {
       ctp::ipc::GlobalSerialize<std::vector<char>> ar(buf);
@@ -502,7 +502,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<SystemMonitorTask> AsyncSystemMonitor(
       const chi::PoolQuery &pool_query, double period_us = 1000000) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<SystemMonitorTask>(
         chi::CreateTaskId(), pool_id_, pool_query);
     if (period_us > 0) {
@@ -521,7 +521,7 @@ class Client : public chi::ContainerClient {
    */
   chi::Future<AnnounceShutdownTask> AsyncAnnounceShutdown(
       const chi::PoolQuery &pool_query, chi::u64 shutting_down_node_id) {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     auto task = ipc_manager->NewTask<AnnounceShutdownTask>(
         chi::CreateTaskId(), pool_id_, pool_query, shutting_down_node_id);
     return ipc_manager->Send(task);

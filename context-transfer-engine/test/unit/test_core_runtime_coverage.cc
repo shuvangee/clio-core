@@ -262,7 +262,7 @@ TEST_CASE("Runtime - DelBlob Success Path", "[runtime][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
   ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
@@ -336,7 +336,7 @@ TEST_CASE("Runtime - GetBlobScore Success", "[runtime][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
   ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
@@ -413,7 +413,7 @@ TEST_CASE("Runtime - GetBlobSize Success", "[runtime][blob]") {
 
   size_t expected_size = 2048;
   auto data = fixture.CreateTestData(expected_size);
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
   ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
@@ -468,7 +468,7 @@ TEST_CASE("Runtime - GetTagSize Success", "[runtime][tag]") {
   tag_task.Wait();
   REQUIRE(tag_task->GetReturnCode() == 0);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
 
   // Put first blob
   size_t size1 = 1024;
@@ -560,7 +560,7 @@ TEST_CASE("Runtime - GetContainedBlobs Success", "[runtime][blob]") {
   tag_task.Wait();
   REQUIRE(tag_task->GetReturnCode() == 0);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
 
   // Add 3 blobs

@@ -94,18 +94,18 @@ TEST_CASE("Basic Chimaera Initialization", "[runtime][basic]") {
     REQUIRE(g_initialized);
 
     // Verify core managers are available (if not null)
-    if (CHI_CHIMAERA_MANAGER != nullptr) {
+    if (CLIO_CHIMAERA_MANAGER != nullptr) {
       INFO("Chimaera manager is available");
-      REQUIRE(CHI_CHIMAERA_MANAGER->IsInitialized());
-      REQUIRE(CHI_CHIMAERA_MANAGER->IsRuntime());
-      REQUIRE(CHI_CHIMAERA_MANAGER->IsClient());
+      REQUIRE(CLIO_CHIMAERA_MANAGER->IsInitialized());
+      REQUIRE(CLIO_CHIMAERA_MANAGER->IsRuntime());
+      REQUIRE(CLIO_CHIMAERA_MANAGER->IsClient());
     } else {
       INFO("Chimaera manager is not available");
     }
 
-    if (CHI_IPC != nullptr) {
+    if (CLIO_IPC != nullptr) {
       INFO("IPC manager is available and initialized");
-      REQUIRE(CHI_IPC->IsInitialized());
+      REQUIRE(CLIO_IPC->IsInitialized());
     } else {
       INFO("IPC manager is not available");
     }
@@ -129,19 +129,19 @@ TEST_CASE("Combined Initialization", "[runtime][client][combined]") {
       INFO("Both runtime and client initialized successfully");
       
       // Check if managers are available
-      if (CHI_CHIMAERA_MANAGER != nullptr) {
+      if (CLIO_CHIMAERA_MANAGER != nullptr) {
         INFO("Chimaera manager available");
       }
-      if (CHI_IPC != nullptr) {
+      if (CLIO_IPC != nullptr) {
         INFO("IPC manager available");
       }
-      if (CHI_POOL_MANAGER != nullptr) {
+      if (CLIO_POOL_MANAGER != nullptr) {
         INFO("Pool manager available");
       }
-      if (CHI_MODULE_MANAGER != nullptr) {
+      if (CLIO_MODULE_MANAGER != nullptr) {
         INFO("Module manager available");
       }
-      if (CHI_WORK_ORCHESTRATOR != nullptr) {
+      if (CLIO_WORK_ORCHESTRATOR != nullptr) {
         INFO("Work orchestrator available");
       }
     }
