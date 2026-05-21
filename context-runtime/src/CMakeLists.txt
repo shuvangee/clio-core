@@ -137,6 +137,15 @@ if(CHIMAERA_GPU_SOURCES)
     target_link_libraries(${CHIMAERA_LIB_NAME}_gpu PUBLIC ctp::rocm_cxx)
     target_link_libraries(${CHIMAERA_LIB_NAME} PRIVATE ${CHIMAERA_LIB_NAME}_gpu)
   endif()
+
+  # Backward-compat alias for the GPU twin, matching the host-lib
+  # `chimaera_cxx` alias added at the bottom of this file.  In-tree
+  # consumers (context-runtime/test/unit, context-transfer-engine
+  # gpu_vector adapter) still link to the legacy name; adding an ALIAS
+  # here lets that work without renaming every CMakeLists.
+  if(NOT TARGET chimaera_cxx_gpu)
+    add_library(chimaera_cxx_gpu ALIAS ${CHIMAERA_LIB_NAME}_gpu)
+  endif()
 endif()
 
 # Set include directories as PUBLIC so they propagate to consumers
