@@ -65,11 +65,6 @@
 
 #include "simple_test.h"
 
-static std::string chi_test_data_dir() {
-  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
-  return (d && *d) ? d : ".";
-}
-
 using namespace std::chrono_literals;
 
 // CLIO Runtime core includes
@@ -80,6 +75,13 @@ using namespace std::chrono_literals;
 #include <clio_cte/core/core_client.h>
 #include <clio_cte/core/core_runtime.h>
 #include <clio_cte/core/core_tasks.h>
+
+// `chi` is a permanent alias of `clio::run` (see clio_runtime/types.h). The
+// helper must be defined *after* the clio_runtime includes pull that alias in.
+static std::string chi_test_data_dir() {
+  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
+  return (d && *d) ? d : ".";
+}
 
 namespace fs = std::filesystem;
 
