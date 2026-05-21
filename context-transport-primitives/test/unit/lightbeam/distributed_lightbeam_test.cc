@@ -228,33 +228,20 @@ int main(int argc, char** argv) {
   std::string bind_addr = GetPrimaryIp();
   std::string domain_arg = domain;
 
-  // Pick topology via env LBM_BENCH_TOPOLOGY: "router_dealer" (default)
-  // or "push_pull". push_pull skips identity + delim frames and uses
-  // ZMQ_PUSH / ZMQ_PULL — closer to what chimaera peer-to-peer actually
-  // needs (no per-message identity routing).
-  ZeroMqTransport::Topology topology = ZeroMqTransport::Topology::kRouterDealer;
-  if (const char *t = std::getenv("LBM_BENCH_TOPOLOGY")) {
-    std::string tv = t;
-    if (tv == "push_pull" || tv == "push-pull" || tv == "pp") {
-      topology = ZeroMqTransport::Topology::kPushPull;
-    }
-  }
+  // ZeroMqTransport is ROUTER/DEALER only now (the kPushPull alternative
+  // has been removed).  Bench just constructs it directly.
   if (my_rank == 0) {
-    std::cout << "[Bench] topology="
-              << (topology == ZeroMqTransport::Topology::kPushPull
-                      ? "push_pull"
-                      : "router_dealer")
-              << std::endl;
+    std::cout << "[Bench] topology=router_dealer" << std::endl;
   }
 
-  // ZMQ path uses the topology-aware ctor directly; other transports
+  // ZMQ path uses ZeroMqTransport's constructor directly; other transports
   // go through the factory. The bench treats clients/servers as base
   // Transport pointers from this point on so the timing / parallel-send
   // / Allgather logic is transport-agnostic.
   std::unique_ptr<Transport> server_owned;
   if (transport == TransportType::kZeroMq) {
     server_owned = std::unique_ptr<Transport>(new ZeroMqTransport(
-        TransportMode::kServer, bind_addr, protocol, my_port, topology));
+        TransportMode::kServer, bind_addr, protocol, my_port));
 #if CTP_ENABLE_THALLIUM
   } else if (transport == TransportType::kThallium) {
     server_owned = std::unique_ptr<Transport>(new ThalliumTransport(
@@ -360,7 +347,7 @@ int main(int argc, char** argv) {
                          int target_port) -> std::unique_ptr<Transport> {
     if (transport == TransportType::kZeroMq) {
       return std::unique_ptr<Transport>(new ZeroMqTransport(
-          TransportMode::kClient, peer_addr, protocol, target_port, topology));
+          TransportMode::kClient, peer_addr, protocol, target_port));
     }
 #if CTP_ENABLE_THALLIUM
     if (transport == TransportType::kThallium) {
