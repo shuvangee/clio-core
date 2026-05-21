@@ -62,7 +62,7 @@ endif()
 #------------------------------------------------------------------------------
 # Client Library
 #------------------------------------------------------------------------------
-add_chimod_client(
+add_clio_module_client(
   SOURCES
     src/core_client.cc
   LINK_LIBRARIES
@@ -95,7 +95,7 @@ if(GLOBUS_ENABLED)
   list(APPEND RUNTIME_LINK_LIBRARIES Poco::Net Poco::NetSSL Poco::Crypto Poco::JSON nlohmann_json::nlohmann_json)
 endif()
 
-add_chimod_runtime(
+add_clio_module_runtime(
   SOURCES
     ${RUNTIME_SOURCES}
   LINK_LIBRARIES

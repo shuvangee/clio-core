@@ -32,10 +32,10 @@ set(STREAMING_TEST_SOURCES
 add_executable(${FLUSH_TEST_TARGET} ${FLUSH_TEST_SOURCES})
 
 target_include_directories(${FLUSH_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
-  ${CHIMAERA_ROOT}/modules/MOD_NAME/include  # For MOD_NAME tasks
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/modules/MOD_NAME/include  # For MOD_NAME tasks
 )
 
 target_link_libraries(${FLUSH_TEST_TARGET}
@@ -63,10 +63,10 @@ set_target_properties(${FLUSH_TEST_TARGET} PROPERTIES
 add_executable(${COMUTEX_TEST_TARGET} ${COMUTEX_TEST_SOURCES})
 
 target_include_directories(${COMUTEX_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
-  ${CHIMAERA_ROOT}/modules/MOD_NAME/include  # For MOD_NAME tasks and client
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/modules/MOD_NAME/include  # For MOD_NAME tasks and client
 )
 
 target_link_libraries(${COMUTEX_TEST_TARGET}
@@ -91,10 +91,10 @@ set_target_properties(${COMUTEX_TEST_TARGET} PROPERTIES
 add_executable(${WAIT_FUNCTIONALITY_TEST_TARGET} ${WAIT_FUNCTIONALITY_TEST_SOURCES})
 
 target_include_directories(${WAIT_FUNCTIONALITY_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
-  ${CHIMAERA_ROOT}/modules/MOD_NAME/include  # For MOD_NAME tasks and client
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/modules/MOD_NAME/include  # For MOD_NAME tasks and client
 )
 
 target_link_libraries(${WAIT_FUNCTIONALITY_TEST_TARGET}
@@ -119,10 +119,10 @@ set_target_properties(${WAIT_FUNCTIONALITY_TEST_TARGET} PROPERTIES
 add_executable(${STREAMING_TEST_TARGET} ${STREAMING_TEST_SOURCES})
 
 target_include_directories(${STREAMING_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
-  ${CHIMAERA_ROOT}/modules/MOD_NAME/include  # For MOD_NAME tasks and client
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/modules/MOD_NAME/include  # For MOD_NAME tasks and client
 )
 
 target_link_libraries(${STREAMING_TEST_TARGET}
@@ -283,16 +283,16 @@ add_custom_target(test_streaming_concurrent
 # Migrate test executable (integration test binary for container migration)
 set(MIGRATE_TEST_TARGET chimaera_migrate_tests)
 set(MIGRATE_TEST_SOURCES
-  ${CHIMAERA_ROOT}/test/integration/migrate/test_migrate.cc
+  ${CLIO_RUN_ROOT}/test/integration/migrate/test_migrate.cc
 )
 
 add_executable(${MIGRATE_TEST_TARGET} ${MIGRATE_TEST_SOURCES})
 
 target_include_directories(${MIGRATE_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include
-  ${CHIMAERA_ROOT}/modules/MOD_NAME/include
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include
+  ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
 )
 
 target_link_libraries(${MIGRATE_TEST_TARGET}
@@ -313,16 +313,16 @@ set_target_properties(${MIGRATE_TEST_TARGET} PROPERTIES
 # Recovery test executable (integration test binary for node failure recovery)
 set(RECOVERY_TEST_TARGET chimaera_recovery_tests)
 set(RECOVERY_TEST_SOURCES
-  ${CHIMAERA_ROOT}/test/integration/recovery/test_recovery.cc
+  ${CLIO_RUN_ROOT}/test/integration/recovery/test_recovery.cc
 )
 
 add_executable(${RECOVERY_TEST_TARGET} ${RECOVERY_TEST_SOURCES})
 
 target_include_directories(${RECOVERY_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include
-  ${CHIMAERA_ROOT}/modules/MOD_NAME/include
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include
+  ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
 )
 
 target_link_libraries(${RECOVERY_TEST_TARGET}
@@ -343,16 +343,16 @@ set_target_properties(${RECOVERY_TEST_TARGET} PROPERTIES
 # Reconnect test executable (integration test binary for client failover)
 set(RECONNECT_TEST_TARGET chimaera_reconnect_tests)
 set(RECONNECT_TEST_SOURCES
-  ${CHIMAERA_ROOT}/test/integration/reconnect/test_reconnect.cc
+  ${CLIO_RUN_ROOT}/test/integration/reconnect/test_reconnect.cc
 )
 
 add_executable(${RECONNECT_TEST_TARGET} ${RECONNECT_TEST_SOURCES})
 
 target_include_directories(${RECONNECT_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include
-  ${CHIMAERA_ROOT}/modules/MOD_NAME/include
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include
+  ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
 )
 
 target_link_libraries(${RECONNECT_TEST_TARGET}

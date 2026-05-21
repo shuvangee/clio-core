@@ -304,7 +304,7 @@ find_package(chimaera_admin REQUIRED)        # Admin Module (required for most C
 **Module Creation Pattern:**
 ```cmake
 # Use modern Module build functions instead of manual add_library
-add_chimod_runtime(
+add_clio_module_runtime(
   CHIMOD_NAME core
   SOURCES
     src/core_runtime.cc
@@ -312,7 +312,7 @@ add_chimod_runtime(
     src/autogen/core_lib_exec.cc
 )
 
-add_chimod_client(
+add_clio_module_client(
   CHIMOD_NAME core
   SOURCES
     src/core_client.cc
@@ -516,7 +516,7 @@ find_package(iowarp-core REQUIRED)
 #   Core Components:
 #     - All ctp::* modular targets (ctp::cxx, ctp::configure, ctp::serialize, etc.)
 #     - chimaera::cxx (core runtime library)
-#     - Module build utilities (add_chimod_client, add_chimod_runtime, etc.)
+#     - Module build utilities (add_clio_module_client, add_clio_module_runtime, etc.)
 #
 #   Core ChiMods (Always Available):
 #     - chimaera::admin_client, chimaera::admin_runtime

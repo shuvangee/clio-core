@@ -14,10 +14,10 @@ add_executable(${LEADER_ELECT_TEST_TARGET}
 )
 
 target_include_directories(${LEADER_ELECT_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include
-  ${CHIMAERA_ROOT}/modules/MOD_NAME/include
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include
+  ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
 )
 
 target_link_libraries(${LEADER_ELECT_TEST_TARGET}

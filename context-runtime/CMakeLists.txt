@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(chimaera VERSION 1.0.0)
 
 # Set root directory for this component
-set(CHIMAERA_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
+set(CLIO_RUN_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Enable CUDA if requested
 if(CLIO_CORE_ENABLE_CUDA)
@@ -49,17 +49,17 @@ endif()
 # SECTION 5: SOURCE COMPILATION
 #------------------------------------------------------------------------------
 # Include directories
-include_directories(${CHIMAERA_ROOT}/include)
+include_directories(${CLIO_RUN_ROOT}/include)
 include_directories(${ClioCtp_INCLUDE_DIRS})
 
 # Output directories are set by root CMakeLists.txt
 
 # Read namespace from chimaera_repo.yaml BEFORE processing subdirectories
-# This searches up the directory tree starting from CHIMAERA_ROOT
-read_repo_namespace(CHIMAERA_NAMESPACE "${CHIMAERA_ROOT}")
+# This searches up the directory tree starting from CLIO_RUN_ROOT
+read_repo_namespace(CLIO_RUN_NAMESPACE "${CLIO_RUN_ROOT}")
 # Set namespace as cache variable so it's available to all CMakeLists.txt
-set(CHIMAERA_NAMESPACE "${CHIMAERA_NAMESPACE}" CACHE STRING "Project namespace for chimod targets")
-message(STATUS "Chimaera namespace: ${CHIMAERA_NAMESPACE}")
+set(CLIO_RUN_NAMESPACE "${CLIO_RUN_NAMESPACE}" CACHE STRING "Project namespace for chimod targets")
+message(STATUS "Chimaera namespace: ${CLIO_RUN_NAMESPACE}")
 
 # Add utilities subdirectory FIRST so chimaera repo refresh builds before everything else
 add_subdirectory(util)
@@ -100,15 +100,15 @@ endif()
 #------------------------------------------------------------------------------
 # Add Jarvis WRP runtime packages
 if(CLIO_CORE_ENABLE_JARVIS)
-    jarvis_repo_add(${CHIMAERA_ROOT}/test/jarvis_clio_core)
+    jarvis_repo_add(${CLIO_RUN_ROOT}/test/jarvis_clio_core)
 endif()
 
 #------------------------------------------------------------------------------
 # SECTION 7: INSTALL CODE
 #------------------------------------------------------------------------------
 # Install the main chimaera library using the same dynamic system as modules
-set(MAIN_EXPORT_NAME "${CHIMAERA_NAMESPACE}_coreTargets")
-set(MAIN_PACKAGE_NAME "${CHIMAERA_NAMESPACE}")
+set(MAIN_EXPORT_NAME "${CLIO_RUN_NAMESPACE}_coreTargets")
+set(MAIN_PACKAGE_NAME "${CLIO_RUN_NAMESPACE}")
 
 # Include cereal in export if it was built as a submodule
 set(_CEREAL_TARGET "")
@@ -118,14 +118,14 @@ endif()
 
 # Collect GPU target if it exists
 set(_GPU_TARGET "")
-if(TARGET ${CHIMAERA_NAMESPACE}_cxx_gpu)
-  set(_GPU_TARGET ${CHIMAERA_NAMESPACE}_cxx_gpu)
+if(TARGET ${CLIO_RUN_NAMESPACE}_cxx_gpu)
+  set(_GPU_TARGET ${CLIO_RUN_NAMESPACE}_cxx_gpu)
 endif()
 
 # Install main library (and GPU library if built).
 # PUBLIC_HEADER points at the new canonical path; the legacy chimaera/chimaera.h
 # is installed via the DIRECTORY install below (as a forwarder shim).
-install(TARGETS ${CHIMAERA_NAMESPACE}_cxx ${_GPU_TARGET} ${_CEREAL_TARGET}
+install(TARGETS ${CLIO_RUN_NAMESPACE}_cxx ${_GPU_TARGET} ${_CEREAL_TARGET}
   EXPORT ${MAIN_EXPORT_NAME}
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
@@ -198,7 +198,7 @@ install(CODE "
 # Export targets file for main library
 install(EXPORT ${MAIN_EXPORT_NAME}
   FILE ${MAIN_EXPORT_NAME}.cmake
-  NAMESPACE ${CHIMAERA_NAMESPACE}::
+  NAMESPACE ${CLIO_RUN_NAMESPACE}::
   DESTINATION lib/cmake/${MAIN_PACKAGE_NAME}
 )
 

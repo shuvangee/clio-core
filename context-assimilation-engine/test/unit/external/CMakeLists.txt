@@ -19,7 +19,7 @@ find_package(iowarp-core CONFIG REQUIRED)
 #   Core Components:
 #     - All ctp::* modular targets (ctp::cxx, ctp::configure, ctp::serialize, etc.)
 #     - chimaera::cxx (core runtime library)
-#     - ChiMod build utilities (add_chimod_client, add_chimod_runtime, etc.)
+#     - ChiMod build utilities (add_clio_module_client, add_clio_module_runtime, etc.)
 #
 #   Core ChiMods (Always Available):
 #     - chimaera::admin_client, chimaera::admin_runtime

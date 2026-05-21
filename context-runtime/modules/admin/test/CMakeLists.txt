@@ -23,10 +23,10 @@ set(SUBMIT_BATCH_TEST_SOURCES
 add_executable(${COMPOSE_TEST_TARGET} ${COMPOSE_TEST_SOURCES})
 
 target_include_directories(${COMPOSE_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin client
-  ${CHIMAERA_ROOT}/modules/bdev/include   # For bdev client
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin client
+  ${CLIO_RUN_ROOT}/modules/bdev/include   # For bdev client
 )
 
 target_link_libraries(${COMPOSE_TEST_TARGET}
@@ -54,9 +54,9 @@ set_target_properties(${COMPOSE_TEST_TARGET} PROPERTIES
 add_executable(${TASK_ARCHIVE_TEST_TARGET} ${TASK_ARCHIVE_TEST_SOURCES})
 
 target_include_directories(${TASK_ARCHIVE_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
 )
 
 target_link_libraries(${TASK_ARCHIVE_TEST_TARGET}
@@ -79,9 +79,9 @@ set_target_properties(${TASK_ARCHIVE_TEST_TARGET} PROPERTIES
 add_executable(${SUBMIT_BATCH_TEST_TARGET} ${SUBMIT_BATCH_TEST_SOURCES})
 
 target_include_directories(${SUBMIT_BATCH_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
 )
 
 target_link_libraries(${SUBMIT_BATCH_TEST_TARGET}

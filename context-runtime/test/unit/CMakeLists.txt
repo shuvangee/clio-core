@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Include common utilities for dependency management
-if(NOT COMMAND add_chimod_client)
+if(NOT COMMAND add_clio_module_client)
   include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/ChimaeraCommon.cmake)
 endif()
 
@@ -99,8 +99,8 @@ set(IPC_ALLOCATE_BUFFER_GPU_TEST_SOURCES
 add_executable(${TEST_TARGET} ${TEST_SOURCES})
 
 target_include_directories(${TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
 )
 
 target_link_libraries(${TEST_TARGET}
@@ -122,8 +122,8 @@ set_target_properties(${TEST_TARGET} PROPERTIES
 add_executable(${IPC_ALLOCATE_BUFFER_TEST_TARGET} ${IPC_ALLOCATE_BUFFER_TEST_SOURCES})
 
 target_include_directories(${IPC_ALLOCATE_BUFFER_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For test utilities
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For test utilities
 )
 
 target_link_libraries(${IPC_ALLOCATE_BUFFER_TEST_TARGET}
@@ -162,10 +162,10 @@ set_target_properties(${UNORDERED_MAP_LL_TEST_TARGET} PROPERTIES
 add_executable(${SAVE_LOAD_TASK_TEST_TARGET} ${SAVE_LOAD_TASK_TEST_SOURCES})
 
 target_include_directories(${SAVE_LOAD_TASK_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
-  ${CHIMAERA_ROOT}/modules/bdev/include   # For bdev tasks
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/modules/bdev/include   # For bdev tasks
 )
 
 target_link_libraries(${SAVE_LOAD_TASK_TEST_TARGET}
@@ -190,10 +190,10 @@ set_target_properties(${SAVE_LOAD_TASK_TEST_TARGET} PROPERTIES
 add_executable(${LOCAL_TASK_ARCHIVE_TEST_TARGET} ${LOCAL_TASK_ARCHIVE_TEST_SOURCES})
 
 target_include_directories(${LOCAL_TASK_ARCHIVE_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
-  ${CHIMAERA_ROOT}/modules/bdev/include   # For bdev tasks
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/modules/bdev/include   # For bdev tasks
 )
 
 target_link_libraries(${LOCAL_TASK_ARCHIVE_TEST_TARGET}
@@ -218,8 +218,8 @@ set_target_properties(${LOCAL_TASK_ARCHIVE_TEST_TARGET} PROPERTIES
 add_executable(${PER_PROCESS_SHM_TEST_TARGET} ${PER_PROCESS_SHM_TEST_SOURCES})
 
 target_include_directories(${PER_PROCESS_SHM_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
 )
 
 target_link_libraries(${PER_PROCESS_SHM_TEST_TARGET}
@@ -242,11 +242,11 @@ if(CLIO_CORE_ENABLE_CAE)
 add_executable(${AUTOGEN_COVERAGE_TEST_TARGET} ${AUTOGEN_COVERAGE_TEST_SOURCES})
 
   target_include_directories(${AUTOGEN_COVERAGE_TEST_TARGET} PRIVATE
-    ${CHIMAERA_ROOT}/include
-    ${CHIMAERA_ROOT}/test  # For simple_test.h
-    ${CHIMAERA_ROOT}/modules/admin/include
-    ${CHIMAERA_ROOT}/modules/bdev/include
-    ${CHIMAERA_ROOT}/modules/MOD_NAME/include
+    ${CLIO_RUN_ROOT}/include
+    ${CLIO_RUN_ROOT}/test  # For simple_test.h
+    ${CLIO_RUN_ROOT}/modules/admin/include
+    ${CLIO_RUN_ROOT}/modules/bdev/include
+    ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
   )
 
   target_link_libraries(${AUTOGEN_COVERAGE_TEST_TARGET}
@@ -279,9 +279,9 @@ endif()  # CLIO_CORE_ENABLE_CAE
 add_executable(${STREAMING_TEST_TARGET} ${STREAMING_TEST_SOURCES})
 
 target_include_directories(${STREAMING_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/MOD_NAME/include  # For MOD_NAME client and tasks
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/MOD_NAME/include  # For MOD_NAME client and tasks
 )
 
 target_link_libraries(${STREAMING_TEST_TARGET}
@@ -305,8 +305,8 @@ set_target_properties(${STREAMING_TEST_TARGET} PROPERTIES
 add_executable(${EXTERNAL_CLIENT_TEST_TARGET} ${EXTERNAL_CLIENT_TEST_SOURCES})
 
 target_include_directories(${EXTERNAL_CLIENT_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
 )
 
 target_link_libraries(${EXTERNAL_CLIENT_TEST_TARGET}
@@ -328,8 +328,8 @@ set_target_properties(${EXTERNAL_CLIENT_TEST_TARGET} PROPERTIES
 add_executable(${RUNTIME_CLEANUP_TEST_TARGET} ${RUNTIME_CLEANUP_TEST_SOURCES})
 
 target_include_directories(${RUNTIME_CLEANUP_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
 )
 
 target_link_libraries(${RUNTIME_CLEANUP_TEST_TARGET}
@@ -351,8 +351,8 @@ set_target_properties(${RUNTIME_CLEANUP_TEST_TARGET} PROPERTIES
 add_executable(${IPC_ERRORS_TEST_TARGET} ${IPC_ERRORS_TEST_SOURCES})
 
 target_include_directories(${IPC_ERRORS_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
 )
 
 target_link_libraries(${IPC_ERRORS_TEST_TARGET}
@@ -374,10 +374,10 @@ set_target_properties(${IPC_ERRORS_TEST_TARGET} PROPERTIES
 add_executable(${IPC_TRANSPORT_MODES_TEST_TARGET} ${IPC_TRANSPORT_MODES_TEST_SOURCES})
 
 target_include_directories(${IPC_TRANSPORT_MODES_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/bdev/include
-  ${CHIMAERA_ROOT}/modules/admin/include
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/bdev/include
+  ${CLIO_RUN_ROOT}/modules/admin/include
 )
 
 target_link_libraries(${IPC_TRANSPORT_MODES_TEST_TARGET}
@@ -401,10 +401,10 @@ set_target_properties(${IPC_TRANSPORT_MODES_TEST_TARGET} PROPERTIES
 add_executable(${CLIENT_RETRY_TEST_TARGET} ${CLIENT_RETRY_TEST_SOURCES})
 
 target_include_directories(${CLIENT_RETRY_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/bdev/include
-  ${CHIMAERA_ROOT}/modules/admin/include
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/bdev/include
+  ${CLIO_RUN_ROOT}/modules/admin/include
 )
 
 target_link_libraries(${CLIENT_RETRY_TEST_TARGET}
@@ -430,14 +430,14 @@ set_target_properties(${CLIENT_RETRY_TEST_TARGET} PROPERTIES
 if(FALSE)
   add_cuda_executable(${IPC_ALLOCATE_BUFFER_GPU_TEST_TARGET} TRUE ${IPC_ALLOCATE_BUFFER_GPU_TEST_SOURCES}
     INCLUDE_DIRS
-      ${CHIMAERA_ROOT}/test
-      ${CHIMAERA_ROOT}/modules/MOD_NAME/include
+      ${CLIO_RUN_ROOT}/test
+      ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
     LINK_LIBS chimaera_cxx ctp::cuda_cxx
   )
   target_include_directories(${IPC_ALLOCATE_BUFFER_GPU_TEST_TARGET} PRIVATE
-    ${CHIMAERA_ROOT}/include
-    ${CHIMAERA_ROOT}/test
-    ${CHIMAERA_ROOT}/modules/MOD_NAME/include
+    ${CLIO_RUN_ROOT}/include
+    ${CLIO_RUN_ROOT}/test
+    ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
   )
   target_link_libraries(${IPC_ALLOCATE_BUFFER_GPU_TEST_TARGET}
     chimaera_cxx
@@ -464,10 +464,10 @@ if(CLIO_CORE_ENABLE_CUDA)
   add_cuda_executable(test_gpu_kernel_stress FALSE
     gpu/test_gpu_kernel_stress_gpu.cc
     INCLUDE_DIRS
-      ${CHIMAERA_ROOT}/include
-      ${CHIMAERA_ROOT}/test
-      ${CHIMAERA_ROOT}/modules/MOD_NAME/include
-      ${CHIMAERA_ROOT}/modules/admin/include
+      ${CLIO_RUN_ROOT}/include
+      ${CLIO_RUN_ROOT}/test
+      ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
+      ${CLIO_RUN_ROOT}/modules/admin/include
     LINK_LIBS
       chimaera_cxx
       chimaera_cxx_gpu
@@ -494,10 +494,10 @@ if(CLIO_CORE_ENABLE_ROCM)
     gpu/test_gpu_kernel_stress_gpu.cc
   )
   target_include_directories(test_gpu_kernel_stress PUBLIC
-    ${CHIMAERA_ROOT}/include
-    ${CHIMAERA_ROOT}/test
-    ${CHIMAERA_ROOT}/modules/MOD_NAME/include
-    ${CHIMAERA_ROOT}/modules/admin/include
+    ${CLIO_RUN_ROOT}/include
+    ${CLIO_RUN_ROOT}/test
+    ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
+    ${CLIO_RUN_ROOT}/modules/admin/include
   )
   target_link_libraries(test_gpu_kernel_stress PUBLIC
     chimaera_cxx
@@ -524,10 +524,10 @@ if(CLIO_CORE_ENABLE_SYCL)
   add_sycl_executable(test_gpu_kernel_stress FALSE
     gpu/test_gpu_kernel_stress_sycl.cc
     INCLUDE_DIRS
-      ${CHIMAERA_ROOT}/include
-      ${CHIMAERA_ROOT}/test
-      ${CHIMAERA_ROOT}/modules/MOD_NAME/include
-      ${CHIMAERA_ROOT}/modules/admin/include
+      ${CLIO_RUN_ROOT}/include
+      ${CLIO_RUN_ROOT}/test
+      ${CLIO_RUN_ROOT}/modules/MOD_NAME/include
+      ${CLIO_RUN_ROOT}/modules/admin/include
     LINK_LIBS
       chimaera_cxx
       chimaera_cxx_gpu
@@ -1029,10 +1029,10 @@ if(CLIO_CORE_ENABLE_MPI)
   add_executable(${MPI_BDEV_TRANSPORT_TEST_TARGET} test_mpi_bdev_transport.cc)
 
   target_include_directories(${MPI_BDEV_TRANSPORT_TEST_TARGET} PRIVATE
-    ${CHIMAERA_ROOT}/include
-    ${CHIMAERA_ROOT}/test
-    ${CHIMAERA_ROOT}/modules/bdev/include
-    ${CHIMAERA_ROOT}/modules/admin/include
+    ${CLIO_RUN_ROOT}/include
+    ${CLIO_RUN_ROOT}/test
+    ${CLIO_RUN_ROOT}/modules/bdev/include
+    ${CLIO_RUN_ROOT}/modules/admin/include
   )
 
   target_link_libraries(${MPI_BDEV_TRANSPORT_TEST_TARGET}

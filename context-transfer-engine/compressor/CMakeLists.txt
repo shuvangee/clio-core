@@ -31,7 +31,7 @@ else()
     message(STATUS "Compressor: XGBoost predictor disabled")
 endif()
 
-add_chimod_runtime(
+add_clio_module_runtime(
   SOURCES
     ${COMPRESSOR_SOURCES}
   LINK_LIBRARIES
@@ -46,7 +46,7 @@ if(xgboost_FOUND)
     target_link_libraries(clio_cte_compressor_runtime PRIVATE xgboost::xgboost)
 endif()
 
-add_chimod_client(
+add_clio_module_client(
   SOURCES
     src/compressor_client.cc
 )

@@ -15,10 +15,10 @@ add_executable(${BDEV_TEST_TARGET} ${BDEV_TEST_SOURCES})
 
 # Include directories for bdev tests
 target_include_directories(${BDEV_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
-  ${CHIMAERA_ROOT}/modules/bdev/include   # For bdev tasks and client
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/modules/bdev/include   # For bdev tasks and client
 )
 
 # Link against required libraries for bdev tests

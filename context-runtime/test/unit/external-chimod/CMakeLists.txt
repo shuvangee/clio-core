@@ -26,7 +26,7 @@ target_link_libraries(test_simple_mod
 
 # Include directories
 target_include_directories(test_simple_mod PUBLIC
-  ${CHIMAERA_ROOT}/modules/simple_mod/include
+  ${CLIO_RUN_ROOT}/modules/simple_mod/include
 )
 
 # Enable testing

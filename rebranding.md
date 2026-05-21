@@ -95,7 +95,7 @@ unchanged; new deployments should prefer `CLIO_*`.
 
 ### Repo / module YAML files
 
-The CMake helpers `read_repo_namespace` and `chimaera_read_module_config`
+The CMake helpers `read_repo_namespace` and `clio_run_read_module_config`
 search `clio_repo.yaml` / `clio_mod.yaml` first, then fall back to
 `chimaera_repo.yaml` / `chimaera_mod.yaml`. Either filename works; the new
 name takes precedence if both exist.

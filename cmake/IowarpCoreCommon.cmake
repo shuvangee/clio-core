@@ -743,7 +743,7 @@ endmacro()
 
 # Helper function to link runtime to client library (called via DEFER)
 # This allows linking to work regardless of which target is defined first
-function(_chimaera_link_runtime_to_client RUNTIME_TARGET CLIENT_TARGET)
+function(_clio_run_link_runtime_to_client RUNTIME_TARGET CLIENT_TARGET)
   if(TARGET ${CLIENT_TARGET})
     target_link_libraries(${RUNTIME_TARGET} PUBLIC ${CLIENT_TARGET})
     message(STATUS "Deferred linking: Runtime ${RUNTIME_TARGET} linked to client ${CLIENT_TARGET}")
@@ -787,7 +787,7 @@ endfunction()
 # Function to read module configuration from clio_mod.yaml (preferred) or
 # chimaera_mod.yaml (legacy). Both formats are accepted; the new name takes
 # precedence to enable gradual migration.
-function(chimaera_read_module_config MODULE_DIR)
+function(clio_run_read_module_config MODULE_DIR)
   set(_mod_candidates
       "${MODULE_DIR}/clio_mod.yaml"
       "${MODULE_DIR}/chimaera_mod.yaml")
@@ -810,25 +810,25 @@ function(chimaera_read_module_config MODULE_DIR)
   # Extract module_name
   string(REGEX MATCH "module_name:[ ]*([^\n\r]*)" MODULE_MATCH ${CONFIG_CONTENT})
   if(MODULE_MATCH)
-    string(REGEX REPLACE "module_name:[ ]*" "" CHIMAERA_MODULE_NAME "${MODULE_MATCH}")
-    string(STRIP "${CHIMAERA_MODULE_NAME}" CHIMAERA_MODULE_NAME)
+    string(REGEX REPLACE "module_name:[ ]*" "" CLIO_RUN_MODULE_NAME "${MODULE_MATCH}")
+    string(STRIP "${CLIO_RUN_MODULE_NAME}" CLIO_RUN_MODULE_NAME)
   endif()
-  set(CHIMAERA_MODULE_NAME ${CHIMAERA_MODULE_NAME} PARENT_SCOPE)
+  set(CLIO_RUN_MODULE_NAME ${CLIO_RUN_MODULE_NAME} PARENT_SCOPE)
 
   # Extract namespace
   string(REGEX MATCH "namespace:[ ]*([^\n\r]*)" NAMESPACE_MATCH ${CONFIG_CONTENT})
   if(NAMESPACE_MATCH)
-    string(REGEX REPLACE "namespace:[ ]*" "" CHIMAERA_NAMESPACE "${NAMESPACE_MATCH}")
-    string(STRIP "${CHIMAERA_NAMESPACE}" CHIMAERA_NAMESPACE)
+    string(REGEX REPLACE "namespace:[ ]*" "" CLIO_RUN_NAMESPACE "${NAMESPACE_MATCH}")
+    string(STRIP "${CLIO_RUN_NAMESPACE}" CLIO_RUN_NAMESPACE)
   endif()
-  set(CHIMAERA_NAMESPACE ${CHIMAERA_NAMESPACE} PARENT_SCOPE)
+  set(CLIO_RUN_NAMESPACE ${CLIO_RUN_NAMESPACE} PARENT_SCOPE)
 
   # Validate extracted values
-  if(NOT CHIMAERA_MODULE_NAME)
+  if(NOT CLIO_RUN_MODULE_NAME)
     message(FATAL_ERROR "module_name not found in ${CONFIG_FILE}. Content preview: ${CONFIG_CONTENT}")
   endif()
 
-  if(NOT CHIMAERA_NAMESPACE)
+  if(NOT CLIO_RUN_NAMESPACE)
     message(FATAL_ERROR "namespace not found in ${CONFIG_FILE}. Content preview: ${CONFIG_CONTENT}")
   endif()
 endfunction()
@@ -837,7 +837,7 @@ endfunction()
 # ChiMod Client Library Function
 #------------------------------------------------------------------------------
 
-# add_chimod_client - Create a ChiMod client library
+# add_clio_module_client - Create a ChiMod client library
 #
 # Parameters:
 #   SOURCES             - Source files for the client library
@@ -853,7 +853,7 @@ endfunction()
 #   This enables wrp_* ChiMods to use chimaera ChiMod headers and functionality without
 #   explicit dependency declarations in their CMakeLists.txt files.
 #
-function(add_chimod_client)
+function(add_clio_module_client)
   cmake_parse_arguments(
     ARG
     ""
@@ -863,7 +863,7 @@ function(add_chimod_client)
   )
 
   # Read module configuration
-  chimaera_read_module_config(${CMAKE_CURRENT_SOURCE_DIR})
+  clio_run_read_module_config(${CMAKE_CURRENT_SOURCE_DIR})
 
   # Create target name. The optional LIB_NAME argument lets a module
   # override the auto-derived `<namespace>_<module>` prefix (used e.g.
@@ -872,18 +872,18 @@ function(add_chimod_client)
   if(ARG_LIB_NAME)
     set(TARGET_NAME "${ARG_LIB_NAME}_client")
   else()
-    set(TARGET_NAME "${CHIMAERA_NAMESPACE}_${CHIMAERA_MODULE_NAME}_client")
+    set(TARGET_NAME "${CLIO_RUN_NAMESPACE}_${CLIO_RUN_MODULE_NAME}_client")
   endif()
 
   # Create the library
   add_library(${TARGET_NAME} SHARED ${ARG_SOURCES})
 
   # Set C++ standard
-  set(CHIMAERA_CXX_STANDARD 20)
-  target_compile_features(${TARGET_NAME} PUBLIC cxx_std_${CHIMAERA_CXX_STANDARD})
+  set(CLIO_RUN_CXX_STANDARD 20)
+  target_compile_features(${TARGET_NAME} PUBLIC cxx_std_${CLIO_RUN_CXX_STANDARD})
 
   # Common compile definitions
-  set(CHIMAERA_COMMON_COMPILE_DEFS
+  set(CLIO_RUN_COMMON_COMPILE_DEFS
     $<$<CONFIG:Debug>:DEBUG>
     $<$<CONFIG:Release>:NDEBUG>
   )
@@ -891,7 +891,7 @@ function(add_chimod_client)
   # Add compile definitions
   target_compile_definitions(${TARGET_NAME}
     PUBLIC
-      ${CHIMAERA_COMMON_COMPILE_DEFS}
+      ${CLIO_RUN_COMMON_COMPILE_DEFS}
       ${ARG_COMPILE_DEFINITIONS}
   )
 
@@ -933,14 +933,14 @@ function(add_chimod_client)
   # (admin keeps LIB_NAME=chimaera_admin, bdev uses LIB_NAME=clio_bdev) — the
   # old guard `NOT NAMESPACE STREQUAL "chimaera"` no longer works now that
   # admin's own namespace is `clio_run`.
-  set(CHIMAERA_CHIMOD_DEPS "")
-  if(NOT "${CHIMAERA_MODULE_NAME}" STREQUAL "admin" AND
-     NOT "${CHIMAERA_MODULE_NAME}" STREQUAL "bdev")
+  set(CLIO_RUN_MODULE_DEPS "")
+  if(NOT "${CLIO_RUN_MODULE_NAME}" STREQUAL "admin" AND
+     NOT "${CLIO_RUN_MODULE_NAME}" STREQUAL "bdev")
     if(TARGET chimaera_admin_client)
-      list(APPEND CHIMAERA_CHIMOD_DEPS chimaera_admin_client)
+      list(APPEND CLIO_RUN_MODULE_DEPS chimaera_admin_client)
     endif()
     if(TARGET clio_bdev_client)
-      list(APPEND CHIMAERA_CHIMOD_DEPS clio_bdev_client)
+      list(APPEND CLIO_RUN_MODULE_DEPS clio_bdev_client)
     endif()
   endif()
 
@@ -949,26 +949,26 @@ function(add_chimod_client)
     PUBLIC
       ${CORE_LIB}
       ${ARG_LINK_LIBRARIES}
-      ${CHIMAERA_CHIMOD_DEPS}
+      ${CLIO_RUN_MODULE_DEPS}
   )
 
   # Create alias for external use
-  add_library(${CHIMAERA_NAMESPACE}::${CHIMAERA_MODULE_NAME}_client ALIAS ${TARGET_NAME})
+  add_library(${CLIO_RUN_NAMESPACE}::${CLIO_RUN_MODULE_NAME}_client ALIAS ${TARGET_NAME})
 
   # Set properties for installation. OUTPUT_NAME tracks LIB_NAME when given
   # so the .so file on disk matches the CMake target.
   if(ARG_LIB_NAME)
     set(_chimod_output_name "${ARG_LIB_NAME}_client")
   else()
-    set(_chimod_output_name "${CHIMAERA_NAMESPACE}_${CHIMAERA_MODULE_NAME}_client")
+    set(_chimod_output_name "${CLIO_RUN_NAMESPACE}_${CLIO_RUN_MODULE_NAME}_client")
   endif()
   set_target_properties(${TARGET_NAME} PROPERTIES
-    EXPORT_NAME "${CHIMAERA_MODULE_NAME}_client"
+    EXPORT_NAME "${CLIO_RUN_MODULE_NAME}_client"
     OUTPUT_NAME "${_chimod_output_name}"
   )
 
   # Install the client library
-  set(MODULE_PACKAGE_NAME "${CHIMAERA_NAMESPACE}_${CHIMAERA_MODULE_NAME}")
+  set(MODULE_PACKAGE_NAME "${CLIO_RUN_NAMESPACE}_${CLIO_RUN_MODULE_NAME}")
   set(MODULE_EXPORT_NAME "${MODULE_PACKAGE_NAME}")
 
   install(TARGETS ${TARGET_NAME}
@@ -994,9 +994,9 @@ function(add_chimod_client)
   )
 
   # Export module info to parent scope
-  set(CHIMAERA_MODULE_CLIENT_TARGET ${TARGET_NAME} PARENT_SCOPE)
-  set(CHIMAERA_MODULE_NAME ${CHIMAERA_MODULE_NAME} PARENT_SCOPE)
-  set(CHIMAERA_NAMESPACE ${CHIMAERA_NAMESPACE} PARENT_SCOPE)
+  set(CLIO_RUN_MODULE_CLIENT_TARGET ${TARGET_NAME} PARENT_SCOPE)
+  set(CLIO_RUN_MODULE_NAME ${CLIO_RUN_MODULE_NAME} PARENT_SCOPE)
+  set(CLIO_RUN_NAMESPACE ${CLIO_RUN_NAMESPACE} PARENT_SCOPE)
 endfunction()
 
 #------------------------------------------------------------------------------
@@ -1005,7 +1005,7 @@ endfunction()
 # ChiMod Runtime Library Function
 #------------------------------------------------------------------------------
 
-# add_chimod_runtime - Create a ChiMod runtime library
+# add_clio_module_runtime - Create a ChiMod runtime library
 #
 # Parameters:
 #   SOURCES             - Source files for the runtime library
@@ -1021,7 +1021,7 @@ endfunction()
 #   This enables wrp_* ChiMods to use chimaera ChiMod headers and functionality without
 #   explicit dependency declarations in their CMakeLists.txt files.
 #
-function(add_chimod_runtime)
+function(add_clio_module_runtime)
   cmake_parse_arguments(
     ARG
     ""
@@ -1031,13 +1031,13 @@ function(add_chimod_runtime)
   )
 
   # Read module configuration
-  chimaera_read_module_config(${CMAKE_CURRENT_SOURCE_DIR})
+  clio_run_read_module_config(${CMAKE_CURRENT_SOURCE_DIR})
 
-  # Create target name (see add_chimod_client for LIB_NAME rationale).
+  # Create target name (see add_clio_module_client for LIB_NAME rationale).
   if(ARG_LIB_NAME)
     set(TARGET_NAME "${ARG_LIB_NAME}_runtime")
   else()
-    set(TARGET_NAME "${CHIMAERA_NAMESPACE}_${CHIMAERA_MODULE_NAME}_runtime")
+    set(TARGET_NAME "${CLIO_RUN_NAMESPACE}_${CLIO_RUN_MODULE_NAME}_runtime")
   endif()
 
   # The GPU companion library concept (separate _gpu.cc files compiled
@@ -1047,11 +1047,11 @@ function(add_chimod_runtime)
   add_library(${TARGET_NAME} SHARED ${ARG_SOURCES})
 
   # Set C++ standard
-  set(CHIMAERA_CXX_STANDARD 20)
-  target_compile_features(${TARGET_NAME} PUBLIC cxx_std_${CHIMAERA_CXX_STANDARD})
+  set(CLIO_RUN_CXX_STANDARD 20)
+  target_compile_features(${TARGET_NAME} PUBLIC cxx_std_${CLIO_RUN_CXX_STANDARD})
 
   # Common compile definitions
-  set(CHIMAERA_COMMON_COMPILE_DEFS
+  set(CLIO_RUN_COMMON_COMPILE_DEFS
     $<$<CONFIG:Debug>:DEBUG>
     $<$<CONFIG:Release>:NDEBUG>
   )
@@ -1060,7 +1060,7 @@ function(add_chimod_runtime)
   target_compile_definitions(${TARGET_NAME}
     PUBLIC
       CHIMAERA_RUNTIME=1
-      ${CHIMAERA_COMMON_COMPILE_DEFS}
+      ${CLIO_RUN_COMMON_COMPILE_DEFS}
       ${ARG_COMPILE_DEFINITIONS}
   )
 
@@ -1098,29 +1098,29 @@ function(add_chimod_runtime)
   endif()
 
   # Runtime-specific link libraries
-  set(CHIMAERA_RUNTIME_LIBS
+  set(CLIO_RUN_RUNTIME_LIBS
     Threads::Threads
   )
 
   # Automatically link to client library if it exists
-  set(RUNTIME_LINK_LIBS ${CORE_LIB} ${CHIMAERA_RUNTIME_LIBS} ${ARG_LINK_LIBRARIES})
+  set(RUNTIME_LINK_LIBS ${CORE_LIB} ${CLIO_RUN_RUNTIME_LIBS} ${ARG_LINK_LIBRARIES})
 
   # Try to find client target by name (handles cases where client was defined first)
-  set(CLIENT_TARGET_NAME "${CHIMAERA_NAMESPACE}_${CHIMAERA_MODULE_NAME}_client")
+  set(CLIENT_TARGET_NAME "${CLIO_RUN_NAMESPACE}_${CLIO_RUN_MODULE_NAME}_client")
   if(TARGET ${CLIENT_TARGET_NAME})
     list(APPEND RUNTIME_LINK_LIBS ${CLIENT_TARGET_NAME})
     message(STATUS "Runtime ${TARGET_NAME} linking to client ${CLIENT_TARGET_NAME}")
-  elseif(CHIMAERA_MODULE_CLIENT_TARGET AND TARGET ${CHIMAERA_MODULE_CLIENT_TARGET})
+  elseif(CLIO_RUN_MODULE_CLIENT_TARGET AND TARGET ${CLIO_RUN_MODULE_CLIENT_TARGET})
     # Fallback to variable-based approach for compatibility
-    list(APPEND RUNTIME_LINK_LIBS ${CHIMAERA_MODULE_CLIENT_TARGET})
-    message(STATUS "Runtime ${TARGET_NAME} linking to client ${CHIMAERA_MODULE_CLIENT_TARGET}")
+    list(APPEND RUNTIME_LINK_LIBS ${CLIO_RUN_MODULE_CLIENT_TARGET})
+    message(STATUS "Runtime ${TARGET_NAME} linking to client ${CLIO_RUN_MODULE_CLIENT_TARGET}")
   endif()
 
   # Automatically add foundational ChiMod dependencies in unified builds.
-  # See the matching block in add_chimod_client for why we key off
-  # CHIMAERA_MODULE_NAME instead of CHIMAERA_NAMESPACE.
-  if(NOT "${CHIMAERA_MODULE_NAME}" STREQUAL "admin" AND
-     NOT "${CHIMAERA_MODULE_NAME}" STREQUAL "bdev")
+  # See the matching block in add_clio_module_client for why we key off
+  # CLIO_RUN_MODULE_NAME instead of CLIO_RUN_NAMESPACE.
+  if(NOT "${CLIO_RUN_MODULE_NAME}" STREQUAL "admin" AND
+     NOT "${CLIO_RUN_MODULE_NAME}" STREQUAL "bdev")
     if(TARGET chimaera_admin_runtime)
       list(APPEND RUNTIME_LINK_LIBS chimaera_admin_runtime)
     endif()
@@ -1136,27 +1136,27 @@ function(add_chimod_runtime)
   )
 
   # Create alias for external use
-  add_library(${CHIMAERA_NAMESPACE}::${CHIMAERA_MODULE_NAME}_runtime ALIAS ${TARGET_NAME})
+  add_library(${CLIO_RUN_NAMESPACE}::${CLIO_RUN_MODULE_NAME}_runtime ALIAS ${TARGET_NAME})
 
   # Set properties for installation. OUTPUT_NAME tracks LIB_NAME when given
   # so the .so file on disk matches the CMake target.
   if(ARG_LIB_NAME)
     set(_chimod_output_name "${ARG_LIB_NAME}_runtime")
   else()
-    set(_chimod_output_name "${CHIMAERA_NAMESPACE}_${CHIMAERA_MODULE_NAME}_runtime")
+    set(_chimod_output_name "${CLIO_RUN_NAMESPACE}_${CLIO_RUN_MODULE_NAME}_runtime")
   endif()
   set_target_properties(${TARGET_NAME} PROPERTIES
-    EXPORT_NAME "${CHIMAERA_MODULE_NAME}_runtime"
+    EXPORT_NAME "${CLIO_RUN_MODULE_NAME}_runtime"
     OUTPUT_NAME "${_chimod_output_name}"
   )
 
   # Use cmake_language(DEFER) to link to client after all targets are processed
   cmake_language(EVAL CODE "
-    cmake_language(DEFER CALL _chimaera_link_runtime_to_client \"${TARGET_NAME}\" \"${CLIENT_TARGET_NAME}\")
+    cmake_language(DEFER CALL _clio_run_link_runtime_to_client \"${TARGET_NAME}\" \"${CLIENT_TARGET_NAME}\")
   ")
 
   # Install the runtime library (add to existing export set if client exists)
-  set(MODULE_PACKAGE_NAME "${CHIMAERA_NAMESPACE}_${CHIMAERA_MODULE_NAME}")
+  set(MODULE_PACKAGE_NAME "${CLIO_RUN_NAMESPACE}_${CLIO_RUN_MODULE_NAME}")
   set(MODULE_EXPORT_NAME "${MODULE_PACKAGE_NAME}")
 
   install(TARGETS ${TARGET_NAME}
@@ -1168,7 +1168,7 @@ function(add_chimod_runtime)
   )
 
   # Install headers (only if not already installed by client)
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include" AND NOT CHIMAERA_MODULE_CLIENT_TARGET)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include" AND NOT CLIO_RUN_MODULE_CLIENT_TARGET)
     install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
       DESTINATION include
       FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
@@ -1177,9 +1177,9 @@ function(add_chimod_runtime)
 
   # Generate and install package config files (only do this once per module)
   set(SHOULD_GENERATE_CONFIG FALSE)
-  if(CHIMAERA_MODULE_CLIENT_TARGET AND TARGET ${CHIMAERA_MODULE_CLIENT_TARGET})
+  if(CLIO_RUN_MODULE_CLIENT_TARGET AND TARGET ${CLIO_RUN_MODULE_CLIENT_TARGET})
     set(SHOULD_GENERATE_CONFIG TRUE)
-  elseif(NOT CHIMAERA_MODULE_CLIENT_TARGET)
+  elseif(NOT CLIO_RUN_MODULE_CLIENT_TARGET)
     set(SHOULD_GENERATE_CONFIG TRUE)
   endif()
 
@@ -1187,7 +1187,7 @@ function(add_chimod_runtime)
     # Export targets file
     install(EXPORT ${MODULE_EXPORT_NAME}
       FILE ${MODULE_EXPORT_NAME}.cmake
-      NAMESPACE ${CHIMAERA_NAMESPACE}::
+      NAMESPACE ${CLIO_RUN_NAMESPACE}::
       DESTINATION lib/cmake/${MODULE_PACKAGE_NAME}
     )
 
@@ -1198,7 +1198,7 @@ function(add_chimod_runtime)
     # the new target. Modules whose namespace doesn't start with "clio_"
     # (e.g. the chimaera::* runtime modules) get no legacy alias block.
     set(LEGACY_NAMESPACE "")
-    if("${CHIMAERA_NAMESPACE}" MATCHES "^clio_(.*)$")
+    if("${CLIO_RUN_NAMESPACE}" MATCHES "^clio_(.*)$")
       set(LEGACY_NAMESPACE "wrp_${CMAKE_MATCH_1}")
     endif()
 
@@ -1224,12 +1224,12 @@ include(\"\${CMAKE_CURRENT_LIST_DIR}/${MODULE_EXPORT_NAME}.cmake\")
       string(APPEND CONFIG_CONTENT "
 # --- Backward-compat aliases for the WRP_ -> CLIO_ namespace rename ---
 # Lets downstream projects that still reference ${LEGACY_NAMESPACE}::*
-# resolve transparently to ${CHIMAERA_NAMESPACE}::*. See rebranding.md.
-foreach(_legacy_tgt IN ITEMS ${CHIMAERA_MODULE_NAME}_client ${CHIMAERA_MODULE_NAME}_runtime)
-  if(TARGET ${CHIMAERA_NAMESPACE}::\${_legacy_tgt} AND NOT TARGET ${LEGACY_NAMESPACE}::\${_legacy_tgt})
+# resolve transparently to ${CLIO_RUN_NAMESPACE}::*. See rebranding.md.
+foreach(_legacy_tgt IN ITEMS ${CLIO_RUN_MODULE_NAME}_client ${CLIO_RUN_MODULE_NAME}_runtime)
+  if(TARGET ${CLIO_RUN_NAMESPACE}::\${_legacy_tgt} AND NOT TARGET ${LEGACY_NAMESPACE}::\${_legacy_tgt})
     add_library(${LEGACY_NAMESPACE}::\${_legacy_tgt} INTERFACE IMPORTED)
     set_target_properties(${LEGACY_NAMESPACE}::\${_legacy_tgt} PROPERTIES
-      INTERFACE_LINK_LIBRARIES ${CHIMAERA_NAMESPACE}::\${_legacy_tgt})
+      INTERFACE_LINK_LIBRARIES ${CLIO_RUN_NAMESPACE}::\${_legacy_tgt})
   endif()
 endforeach()
 ")
@@ -1268,13 +1268,13 @@ check_required_components(${MODULE_PACKAGE_NAME})
 
     # Collect targets for status message
     set(INSTALLED_TARGETS ${TARGET_NAME})
-    if(CHIMAERA_MODULE_CLIENT_TARGET AND TARGET ${CHIMAERA_MODULE_CLIENT_TARGET})
-      list(APPEND INSTALLED_TARGETS ${CHIMAERA_MODULE_CLIENT_TARGET})
+    if(CLIO_RUN_MODULE_CLIENT_TARGET AND TARGET ${CLIO_RUN_MODULE_CLIENT_TARGET})
+      list(APPEND INSTALLED_TARGETS ${CLIO_RUN_MODULE_CLIENT_TARGET})
     endif()
 
     message(STATUS "Created module package: ${MODULE_PACKAGE_NAME}")
     message(STATUS "  Targets: ${INSTALLED_TARGETS}")
-    message(STATUS "  Aliases: ${CHIMAERA_NAMESPACE}::${CHIMAERA_MODULE_NAME}_client, ${CHIMAERA_NAMESPACE}::${CHIMAERA_MODULE_NAME}_runtime")
+    message(STATUS "  Aliases: ${CLIO_RUN_NAMESPACE}::${CLIO_RUN_MODULE_NAME}_client, ${CLIO_RUN_NAMESPACE}::${CLIO_RUN_MODULE_NAME}_runtime")
   endif()
 
   # Precompiled headers for faster builds
@@ -1284,9 +1284,38 @@ check_required_components(${MODULE_PACKAGE_NAME})
   )
 
   # Export module info to parent scope
-  set(CHIMAERA_MODULE_RUNTIME_TARGET ${TARGET_NAME} PARENT_SCOPE)
-  set(CHIMAERA_MODULE_NAME ${CHIMAERA_MODULE_NAME} PARENT_SCOPE)
-  set(CHIMAERA_NAMESPACE ${CHIMAERA_NAMESPACE} PARENT_SCOPE)
+  set(CLIO_RUN_MODULE_RUNTIME_TARGET ${TARGET_NAME} PARENT_SCOPE)
+  set(CLIO_RUN_MODULE_NAME ${CLIO_RUN_MODULE_NAME} PARENT_SCOPE)
+  set(CLIO_RUN_NAMESPACE ${CLIO_RUN_NAMESPACE} PARENT_SCOPE)
 endfunction()
 
 message(STATUS "IowarpCoreCommon.cmake loaded successfully")
+
+#==============================================================================
+# Backward-compat aliases (CHIMAERA_* / chimaera_* / add_chimod_* names)
+#
+# All CMake-facing identifiers in this file were renamed CHIMAERA_* -> CLIO_RUN_*
+# and the helper functions gained `clio` branding (e.g. add_chimod_client ->
+# add_clio_module_client). The legacy names below are macro wrappers that
+# forward to the new names so out-of-tree CMake code keeps building unchanged.
+# See docs/deprecation-notes.md.
+#==============================================================================
+
+# Function wrappers
+macro(add_chimod_client)
+  add_clio_module_client(${ARGV})
+endmacro()
+
+macro(add_chimod_runtime)
+  add_clio_module_runtime(${ARGV})
+endmacro()
+
+macro(chimaera_read_module_config _dir)
+  clio_run_read_module_config(${_dir})
+  # Re-export the new variables under their legacy CHIMAERA_* names so any
+  # CMakeLists.txt that still reads e.g. `${CHIMAERA_MODULE_NAME}` keeps
+  # working transparently.
+  set(CHIMAERA_NAMESPACE             "${CLIO_RUN_NAMESPACE}"             PARENT_SCOPE)
+  set(CHIMAERA_MODULE_NAME           "${CLIO_RUN_MODULE_NAME}"           PARENT_SCOPE)
+endmacro()
+

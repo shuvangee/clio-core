@@ -18,7 +18,7 @@ endif()
 # LIB_NAME pins the library to `clio_bdev_client` (the new brand-aligned
 # name); ALIAS keeps `chimaera_bdev_client` working as a CMake target for
 # any in-tree or out-of-tree consumer that still references the old name.
-add_chimod_client(
+add_clio_module_client(
   LIB_NAME clio_bdev
   SOURCES
     src/bdev_client.cc
@@ -30,7 +30,7 @@ add_chimod_client(
 add_library(chimaera_bdev_client ALIAS clio_bdev_client)
 
 # Runtime library (see client block above for the LIB_NAME + ALIAS rationale).
-add_chimod_runtime(
+add_clio_module_runtime(
   LIB_NAME clio_bdev
   SOURCES
     src/bdev_runtime.cc

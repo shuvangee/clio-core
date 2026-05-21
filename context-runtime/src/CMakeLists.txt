@@ -49,7 +49,7 @@ foreach(src ${CHIMAERA_EXTERNAL_GPU_SOURCES})
 endforeach()
 
 # Create main library with namespace prefix to avoid conflicts
-set(CHIMAERA_LIB_NAME "${CHIMAERA_NAMESPACE}_cxx")
+set(CHIMAERA_LIB_NAME "${CLIO_RUN_NAMESPACE}_cxx")
 add_library(${CHIMAERA_LIB_NAME} SHARED ${CHIMAERA_CPU_SOURCES})
 
 # Build GPU work orchestrator library if CUDA/ROCm/SYCL enabled and GPU sources exist
@@ -204,8 +204,8 @@ target_link_libraries(${CHIMAERA_LIB_NAME}
 set_target_properties(${CHIMAERA_LIB_NAME} PROPERTIES
   VERSION ${PROJECT_VERSION}
   SOVERSION 1
-  PUBLIC_HEADER "${CHIMAERA_ROOT}/include/clio_runtime/clio_runtime.h"
-  OUTPUT_NAME "${CHIMAERA_NAMESPACE}_cxx"
+  PUBLIC_HEADER "${CLIO_RUN_ROOT}/include/clio_runtime/clio_runtime.h"
+  OUTPUT_NAME "${CLIO_RUN_NAMESPACE}_cxx"
 )
 
 # Export target for parent scope
@@ -223,4 +223,4 @@ if(NOT CLIO_CORE_ENABLE_SYCL)
 endif()
 
 # Create namespace alias for external consumption
-add_library(${CHIMAERA_NAMESPACE}::cxx ALIAS ${CHIMAERA_LIB_NAME})
+add_library(${CLIO_RUN_NAMESPACE}::cxx ALIAS ${CHIMAERA_LIB_NAME})

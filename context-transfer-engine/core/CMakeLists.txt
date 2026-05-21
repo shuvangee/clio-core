@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Create runtime library using modern ChiMod build functions
-add_chimod_runtime(
+add_clio_module_runtime(
   SOURCES
     src/core_runtime.cc
     src/core_config.cc
@@ -35,7 +35,7 @@ if(CLIO_CORE_ENABLE_ROCM)
 endif()
 
 # Create client library using modern ChiMod build functions
-add_chimod_client(
+add_clio_module_client(
   SOURCES
     src/core_client.cc
     src/content_transfer_engine.cc
