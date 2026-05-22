@@ -282,8 +282,11 @@ TEST_CASE("Cleanup - Client Thread Flags", "[cleanup][ipc][threads]") {
 // ============================================================================
 
 TEST_CASE("Cleanup - ZZZ Final Cleanup", "[cleanup][ipc]") {
-  // Force exit to avoid hanging on worker thread joins during finalization
-  _exit(0);
+  // Force exit to avoid hanging on worker thread joins during finalization.
+  // Use SIMPLE_TEST_PROCESS_EXIT so Windows uses TerminateProcess (which
+  // bypasses the libzmq static-destructor signaler abort) and POSIX still
+  // gets the original _exit semantics via the macro fallback.
+  SIMPLE_TEST_PROCESS_EXIT(0);
 }
 
 SIMPLE_TEST_MAIN()

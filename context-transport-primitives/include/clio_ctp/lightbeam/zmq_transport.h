@@ -95,15 +95,30 @@ class ZeroMqTransport : public Transport {
       std::mutex mtx;
       ~CtxOwner() {
         if (ctx) {
+#ifdef _WIN32
+          // libzmq 4.3.x's signaler aborts inside both zmq_ctx_shutdown
+          // and zmq_ctx_destroy on Windows during static-destructor
+          // teardown (assertion "WSASTARTUP not yet performed" in
+          // signaler.cpp). The signaler's wakeup `send()` runs on a
+          // mailbox thread whose Winsock state is already torn down by
+          // the time the global ctx destructor runs, and there's no
+          // user-side knob to fix it (we tried pinning the WSAStartup
+          // refcount). The process is exiting anyway, so we leak the
+          // context: the OS reclaims its sockets at process exit. Tracked
+          // under a follow-up GH issue.
+          (void)ctx;
+#else
           // zmq_ctx_shutdown() causes all blocking ZMQ calls on open sockets
           // to return immediately with ETERM.  This unblocks any background
           // receive threads (e.g. RecvZmqClientThread) that are polling the
           // socket, allowing them to exit cleanly.  zmq_ctx_destroy() would
           // otherwise block forever if a socket is still open (because the
-          // CLIO Runtime singleton is heap-allocated and its destructor -- which
-          // calls ClientFinalize / closes the socket -- is never invoked).
+          // CLIO Runtime singleton is heap-allocated and its destructor --
+          // which calls ClientFinalize / closes the socket -- is never
+          // invoked).
           zmq_ctx_shutdown(ctx);
           zmq_ctx_destroy(ctx);
+#endif
           ctx = nullptr;
         }
       }

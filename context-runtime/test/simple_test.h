@@ -255,8 +255,43 @@ inline int run_all_tests(const std::string& filter = "") {
     static SimpleTest::TestRegistrar UNIQUE_NAME(test_reg_)(std::string(test_name) + " " + std::string(tags), UNIQUE_NAME(test_func_)); \
     void UNIQUE_NAME(test_func_)()
 
-// Main function for test executable
-#define SIMPLE_TEST_MAIN() \
+// On Windows the libzmq 4.3.x signaler asserts inside zmq_close() at
+// static-destructor / atexit time with "WSASTARTUP not yet performed" — its
+// mailbox send() runs after some part of the Winsock state has gone away.
+// All tests have already passed by the time we get there, so on Windows we
+// TerminateProcess() to skip every cleanup path (no atexit, no static dtors,
+// no CRT cleanup). On POSIX we _exit() to match the historical behaviour
+// some test cases relied on for skipping worker-join hangs.
+#ifdef _WIN32
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#  define SIMPLE_TEST_PROCESS_EXIT(code) \
+     (::TerminateProcess(::GetCurrentProcess(), (UINT)(code)))
+#else
+#  include <unistd.h>
+#  define SIMPLE_TEST_PROCESS_EXIT(code) (::_exit((code)))
+#endif
+
+// Main function for test executable.
+// On POSIX we return the result normally so leak sanitizers / coverage
+// instrumentation can run static destructors. On Windows we TerminateProcess
+// after running tests to dodge the libzmq teardown abort.
+#ifdef _WIN32
+#  define SIMPLE_TEST_MAIN() \
+int main(int argc, char* argv[]) { \
+    std::string filter = ""; \
+    if (argc > 1) { \
+        filter = argv[1]; \
+    } \
+    int result = SimpleTest::run_all_tests(filter); \
+    if (SimpleTest::g_test_finalize) SimpleTest::g_test_finalize(); \
+    SIMPLE_TEST_PROCESS_EXIT(result); \
+    return result; /* unreachable on Windows */ \
+}
+#else
+#  define SIMPLE_TEST_MAIN() \
 int main(int argc, char* argv[]) { \
     std::string filter = ""; \
     if (argc > 1) { \
@@ -266,3 +301,4 @@ int main(int argc, char* argv[]) { \
     if (SimpleTest::g_test_finalize) SimpleTest::g_test_finalize(); \
     return result; \
 }
+#endif
