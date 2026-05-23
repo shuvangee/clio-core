@@ -193,6 +193,14 @@ class IpcManager {
   void ClientFinalize();
 
   /**
+   * Reset transport objects before workers are destroyed.
+   * Must be called after StopWorkers() but before WorkOrchestrator::Finalize()
+   * to avoid use-after-free: transports hold raw EventManager* pointers that
+   * are owned by Worker objects freed during Finalize().
+   */
+  void ClearTransports();
+
+  /**
    * Server finalize - cleanup all IPC resources
    */
   void ServerFinalize();
@@ -1374,6 +1382,13 @@ class IpcManager {
   hshm::lbm::TransportPtr client_tcp_transport_;
   // Server-side: Socket transport for IPC client communication
   hshm::lbm::TransportPtr client_ipc_transport_;
+
+  // EventManager for the client recv thread.  Must be declared BEFORE
+  // zmq_transport_ so that it is destroyed AFTER zmq_transport_ during
+  // IpcManager destruction; and its lifetime must exceed the transport reset
+  // in ClientFinalize() so SocketTransport::~SocketTransport() can safely call
+  // em_->RemoveEvent() without a use-after-free.
+  hshm::lbm::EventManager zmq_client_em_;
 
   // Client recv thread (receives completed task outputs via lightbeam)
   std::thread zmq_recv_thread_;

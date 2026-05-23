@@ -385,6 +385,13 @@ void IpcManager::ClientFinalize() {
   // Clients should not destroy shared resources
 }
 
+void IpcManager::ClearTransports() {
+  local_transport_.reset();
+  main_transport_.reset();
+  client_tcp_transport_.reset();
+  client_ipc_transport_.reset();
+}
+
 void IpcManager::ServerFinalize() {
   if (!is_initialized_) {
     return;
@@ -398,13 +405,10 @@ void IpcManager::ServerFinalize() {
   // Close persistent outbound DEALER sockets before resetting transports
   ClearClientPool();
 
-  // Cleanup servers
-  local_transport_.reset();
-  main_transport_.reset();
-
-  // Clean up lightbeam client transport objects
-  client_tcp_transport_.reset();
-  client_ipc_transport_.reset();
+  // Transports may have already been reset by ClearTransports() (called
+  // earlier in the shutdown sequence before workers are freed); these are
+  // no-ops in that case.
+  ClearTransports();
 
   // Clear main allocator pointer
   main_allocator_ = nullptr;
@@ -2645,9 +2649,11 @@ void IpcManager::RecvZmqClientThread() {
     return;
   }
 
-  // Set up EventManager for ZMQ transport polling
-  hshm::lbm::EventManager em;
-  zmq_transport_->RegisterEventManager(em);
+  // Set up EventManager for ZMQ transport polling.
+  // Use the member zmq_client_em_ (not a local) so the EventManager outlives
+  // the transport reset in ClientFinalize() and the ~SocketTransport()
+  // destructor can safely call em_->RemoveEvent().
+  zmq_transport_->RegisterEventManager(zmq_client_em_);
 
   while (zmq_recv_running_.load()) {
     // Drain all available messages first
@@ -2706,7 +2712,7 @@ void IpcManager::RecvZmqClientThread() {
     // Only block on epoll when the drain loop found nothing;
     // if we just processed messages, loop back immediately.
     if (!drained_any) {
-      em.Wait(100);  // 100μs (precise with epoll_pwait2)
+      zmq_client_em_.Wait(100);  // 100μs (precise with epoll_pwait2)
     }
   }
 }

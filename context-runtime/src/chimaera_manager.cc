@@ -351,7 +351,14 @@ void Chimaera::ServerFinalize() {
 
   // Stop workers and finalize server components
   auto *work_orchestrator = CHI_WORK_ORCHESTRATOR;
+  auto *ipc_manager = CHI_IPC;
   work_orchestrator->StopWorkers();
+  // Reset transports while Worker::EventManager objects are still alive.
+  // Transports hold raw EventManager* pointers registered via
+  // admin_runtime; Finalize() below destroys the workers that own them.
+  if (ipc_manager) {
+    ipc_manager->ClearTransports();
+  }
   work_orchestrator->Finalize();
   auto *module_manager = CHI_MODULE_MANAGER;
   module_manager->Finalize();
@@ -359,7 +366,6 @@ void Chimaera::ServerFinalize() {
   // Finalize shared components
   auto *pool_manager = CHI_POOL_MANAGER;
   pool_manager->Finalize();
-  auto *ipc_manager = CHI_IPC;
 
   // Reap all shared memory segments before finalizing IPC
   size_t reaped = ipc_manager->WreapAllIpcs();
