@@ -994,6 +994,9 @@ function(add_clio_module_client)
   set_target_properties(${TARGET_NAME} PROPERTIES
     EXPORT_NAME "${CLIO_RUN_MODULE_NAME}_client"
     OUTPUT_NAME "${_chimod_output_name}"
+    # Auto-export non-static symbols on Windows so dependent module DLLs
+    # (e.g. *_runtime depends on *_client) can find an import lib without
+    # each symbol needing __declspec(dllexport).
     WINDOWS_EXPORT_ALL_SYMBOLS ON
   )
 
@@ -1172,9 +1175,13 @@ function(add_clio_module_runtime)
 
   target_link_libraries(${TARGET_NAME}
     PUBLIC
-      ${RUNTIME_LINK_LIBS} 
-      rt  # POSIX real-time library for async I/O
+      ${RUNTIME_LINK_LIBS}
   )
+  # POSIX real-time library for async I/O. Linux-only — Windows ships its
+  # AIO support in kernel32/winsock, not as a separate library.
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(${TARGET_NAME} PUBLIC rt)
+  endif()
 
   # Create alias for external use
   add_library(${CLIO_RUN_NAMESPACE}::${CLIO_RUN_MODULE_NAME}_runtime ALIAS ${TARGET_NAME})

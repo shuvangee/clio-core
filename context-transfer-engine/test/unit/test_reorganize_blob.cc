@@ -56,8 +56,6 @@
 #include <fstream>
 #include <vector>
 
-#include <hermes_shm/introspect/system_info.h>
-
 #include "simple_test.h"
 
 namespace fs = std::filesystem;
@@ -89,7 +87,7 @@ class ReorganizeBlobTestFixture {
     INFO("=== Initializing ReorganizeBlob Test ===");
 
     // Setup paths
-    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::GetHomeDir();
     REQUIRE(!home_dir.empty());
     config_path_ = chi_test_data_dir() + "/reorganize_blob_config.yaml";
     file_storage_path_ = chi_test_data_dir() + "/reorganize_blob_storage.bin";
@@ -102,8 +100,8 @@ class ReorganizeBlobTestFixture {
 
     // Set environment variable for runtime config
     // CHI_SERVER_CONF is checked first, so set it to override any existing value
-    setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
-    setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
+    ctp::SystemInfo::Setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
+    ctp::SystemInfo::Setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
 
     // Initialize CLIO Runtime runtime
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
@@ -127,12 +125,11 @@ class ReorganizeBlobTestFixture {
   }
 
   void Cleanup() {
-    std::error_code ec;
-    if (fs::exists(config_path_, ec)) {
-      fs::remove(config_path_, ec);
+    if (fs::exists(config_path_)) {
+      fs::remove(config_path_);
     }
-    if (fs::exists(file_storage_path_, ec)) {
-      fs::remove(file_storage_path_, ec);
+    if (fs::exists(file_storage_path_)) {
+      fs::remove(file_storage_path_);
     }
   }
 
@@ -144,10 +141,6 @@ class ReorganizeBlobTestFixture {
   void CreateConfigFile() {
     std::ofstream config_file(config_path_);
     REQUIRE(config_file.is_open());
-
-    // Use forward slashes in YAML to avoid backslash escape issues on Windows
-    std::string yaml_storage_path = file_storage_path_;
-    std::replace(yaml_storage_path.begin(), yaml_storage_path.end(), '\\', '/');
 
     config_file << R"(
 # ReorganizeBlob Test Configuration
@@ -179,7 +172,7 @@ compose:
         score: 1.0
 
       # Slow tier: 64MB File (score 0.2)
-      - path: ")" << yaml_storage_path << R"("
+      - path: ")" << file_storage_path_ << R"("
         bdev_type: "file"
         capacity_limit: "64MB"
         score: 0.2
@@ -445,8 +438,6 @@ TEST_CASE("ReorganizeBlob - Cleanup", "[reorganize][cleanup]") {
 }
 
 int main(int argc, char** argv) {
-  hshm::SystemInfo::SuppressErrorDialogs();
-
   // Create fixture (initializes runtime)
   g_fixture = new ReorganizeBlobTestFixture();
 
@@ -458,7 +449,6 @@ int main(int argc, char** argv) {
   delete g_fixture;
   g_fixture = nullptr;
 
-  chi::CHIMAERA_FINALIZE();
-  SIMPLE_TEST_HARD_EXIT(result);
-  return result;
+  SIMPLE_TEST_PROCESS_EXIT(result);
+  return result;  // unreachable on Windows
 }

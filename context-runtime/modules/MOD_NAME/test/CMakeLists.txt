@@ -145,12 +145,6 @@ set_target_properties(${STREAMING_TEST_TARGET} PROPERTIES
 
 # Enable CTest integration if testing is enabled
 if(CLIO_CORE_ENABLE_TESTS)
-  # Platform-portable library search path for test environment
-  if(WIN32)
-    set(CHI_TEST_LIB_ENV "PATH=${CMAKE_BINARY_DIR}/bin\;$ENV{PATH}")
-  else()
-    set(CHI_TEST_LIB_ENV "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}")
-  endif()
   # Each binary is registered once and runs all its Catch2 sections in a single
   # chimaera init/finalize cycle.  The previous setup added ~22 filtered ctest
   # entries over the same 4 binaries, which forced ~22 init/finalize cycles
@@ -161,20 +155,17 @@ if(CLIO_CORE_ENABLE_TESTS)
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
   )
 
-
   add_test(
     NAME cr_all_comutex_tests
     COMMAND ${COMUTEX_TEST_TARGET}
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
   )
 
-
   add_test(
     NAME cr_all_wait_functionality_tests
     COMMAND ${WAIT_FUNCTIONALITY_TEST_TARGET}
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
   )
-
 
   add_test(
     NAME cr_all_streaming_tests
@@ -189,7 +180,7 @@ if(CLIO_CORE_ENABLE_TESTS)
     cr_all_streaming_tests
     PROPERTIES
       TIMEOUT 300
-      ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV};CHIMAERA_TEST_MODE=1"
+      ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHIMAERA_TEST_MODE=1;CLIO_BIND_ADDR=127.0.0.1;CLIO_PORT=10500"
       LABELS "msan_skip;asan_skip"
   )
 

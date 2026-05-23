@@ -40,7 +40,10 @@
 
 #include "../simple_test.h"
 
-#include <cstdlib>
+#ifndef _WIN32
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 
 #include "clio_runtime/clio_runtime.h"
 #include "clio_runtime/ipc_manager.h"
@@ -125,6 +128,7 @@ TEST_CASE("IpcErrors - Connection Timeout", "[ipc][errors]") {
 // ============================================================================
 
 TEST_CASE("IpcErrors - Huge Buffer Allocation", "[ipc][errors][memory]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
@@ -133,29 +137,50 @@ TEST_CASE("IpcErrors - Huge Buffer Allocation", "[ipc][errors][memory]") {
   // Try to allocate impossibly large buffer
   size_t huge_size = ctp::Unit<size_t>::Terabytes(100);
   auto buf = ipc->AllocateBuffer(huge_size);
+
+  // Should return null pointer, not crash
   REQUIRE(buf.IsNull());
+
+  // Note: Cleanup happens once at end of all tests
 }
 
 TEST_CASE("IpcErrors - Zero Size Allocation", "[ipc][errors][memory]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
+  // Try to allocate zero-size buffer
   auto buf = ipc->AllocateBuffer(0);
+
+  // Should handle gracefully (either null or valid pointer)
+  // The important thing is it doesn't crash
+
+  // If we got a buffer, free it
   if (!buf.IsNull()) {
     ipc->FreeBuffer(buf);
   }
+
+  // Note: Cleanup happens once at end of all tests
 }
 
 TEST_CASE("IpcErrors - Invalid Buffer Free", "[ipc][errors][memory]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
+  // Try to free null buffer - this should be handled gracefully
   FullPtr<char> null_buf;
   ipc->FreeBuffer(null_buf);
+
+  // Note: We don't test freeing invalid pointers (like 0xDEADBEEF) because
+  // that's undefined behavior and will cause segfaults. The allocator can't
+  // validate if a pointer is valid before dereferencing it.
+
+  // Note: Cleanup happens once at end of all tests
 }
 
 // ============================================================================
@@ -163,47 +188,65 @@ TEST_CASE("IpcErrors - Invalid Buffer Free", "[ipc][errors][memory]") {
 // ============================================================================
 
 TEST_CASE("IpcErrors - Invalid Node ID", "[ipc][errors][network]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
+  // Try to get host with invalid node ID
   auto *host = ipc->GetHost(0xDEADBEEF);
   REQUIRE(host == nullptr);
 
+  // Note: GetHost(0) returns a valid host in single-node setup (node_id 0 =
+  // localhost), so we use a different large invalid ID instead.
   host = ipc->GetHost(0xFFFFFFFF);
   REQUIRE(host == nullptr);
+
+  // Note: Cleanup happens once at end of all tests
 }
 
 TEST_CASE("IpcErrors - Invalid IP Address", "[ipc][errors][network]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
+  // Try to get host by invalid IP
   auto *host = ipc->GetHostByIp("999.999.999.999");
   REQUIRE(host == nullptr);
 
+  // Try empty IP
   host = ipc->GetHostByIp("");
   REQUIRE(host == nullptr);
 
+  // Try malformed IP
   host = ipc->GetHostByIp("not.an.ip.address");
   REQUIRE(host == nullptr);
+
+  // Note: Cleanup happens once at end of all tests
 }
 
 TEST_CASE("IpcErrors - Network Client Creation Failure",
           "[ipc][errors][network]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
+  // Try to create client with invalid address
+  // TransportFactory::GetClient may throw for invalid protocols
   try {
     auto *client = ipc->GetOrCreateClient("invalid://address", 0);
+    // May return nullptr or valid client depending on implementation
     (void)client;
   } catch (const std::exception &e) {
     // Exception is acceptable for invalid address
   }
+
+  // Note: Cleanup happens once at end of all tests
 }
 
 // ============================================================================
@@ -211,6 +254,7 @@ TEST_CASE("IpcErrors - Network Client Creation Failure",
 // ============================================================================
 
 TEST_CASE("IpcErrors - Network Queue Operations", "[ipc][errors][queue]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
@@ -223,6 +267,7 @@ TEST_CASE("IpcErrors - Network Queue Operations", "[ipc][errors][queue]") {
   REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutLatency, future));
   REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutIO, future));
 
+  // Note: Cleanup happens once at end of all tests
 }
 
 // ============================================================================
@@ -230,6 +275,7 @@ TEST_CASE("IpcErrors - Network Queue Operations", "[ipc][errors][queue]") {
 // ============================================================================
 
 TEST_CASE("IpcErrors - Invalid Allocator Registration", "[ipc][errors][shm]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
@@ -238,18 +284,24 @@ TEST_CASE("IpcErrors - Invalid Allocator Registration", "[ipc][errors][shm]") {
   // Try to register with invalid allocator ID
   ctp::ipc::AllocatorId invalid_id(0xFFFF, 0xFFFF);
   bool registered = ipc->RegisterMemory(invalid_id);
-  (void)registered;
+  // May succeed or fail, but shouldn't crash
+
+  // Note: Cleanup happens once at end of all tests
 }
 
 TEST_CASE("IpcErrors - GetClientShmInfo Invalid Index",
           "[ipc][errors][shm]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
+  // Try to get info with invalid index
   ClientShmInfo info = ipc->GetClientShmInfo(9999);
-  (void)info;
+  // Should return empty/default info, not crash
+
+  // Note: Cleanup happens once at end of all tests
 }
 
 // ============================================================================
@@ -257,17 +309,26 @@ TEST_CASE("IpcErrors - GetClientShmInfo Invalid Index",
 // ============================================================================
 
 TEST_CASE("IpcErrors - SetNumSchedQueues Edge Cases", "[ipc][errors][sched]") {
+  // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
   auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
+  // Get current value
   u32 original = ipc->GetNumSchedQueues();
   REQUIRE(original > 0);
 
+  // Try to set to 0 (should be rejected or handled gracefully)
   ipc->SetNumSchedQueues(0);
+
+  // Try to set to huge value
   ipc->SetNumSchedQueues(1000000);
+
+  // Restore original (if possible)
   ipc->SetNumSchedQueues(original);
+
+  // Note: Cleanup happens once at end of all tests
 }
 
 // ============================================================================
@@ -297,7 +358,7 @@ TEST_CASE("IpcErrors - Concurrent Init/Finalize", "[ipc][errors][multiproc]") {
           ipc->GetNumSchedQueues();
 
           // Finalize using CLIO Runtime API
-          CLIO_CHIMAERA_MANAGER->ServerFinalize();
+          CLIO_RUNTIME_MANAGER->ServerFinalize();
         }
         exit(0);
       } else {
@@ -326,9 +387,11 @@ TEST_CASE("IpcErrors - Concurrent Init/Finalize", "[ipc][errors][multiproc]") {
 // ============================================================================
 
 TEST_CASE("IpcErrors - ZZZ Final Cleanup", "[ipc][errors][cleanup]") {
-  // Finalize before hard exit to release ZMQ ports
-  chi::CHIMAERA_FINALIZE();
-  SIMPLE_TEST_HARD_EXIT(0);
+  // This test runs last (ZZZ prefix ensures it's last alphabetically).
+  // Force exit to avoid hanging on worker thread joins during finalization.
+  // SIMPLE_TEST_PROCESS_EXIT is TerminateProcess on Windows (bypasses the
+  // libzmq teardown abort) and ::_exit elsewhere.
+  SIMPLE_TEST_PROCESS_EXIT(0);
 }
 
 SIMPLE_TEST_MAIN()

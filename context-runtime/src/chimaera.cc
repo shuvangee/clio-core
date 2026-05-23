@@ -51,15 +51,10 @@ bool ClioInitImpl(ChimaeraMode mode, bool default_with_runtime,
     return true;  // Already initialized, return success
   }
 
-  // Suppress OS error dialogs so tests don't block on popups
-  ctp::SystemInfo::SuppressErrorDialogs();
-
-  auto* chimaera_manager = CLIO_CHIMAERA_MANAGER;
-  chimaera_manager->is_restart_ = is_restart;
+  auto* runtime_manager = CLIO_RUNTIME_MANAGER;
+  runtime_manager->is_restart_ = is_restart;
 
   // Check environment variable CHI_WITH_RUNTIME
-  // Use hshm::SystemInfo::Getenv for Windows compatibility (std::getenv
-  // doesn't reflect changes made via SetEnvironmentVariable/Setenv)
   bool with_runtime = default_with_runtime;
   const char* env_val = chi::env::GetCompat("WITH_RUNTIME");
   if (env_val != nullptr) {
@@ -84,14 +79,14 @@ bool ClioInitImpl(ChimaeraMode mode, bool default_with_runtime,
 
   // Initialize runtime first if needed
   if (init_runtime) {
-    if (!chimaera_manager->ServerInit()) {
+    if (!runtime_manager->ServerInit()) {
       return false;
     }
   }
 
   // Initialize client components
   if (init_client) {
-    if (!chimaera_manager->ClientInit()) {
+    if (!runtime_manager->ClientInit()) {
       return false;
     }
   }
@@ -113,7 +108,7 @@ void CHIMAERA_FINALIZE() {
     return;
   }
   s_finalized = true;
-  auto *mgr = CLIO_CHIMAERA_MANAGER;
+  auto *mgr = CLIO_RUNTIME_MANAGER;
   if (mgr) {
     // Server first: stop worker threads that may still be sending IPC
     mgr->ServerFinalize();

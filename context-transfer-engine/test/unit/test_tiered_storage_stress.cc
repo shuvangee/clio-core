@@ -53,8 +53,6 @@
 #include <fstream>
 #include <vector>
 
-#include <hermes_shm/introspect/system_info.h>
-
 #include "simple_test.h"
 
 namespace fs = std::filesystem;
@@ -87,7 +85,7 @@ class TieredStorageStressFixture {
     INFO("=== Initializing Tiered Storage Stress Test ===");
 
     // Setup paths
-    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::GetHomeDir();
     REQUIRE(!home_dir.empty());
     config_path_ = chi_test_data_dir() + "/tiered_stress_config.yaml";
     file_storage_path_ = chi_test_data_dir() + "/tiered_stress_storage.bin";
@@ -100,8 +98,8 @@ class TieredStorageStressFixture {
 
     // Set environment variable for runtime config
     // CHI_SERVER_CONF is checked first, so set it to override any existing value
-    setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
-    setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
+    ctp::SystemInfo::Setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
+    ctp::SystemInfo::Setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
 
     // Initialize CLIO Runtime runtime
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
@@ -125,12 +123,11 @@ class TieredStorageStressFixture {
   }
 
   void Cleanup() {
-    std::error_code ec;
-    if (fs::exists(config_path_, ec)) {
-      fs::remove(config_path_, ec);
+    if (fs::exists(config_path_)) {
+      fs::remove(config_path_);
     }
-    if (fs::exists(file_storage_path_, ec)) {
-      fs::remove(file_storage_path_, ec);
+    if (fs::exists(file_storage_path_)) {
+      fs::remove(file_storage_path_);
     }
   }
 
@@ -140,10 +137,6 @@ class TieredStorageStressFixture {
   void CreateConfigFile() {
     std::ofstream config_file(config_path_);
     REQUIRE(config_file.is_open());
-
-    // Use forward slashes in YAML to avoid backslash escape issues on Windows
-    std::string yaml_storage_path = file_storage_path_;
-    std::replace(yaml_storage_path.begin(), yaml_storage_path.end(), '\\', '/');
 
     config_file << R"(
 # Tiered Storage Stress Test Configuration
@@ -175,7 +168,7 @@ compose:
         score: 0.0
 
       # Slow tier: 256MB File
-      - path: ")" << yaml_storage_path << R"("
+      - path: ")" << file_storage_path_ << R"("
         bdev_type: "file"
         capacity_limit: "256MB"
         score: 1.0
@@ -408,8 +401,6 @@ TEST_CASE("TieredStorage - Cleanup", "[tiered][stress][cleanup]") {
 }
 
 int main(int argc, char** argv) {
-  hshm::SystemInfo::SuppressErrorDialogs();
-
   // Create fixture (initializes runtime)
   g_fixture = new TieredStorageStressFixture();
 
@@ -421,7 +412,8 @@ int main(int argc, char** argv) {
   delete g_fixture;
   g_fixture = nullptr;
 
-  chi::CHIMAERA_FINALIZE();
-  SIMPLE_TEST_HARD_EXIT(result);
-  return result;
+  // SIMPLE_TEST_PROCESS_EXIT is TerminateProcess on Windows to dodge the
+  // libzmq teardown abort; a plain return elsewhere.
+  SIMPLE_TEST_PROCESS_EXIT(result);
+  return result;  // unreachable on Windows
 }

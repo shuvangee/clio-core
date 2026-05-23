@@ -200,14 +200,18 @@ CTP_CROSS_FUN static inline T *GetGlobalCrossVar(T &instance) {
 #endif
 
 /**
- * C-style pointer singleton with global variables
+ * C-style pointer singleton with global variables.
+ *
+ * No DLL decoration here: globals declared via this macro are typically
+ * local to a single DLL, or — when accessed across DLL boundaries on
+ * Windows — must be decorated with a per-DLL API macro at the use site
+ * (Windows requires explicit __declspec(dllimport) on data symbols
+ * imported from another DLL; CMake's WINDOWS_EXPORT_ALL_SYMBOLS handles
+ * function symbols but not data).
  */
 #define CTP_DEFINE_GLOBAL_PTR_VAR_H(T, NAME) extern __TU(T) * NAME;
 #define CTP_DEFINE_GLOBAL_PTR_VAR_CC(T, NAME) __TU(T) *NAME = nullptr;
 #define CTP_GET_GLOBAL_PTR_VAR(T, NAME) ctp::GetGlobalPtrVar<__TU(T)>(NAME)
-// API-annotated variants for DLL-exported globals (Windows dllexport/dllimport)
-#define CTP_DEFINE_GLOBAL_API_PTR_VAR_H(API, T, NAME) extern API __TU(T) * NAME;
-#define CTP_DEFINE_GLOBAL_API_PTR_VAR_CC(API, T, NAME) API __TU(T) *NAME = nullptr;
 template <typename T>
 static inline T *GetGlobalPtrVar(T *&instance) {
   if (instance == nullptr) {

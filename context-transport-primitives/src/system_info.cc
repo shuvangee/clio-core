@@ -47,8 +47,6 @@
 #endif
 // LCOV_EXCL_STOP
 #include <cstdlib>
-#include <fstream>
-#include <iostream>
 #include <string>
 
 #include "clio_ctp/constants/macros.h"
@@ -64,9 +62,15 @@
 #define CTP_MSAN_UNPOISON(ptr, size) ((void)0)
 #endif
 #if CTP_ENABLE_PROCFS_SYSINFO
-#include <limits.h>
+#include <arpa/inet.h>
+#include <dirent.h>
 #include <dlfcn.h>
+#include <ifaddrs.h>
+#include <libgen.h>
+#include <limits.h>
+#include <netdb.h>
 #include <signal.h>
+#include <sys/socket.h>
 // LINUX
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -78,24 +82,43 @@
 #include <sys/sysctl.h>
 #endif
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <unistd.h>
 #if __linux__
 #include <linux/memfd.h>
 #endif
-#if __APPLE__
-#include <mach-o/dyld.h>
-#endif
 // WINDOWS
 #elif CTP_ENABLE_WINDOWS_SYSINFO
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
 #include <windows.h>
-#include <crtdbg.h>
+#include <filesystem>
+#pragma comment(lib, "iphlpapi.lib")
+#pragma comment(lib, "ws2_32.lib")
 #else
 #error \
     "Must define either CTP_ENABLE_PROCFS_SYSINFO or CTP_ENABLE_WINDOWS_SYSINFO"
 #endif
 
 namespace ctp {
+
+#if CTP_ENABLE_WINDOWS_SYSINFO
+// Translate a POSIX shm_open()-style name ("/ctp_xxx") into a Win32
+// kernel-object name. Win32 names can't contain `/`; the "Local\" prefix
+// places the object in the user's session namespace, which is correct
+// for per-host SHM. Returns the cleaned name suitable for both
+// CreateFileMapping and OpenFileMapping.
+static std::string WinShmName(const std::string &posix_name) {
+  std::string base = posix_name;
+  while (!base.empty() && (base.front() == '/' || base.front() == '\\')) {
+    base.erase(0, 1);
+  }
+  for (auto &c : base) {
+    if (c == '/' || c == '\\') c = '_';
+  }
+  return "Local\\" + base;
+}
+#endif
 
 void SystemInfo::RefreshCpuFreqKhz() {
 #if CTP_IS_HOST
@@ -473,15 +496,19 @@ bool SystemInfo::CreateNewSharedMemory(File &fd, const std::string &name,
   return true;
 #endif
 #elif CTP_ENABLE_WINDOWS_SYSINFO
-  DWORD size_hi = static_cast<DWORD>(size >> 32);
-  DWORD size_lo = static_cast<DWORD>(size & 0xFFFFFFFF);
+  // POSIX shared memory names start with `/` (e.g. "/ctp_shm_42"). Win32
+  // kernel object names can't contain `/`, so map to "Local\<base>" — the
+  // per-session namespace, which is right for single-host SHM. Without
+  // this the mapping was created anonymously (nullptr name) and could
+  // not be reopened by name, breaking every OpenSharedMemory.
+  std::string win_name = WinShmName(name);
   fd.windows_fd_ =
-      CreateFileMapping(INVALID_HANDLE_VALUE,  // use paging file
-                        nullptr,               // default security
-                        PAGE_READWRITE,        // read/write access
-                        size_hi,               // maximum object size (high-order DWORD)
-                        size_lo,               // maximum object size (low-order DWORD)
-                        name.c_str());         // name of mapping object
+      CreateFileMapping(INVALID_HANDLE_VALUE,    // use paging file
+                        nullptr,                 // default security
+                        PAGE_READWRITE,          // read/write access
+                        0,           // maximum object size (high-order DWORD)
+                        static_cast<DWORD>(size),  // low-order DWORD
+                        win_name.c_str());         // mapping object name
   return fd.windows_fd_ != nullptr;
 #endif
 }
@@ -497,7 +524,9 @@ bool SystemInfo::OpenSharedMemory(File &fd, const std::string &name) {
   return fd.posix_fd_ >= 0;
 #endif
 #elif CTP_ENABLE_WINDOWS_SYSINFO
-  fd.windows_fd_ = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
+  std::string win_name = WinShmName(name);
+  fd.windows_fd_ =
+      OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, win_name.c_str());
   return fd.windows_fd_ != nullptr;
 #endif
 }
@@ -555,22 +584,14 @@ void *SystemInfo::MapSharedMemory(const File &fd, size_t size, i64 off) {
   CTP_MSAN_UNPOISON(ptr, size);
   return ptr;
 #elif CTP_ENABLE_WINDOWS_SYSINFO
-  // Windows MapViewOfFile requires the offset to be aligned to the system
-  // allocation granularity (typically 64KB). Align down and adjust the pointer.
-  SYSTEM_INFO si;
-  GetSystemInfo(&si);
-  DWORD granularity = si.dwAllocationGranularity;
-  i64 aligned_off = off & ~(static_cast<i64>(granularity) - 1);
-  size_t delta = static_cast<size_t>(off - aligned_off);
-  size_t aligned_size = size + delta;
-
-  DWORD highDword = (DWORD)((aligned_off >> 32) & 0xFFFFFFFF);
-  DWORD lowDword = (DWORD)(aligned_off & 0xFFFFFFFF);
+  // Convert i64 to low and high dwords
+  DWORD highDword = (DWORD)((off >> 32) & 0xFFFFFFFF);
+  DWORD lowDword = (DWORD)(off & 0xFFFFFFFF);
   void *ret = MapViewOfFile(fd.windows_fd_,       // handle to map object
                             FILE_MAP_ALL_ACCESS,  // read/write permission
                             highDword,            // file offset high
                             lowDword,             // file offset low
-                            aligned_size);        // number of bytes to map
+                            size);                // number of bytes to map
   if (ret == nullptr) {
     DWORD error = GetLastError();
     LPVOID msg_buf;
@@ -580,80 +601,16 @@ void *SystemInfo::MapSharedMemory(const File &fd, size_t size, i64 off) {
                   (LPTSTR)&msg_buf, 0, NULL);
     printf("MapViewOfFile failed with error: %s\n", (char *)msg_buf);
     LocalFree(msg_buf);
-    return nullptr;
   }
-  return static_cast<char *>(ret) + delta;
+  return ret;
 #endif
 }
-
-void *SystemInfo::MapMixedMemory(const File &fd, size_t private_size,
-                                  size_t shared_size, i64 shared_offset) {
-#if CTP_ENABLE_PROCFS_SYSINFO
-  // Calculate total size
-  size_t total_size = private_size + shared_size;
-
-  // Step 1: Reserve the entire contiguous address space
-  // Map the entire region as private/anonymous to reserve virtual addresses
-  void *ptr = mmap64(nullptr, total_size, PROT_READ | PROT_WRITE,
-                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  if (ptr == MAP_FAILED) {
-    perror("MapMixedMemory: initial mmap failed");
-    return nullptr;
-  }
-
-  // Step 2: Remap the shared portion using MAP_FIXED
-  // This replaces the shared portion with actual shared memory from the fd
-  // The private portion remains as private/anonymous
-  char *shared_ptr = static_cast<char*>(ptr) + private_size;
-  void *result = mmap64(shared_ptr, shared_size, PROT_READ | PROT_WRITE,
-                        MAP_SHARED | MAP_FIXED, fd.posix_fd_, shared_offset);
-  if (result == MAP_FAILED || result != shared_ptr) {
-    int saved_errno = errno;
-    fprintf(stderr, "MapMixedMemory: MAP_FIXED mmap failed\n");
-    fprintf(stderr, "  Requested addr: %p\n", shared_ptr);
-    fprintf(stderr, "  Size: %zu bytes\n", shared_size);
-    fprintf(stderr, "  fd: %d\n", fd.posix_fd_);
-    fprintf(stderr, "  offset: %ld\n", shared_offset);
-    fprintf(stderr, "  errno: %d (%s)\n", saved_errno, strerror(saved_errno));
-    if (result != MAP_FAILED && result != shared_ptr) {
-      fprintf(stderr, "  Got addr: %p (unexpected!)\n", result);
-      munmap(result, shared_size);
-    }
-    // Clean up: unmap the entire region
-    munmap(ptr, total_size);
-    return nullptr;
-  }
-
-  // Success: we now have [private_size bytes private | shared_size bytes shared]
-  return ptr;
-
-#elif CTP_ENABLE_WINDOWS_SYSINFO
-  // Windows doesn't support MAP_FIXED-style mixed private/shared mappings.
-  // Map the full region (private_size + shared_size) as file-backed shared
-  // memory so that all offsets and sizes match the Linux layout exactly.
-  // The "private header" portion will be file-backed (shared between processes)
-  // rather than truly per-process private. The MultiProcessAllocator handles
-  // this by using process-local storage for its private header data on Windows.
-  return MapSharedMemory(fd, private_size + shared_size, shared_offset);
-#endif
-}
-
 
 void SystemInfo::UnmapMemory(void *ptr, size_t size) {
 #if CTP_ENABLE_PROCFS_SYSINFO
   munmap(ptr, size);
 #elif CTP_ENABLE_WINDOWS_SYSINFO
-  // Use VirtualQuery to determine how the memory was allocated.
-  // MapViewOfFile regions have Type MEM_MAPPED, VirtualAlloc regions have
-  // MEM_PRIVATE.
-  MEMORY_BASIC_INFORMATION mbi;
-  if (VirtualQuery(ptr, &mbi, sizeof(mbi)) != 0 && mbi.Type == MEM_MAPPED) {
-    // For MapViewOfFile, must unmap with the allocation base (handles
-    // offset-adjusted pointers from MapSharedMemory).
-    UnmapViewOfFile(mbi.AllocationBase);
-  } else {
-    VirtualFree(ptr, 0, MEM_RELEASE);
-  }
+  VirtualFree(ptr, size, MEM_RELEASE);
 #endif
 }
 
@@ -662,6 +619,14 @@ void *SystemInfo::AlignedAlloc(size_t alignment, size_t size) {
   return aligned_alloc(alignment, size);
 #elif CTP_ENABLE_WINDOWS_SYSINFO
   return _aligned_malloc(size, alignment);
+#endif
+}
+
+void SystemInfo::AlignedFree(void *ptr) {
+#if CTP_ENABLE_PROCFS_SYSINFO
+  free(ptr);
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  _aligned_free(ptr);
 #endif
 }
 
@@ -702,6 +667,244 @@ std::string SystemInfo::GetModuleDirectory() {
   auto pos2 = path_str.rfind('\\');
   if (pos2 == std::string::npos) pos2 = path_str.rfind('/');
   return (pos2 != std::string::npos) ? path_str.substr(0, pos2) : std::string();
+#endif
+}
+
+uint64_t SystemInfo::ThreadCpuTimeNs() {
+#if CTP_ENABLE_PROCFS_SYSINFO
+  struct timespec ts;
+#ifdef CLOCK_THREAD_CPUTIME_ID
+  if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
+    return static_cast<uint64_t>(ts.tv_sec) * 1000000000ull +
+           static_cast<uint64_t>(ts.tv_nsec);
+  }
+#endif
+  return 0;
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  FILETIME create_t, exit_t, kernel_t, user_t;
+  if (!::GetThreadTimes(::GetCurrentThread(), &create_t, &exit_t, &kernel_t,
+                         &user_t)) {
+    return 0;
+  }
+  auto to_u64 = [](FILETIME f) {
+    ULARGE_INTEGER u;
+    u.LowPart = f.dwLowDateTime;
+    u.HighPart = f.dwHighDateTime;
+    return u.QuadPart;  // 100-ns intervals
+  };
+  return (to_u64(kernel_t) + to_u64(user_t)) * 100ull;
+#endif
+}
+
+std::string SystemInfo::GetMathLibraryName() {
+#if CTP_ENABLE_PROCFS_SYSINFO
+  return "libm.so.6";
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  return "ucrtbase.dll";
+#endif
+}
+
+void SystemInfo::TerminateProcessNow(int exit_code) {
+#if CTP_ENABLE_PROCFS_SYSINFO
+  // No-op on POSIX: callers fall through and main() returns normally,
+  // so static destructors, atexit handlers, leak sanitizers, and coverage
+  // instrumentation all run as they should.
+  (void)exit_code;
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  // TerminateProcess skips DLL detach notifications and the entire
+  // destructor chain, which is exactly what we need to dodge libzmq's
+  // signaler abort during shutdown on Windows.
+  ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(exit_code));
+  // Fallback in case TerminateProcess somehow returns (it shouldn't).
+  ::_exit(exit_code);
+#endif
+}
+
+void SystemInfo::SetCurrentThreadName(const std::string &name) {
+#if CTP_ENABLE_PROCFS_SYSINFO
+#ifdef __linux__
+  // pthread_setname_np truncates names longer than 15 chars (+ NUL).
+  pthread_setname_np(pthread_self(), name.substr(0, 15).c_str());
+#endif
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  // SetThreadDescription needs wide chars.
+  std::wstring wname(name.begin(), name.end());
+  SetThreadDescription(GetCurrentThread(), wname.c_str());
+#endif
+}
+
+std::string SystemInfo::GetHomeDir() {
+#if CTP_ENABLE_PROCFS_SYSINFO
+  const char *home = std::getenv("HOME");
+  return home ? std::string(home) : std::string();
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  // USERPROFILE is the canonical home on Windows (C:\Users\<name>).
+  // Fall back to HOMEDRIVE+HOMEPATH or HOME if a user explicitly set them.
+  char buf[MAX_PATH];
+  DWORD len = ::GetEnvironmentVariableA("USERPROFILE", buf, sizeof(buf));
+  if (len > 0 && len < sizeof(buf)) return std::string(buf, len);
+  len = ::GetEnvironmentVariableA("HOME", buf, sizeof(buf));
+  if (len > 0 && len < sizeof(buf)) return std::string(buf, len);
+  return std::string();
+#endif
+}
+
+std::string SystemInfo::GetHostname() {
+  char buf[256] = {0};
+#if CTP_ENABLE_PROCFS_SYSINFO
+  if (gethostname(buf, sizeof(buf) - 1) != 0) return "";
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  DWORD len = sizeof(buf);
+  if (!GetComputerNameExA(ComputerNameDnsHostname, buf, &len)) return "";
+#endif
+  return std::string(buf);
+}
+
+std::string SystemInfo::GetModuleDirectoryFor(void *symbol) {
+  if (!symbol) return "";
+#if CTP_ENABLE_PROCFS_SYSINFO
+  Dl_info dl_info;
+  if (dladdr(symbol, &dl_info) == 0) return "";
+  char resolved[PATH_MAX];
+  if (realpath(dl_info.dli_fname, resolved) == nullptr) return "";
+  std::string resolved_str(resolved);
+  auto pos = resolved_str.rfind('/');
+  return (pos != std::string::npos) ? resolved_str.substr(0, pos)
+                                    : std::string();
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  HMODULE hModule = nullptr;
+  if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                              GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          reinterpret_cast<LPCSTR>(symbol), &hModule)) {
+    return "";
+  }
+  char path[MAX_PATH];
+  if (GetModuleFileNameA(hModule, path, MAX_PATH) == 0) return "";
+  std::string path_str(path);
+  auto pos2 = path_str.rfind('\\');
+  if (pos2 == std::string::npos) pos2 = path_str.rfind('/');
+  return (pos2 != std::string::npos) ? path_str.substr(0, pos2) : std::string();
+#endif
+}
+
+std::vector<std::string> SystemInfo::GetLocalInterfaceIps() {
+  std::vector<std::string> ips;
+#if CTP_ENABLE_PROCFS_SYSINFO
+  struct ifaddrs *ifaddr = nullptr;
+  if (getifaddrs(&ifaddr) != 0 || ifaddr == nullptr) return ips;
+  for (struct ifaddrs *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) continue;
+    char buf[INET6_ADDRSTRLEN] = {0};
+    const int fam = ifa->ifa_addr->sa_family;
+    if (fam == AF_INET) {
+      auto *sa = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr);
+      if (inet_ntop(AF_INET, &sa->sin_addr, buf, sizeof(buf))) {
+        ips.emplace_back(buf);
+      }
+    } else if (fam == AF_INET6) {
+      auto *sa = reinterpret_cast<struct sockaddr_in6 *>(ifa->ifa_addr);
+      if (inet_ntop(AF_INET6, &sa->sin6_addr, buf, sizeof(buf))) {
+        std::string s(buf);
+        auto pct = s.find('%');
+        ips.push_back(pct == std::string::npos ? s : s.substr(0, pct));
+      }
+    }
+  }
+  freeifaddrs(ifaddr);
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  ULONG buf_len = 16 * 1024;
+  std::vector<char> buf(buf_len);
+  auto *addrs = reinterpret_cast<IP_ADAPTER_ADDRESSES *>(buf.data());
+  const ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
+                      GAA_FLAG_SKIP_DNS_SERVER;
+  ULONG rc = GetAdaptersAddresses(AF_UNSPEC, flags, nullptr, addrs, &buf_len);
+  if (rc == ERROR_BUFFER_OVERFLOW) {
+    buf.resize(buf_len);
+    addrs = reinterpret_cast<IP_ADAPTER_ADDRESSES *>(buf.data());
+    rc = GetAdaptersAddresses(AF_UNSPEC, flags, nullptr, addrs, &buf_len);
+  }
+  if (rc != NO_ERROR) return ips;
+  for (auto *a = addrs; a != nullptr; a = a->Next) {
+    for (auto *u = a->FirstUnicastAddress; u != nullptr; u = u->Next) {
+      char text[INET6_ADDRSTRLEN] = {0};
+      auto *sa = u->Address.lpSockaddr;
+      if (sa->sa_family == AF_INET) {
+        auto *in4 = reinterpret_cast<sockaddr_in *>(sa);
+        if (inet_ntop(AF_INET, &in4->sin_addr, text, sizeof(text))) {
+          ips.emplace_back(text);
+        }
+      } else if (sa->sa_family == AF_INET6) {
+        auto *in6 = reinterpret_cast<sockaddr_in6 *>(sa);
+        if (inet_ntop(AF_INET6, &in6->sin6_addr, text, sizeof(text))) {
+          std::string s(text);
+          auto pct = s.find('%');
+          ips.push_back(pct == std::string::npos ? s : s.substr(0, pct));
+        }
+      }
+    }
+  }
+#endif
+  return ips;
+}
+
+std::vector<std::string> SystemInfo::ResolveHostname(const std::string &host) {
+  std::vector<std::string> ips;
+  struct addrinfo hints {};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  struct addrinfo *res = nullptr;
+  if (getaddrinfo(host.c_str(), nullptr, &hints, &res) != 0 || res == nullptr) {
+    return ips;
+  }
+  for (struct addrinfo *p = res; p != nullptr; p = p->ai_next) {
+    char buf[INET6_ADDRSTRLEN] = {0};
+    if (p->ai_family == AF_INET) {
+      auto *sa = reinterpret_cast<struct sockaddr_in *>(p->ai_addr);
+      if (inet_ntop(AF_INET, &sa->sin_addr, buf, sizeof(buf))) {
+        ips.emplace_back(buf);
+      }
+    } else if (p->ai_family == AF_INET6) {
+      auto *sa = reinterpret_cast<struct sockaddr_in6 *>(p->ai_addr);
+      if (inet_ntop(AF_INET6, &sa->sin6_addr, buf, sizeof(buf))) {
+        std::string s(buf);
+        auto pct = s.find('%');
+        ips.push_back(pct == std::string::npos ? s : s.substr(0, pct));
+      }
+    }
+  }
+  freeaddrinfo(res);
+  return ips;
+}
+
+std::vector<std::string> SystemInfo::ListDirectory(const std::string &path) {
+  std::vector<std::string> entries;
+#if CTP_ENABLE_PROCFS_SYSINFO
+  DIR *dir = opendir(path.c_str());
+  if (dir == nullptr) return entries;
+  while (struct dirent *entry = readdir(dir)) {
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+      continue;
+    }
+    entries.emplace_back(entry->d_name);
+  }
+  closedir(dir);
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  std::error_code ec;
+  if (!std::filesystem::is_directory(path, ec)) return entries;
+  for (auto &p : std::filesystem::directory_iterator(path, ec)) {
+    if (ec) break;
+    entries.push_back(p.path().filename().string());
+  }
+#endif
+  return entries;
+}
+
+bool SystemInfo::RemoveFile(const std::string &path) {
+#if CTP_ENABLE_PROCFS_SYSINFO
+  return ::unlink(path.c_str()) == 0;
+#elif CTP_ENABLE_WINDOWS_SYSINFO
+  std::error_code ec;
+  return std::filesystem::remove(path, ec);
 #endif
 }
 
@@ -758,12 +961,19 @@ void SystemInfo::Setenv(const char *name, const std::string &value,
 #if CTP_ENABLE_PROCFS_SYSINFO
   setenv(name, value.c_str(), overwrite);
 #elif CTP_ENABLE_WINDOWS_SYSINFO
-  // Use _putenv_s to update BOTH the C runtime env (read by std::getenv)
-  // and the Win32 env block (read by GetEnvironmentVariable).
-  // SetEnvironmentVariable alone only updates the Win32 block.
-  if (overwrite || GetEnvironmentVariable(name, nullptr, 0) == 0) {
-    _putenv_s(name, value.c_str());
+  // _putenv_s updates BOTH the CRT environment block (which std::getenv
+  // reads) and the Win32 process environment block (which
+  // GetEnvironmentVariable reads). SetEnvironmentVariable only touches
+  // the Win32 block, which would leave std::getenv blind to the new
+  // value — and chi::env::GetCompat goes through std::getenv. Honor the
+  // overwrite flag manually since _putenv_s always overwrites.
+  if (!overwrite) {
+    char probe[2];
+    if (::GetEnvironmentVariableA(name, probe, sizeof(probe)) != 0) {
+      return;  // already set, caller asked us not to overwrite
+    }
   }
+  (void)_putenv_s(name, value.c_str());
 #endif
 }
 
@@ -771,9 +981,9 @@ void SystemInfo::Unsetenv(const char *name) {
 #if CTP_ENABLE_PROCFS_SYSINFO
   unsetenv(name);
 #elif CTP_ENABLE_WINDOWS_SYSINFO
-  // _putenv_s with empty string removes the variable from both
-  // the C runtime env and Win32 env blocks.
-  _putenv_s(name, "");
+  // Setting an env var to an empty string via _putenv_s removes it from
+  // both the CRT and Win32 environment blocks.
+  (void)_putenv_s(name, "");
 #endif
 }
 
@@ -797,14 +1007,32 @@ void SharedLibrary::Load(const std::string &name) {
   handle_ = dlopen(name.c_str(), RTLD_GLOBAL | RTLD_NOW);
 #elif CTP_ENABLE_WINDOWS_SYSINFO
   handle_ = LoadLibraryA(name.c_str());
+  if (!handle_) {
+    DWORD err = ::GetLastError();
+    char *buf = nullptr;
+    DWORD len = ::FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<LPSTR>(&buf), 0, nullptr);
+    if (buf) {
+      error_string_.assign(buf, len);
+      ::LocalFree(buf);
+    } else {
+      error_string_ = "LoadLibraryA failed: " + std::to_string(err);
+    }
+  } else {
+    error_string_.clear();
+  }
 #endif
 }
 
 std::string SharedLibrary::GetError() const {
 #if CTP_ENABLE_PROCFS_SYSINFO
-  return std::string(dlerror());
+  const char *err = dlerror();
+  return err ? std::string(err) : std::string();
 #elif CTP_ENABLE_WINDOWS_SYSINFO
-  return std::string();
+  return error_string_;
 #endif
 }
 
@@ -827,215 +1055,6 @@ SharedLibrary &SharedLibrary::operator=(SharedLibrary &&other) noexcept {
     other.handle_ = nullptr;
   }
   return *this;
-}
-
-ProcessHandle SystemInfo::SpawnProcess(
-    const std::string &exe_path,
-    const std::vector<std::string> &args,
-    const std::vector<std::pair<std::string, std::string>> &env) {
-  ProcessHandle handle{};
-
-  // Save original env values so we can restore after spawn.
-  // SpawnProcess must not permanently modify the parent's environment.
-  std::vector<std::pair<std::string, std::string>> saved_env;
-  saved_env.reserve(env.size());
-  for (const auto &kv : env) {
-    saved_env.emplace_back(kv.first, Getenv(kv.first.c_str()));
-    Setenv(kv.first.c_str(), kv.second, 1);
-  }
-
-#if CTP_ENABLE_PROCFS_SYSINFO
-  pid_t pid = fork();
-  if (pid == 0) {
-    // Child process — redirect stdout/stderr to /dev/null
-    (void)freopen("/dev/null", "w", stdout);
-    (void)freopen("/dev/null", "w", stderr);
-
-    // Build argv for execv
-    std::vector<const char *> argv;
-    argv.push_back(exe_path.c_str());
-    for (const auto &a : args) {
-      argv.push_back(a.c_str());
-    }
-    argv.push_back(nullptr);
-
-    execv(exe_path.c_str(), const_cast<char *const *>(argv.data()));
-    // If exec fails, exit child
-    _exit(127);
-  }
-  handle.pid = pid;
-
-  // Restore parent's original environment
-  for (const auto &kv : saved_env) {
-    if (kv.second.empty()) {
-      Unsetenv(kv.first.c_str());
-    } else {
-      Setenv(kv.first.c_str(), kv.second, 1);
-    }
-  }
-
-#elif CTP_ENABLE_WINDOWS_SYSINFO
-  // Build command line: "exe_path" arg1 arg2 ...
-  std::string cmd_line = "\"" + exe_path + "\"";
-  for (const auto &a : args) {
-    cmd_line += " \"" + a + "\"";
-  }
-
-  STARTUPINFOA si{};
-  si.cb = sizeof(si);
-  // Redirect stdout/stderr to NUL
-  HANDLE hNull = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE,
-                             nullptr, OPEN_EXISTING, 0, nullptr);
-  if (hNull != INVALID_HANDLE_VALUE) {
-    si.dwFlags |= STARTF_USESTDHANDLES;
-    si.hStdOutput = hNull;
-    si.hStdError = hNull;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-  }
-
-  // Create a Job Object so the child is automatically killed when the
-  // parent process exits (the Job handle is closed).
-  HANDLE hJob = CreateJobObjectA(nullptr, nullptr);
-  if (hJob) {
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli{};
-    jeli.BasicLimitInformation.LimitFlags =
-        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    SetInformationJobObject(hJob, JobObjectExtendedLimitInformation,
-                            &jeli, sizeof(jeli));
-  }
-
-  PROCESS_INFORMATION pi{};
-  BOOL ok = CreateProcessA(
-      nullptr,
-      const_cast<char *>(cmd_line.c_str()),
-      nullptr, nullptr,
-      (hNull != INVALID_HANDLE_VALUE) ? TRUE : FALSE,  // inherit handles for NUL redirect
-      CREATE_SUSPENDED, nullptr, nullptr,
-      &si, &pi);
-
-  if (hNull != INVALID_HANDLE_VALUE) {
-    CloseHandle(hNull);
-  }
-
-  if (ok) {
-    // Assign child to Job Object before resuming so it can't escape
-    if (hJob) {
-      AssignProcessToJobObject(hJob, pi.hProcess);
-    }
-    ResumeThread(pi.hThread);
-    handle.hProcess = pi.hProcess;
-    handle.hThread = pi.hThread;
-    handle.hJob = hJob;
-    handle.pid = pi.dwProcessId;
-  } else {
-    handle.hProcess = nullptr;
-    handle.hThread = nullptr;
-    handle.hJob = nullptr;
-    handle.pid = 0;
-    if (hJob) CloseHandle(hJob);
-  }
-
-  // Restore parent's original environment
-  for (const auto &kv : saved_env) {
-    if (kv.second.empty()) {
-      Unsetenv(kv.first.c_str());
-    } else {
-      Setenv(kv.first.c_str(), kv.second, 1);
-    }
-  }
-#endif
-
-  return handle;
-}
-
-void SystemInfo::KillProcess(ProcessHandle &proc) {
-#if CTP_ENABLE_PROCFS_SYSINFO
-  if (proc.pid > 0) {
-    kill(proc.pid, SIGTERM);
-  }
-#elif CTP_ENABLE_WINDOWS_SYSINFO
-  if (proc.hProcess != nullptr) {
-    TerminateProcess(proc.hProcess, 1);
-  }
-  if (proc.hJob != nullptr) {
-    CloseHandle(proc.hJob);
-    proc.hJob = nullptr;
-  }
-#endif
-}
-
-int SystemInfo::WaitProcess(ProcessHandle &proc) {
-#if CTP_ENABLE_PROCFS_SYSINFO
-  if (proc.pid <= 0) return -1;
-  int status = 0;
-  waitpid(proc.pid, &status, 0);
-  proc.pid = -1;
-  if (WIFEXITED(status)) {
-    return WEXITSTATUS(status);
-  }
-  return -1;
-#elif CTP_ENABLE_WINDOWS_SYSINFO
-  if (proc.hProcess == nullptr) return -1;
-  WaitForSingleObject(proc.hProcess, INFINITE);
-  ::DWORD exit_code = 0;
-  ::GetExitCodeProcess(proc.hProcess, &exit_code);
-  CloseHandle(proc.hProcess);
-  CloseHandle(proc.hThread);
-  if (proc.hJob != nullptr) {
-    CloseHandle(proc.hJob);
-    proc.hJob = nullptr;
-  }
-  proc.hProcess = nullptr;
-  proc.hThread = nullptr;
-  return static_cast<int>(exit_code);
-#endif
-}
-
-std::string SystemInfo::GetSelfExePath() {
-#if CTP_ENABLE_PROCFS_SYSINFO
-#ifdef __linux__
-  char buf[PATH_MAX];
-  ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-  if (len > 0) {
-    buf[len] = '\0';
-    return std::string(buf);
-  }
-  return "";
-#elif __APPLE__
-  char buf[PATH_MAX];
-  uint32_t size = sizeof(buf);
-  if (_NSGetExecutablePath(buf, &size) == 0) {
-    char resolved[PATH_MAX];
-    if (realpath(buf, resolved)) {
-      return std::string(resolved);
-    }
-    return std::string(buf);
-  }
-  return "";
-#else
-  return "";
-#endif
-#elif CTP_ENABLE_WINDOWS_SYSINFO
-  char buf[MAX_PATH];
-  ::DWORD len = ::GetModuleFileNameA(nullptr, buf, MAX_PATH);
-  if (len > 0 && len < MAX_PATH) {
-    return std::string(buf, len);
-  }
-  return "";
-#endif
-}
-
-void SystemInfo::SuppressErrorDialogs() {
-#ifdef _WIN32
-  // Redirect CRT assert/error reports to stderr instead of popup dialogs
-  _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
-  _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
-  _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
-  _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
-  _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
-  // Suppress Windows Error Reporting crash dialogs
-  SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
-#endif
 }
 
 }  // namespace ctp

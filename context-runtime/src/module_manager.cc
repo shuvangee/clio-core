@@ -37,15 +37,13 @@
 
 #include "clio_runtime/module_manager.h"
 
-#include <climits>
-
 #include <cstring>
 #include <filesystem>
 
 #include "clio_runtime/container.h"
 
 // Global pointer variable definition for Module manager singleton
-CTP_DEFINE_GLOBAL_API_PTR_VAR_CC(CLIO_RUN_CXX_API, chi::ModuleManager, g_module_manager);
+CLIO_RUN_DEFINE_GLOBAL_PTR_VAR_CC(chi::ModuleManager, g_module_manager);
 
 namespace clio::run {
 
@@ -235,8 +233,11 @@ std::vector<std::string> ModuleManager::GetScanDirectories() const {
   const char *chi_repo_path = chi::env::GetCompat("REPO_PATH");
   if (chi_repo_path) {
     std::string path_str(chi_repo_path);
-    // Split by platform path separator
-    char delimiter = hshm::SystemInfo::GetPathListSeparator();
+    // Split by colon (Unix) or semicolon (Windows)
+    char delimiter = ':';
+#ifdef _WIN32
+    delimiter = ';';
+#endif
 
     size_t start = 0;
     size_t end = path_str.find(delimiter);
@@ -248,18 +249,16 @@ std::vector<std::string> ModuleManager::GetScanDirectories() const {
     directories.push_back(path_str.substr(start));
   }
 
-  // Get library search path (LD_LIBRARY_PATH on Linux, PATH on Windows)
-  std::string lib_path_var = hshm::SystemInfo::GetLibrarySearchPathVar();
-  char path_sep = hshm::SystemInfo::GetPathListSeparator();
-  std::string ld_path = hshm::SystemInfo::Getenv(lib_path_var.c_str());
-  if (!ld_path.empty()) {
+  // Get LD_LIBRARY_PATH
+  const char *ld_path = std::getenv("LD_LIBRARY_PATH");
+  if (ld_path) {
     std::string path_str(ld_path);
     size_t start = 0;
-    size_t end = path_str.find(path_sep);
+    size_t end = path_str.find(':');
     while (end != std::string::npos) {
       directories.push_back(path_str.substr(start, end - start));
       start = end + 1;
-      end = path_str.find(path_sep, start);
+      end = path_str.find(':', start);
     }
     directories.push_back(path_str.substr(start));
   }
@@ -267,9 +266,7 @@ std::vector<std::string> ModuleManager::GetScanDirectories() const {
   // Add default directories
   directories.push_back("./lib");
   directories.push_back("../lib");
-#ifndef _WIN32
   directories.push_back("/usr/local/lib");
-#endif
 
   // Print all scan directories
   HLOG(kDebug, "ChiMod scan directories:");
@@ -281,11 +278,21 @@ std::vector<std::string> ModuleManager::GetScanDirectories() const {
 }
 
 std::string ModuleManager::GetModuleDirectory() const {
-  return hshm::SystemInfo::GetModuleDirectory();
+  // Resolve the directory of *this* shared library (clio_run_cxx) by passing
+  // the address of a symbol defined in this module. Cross-platform impl lives
+  // in ctp::SystemInfo.
+  return ctp::SystemInfo::GetModuleDirectoryFor(GetSymbolForDlAddr());
 }
 
 bool ModuleManager::IsSharedLibrary(const std::string &file_path) const {
-  const std::string ext = hshm::SystemInfo::GetSharedLibExtension();
+  // Check file extension
+#ifdef _WIN32
+  const std::string ext = ".dll";
+#elif __APPLE__
+  const std::string ext = ".dylib";
+#else
+  const std::string ext = ".so";
+#endif
   return file_path.length() >= ext.length() &&
          file_path.compare(file_path.length() - ext.length(), ext.length(),
                            ext) == 0;
@@ -293,8 +300,15 @@ bool ModuleManager::IsSharedLibrary(const std::string &file_path) const {
 
 bool ModuleManager::HasModuleNamingConvention(
     const std::string &file_path) const {
-  // ChiMod libraries must end with "_runtime.so" (not "_runtime_gpu.so")
-  return file_path.find("_runtime.so") != std::string::npos;
+  // ChiMod libraries must end with "_runtime<sharedlibext>"
+  // (not "_runtime_gpu<sharedlibext>"). The extension is per-platform — on
+  // Linux .so, macOS .dylib, Windows .dll — and the canonical source comes
+  // from ctp::SystemInfo so we don't duplicate the table.
+  const std::string suffix =
+      std::string("_runtime") + ctp::SystemInfo::GetSharedLibExtension();
+  if (file_path.size() < suffix.size()) return false;
+  return file_path.compare(file_path.size() - suffix.size(), suffix.size(),
+                           suffix) == 0;
 }
 
 bool ModuleManager::ValidateChiMod(ctp::SharedLibrary &lib) const {

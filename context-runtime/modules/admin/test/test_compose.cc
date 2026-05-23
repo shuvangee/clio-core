@@ -212,8 +212,10 @@ int main(int argc, char **argv) {
   if (argc > 1) {
     filter = argv[1];
   }
-  int rc = SimpleTest::run_all_tests(filter);
-  chi::CHIMAERA_FINALIZE();
-  SIMPLE_TEST_HARD_EXIT(rc);
-  return rc;
+  int result = SimpleTest::run_all_tests(filter);
+  // SIMPLE_TEST_PROCESS_EXIT is TerminateProcess on Windows (dodges a libzmq
+  // static-destructor abort that fires after all tests pass) and a plain
+  // return elsewhere.
+  SIMPLE_TEST_PROCESS_EXIT(result);
+  return result;  // unreachable on Windows
 }
