@@ -2002,6 +2002,7 @@ size_t IpcManager::ClearUserIpcs() {
   size_t removed_count = 0;
   std::string memfd_dir = ctp::SystemInfo::GetMemfdDir();
 
+  const std::string prefix = "chimaera_";
   std::error_code ec;
   if (!std::filesystem::exists(memfd_dir, ec)) {
     return 0;
