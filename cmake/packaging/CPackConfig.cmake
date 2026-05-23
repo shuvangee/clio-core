@@ -15,9 +15,15 @@ set(CPACK_PACKAGE_CONTACT "grc@illinoistech.edu")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 
-# Component-based installation (simplified to single component for now)
-set(CPACK_COMPONENTS_ALL system_package)
-set(CPACK_COMPONENT_SYSTEM_PACKAGE_DISPLAY_NAME "IOWarp Core System Package")
+# Only package the default (Unspecified) component — excludes pip_package files
+# such as iowarp_core.pth which are wheel-only and must not land in system packages.
+# CPACK_*_COMPONENT_INSTALL enables component-aware mode so CPACK_COMPONENTS_ALL
+# is actually respected; without it CPack includes all components unconditionally.
+set(CPACK_COMPONENTS_ALL Unspecified)
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_RPM_COMPONENT_INSTALL ON)
+# Keep a single combined package (don't split per-component)
+set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
 
 # Determine which generators to enable based on options
 set(CPACK_GENERATORS_ENABLED OFF)

@@ -35,11 +35,12 @@ jobs:
         echo "Version check passed."
 
   #-----------------------------------------------------------------------
-  # Build .deb on Ubuntu
+  # Build .deb on Ubuntu (devcontainer has all build dependencies)
   #-----------------------------------------------------------------------
   build-deb:
     name: Build Debian package
     runs-on: ubuntu-latest
+    container: iowarp/clio-core-devcontainer:latest
     needs: [check-version]
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
     steps:
@@ -48,11 +49,6 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 0
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq cmake ninja-build libzmq3-dev libyaml-cpp-dev dpkg-dev
 
     - name: Configure with CMake
       run: |
@@ -94,7 +90,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        dnf install -y cmake ninja-build zeromq-devel yaml-cpp-devel rpm-build
+        dnf install -y cmake ninja-build gcc-c++ zeromq-devel yaml-cpp-devel cereal-devel msgpack-devel rpm-build
 
     - name: Configure with CMake
       run: |
@@ -102,6 +98,7 @@ jobs:
           -DCLIO_CORE_ENABLE_RPM_PACKAGE=ON \
           -DCLIO_CORE_ENABLE_TESTS=OFF \
           -DCLIO_CORE_ENABLE_PYTHON=OFF \
+          -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
           -G Ninja
 
     - name: Build with CMake
@@ -119,11 +116,14 @@ jobs:
         path: build-rpm/*.rpm
 
   #-----------------------------------------------------------------------
-  # Build AppImage on Ubuntu
+  # Build AppImage on Ubuntu (devcontainer has all build dependencies)
+  # appimagetool is downloaded at build time; APPIMAGE_EXTRACT_AND_RUN=1
+  # lets it run without a FUSE mount (no --privileged needed).
   #-----------------------------------------------------------------------
   build-appimage:
     name: Build AppImage
     runs-on: ubuntu-latest
+    container: iowarp/clio-core-devcontainer:latest
     needs: [check-version]
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
     steps:
@@ -132,11 +132,6 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 0
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq cmake ninja-build libzmq3-dev libyaml-cpp-dev libfuse2
 
     - name: Configure with CMake
       run: |
