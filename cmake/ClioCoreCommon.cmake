@@ -994,6 +994,7 @@ function(add_clio_module_client)
   set_target_properties(${TARGET_NAME} PROPERTIES
     EXPORT_NAME "${CLIO_RUN_MODULE_NAME}_client"
     OUTPUT_NAME "${_chimod_output_name}"
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
   )
 
   # Install the client library
@@ -1195,6 +1196,7 @@ function(add_clio_module_runtime)
   set_target_properties(${TARGET_NAME} PROPERTIES
     EXPORT_NAME "${CLIO_RUN_MODULE_NAME}_runtime"
     OUTPUT_NAME "${_chimod_output_name}"
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
   )
 
   # Use cmake_language(DEFER) to link to client after all targets are processed
