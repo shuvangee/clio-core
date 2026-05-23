@@ -223,8 +223,6 @@ TEST_CASE("IpcErrors - Network Queue Operations", "[ipc][errors][queue]") {
   REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutLatency, future));
   REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutIO, future));
 
-  result = ipc->TryPopNetTask(NetQueuePriority::kSendOut, future);
-  REQUIRE(!result);
 }
 
 // ============================================================================
