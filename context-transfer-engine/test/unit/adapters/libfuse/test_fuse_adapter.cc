@@ -41,10 +41,10 @@
  * 4. End-to-end integration (create file, write, read, list, delete)
  */
 
-#include <chimaera/chimaera.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
 
 #include <algorithm>
 #include <chrono>
@@ -57,7 +57,7 @@
 #include "simple_test.h"
 
 namespace fs = std::filesystem;
-using namespace wrp::cae::fuse;
+using namespace clio::cae::fuse;
 
 // ============================================================================
 // Test fixture
@@ -72,7 +72,7 @@ class FuseAdapterTestFixture {
   bool target_initialized_ = false;
 
   FuseAdapterTestFixture() {
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::GetHomeDir();
     REQUIRE(!home_dir.empty());
     test_storage_path_ = home_dir + "/cte_fuse_test.dat";
 
@@ -86,17 +86,17 @@ class FuseAdapterTestFixture {
 
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-      success = wrp_cte::core::WRP_CTE_CLIENT_INIT();
+      success = clio::cte::core::CLIO_CTE_CLIENT_INIT();
       REQUIRE(success);
 
-      auto *cte_client = WRP_CTE_CLIENT;
+      auto *cte_client = CLIO_CTE_CLIENT;
       REQUIRE(cte_client != nullptr);
-      cte_client->Init(wrp_cte::core::kCtePoolId);
+      cte_client->Init(clio::cte::core::kCtePoolId);
 
-      wrp_cte::core::CreateParams params;
+      clio::cte::core::CreateParams params;
       auto create_task = cte_client->AsyncCreate(
-          chi::PoolQuery::Dynamic(), wrp_cte::core::kCtePoolName,
-          wrp_cte::core::kCtePoolId, params);
+          chi::PoolQuery::Dynamic(), clio::cte::core::kCtePoolName,
+          clio::cte::core::kCtePoolId, params);
       create_task.Wait();
       REQUIRE(create_task->GetReturnCode() == 0);
 
@@ -116,19 +116,19 @@ class FuseAdapterTestFixture {
       return;
     }
 
-    auto *cte_client = WRP_CTE_CLIENT;
+    auto *cte_client = CLIO_CTE_CLIENT;
 
     chi::PoolId bdev_pool_id(950, 0);
-    chimaera::bdev::Client bdev_client(bdev_pool_id);
+    clio::run::bdev::Client bdev_client(bdev_pool_id);
     auto create_task =
         bdev_client.AsyncCreate(chi::PoolQuery::Dynamic(), test_storage_path_,
-                                bdev_pool_id, chimaera::bdev::BdevType::kFile);
+                                bdev_pool_id, clio::run::bdev::BdevType::kFile);
     create_task.Wait();
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     auto reg_task = cte_client->AsyncRegisterTarget(
-        test_storage_path_, chimaera::bdev::BdevType::kFile, kTestTargetSize,
+        test_storage_path_, clio::run::bdev::BdevType::kFile, kTestTargetSize,
         chi::PoolQuery::Local(), bdev_pool_id);
     reg_task.Wait();
     REQUIRE(reg_task->GetReturnCode() == 0);
@@ -167,7 +167,7 @@ class FuseAdapterTestFixture {
 // ============================================================================
 
 TEST_CASE("FUSE CTE - Tag create and exists", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_test/tag_exists";
@@ -187,7 +187,7 @@ TEST_CASE("FUSE CTE - Tag create and exists", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - Tag deletion", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_test/tag_delete";
@@ -208,7 +208,7 @@ TEST_CASE("FUSE CTE - Tag deletion", "[fuse][cte]") {
 // ============================================================================
 
 TEST_CASE("FUSE CTE - CteDirExists for implicit directories", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   // Create tags that imply directory structure
@@ -240,7 +240,7 @@ TEST_CASE("FUSE CTE - CteDirExists for implicit directories", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - CteListDirectChildren", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string f1 = "/fuse_list_test/alpha.txt";
@@ -268,7 +268,7 @@ TEST_CASE("FUSE CTE - CteListDirectChildren", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - CteListSubdirs", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string f1 = "/fuse_subdir_test/x/file1.txt";
@@ -299,7 +299,7 @@ TEST_CASE("FUSE CTE - CteListSubdirs", "[fuse][cte]") {
 // ============================================================================
 
 TEST_CASE("FUSE CTE - Small write and read round-trip", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_io_test/small_rw";
@@ -320,7 +320,7 @@ TEST_CASE("FUSE CTE - Small write and read round-trip", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - Multi-page write and read", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_io_test/multipage_rw";
@@ -356,7 +356,7 @@ TEST_CASE("FUSE CTE - Multi-page write and read", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - Partial page write with offset", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_io_test/partial_page";
@@ -378,7 +378,7 @@ TEST_CASE("FUSE CTE - Partial page write with offset", "[fuse][cte]") {
 }
 
 TEST_CASE("FUSE CTE - Cross-page write simulation", "[fuse][cte]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   std::string tag_name = "/fuse_io_test/cross_page";
@@ -413,7 +413,7 @@ TEST_CASE("FUSE CTE - Cross-page write simulation", "[fuse][cte]") {
 // ============================================================================
 
 TEST_CASE("FUSE Integration - Full file lifecycle", "[fuse][integration]") {
-  auto *fixture = hshm::Singleton<FuseAdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<FuseAdapterTestFixture>::GetInstance();
   fixture->SetupTarget();
 
   // 1. Create file (tag)

@@ -45,8 +45,8 @@
 #include <unistd.h>
 #endif
 
-#include "chimaera/chimaera.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/ipc_manager.h"
 
 using namespace chi;
 
@@ -78,15 +78,15 @@ TEST_CASE("IpcErrors - Client Connect Without Server", "[ipc][errors]") {
   // (This may fail if no IPCs exist, which is fine)
 
   // Try to connect as client when NO server exists
-  setenv("CHI_WITH_RUNTIME", "0", 1);
+  setenv("CLIO_WITH_RUNTIME", "0", 1);
 
   // This should timeout and fail gracefully (not crash)
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
   REQUIRE(!success);
 
   // Verify IPC manager is not initialized
-  // Note: CHI_IPC may be null or in uninitialized state
-  auto *ipc = CHI_IPC;
+  // Note: CLIO_IPC may be null or in uninitialized state
+  auto *ipc = CLIO_IPC;
   if (ipc != nullptr) {
     REQUIRE(!ipc->IsInitialized());
   }
@@ -102,7 +102,7 @@ TEST_CASE("IpcErrors - Connection Timeout", "[ipc][errors]") {
   pid_t server_pid = fork();
   if (server_pid == 0) {
     // Child: Start server then immediately exit
-    setenv("CHI_WITH_RUNTIME", "1", 1);
+    setenv("CLIO_WITH_RUNTIME", "1", 1);
     CHIMAERA_INIT(ChimaeraMode::kServer, true);
     exit(0);  // Exit immediately
   }
@@ -115,7 +115,7 @@ TEST_CASE("IpcErrors - Connection Timeout", "[ipc][errors]") {
   usleep(100000);
 
   // Now try to connect - server is gone
-  setenv("CHI_WITH_RUNTIME", "0", 1);
+  setenv("CLIO_WITH_RUNTIME", "0", 1);
   bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
 
   // May succeed or fail depending on timing and leftover shm
@@ -131,11 +131,11 @@ TEST_CASE("IpcErrors - Huge Buffer Allocation", "[ipc][errors][memory]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to allocate impossibly large buffer
-  size_t huge_size = hshm::Unit<size_t>::Terabytes(100);
+  size_t huge_size = ctp::Unit<size_t>::Terabytes(100);
   auto buf = ipc->AllocateBuffer(huge_size);
 
   // Should return null pointer, not crash
@@ -148,7 +148,7 @@ TEST_CASE("IpcErrors - Zero Size Allocation", "[ipc][errors][memory]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to allocate zero-size buffer
@@ -169,7 +169,7 @@ TEST_CASE("IpcErrors - Invalid Buffer Free", "[ipc][errors][memory]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to free null buffer - this should be handled gracefully
@@ -191,7 +191,7 @@ TEST_CASE("IpcErrors - Invalid Node ID", "[ipc][errors][network]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to get host with invalid node ID
@@ -210,7 +210,7 @@ TEST_CASE("IpcErrors - Invalid IP Address", "[ipc][errors][network]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to get host by invalid IP
@@ -233,7 +233,7 @@ TEST_CASE("IpcErrors - Network Client Creation Failure",
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to create client with invalid address
@@ -257,17 +257,15 @@ TEST_CASE("IpcErrors - Network Queue Operations", "[ipc][errors][queue]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
-  // Try to pop from empty network queue
+  // Try to pop from empty network queue across the latency/IO lanes
   Future<Task> future;
-  bool result = ipc->TryPopNetTask(NetQueuePriority::kSendIn, future);
-  REQUIRE(!result);  // Should return false for empty queue
-
-  // Try with different priority
-  result = ipc->TryPopNetTask(NetQueuePriority::kSendOut, future);
-  REQUIRE(!result);
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendInLatency, future));
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendInIO, future));
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutLatency, future));
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutIO, future));
 
   // Note: Cleanup happens once at end of all tests
 }
@@ -280,11 +278,11 @@ TEST_CASE("IpcErrors - Invalid Allocator Registration", "[ipc][errors][shm]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to register with invalid allocator ID
-  hipc::AllocatorId invalid_id(0xFFFF, 0xFFFF);
+  ctp::ipc::AllocatorId invalid_id(0xFFFF, 0xFFFF);
   bool registered = ipc->RegisterMemory(invalid_id);
   // May succeed or fail, but shouldn't crash
 
@@ -296,7 +294,7 @@ TEST_CASE("IpcErrors - GetClientShmInfo Invalid Index",
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Try to get info with invalid index
@@ -314,7 +312,7 @@ TEST_CASE("IpcErrors - SetNumSchedQueues Edge Cases", "[ipc][errors][sched]") {
   // Use shared runtime initialization
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   // Get current value
@@ -353,14 +351,14 @@ TEST_CASE("IpcErrors - Concurrent Init/Finalize", "[ipc][errors][multiproc]") {
       bool success = CHIMAERA_INIT(ChimaeraMode::kClient, true);
 
       if (success) {
-        auto *ipc = CHI_IPC;
+        auto *ipc = CLIO_IPC;
         if (ipc && ipc->IsInitialized()) {
           // Do some operations
           ipc->GetNodeId();
           ipc->GetNumSchedQueues();
 
-          // Finalize using Chimaera API
-          CHI_CHIMAERA_MANAGER->ServerFinalize();
+          // Finalize using CLIO Runtime API
+          CLIO_RUNTIME_MANAGER->ServerFinalize();
         }
         exit(0);
       } else {
@@ -389,9 +387,11 @@ TEST_CASE("IpcErrors - Concurrent Init/Finalize", "[ipc][errors][multiproc]") {
 // ============================================================================
 
 TEST_CASE("IpcErrors - ZZZ Final Cleanup", "[ipc][errors][cleanup]") {
-  // This test runs last (ZZZ prefix ensures it's last alphabetically)
-  // Force exit to avoid hanging on worker thread joins during finalization
-  _exit(0);
+  // This test runs last (ZZZ prefix ensures it's last alphabetically).
+  // Force exit to avoid hanging on worker thread joins during finalization.
+  // SIMPLE_TEST_PROCESS_EXIT is TerminateProcess on Windows (bypasses the
+  // libzmq teardown abort) and ::_exit elsewhere.
+  SIMPLE_TEST_PROCESS_EXIT(0);
 }
 
 SIMPLE_TEST_MAIN()

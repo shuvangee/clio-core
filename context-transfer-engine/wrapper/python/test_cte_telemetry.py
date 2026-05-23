@@ -6,17 +6,17 @@ This test module specifically focuses on testing the PollTelemetryLog
 functionality of the CTE Python bindings.
 
 Requirements:
-- wrp_cte_core_ext module (Python bindings)
-- Chimaera runtime initialized with CHI_WITH_RUNTIME=1
-- WRP_RUNTIME_CONF environment variable set to config file
+- clio_cte_core_ext module (Python bindings)
+- Chimaera runtime initialized with CLIO_WITH_RUNTIME=1
+- CLIO_SERVER_CONF environment variable set to config file
 - pytest (optional, for test framework mode)
 
 Usage:
     # Run with pytest (if available)
-    CHI_WITH_RUNTIME=1 WRP_RUNTIME_CONF=/path/to/config.yaml pytest test_cte_telemetry.py -v
+    CLIO_WITH_RUNTIME=1 CLIO_SERVER_CONF=/path/to/config.yaml pytest test_cte_telemetry.py -v
 
     # Run as standalone script (no pytest required)
-    CHI_WITH_RUNTIME=1 WRP_RUNTIME_CONF=/path/to/config.yaml python3 test_cte_telemetry.py
+    CLIO_WITH_RUNTIME=1 CLIO_SERVER_CONF=/path/to/config.yaml python3 test_cte_telemetry.py
 """
 
 import sys
@@ -48,7 +48,7 @@ except ImportError:
     pytest = DummyPytest()
 
 try:
-    import wrp_cte_core_ext as cte
+    import clio_cte_core_ext as cte
     HAS_CTE_MODULE = True
 except ImportError:
     HAS_CTE_MODULE = False
@@ -61,7 +61,7 @@ except ImportError:
 def cte_module():
     """Fixture to ensure CTE module is available"""
     if not HAS_CTE_MODULE:
-        pytest.skip("wrp_cte_core_ext module not available")
+        pytest.skip("clio_cte_core_ext module not available")
     return cte
 
 
@@ -70,17 +70,17 @@ def runtime_initialized(cte_module):
     """Fixture to initialize Chimaera runtime once per module
 
     This follows the pattern from test_bindings.py for runtime initialization.
-    Requires CHI_WITH_RUNTIME=1 environment variable.
+    Requires CLIO_WITH_RUNTIME=1 environment variable.
     """
     # Check if runtime should be initialized
-    env_val = os.getenv("CHI_WITH_RUNTIME")
+    env_val = os.getenv("CLIO_WITH_RUNTIME")
     if env_val and str(env_val).lower() in ("0", "false", "no", "off"):
-        pytest.skip("Runtime initialization disabled (CHI_WITH_RUNTIME=0)")
+        pytest.skip("Runtime initialization disabled (CLIO_WITH_RUNTIME=0)")
 
     # Check for config file
-    config_path = os.getenv("WRP_RUNTIME_CONF")
+    config_path = os.getenv("CLIO_SERVER_CONF")
     if not config_path:
-        pytest.skip("WRP_RUNTIME_CONF environment variable not set")
+        pytest.skip("CLIO_SERVER_CONF environment variable not set")
 
     if not os.path.exists(config_path):
         pytest.skip(f"Config file not found: {config_path}")
@@ -90,7 +90,7 @@ def runtime_initialized(cte_module):
         module_file = cte_module.__file__ if hasattr(cte_module, '__file__') else None
         if module_file:
             bin_dir = os.path.dirname(os.path.abspath(module_file))
-            os.environ["CHI_REPO_PATH"] = bin_dir
+            os.environ["CLIO_REPO_PATH"] = bin_dir
             existing_ld_path = os.getenv("LD_LIBRARY_PATH", "")
             if existing_ld_path:
                 os.environ["LD_LIBRARY_PATH"] = f"{bin_dir}:{existing_ld_path}"
@@ -99,7 +99,7 @@ def runtime_initialized(cte_module):
     except Exception:
         pass  # Continue with existing environment
 
-    # Initialize Chimaera
+    # Initialize CLIO Runtime
     try:
         init_result = cte_module.chimaera_init(cte_module.ChimaeraMode.kClient, True)
         if not init_result:
@@ -318,13 +318,13 @@ def main():
     print()
 
     if not HAS_CTE_MODULE:
-        print("❌ wrp_cte_core_ext module not available")
+        print("❌ clio_cte_core_ext module not available")
         return 1
 
     # Initialize runtime
-    config_path = os.getenv("WRP_RUNTIME_CONF")
+    config_path = os.getenv("CLIO_SERVER_CONF")
     if not config_path:
-        print("❌ WRP_RUNTIME_CONF environment variable not set")
+        print("❌ CLIO_SERVER_CONF environment variable not set")
         return 1
 
     try:
@@ -332,7 +332,7 @@ def main():
         module_file = cte.__file__ if hasattr(cte, '__file__') else None
         if module_file:
             bin_dir = os.path.dirname(os.path.abspath(module_file))
-            os.environ["CHI_REPO_PATH"] = bin_dir
+            os.environ["CLIO_REPO_PATH"] = bin_dir
             existing_ld_path = os.getenv("LD_LIBRARY_PATH", "")
             if existing_ld_path:
                 os.environ["LD_LIBRARY_PATH"] = f"{bin_dir}:{existing_ld_path}"

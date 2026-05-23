@@ -1,5 +1,5 @@
 
-# Hermes Shared Memory (CTE)
+# Clio Shared Memory (CTE)
 
 [![IoWarp](https://img.shields.io/badge/IoWarp-GitHub-blue.svg)](http://github.com/iowarp)
 [![GRC](https://img.shields.io/badge/GRC-Website-blue.svg)](https://grc.iit.edu/)
@@ -26,8 +26,8 @@ docker pull iowarp/iowarp-build:latest
 ## Building Manually
 
 ```bash
-git clone https://github.com/grc-iit/cte-hermes-shm.git
-cd cte-hermes-shm
+git clone https://github.com/grc-iit/context-transport-primitives.git
+cd context-transport-primitives
 mkdir build
 cd build
 cmake ../ -DHSHM_ENABLE_CUDA=OFF -DHSHM_ENABLE_ROCM=OFF
@@ -36,38 +36,38 @@ make -j8
 
 ## CMake Integration
 
-HermesShm provides modular CMake targets for flexible dependency management. Link only what you need.
+ClioCtp provides modular CMake targets for flexible dependency management. Link only what you need.
 
 ### Core Library (CPU-Only)
 ```cmake
-find_package(HermesShm CONFIG REQUIRED)
-target_link_libraries(your_target hshm::cxx)
+find_package(ClioCtp CONFIG REQUIRED)
+target_link_libraries(your_target ctp::cxx)
 ```
 
 ### Modular Dependency Targets
 
-HermesShm provides fine-grained modular targets for optional dependencies:
+ClioCtp provides fine-grained modular targets for optional dependencies:
 
 ```cmake
-find_package(HermesShm CONFIG REQUIRED)
+find_package(ClioCtp CONFIG REQUIRED)
 
 target_link_libraries(your_target
-  hshm::cxx              # Core library (required)
-  hshm::configure        # YAML configuration parsing (instead of yaml-cpp directly)
-  hshm::serialize        # Object serialization (instead of cereal directly)
-  hshm::interceptor      # ELF interception for adapters
-  hshm::lightbeam        # Network transport (ZMQ, libfabric, Thallium)
-  hshm::thread_all       # Threading support (pthread, OpenMP)
-  hshm::mpi              # MPI support (use only where needed)
-  hshm::compress         # Compression utilities
-  hshm::encrypt          # Encryption utilities
+  ctp::cxx              # Core library (required)
+  ctp::configure        # YAML configuration parsing (instead of yaml-cpp directly)
+  ctp::serialize        # Object serialization (instead of cereal directly)
+  ctp::interceptor      # ELF interception for adapters
+  ctp::lightbeam        # Network transport (ZMQ, libfabric, Thallium)
+  ctp::thread_all       # Threading support (pthread, OpenMP)
+  ctp::mpi              # MPI support (use only where needed)
+  ctp::compress         # Compression utilities
+  ctp::encrypt          # Encryption utilities
 )
 ```
 
 **Key Guidelines:**
-- Always link `hshm::cxx` as the base
-- Use `hshm::configure` instead of linking to `yaml-cpp` directly
-- Use `hshm::serialize` instead of linking to `cereal` directly
+- Always link `ctp::cxx` as the base
+- Use `ctp::configure` instead of linking to `yaml-cpp` directly
+- Use `ctp::serialize` instead of linking to `cereal` directly
 - Link only the modular targets you actually need
 - Each modular target includes appropriate compile definitions
 
@@ -75,14 +75,14 @@ target_link_libraries(your_target
 
 **CUDA Version:**
 ```cmake
-find_package(HermesShm CONFIG REQUIRED)
-target_link_libraries(your_target hshm::cudacxx)
+find_package(ClioCtp CONFIG REQUIRED)
+target_link_libraries(your_target ctp::cudacxx)
 ```
 
 **ROCm Version:**
 ```cmake
-find_package(HermesShm CONFIG REQUIRED)
-target_link_libraries(your_target hshm::rocmcxx_gpu)
+find_package(ClioCtp CONFIG REQUIRED)
+target_link_libraries(your_target ctp::rocmcxx_gpu)
 ```
 
 ## Tests
@@ -99,7 +99,7 @@ ctest -VV -R test_mpsc_ring_buffer_mpi
 
 ## Project Structure
 
-- `include/hermes_shm/` - Public API headers organized by functional modules
+- `include/clio_ctp/` - Public API headers organized by functional modules
   - `data_structures/` - Shared memory compatible data structures
     - `ipc/` - IPC-safe containers (vector, list, unordered_map, ring queues, etc.)
     - `internal/` - Internal implementation details

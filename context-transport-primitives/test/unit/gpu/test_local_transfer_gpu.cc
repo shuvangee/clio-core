@@ -45,21 +45,21 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "hermes_shm/lightbeam/shm_transport.h"
-#include "hermes_shm/memory/allocator/buddy_allocator.h"
-#include "hermes_shm/memory/backend/gpu_shm_mmap.h"
-#include "hermes_shm/util/gpu_api.h"
+#include "clio_ctp/lightbeam/shm_transport.h"
+#include "clio_ctp/memory/allocator/buddy_allocator.h"
+#include "clio_ctp/memory/backend/gpu_shm_mmap.h"
+#include "clio_ctp/util/gpu_api.h"
 
-using hshm::ipc::BuddyAllocator;
-using hshm::ipc::GpuShmMmap;
-using hshm::ipc::MemoryBackendId;
-using hshm::lbm::Bulk;
-using hshm::lbm::LbmContext;
-using hshm::lbm::LbmMeta;
-using hshm::lbm::ShmTransferInfo;
-using hshm::lbm::ShmTransport;
+using ctp::ipc::BuddyAllocator;
+using ctp::ipc::GpuShmMmap;
+using ctp::ipc::MemoryBackendId;
+using ctp::lbm::Bulk;
+using ctp::lbm::LbmContext;
+using ctp::lbm::LbmMeta;
+using ctp::lbm::ShmTransferInfo;
+using ctp::lbm::ShmTransport;
 
-using GpuAllocT = hshm::ipc::BuddyAllocator;
+using GpuAllocT = ctp::ipc::BuddyAllocator;
 using GpuMeta = LbmMeta<GpuAllocT>;
 
 /**
@@ -85,15 +85,15 @@ __global__ void DiagnoseContainsPtrKernel(GpuAllocT *alloc, size_t test_offset,
     diag->test_offset   = test_offset;
 
     // Test 1: ContainsPtr(OffsetPtrBase) directly
-    hipc::OffsetPtr<void> ptr(test_offset);
+    ctp::ipc::OffsetPtr<void> ptr(test_offset);
     diag->contains_result = alloc->ContainsPtr(ptr);
 
     // Test 2: FullPtr via OffsetPtr overload (the original broken path)
-    hipc::FullPtr<void> fp_offset(alloc, hipc::OffsetPtr<void>(test_offset));
+    ctp::ipc::FullPtr<void> fp_offset(alloc, ctp::ipc::OffsetPtr<void>(test_offset));
     diag->fullptr_offset_null = fp_offset.IsNull();
 
     // Test 3: FullPtr via size_t overload (the fixed path)
-    hipc::FullPtr<void> fp_size(alloc, test_offset);
+    ctp::ipc::FullPtr<void> fp_size(alloc, test_offset);
     diag->fullptr_size_null = fp_size.IsNull();
   }
 }
@@ -122,10 +122,10 @@ __global__ void GpuSendSimpleKernel(GpuAllocT *alloc, const char *src_buffer,
     GpuMeta meta(alloc);
     Bulk bulk;
     bulk.data.ptr_ = const_cast<char *>(src_buffer);
-    bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
+    bulk.data.shm_.alloc_id_ = ctp::ipc::AllocatorId::GetNull();
     bulk.data.shm_.off_ = 0;
     bulk.size = data_size;
-    bulk.flags = hshm::bitfield32_t(BULK_XFER);
+    bulk.flags = ctp::bitfield32_t(BULK_XFER);
     meta.send.push_back(bulk);
     meta.send_bulks = 1;
     LbmContext ctx;
@@ -163,7 +163,7 @@ TEST_CASE("ShmTransfer GPU", "[gpu][transfer]") {
     REQUIRE(init_success);
 
     // Step 2: Create an BuddyAllocator on that backend
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -233,7 +233,7 @@ TEST_CASE("ShmTransfer GPU", "[gpu][transfer]") {
         backend.shm_init(backend_id, kBackendSize, kUrl + "_pattern", kGpuId);
     REQUIRE(init_success);
 
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -296,7 +296,7 @@ TEST_CASE("ShmTransfer GPU", "[gpu][transfer]") {
         backend.shm_init(backend_id, kBackendSize, kUrl + "_direct", kGpuId);
     REQUIRE(init_success);
 
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -339,7 +339,7 @@ TEST_CASE("ShmTransfer GPU", "[gpu][transfer]") {
         backend.shm_init(backend_id, kBackendSize, kUrl + "_large", kGpuId);
     REQUIRE(init_success);
 
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -423,10 +423,10 @@ __global__ void GpuSendKernel(GpuAllocT *alloc, char *data_buf,
     // Create bulk descriptor for the data buffer (private memory)
     Bulk bulk;
     bulk.data.ptr_ = data_buf;
-    bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
+    bulk.data.shm_.alloc_id_ = ctp::ipc::AllocatorId::GetNull();
     bulk.data.shm_.off_ = 0;
     bulk.size = data_size;
-    bulk.flags = hshm::bitfield32_t(BULK_XFER);
+    bulk.flags = ctp::bitfield32_t(BULK_XFER);
     meta.send.push_back(bulk);
     meta.send_bulks = 1;
 
@@ -496,7 +496,7 @@ TEST_CASE("ShmTransport Send/Recv GPU", "[gpu][transport]") {
     REQUIRE(init_success);
 
     // Step 2: Create BuddyAllocator on that backend (GPU-accessible)
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -574,7 +574,7 @@ TEST_CASE("ShmTransport Send/Recv GPU", "[gpu][transport]") {
         backend.shm_init(backend_id, kBackendSize, kUrl + "_large", kGpuId);
     REQUIRE(init_success);
 
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -652,7 +652,7 @@ TEST_CASE("ShmTransport Send/Recv GPU", "[gpu][transport]") {
                                      kUrl + "_gpu2gpu_shared", kGpuId));
 
     // Step 2: Create allocators
-    using AllocT = hshm::ipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *send_alloc = send_backend.MakeAlloc<AllocT>();
     AllocT *recv_alloc = recv_backend.MakeAlloc<AllocT>();
     AllocT *shared_alloc = shared_backend.MakeAlloc<AllocT>();

@@ -36,7 +36,7 @@
  * @brief Implementation of Q-Table compression predictor
  */
 
-#include "hermes_shm/compress/dynamic/compression/qtable_predictor.h"
+#include "clio_ctp/compress/dynamic/compression/qtable_predictor.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -48,7 +48,7 @@
 
 using json = nlohmann::json;
 
-namespace hshm {
+namespace ctp {
 namespace compress {
 
 // ============================================================================
@@ -544,4 +544,4 @@ QValue QTablePredictor::GetPrediction(const QState& state) {
 }
 
 }  // namespace compress
-}  // namespace hshm
+}  // namespace ctp

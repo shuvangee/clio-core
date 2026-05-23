@@ -3,8 +3,8 @@ import pathlib, os
 
 PROJECT_ROOT=pathlib.Path(__file__).parent.parent.resolve()
 
-DATA_STRUCTURE_TEMPLATES='include/hermes_shm/data_structures/internal/template'
-DATA_STRUCTURE_INTERNAL='include/hermes_shm/data_structures/internal'
+DATA_STRUCTURE_TEMPLATES='include/clio_ctp/data_structures/internal/template'
+DATA_STRUCTURE_INTERNAL='include/clio_ctp/data_structures/internal'
 
 CppMacroGenerator().generate(
     os.path.join(PROJECT_ROOT,
@@ -14,4 +14,4 @@ CppMacroGenerator().generate(
     "HIPC_CONTAINER_TEMPLATE",
     ["CLASS_NAME", "TYPED_CLASS"],
     ["TYPE_UNWRAP", "TYPE_UNWRAP"],
-    "HSHM_DATA_STRUCTURES_INTERNAL_SHM_CONTAINER_MACRO_H_")
+    "CTP_DATA_STRUCTURES_INTERNAL_SHM_CONTAINER_MACRO_H_")

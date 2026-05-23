@@ -56,13 +56,13 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "hermes_shm/memory/allocator/buddy_allocator.h"
-#include "hermes_shm/memory/backend/gpu_shm_mmap.h"
-#include "hermes_shm/util/gpu_api.h"
+#include "clio_ctp/memory/allocator/buddy_allocator.h"
+#include "clio_ctp/memory/backend/gpu_shm_mmap.h"
+#include "clio_ctp/util/gpu_api.h"
 
-using hipc::BuddyAllocator;
-using hshm::ipc::GpuShmMmap;
-using hshm::ipc::MemoryBackendId;
+using ctp::ipc::BuddyAllocator;
+using ctp::ipc::GpuShmMmap;
+using ctp::ipc::MemoryBackendId;
 
 // ─── Test struct ─────────────────────────────────────────────────────────────
 
@@ -72,12 +72,12 @@ using hshm::ipc::MemoryBackendId;
  * tail corruption are detected.  Init/Check are callable from GPU.
  */
 struct FakeBig408 {
-  hshm::u32 magic0_;  ///< = (tid << 16) | idx
+  ctp::u32 magic0_;  ///< = (tid << 16) | idx
   char      body_[400];
-  hshm::u32 magic1_;  ///< = ~magic0_
+  ctp::u32 magic1_;  ///< = ~magic0_
 
-  HSHM_INLINE_CROSS_FUN void Init(hshm::u32 tid, hshm::u32 idx) {
-    hshm::u32 m = (tid << 16) | (idx & 0xFFFFu);
+  CTP_INLINE_CROSS_FUN void Init(ctp::u32 tid, ctp::u32 idx) {
+    ctp::u32 m = (tid << 16) | (idx & 0xFFFFu);
     magic0_ = m;
     magic1_ = ~m;
     for (int i = 0; i < 400; ++i) {
@@ -85,8 +85,8 @@ struct FakeBig408 {
     }
   }
 
-  HSHM_INLINE_CROSS_FUN bool Check(hshm::u32 tid, hshm::u32 idx) const {
-    hshm::u32 m = (tid << 16) | (idx & 0xFFFFu);
+  CTP_INLINE_CROSS_FUN bool Check(ctp::u32 tid, ctp::u32 idx) const {
+    ctp::u32 m = (tid << 16) | (idx & 0xFFFFu);
     if (magic0_ != m) return false;
     if (magic1_ != ~m) return false;
     for (int i = 0; i < 400; ++i) {
@@ -119,7 +119,7 @@ __global__ void BuddyAllocKernel(
     char                   *backend_base,
     size_t                  total_capacity,
     size_t                  per_thread_bytes,
-    hipc::MemoryBackendId   backend_id,
+    ctp::ipc::MemoryBackendId   backend_id,
     int                    *d_results) {
 
   int tid = static_cast<int>(threadIdx.x + blockIdx.x * blockDim.x);
@@ -133,7 +133,7 @@ __global__ void BuddyAllocKernel(
 
   // Sub-backend: data_ = full backend base so every OffsetPtr offset is
   // a valid index into the entire 32 MB region (matches ClientInitGpu pattern).
-  hipc::MemoryBackend sub_backend;
+  ctp::ipc::MemoryBackend sub_backend;
   sub_backend.data_          = backend_base;
   sub_backend.data_capacity_ = total_capacity;
   sub_backend.id_            = backend_id;
@@ -148,11 +148,11 @@ __global__ void BuddyAllocKernel(
     auto fp = alloc->template AllocateObjs<FakeBig408>(1);
     if (fp.IsNull()) break;
 
-    fp.ptr_->Init(static_cast<hshm::u32>(tid),
-                  static_cast<hshm::u32>(count));
+    fp.ptr_->Init(static_cast<ctp::u32>(tid),
+                  static_cast<ctp::u32>(count));
 
-    if (!fp.ptr_->Check(static_cast<hshm::u32>(tid),
-                        static_cast<hshm::u32>(count))) {
+    if (!fp.ptr_->Check(static_cast<ctp::u32>(tid),
+                        static_cast<ctp::u32>(count))) {
       d_results[tid] = -2;  // corruption
       return;
     }
@@ -183,7 +183,7 @@ TEST_CASE("BuddyAllocatorGpu", "[gpu][allocator]") {
     constexpr size_t kBackendSize    = kNumThreads * kPerThreadBytes;  // 32 MB
 
     // ptxas -v shows this kernel compiles to 0 bytes stack frame (fully
-    // register-allocated).  4 096 B matches the Chimaera orchestrator setting
+    // register-allocated).  4 096 B matches the CLIO Runtime orchestrator setting
     // and is generous for this test; even 2 048 B passes in practice.
     cudaDeviceSetLimit(cudaLimitStackSize, 4096);
 

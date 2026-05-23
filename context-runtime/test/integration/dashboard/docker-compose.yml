@@ -26,10 +26,10 @@ services:
     environment:
       - NODE_ID=1
       - NODE_IP=172.20.0.10
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/dashboard/wrp_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/dashboard/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/dashboard/hostfile
-      - CHI_WITH_RUNTIME=0
-      - CHI_NUM_CONTAINERS=4
+      - CLIO_WITH_RUNTIME=0
+      - CLIO_NUM_CONTAINERS=4
       - PATH=/home/iowarp/venv/bin:/workspace/build/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
       - PYTHONPATH=/workspace/build/bin:/workspace/context-visualizer
@@ -52,7 +52,7 @@ services:
         pip install flask pyyaml msgpack 2>&1 | tail -3 &&
 
         echo 'Node 1: Starting runtime in background...' &&
-        /workspace/build/bin/chimaera runtime start &
+        /workspace/build/bin/clio_run runtime start &
         RUNTIME_PID=\$! &&
         sleep 5 &&
 
@@ -82,10 +82,10 @@ services:
     environment:
       - NODE_ID=2
       - NODE_IP=172.20.0.11
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/dashboard/wrp_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/dashboard/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/dashboard/hostfile
-      - CHI_WITH_RUNTIME=0
-      - CHI_NUM_CONTAINERS=4
+      - CLIO_WITH_RUNTIME=0
+      - CLIO_NUM_CONTAINERS=4
       - PATH=/home/iowarp/venv/bin:/workspace/build/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -104,7 +104,7 @@ services:
         sudo /usr/sbin/sshd;
 
         echo 'Node 2: Starting runtime...' &&
-        /workspace/build/bin/chimaera runtime start &
+        /workspace/build/bin/clio_run runtime start &
         sleep infinity
       "
 
@@ -126,10 +126,10 @@ services:
     environment:
       - NODE_ID=3
       - NODE_IP=172.20.0.12
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/dashboard/wrp_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/dashboard/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/dashboard/hostfile
-      - CHI_WITH_RUNTIME=0
-      - CHI_NUM_CONTAINERS=4
+      - CLIO_WITH_RUNTIME=0
+      - CLIO_NUM_CONTAINERS=4
       - PATH=/home/iowarp/venv/bin:/workspace/build/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -148,7 +148,7 @@ services:
         sudo /usr/sbin/sshd;
 
         echo 'Node 3: Starting runtime...' &&
-        /workspace/build/bin/chimaera runtime start &
+        /workspace/build/bin/clio_run runtime start &
         sleep infinity
       "
 
@@ -170,10 +170,10 @@ services:
     environment:
       - NODE_ID=4
       - NODE_IP=172.20.0.13
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/dashboard/wrp_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/dashboard/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/dashboard/hostfile
-      - CHI_WITH_RUNTIME=0
-      - CHI_NUM_CONTAINERS=4
+      - CLIO_WITH_RUNTIME=0
+      - CLIO_NUM_CONTAINERS=4
       - PATH=/home/iowarp/venv/bin:/workspace/build/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -192,7 +192,7 @@ services:
         sudo /usr/sbin/sshd;
 
         echo 'Node 4: Starting runtime...' &&
-        /workspace/build/bin/chimaera runtime start &
+        /workspace/build/bin/clio_run runtime start &
         sleep infinity
       "
 

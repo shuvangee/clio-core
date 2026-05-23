@@ -39,7 +39,7 @@
  *   2. DRAM→FILE (CPU→storage) transfer via dst_fd in LbmContext
  */
 
-#include <hermes_shm/lightbeam/nixl_transport.h>
+#include <clio_ctp/lightbeam/nixl_transport.h>
 
 #include <cassert>
 #include <cstring>
@@ -50,7 +50,7 @@
 #include <unistd.h>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -78,7 +78,7 @@ static void Require(bool cond, const std::string& msg) {
  *        destination buffers within the same process.
  */
 static void TestDramToMem() {
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
   std::cout << "\n==== TestDramToMem (DRAM→DRAM loopback via NIXL) ====\n";
 
   const std::string payload = "nixl_dram_loopback_test";
@@ -95,14 +95,14 @@ static void TestDramToMem() {
   // Build send metadata
   LbmMeta<> meta;
   Bulk send_bulk =
-      transport.Expose(hipc::FullPtr<char>(src.data()), kSize, BULK_XFER);
+      transport.Expose(ctp::ipc::FullPtr<char>(src.data()), kSize, BULK_XFER);
   meta.send.push_back(send_bulk);
 
   // Pre-populate recv with destination buffer so NixlTransport writes there
   Bulk recv_bulk;
   recv_bulk.size = kSize;
-  recv_bulk.flags = hshm::bitfield32_t(BULK_XFER);
-  recv_bulk.data = hipc::FullPtr<char>(dst.data());
+  recv_bulk.flags = ctp::bitfield32_t(BULK_XFER);
+  recv_bulk.data = ctp::ipc::FullPtr<char>(dst.data());
   meta.recv.push_back(recv_bulk);
 
   int rc = transport.Send(meta);
@@ -129,7 +129,7 @@ static void TestDramToMem() {
  *        LbmContext carries a valid dst_fd_.
  */
 static void TestDramToFile() {
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
   std::cout << "\n==== TestDramToFile (DRAM→FILE via NIXL POSIX backend) ====\n";
 
   const std::string payload = "nixl_file_transfer_test_payload";
@@ -156,7 +156,7 @@ static void TestDramToFile() {
   // Build send metadata
   LbmMeta<> meta;
   Bulk send_bulk =
-      transport.Expose(hipc::FullPtr<char>(src.data()), kSize, BULK_XFER);
+      transport.Expose(ctp::ipc::FullPtr<char>(src.data()), kSize, BULK_XFER);
   meta.send.push_back(send_bulk);
 
   // Build context: write to fd at offset 0
@@ -201,7 +201,7 @@ static void TestDramToFile() {
  *        to the destination file.
  */
 static void TestMultiBulkToFile() {
-#if HSHM_ENABLE_NIXL
+#if CTP_ENABLE_NIXL
   std::cout << "\n==== TestMultiBulkToFile (scatter-gather → FILE) ====\n";
 
   const std::string part1 = "Hello, ";
@@ -223,9 +223,9 @@ static void TestMultiBulkToFile() {
 
   LbmMeta<> meta;
   meta.send.push_back(
-      transport.Expose(hipc::FullPtr<char>(buf1.data()), buf1.size(), BULK_XFER));
+      transport.Expose(ctp::ipc::FullPtr<char>(buf1.data()), buf1.size(), BULK_XFER));
   meta.send.push_back(
-      transport.Expose(hipc::FullPtr<char>(buf2.data()), buf2.size(), BULK_XFER));
+      transport.Expose(ctp::ipc::FullPtr<char>(buf2.data()), buf2.size(), BULK_XFER));
 
   LbmContext ctx(LBM_SYNC, 0, fd, /*dst_offset=*/0);
   int rc = transport.Send(meta, ctx);

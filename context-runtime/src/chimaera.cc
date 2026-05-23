@@ -32,30 +32,31 @@
  */
 
 /**
- * Main Chimaera initialization and global functions
+ * Main CLIO Runtime initialization and global functions
  */
 
-#include "chimaera/chimaera.h"
-#include "chimaera/container.h"
-#include "chimaera/work_orchestrator.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/work_orchestrator.h"
 #include <cstdlib>
 #include <cstring>
 
-namespace chi {
+namespace clio::run {
 
-bool CHIMAERA_INIT(ChimaeraMode mode, bool default_with_runtime, bool is_restart) {
+bool ClioInitImpl(ChimaeraMode mode, bool default_with_runtime,
+                  bool is_restart) {
   // Static guard to prevent double initialization
   static bool s_initialized = false;
   if (s_initialized) {
     return true;  // Already initialized, return success
   }
 
-  auto* chimaera_manager = CHI_CHIMAERA_MANAGER;
-  chimaera_manager->is_restart_ = is_restart;
+  auto* runtime_manager = CLIO_RUNTIME_MANAGER;
+  runtime_manager->is_restart_ = is_restart;
 
   // Check environment variable CHI_WITH_RUNTIME
   bool with_runtime = default_with_runtime;
-  const char* env_val = std::getenv("CHI_WITH_RUNTIME");
+  const char* env_val = chi::env::GetCompat("WITH_RUNTIME");
   if (env_val != nullptr) {
     with_runtime = (std::strcmp(env_val, "1") == 0 ||
                    std::strcmp(env_val, "true") == 0 ||
@@ -78,20 +79,20 @@ bool CHIMAERA_INIT(ChimaeraMode mode, bool default_with_runtime, bool is_restart
 
   // Initialize runtime first if needed
   if (init_runtime) {
-    if (!chimaera_manager->ServerInit()) {
+    if (!runtime_manager->ServerInit()) {
       return false;
     }
   }
 
   // Initialize client components
   if (init_client) {
-    if (!chimaera_manager->ClientInit()) {
+    if (!runtime_manager->ClientInit()) {
       return false;
     }
   }
 
   // Register atexit handler so CHIMAERA_FINALIZE runs before static
-  // destructors.  The Chimaera singleton is heap-allocated (GetGlobalPtrVar)
+  // destructors.  The CLIO Runtime singleton is heap-allocated (GetGlobalPtrVar)
   // so its destructor is never called automatically.  Without this the ZMQ
   // DEALER socket stays open and zmq_ctx_destroy blocks forever at exit.
   std::atexit(CHIMAERA_FINALIZE);
@@ -107,7 +108,7 @@ void CHIMAERA_FINALIZE() {
     return;
   }
   s_finalized = true;
-  auto *mgr = CHI_CHIMAERA_MANAGER;
+  auto *mgr = CLIO_RUNTIME_MANAGER;
   if (mgr) {
     // Server first: stop worker threads that may still be sending IPC
     mgr->ServerFinalize();
@@ -116,4 +117,4 @@ void CHIMAERA_FINALIZE() {
   }
 }
 
-}  // namespace chi
+}  // namespace clio::run

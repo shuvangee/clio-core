@@ -122,7 +122,7 @@ elf_enabled: "OFF"
 
 ```
 installers/conda/
-├── recipe.yaml              # Main recipe (rattler-build format)
+├── meta.yaml                 # Main recipe (conda-build format)
 ├── conda_build_config.yaml  # Variant definitions
 ├── conda-forge.yml          # conda-forge CI configuration
 ├── conda-local.sh           # Local build script
@@ -187,18 +187,18 @@ After installation, IOWarp Core files are organized as follows:
 ```
 $CONDA_PREFIX/
 ├── bin/                           # Command-line tools
-│   ├── chimaera runtime start
-│   ├── wrp_cte
-│   ├── wrp_cae_omni
+│   ├── clio_run runtime start
+│   ├── clio_cte
+│   ├── clio_cae
 │   └── ...
 ├── lib/                           # Shared libraries
 │   ├── libchimaera_cxx.so
-│   ├── libhermes_shm_host.so
-│   ├── chimaera_admin_runtime.so
+│   ├── libclio_ctp_host.so
+│   ├── clio_admin_runtime.so
 │   └── ...
 ├── lib/python3.X/site-packages/   # Python modules
-│   ├── wrp_cte/
-│   └── wrp_cee/
+│   ├── clio_cte/
+│   └── clio_cee/
 ├── include/                       # C++ headers
 │   ├── chimaera/
 │   ├── hshm/
@@ -206,7 +206,7 @@ $CONDA_PREFIX/
 └── lib/cmake/                     # CMake package configs
     ├── iowarp-core/
     ├── chimaera/
-    ├── HermesShm/
+    ├── ClioCtp/
     └── ...
 ```
 
@@ -217,18 +217,18 @@ After installation, you can use IOWarp Core in several ways:
 ### 1. Command-Line Tools
 
 ```bash
-# Start the Chimaera runtime
-chimaera runtime start
+# Start the Clio runtime
+clio_run runtime start
 
 # Use CTE tools
-wrp_cte --help
+clio_cte --help
 ```
 
 ### 2. Python
 
 ```python
-import wrp_cte
-import wrp_cee
+import clio_cte
+import clio_cee
 
 # Use the Python bindings
 ```
@@ -237,11 +237,11 @@ import wrp_cee
 
 ```cmake
 # In your CMakeLists.txt
-find_package(iowarp-core REQUIRED)
+find_package(clio-core REQUIRED)
 
 target_link_libraries(your_app
-    chimaera::admin_client
-    wrp_cte::core_client
+    clio::run::admin_client
+    clio::cte::core_client
 )
 ```
 
@@ -250,7 +250,7 @@ target_link_libraries(your_app
 To submit to conda-forge:
 
 1. Fork [conda-forge/staged-recipes](https://github.com/conda-forge/staged-recipes)
-2. Copy `recipe.yaml` and `conda_build_config.yaml` to `recipes/iowarp-core/`
+2. Copy `meta.yaml` and `conda_build_config.yaml` to `recipes/iowarp-core/`
 3. Submit a pull request
 
 The CI will automatically build all variant combinations defined in `conda_build_config.yaml`.

@@ -4,7 +4,7 @@
 cd ${GITHUB_WORKSPACE}
 
 # This script will build and install them via Spack from source
-# because Hermes requires a very specific version and configuration options
+# because Clio requires a very specific version and configuration options
 # for each package.
 
 set -x
@@ -32,5 +32,5 @@ spack repo add clio-core/installers/spack
 # This will allow Spack to skip building some packages that are directly
 spack external find
 
-# Install hermes_shm (needed for dependencies)
-spack install cte-hermes-shm +compress +encrypt +elf +cereal +mpiio +vfd +mochi +boost +nocompile 
+# Install clio_ctp (needed for dependencies)
+spack install context-transport-primitives +compress +encrypt +elf +cereal +mpiio +vfd +mochi +boost +nocompile 

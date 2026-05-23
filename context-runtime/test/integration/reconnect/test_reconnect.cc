@@ -57,16 +57,16 @@
 #include <chrono>
 #include <thread>
 
-#include <chimaera/chimaera.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 
-#include <chimaera/MOD_NAME/MOD_NAME_client.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_client.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
 
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 using namespace std::chrono_literals;
 
@@ -88,10 +88,10 @@ class ReconnectTestFixture {
         // intentionally kills the local runtime.  Calling CHIMAERA_FINALIZE
         // after the server is dead would hang or crash.
         std::this_thread::sleep_for(500ms);
-        REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-        REQUIRE(CHI_IPC != nullptr);
-        REQUIRE(CHI_POOL_MANAGER != nullptr);
-        REQUIRE(CHI_IPC->IsInitialized());
+        REQUIRE(CLIO_RUNTIME_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC != nullptr);
+        REQUIRE(CLIO_POOL_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC->IsInitialized());
         INFO("Chimaera initialization successful");
       } else {
         FAIL("Failed to initialize Chimaera");
@@ -111,7 +111,7 @@ TEST_CASE("Failover to new host after server shutdown",
     // Step 1: Create a MOD_NAME pool and verify a task completes locally
     // ------------------------------------------------------------------
     INFO("Step 1: Creating MOD_NAME pool and running pre-shutdown task");
-    chimaera::MOD_NAME::Client mod_name_client(kReconnectPoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kReconnectPoolId);
     {
       auto create_task = mod_name_client.AsyncCreate(
           chi::PoolQuery::Dynamic(), "reconnect_test_pool", kReconnectPoolId);
@@ -135,7 +135,7 @@ TEST_CASE("Failover to new host after server shutdown",
     // ------------------------------------------------------------------
     INFO("Step 2: Sending AsyncStopRuntime to local runtime");
     {
-      chimaera::admin::Client admin_client(chi::kAdminPoolId);
+      clio::run::admin::Client admin_client(chi::kAdminPoolId);
       // Fire-and-forget: send stop with short grace period.
       // Do NOT call Wait() — the server may die before responding.
       admin_client.AsyncStopRuntime(
@@ -162,7 +162,7 @@ TEST_CASE("Failover to new host after server shutdown",
     // ------------------------------------------------------------------
     INFO("Step 3: Creating pool on new host after reconnection");
     {
-      chimaera::MOD_NAME::Client new_client(kReconnectPoolId);
+      clio::run::MOD_NAME::Client new_client(kReconnectPoolId);
       auto create_task = new_client.AsyncCreate(
           chi::PoolQuery::Dynamic(), "reconnect_post_failover_pool",
           kReconnectPoolId);

@@ -31,12 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "hermes_shm/memory/allocator/malloc_allocator.h"
+#include "clio_ctp/memory/allocator/malloc_allocator.h"
 
-namespace hshm::ipc {
+namespace ctp::ipc {
 
 // Explicit template instantiations
 template class _MallocAllocator<false>;
 template class _MallocAllocator<true>;
 
-}  // namespace hshm::ipc
+}  // namespace ctp::ipc

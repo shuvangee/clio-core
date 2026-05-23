@@ -4,13 +4,16 @@
 # It will automatically install Miniconda if conda is not detected
 #
 # Usage:
-#   ./install.sh              # Build with default (release) preset
-#   ./install.sh release      # Build with release preset
-#   ./install.sh release-fuse # Build with FUSE adapter enabled
-#   ./install.sh debug        # Build with debug preset
-#   ./install.sh conda        # Build with conda-optimized preset
-#   ./install.sh cuda         # Build with CUDA preset
-#   ./install.sh rocm         # Build with ROCm preset
+#   ./install.sh                          # Build with default (release) preset
+#   ./install.sh release                  # Build with release preset
+#   ./install.sh release-fuse             # Build with FUSE adapter enabled
+#   ./install.sh debug                    # Build with debug preset
+#   ./install.sh conda                    # Build with conda-optimized preset
+#   ./install.sh cuda                     # Build with CUDA preset
+#   ./install.sh rocm                     # Build with ROCm preset
+#   ./install.sh --only-deps [preset]     # Install ONLY iowarp-core's deps
+#                                         # (build+host+run from the recipe),
+#                                         # skip conda-build of iowarp-core itself.
 
 set -e  # Exit on error
 
@@ -18,8 +21,34 @@ set -e  # Exit on error
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Parse preset argument (default to release)
-PRESET="${1:-release}"
+# Parse arguments: --only-deps flag + optional positional preset
+ONLY_DEPS=false
+PRESET=""
+for arg in "$@"; do
+    case "$arg" in
+        --only-deps) ONLY_DEPS=true ;;
+        --*)
+            echo "Unknown flag: $arg" >&2
+            echo "Usage: $0 [--only-deps] [preset]" >&2
+            exit 1
+            ;;
+        *) PRESET="${PRESET:-$arg}" ;;
+    esac
+done
+PRESET="${PRESET:-release}"
+
+# Single source of truth for the build/target Python: the recipe's
+# conda_build_config.yaml `python:` pin. We deliberately do NOT derive
+# this from whatever `python3` is active — conda-forge's `python`
+# metapackage moved its default to 3.14, and forcing `conda build
+# --python=3.14` (overriding the recipe pin) crashes conda-build in
+# get_upstream_pins/execute_download_actions with
+# "IndexError: list index out of range". Pinning the env, the build,
+# and the install to the recipe's value keeps all three consistent.
+CBC_FILE="$SCRIPT_DIR/installers/conda/conda_build_config.yaml"
+PYVER="$(grep -A2 '^python:' "$CBC_FILE" 2>/dev/null \
+    | grep -oE '[0-9]+\.[0-9]+' | head -1)"
+PYVER="${PYVER:-3.12}"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -144,8 +173,8 @@ if [ -z "$CONDA_PREFIX" ]; then
     if conda env list | grep -q "^$ENV_NAME "; then
         echo -e "${YELLOW}Environment '$ENV_NAME' already exists. Using existing environment.${NC}"
     else
-        conda create -n "$ENV_NAME" -y python
-        echo -e "${GREEN}Environment created${NC}"
+        conda create -n "$ENV_NAME" -y "python=$PYVER"
+        echo -e "${GREEN}Environment created (python=$PYVER)${NC}"
     fi
 
     echo -e "${BLUE}Activating environment: $ENV_NAME${NC}"
@@ -206,24 +235,119 @@ fi
 # Build the conda package
 RECIPE_DIR="$SCRIPT_DIR/installers/conda"
 
-echo -e "${BLUE}>>> Building conda package with conda-build...${NC}"
-echo -e "${YELLOW}This may take 10-30 minutes depending on your system${NC}"
-echo ""
-
 OUTPUT_DIR="$SCRIPT_DIR/build/conda-output"
 mkdir -p "$OUTPUT_DIR"
 
 export IOWARP_PRESET="$PRESET"
 
-# Match the build Python version to the target environment so that
-# the built package's python pin is satisfiable at install time.
-TARGET_PYTHON="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-echo -e "${BLUE}Target Python version: $TARGET_PYTHON${NC}"
+# Extract PKG_VERSION from CMakeLists.txt's `project(iowarp-core VERSION X.Y.Z)`
+# and export it so meta.yaml's `environ.get('PKG_VERSION', '1.0.0')` jinja
+# resolves to the real version.  Without this, conda-build 26.x's jinja
+# returns the literal string "None" for the unset env var (instead of the
+# fallback default), and the package name ends up "iowarp-core-None-...",
+# which then breaks at the _test_env solve step with
+# `libmambapy.bindings.specs.ParseError: invalid version predicate in "None"`.
+# Mirrors the same extraction step in .github/workflows/install-conda.yml.
+if [ -z "${PKG_VERSION:-}" ]; then
+    PKG_VERSION="$(grep -oP 'project\(iowarp-core VERSION \K[\d.]+' "$SCRIPT_DIR/CMakeLists.txt" || true)"
+    if [ -z "$PKG_VERSION" ]; then
+        PKG_VERSION="1.0.0"
+    fi
+    export PKG_VERSION
+fi
+echo -e "${BLUE}Package version: $PKG_VERSION${NC}"
 
+# Build/target Python comes from the recipe pin (computed above as
+# $PYVER), NOT from the active interpreter. See the comment at the top.
+echo -e "${BLUE}Target Python version: $PYVER (from conda_build_config.yaml)${NC}"
+
+# --only-deps: render the recipe to resolve jinja, extract the union
+# of build/host/run requirements, and conda-install them. Skip the
+# conda-build of iowarp-core itself. Useful for dev iteration when
+# you want to compile the tree manually (cmake --build) but let
+# conda manage the C++/python dependencies.
+if [ "$ONLY_DEPS" = true ]; then
+    echo -e "${BLUE}>>> --only-deps: installing iowarp-core dependencies (no build)${NC}"
+    echo ""
+    RENDERED="$(mktemp --suffix=.yaml)"
+    # -f writes the rendered YAML to FILE without the "Hash contents:"
+    # / "meta.yaml:" prelude that `conda render` would otherwise emit
+    # on stdout (which is not parseable as pure YAML).
+    # No --python: the recipe's conda_build_config.yaml `python:` pin
+    # drives the variant. Passing --python on the CLI overrides that
+    # pin and trips conda-build's execute_download_actions IndexError.
+    if ! "$CONDA_BIN" render "$RECIPE_DIR" \
+            -c conda-forge \
+            -f "$RENDERED" >/dev/null 2>&1; then
+        echo -e "${RED}conda render failed${NC}"
+        rm -f "$RENDERED"
+        exit 1
+    fi
+
+    # Parse rendered meta.yaml with python+yaml (conda-build pulls in
+    # pyyaml into base, so $CONDA_BIN's python has it).
+    DEPS="$("$CONDA_BASE/bin/python" - "$RENDERED" <<'PY'
+import sys, yaml
+with open(sys.argv[1]) as f:
+    data = yaml.safe_load(f)
+reqs = (data or {}).get("requirements", {}) or {}
+# `conda render` resolves each dep to "name version build" with the
+# exact transitive build hash; for a dev "install deps" flow we want
+# the loosest practical pin so the solver can fit them into the user's
+# active env. Strip to just the package name (drop version and build
+# hash). Users who need strict pinning should `conda build` the full
+# package, which already encodes them.
+seen_names = set()
+ordered = []
+for section in ("build", "host", "run"):
+    for dep in reqs.get(section, []) or []:
+        if not isinstance(dep, str):
+            continue
+        name = dep.split()[0]
+        if name in seen_names:
+            continue
+        seen_names.add(name)
+        ordered.append(name)
+print(" ".join(ordered))
+PY
+)"
+    rm -f "$RENDERED"
+
+    if [ -z "$DEPS" ]; then
+        echo -e "${RED}No dependencies extracted from recipe.${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}Dependencies to install:${NC}"
+    echo "  $DEPS"
+    echo ""
+
+    # shellcheck disable=SC2086  # intentional word-splitting of $DEPS
+    if conda install -y -c conda-forge $DEPS; then
+        echo ""
+        echo -e "${GREEN}======================================================================"
+        echo -e "Dependencies installed (iowarp-core itself was NOT built/installed)"
+        echo -e "======================================================================${NC}"
+        echo -e "${BLUE}Active env: ${CONDA_PREFIX}${NC}"
+        exit 0
+    else
+        echo -e "${RED}conda install of dependencies failed.${NC}"
+        exit 1
+    fi
+fi
+
+echo -e "${BLUE}>>> Building conda package with conda-build...${NC}"
+echo -e "${YELLOW}This may take 10-30 minutes depending on your system${NC}"
+echo ""
+
+# No --python flag: the recipe's conda_build_config.yaml pins
+# python (3.12). Passing --python on the CLI overrides that pin and
+# crashes conda-build in execute_download_actions
+# ("IndexError: list index out of range"), even when the value
+# matches the pin. This mirrors the known-good install-conda.yml job.
 if "$CONDA_BIN" build "$RECIPE_DIR" \
     --output-folder "$OUTPUT_DIR" \
     -c conda-forge \
-    --python="$TARGET_PYTHON" \
     --no-anaconda-upload; then
     BUILD_SUCCESS=true
 else

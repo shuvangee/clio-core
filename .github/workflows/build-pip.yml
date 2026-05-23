@@ -14,6 +14,36 @@ permissions:
 
 jobs:
   #------------------------------------------------------------
+  # Guard: on a version tag, the git tag MUST match the version
+  # in CMakeLists.txt (the single source of truth that
+  # pyproject.toml derives the wheel version from). Without this,
+  # a tag like v1.5.0 with a stale CMakeLists.txt version (1.0.3)
+  # builds 1.0.3 wheels and PyPI publish silently no-ops via
+  # skip-existing -> a "successful" release that publishes nothing.
+  #------------------------------------------------------------
+  check-version:
+    name: Check tag matches version
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Verify tag == CMakeLists.txt version
+      run: |
+        set -e
+        TAG="${GITHUB_REF_NAME#v}"
+        CMAKE_VERSION=$(grep -oP 'project\(iowarp-core VERSION \K[\d.]+' CMakeLists.txt)
+        echo "Git tag version:        $TAG"
+        echo "CMakeLists.txt version: $CMAKE_VERSION"
+        if [ "$TAG" != "$CMAKE_VERSION" ]; then
+          echo "::error::Tag '$GITHUB_REF_NAME' does not match CMakeLists.txt version '$CMAKE_VERSION'."
+          echo "::error::Bump 'project(iowarp-core VERSION ...)' in CMakeLists.txt to $TAG and re-tag."
+          exit 1
+        fi
+        echo "Version check passed."
+
+  #------------------------------------------------------------
   # Build manylinux wheels via cibuildwheel
   #------------------------------------------------------------
   build-wheels:
@@ -163,6 +193,34 @@ jobs:
             echo "=== CLI test ==="
             chimaera --help
 
+            echo "=== Benchmark binaries: --help smoke test ==="
+            # NOTE: This entire docker invocation is wrapped in bash -c
+            # (single quotes), so comments here must not contain apostrophes
+            # or they prematurely terminate the outer string and the
+            # remaining commands run in the runner shell instead of docker.
+            # See PR #430 followup for the original miss.
+            #
+            # Purpose: catch load-time crashes (missing NEEDED libs, ABI
+            # mismatches, RPATH bugs from repair_wheel.sh) on benchmark
+            # binaries that the import / ldd checks above do not exercise.
+            # See issue #429 for the regression this guards against.
+            #
+            # clio_cte_bench prints --help via its logging framework at
+            # ERROR level. clio_run_thrpt_bench prints to stdout and
+            # exits 1. The point of this block is to fail the job on
+            # SIGSEGV / exit >= 128, not on the benchmarks own --help
+            # exit codes.
+            for bench in clio_cte_bench clio_run_thrpt_bench; do
+              echo "--- $bench --help ---"
+              "$bench" --help || rc=$?
+              rc=${rc:-0}
+              if [ "$rc" -ge 128 ]; then
+                echo "FAIL: $bench --help died with signal (exit $rc)"
+                exit 1
+              fi
+              unset rc
+            done
+
             echo "=== Symbol resolution check ==="
             LIB_DIR=$(python -c "import iowarp_core; print(iowarp_core.get_lib_dir())")
             export LD_LIBRARY_PATH="$LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -196,7 +254,7 @@ jobs:
   #------------------------------------------------------------
   publish-to-pypi:
     name: Publish to PyPI
-    needs: [build-wheels, test-wheels]
+    needs: [check-version, build-wheels, test-wheels]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     environment:
@@ -232,7 +290,7 @@ jobs:
   #------------------------------------------------------------
   github-release:
     name: Create GitHub Release
-    needs: [build-wheels, test-wheels]
+    needs: [check-version, build-wheels, test-wheels]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:

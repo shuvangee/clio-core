@@ -44,9 +44,9 @@
  * 3. GetBlobInfo() verifies score and block placement changes
  */
 
-#include <chimaera/chimaera.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
 
 #include <chrono>
 #include <cstdio>
@@ -59,6 +59,11 @@
 #include "simple_test.h"
 
 namespace fs = std::filesystem;
+
+static std::string chi_test_data_dir() {
+  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
+  return (d && *d) ? d : ".";
+}
 
 // Test constants for two-tier storage
 static constexpr chi::u64 kDramCapacity = 16 * 1024 * 1024;  // 16MB
@@ -82,10 +87,10 @@ class ReorganizeBlobTestFixture {
     INFO("=== Initializing ReorganizeBlob Test ===");
 
     // Setup paths
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::GetHomeDir();
     REQUIRE(!home_dir.empty());
-    config_path_ = home_dir + "/reorganize_blob_config.yaml";
-    file_storage_path_ = home_dir + "/reorganize_blob_storage.bin";
+    config_path_ = chi_test_data_dir() + "/reorganize_blob_config.yaml";
+    file_storage_path_ = chi_test_data_dir() + "/reorganize_blob_storage.bin";
 
     // Clean up existing files
     Cleanup();
@@ -95,17 +100,17 @@ class ReorganizeBlobTestFixture {
 
     // Set environment variable for runtime config
     // CHI_SERVER_CONF is checked first, so set it to override any existing value
-    setenv("CHI_SERVER_CONF", config_path_.c_str(), 1);
-    setenv("WRP_RUNTIME_CONF", config_path_.c_str(), 1);
+    ctp::SystemInfo::Setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
+    ctp::SystemInfo::Setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
 
-    // Initialize Chimaera runtime
+    // Initialize CLIO Runtime runtime
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
     REQUIRE(success);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Initialize CTE client
-    success = wrp_cte::core::WRP_CTE_CLIENT_INIT();
+    success = clio::cte::core::CLIO_CTE_CLIENT_INIT();
     REQUIRE(success);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -149,8 +154,8 @@ runtime:
   max_sleep: 50000
 
 compose:
-  - mod_name: wrp_cte_core
-    pool_name: wrp_cte
+  - mod_name: clio_cte_core
+    pool_name: clio_cte
     pool_query: local
     pool_id: 512.0
 
@@ -214,20 +219,20 @@ TEST_CASE("ReorganizeBlob - PutBlob to DRAM", "[reorganize][put][dram]") {
   REQUIRE(g_fixture != nullptr);
   REQUIRE(g_fixture->initialized_);
 
-  auto* cte_client = WRP_CTE_CLIENT;
+  auto* cte_client = CLIO_CTE_CLIENT;
   REQUIRE(cte_client != nullptr);
 
   // Create a tag for our test blobs
   std::string tag_name = "reorganize_test_tag";
-  wrp_cte::core::Tag tag(tag_name);
-  wrp_cte::core::TagId tag_id = tag.GetTagId();
+  clio::cte::core::Tag tag(tag_name);
+  clio::cte::core::TagId tag_id = tag.GetTagId();
 
   INFO("Putting blob with score=1.0 (should go to DRAM)");
 
   // Allocate shared memory buffer
-  auto shm_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto shm_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!shm_buffer.IsNull());
-  hipc::ShmPtr<> shm_ptr = shm_buffer.shm_.template Cast<void>();
+  ctp::ipc::ShmPtr<> shm_ptr = shm_buffer.shm_.template Cast<void>();
 
   // Fill buffer with pattern
   auto test_data = g_fixture->CreateTestData(kBlobSize, 'D');  // 'D' for DRAM
@@ -264,7 +269,7 @@ TEST_CASE("ReorganizeBlob - PutBlob to DRAM", "[reorganize][put][dram]") {
   REQUIRE(size_task->size_ == kBlobSize);
   INFO("Blob size: " << size_task->size_);
 
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
   INFO("SUCCESS: Blob placed with score=1.0");
 }
 
@@ -275,12 +280,12 @@ TEST_CASE("ReorganizeBlob - Move to Disk", "[reorganize][move][disk]") {
   REQUIRE(g_fixture != nullptr);
   REQUIRE(g_fixture->initialized_);
 
-  auto* cte_client = WRP_CTE_CLIENT;
+  auto* cte_client = CLIO_CTE_CLIENT;
   REQUIRE(cte_client != nullptr);
 
   std::string tag_name = "reorganize_test_tag";
-  wrp_cte::core::Tag tag(tag_name);
-  wrp_cte::core::TagId tag_id = tag.GetTagId();
+  clio::cte::core::Tag tag(tag_name);
+  clio::cte::core::TagId tag_id = tag.GetTagId();
   std::string blob_name = "test_blob_dram";
 
   // Get blob score before reorganization
@@ -323,13 +328,13 @@ TEST_CASE("ReorganizeBlob - Verify Data Integrity", "[reorganize][integrity]") {
   REQUIRE(g_fixture->initialized_);
 
   std::string tag_name = "reorganize_test_tag";
-  wrp_cte::core::Tag tag(tag_name);
+  clio::cte::core::Tag tag(tag_name);
   std::string blob_name = "test_blob_dram";
 
   INFO("Verifying data integrity after reorganization");
 
   // Allocate buffer for reading
-  auto read_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!read_buffer.IsNull());
 
   // Read blob data
@@ -342,7 +347,7 @@ TEST_CASE("ReorganizeBlob - Verify Data Integrity", "[reorganize][integrity]") {
   bool data_valid = g_fixture->VerifyTestData(read_data, 'D');  // 'D' pattern from put
   REQUIRE(data_valid);
 
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
   INFO("SUCCESS: Data integrity verified after reorganization");
 }
 
@@ -353,12 +358,12 @@ TEST_CASE("ReorganizeBlob - Promote to DRAM", "[reorganize][promote][dram]") {
   REQUIRE(g_fixture != nullptr);
   REQUIRE(g_fixture->initialized_);
 
-  auto* cte_client = WRP_CTE_CLIENT;
+  auto* cte_client = CLIO_CTE_CLIENT;
   REQUIRE(cte_client != nullptr);
 
   std::string tag_name = "reorganize_test_tag";
-  wrp_cte::core::Tag tag(tag_name);
-  wrp_cte::core::TagId tag_id = tag.GetTagId();
+  clio::cte::core::Tag tag(tag_name);
+  clio::cte::core::TagId tag_id = tag.GetTagId();
   std::string blob_name = "test_blob_dram";
 
   // Get blob score before promotion
@@ -390,7 +395,7 @@ TEST_CASE("ReorganizeBlob - Promote to DRAM", "[reorganize][promote][dram]") {
   INFO("SUCCESS: Score changed from " << score_before << " to " << score_after);
 
   // Verify data integrity after promotion
-  auto read_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!read_buffer.IsNull());
 
   tag.GetBlob(blob_name, read_buffer.shm_.template Cast<void>(), kBlobSize, 0);
@@ -401,7 +406,7 @@ TEST_CASE("ReorganizeBlob - Promote to DRAM", "[reorganize][promote][dram]") {
   bool data_valid = g_fixture->VerifyTestData(read_data, 'D');
   REQUIRE(data_valid);
 
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
   INFO("SUCCESS: Blob promoted back to DRAM with data integrity");
 }
 
@@ -412,12 +417,12 @@ TEST_CASE("ReorganizeBlob - Cleanup", "[reorganize][cleanup]") {
   REQUIRE(g_fixture != nullptr);
   REQUIRE(g_fixture->initialized_);
 
-  auto* cte_client = WRP_CTE_CLIENT;
+  auto* cte_client = CLIO_CTE_CLIENT;
   REQUIRE(cte_client != nullptr);
 
   std::string tag_name = "reorganize_test_tag";
-  wrp_cte::core::Tag tag(tag_name);
-  wrp_cte::core::TagId tag_id = tag.GetTagId();
+  clio::cte::core::Tag tag(tag_name);
+  clio::cte::core::TagId tag_id = tag.GetTagId();
 
   INFO("Cleaning up test blobs and tags");
 
@@ -444,5 +449,6 @@ int main(int argc, char** argv) {
   delete g_fixture;
   g_fixture = nullptr;
 
-  return result;
+  SIMPLE_TEST_PROCESS_EXIT(result);
+  return result;  // unreachable on Windows
 }

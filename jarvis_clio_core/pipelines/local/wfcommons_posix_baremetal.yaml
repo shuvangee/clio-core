@@ -1,0 +1,52 @@
+# WfCommons (bare-metal) + CTE via POSIX adapter.
+#
+# Layout:
+#   clio_runtime    - starts the chimaera/CTE runtime locally
+#   clio_adapters   - LD_PRELOADs libclio_cte_posix.so into the next pkg
+#   wfcommons      - bare-metal install (creates a venv, pip installs
+#                    wfcommons, then runs the recipe + wfbench driver)
+#
+# Interception is opt-in per path: any open() with a "clio::" prefix
+# goes through CTE; everything else (including all wfbench data/* paths)
+# passes straight to the kernel. As a result this run is primarily a
+# wiring/no-regression test for the POSIX adapter under a real workload.
+
+name: wfcommons_posix_baremetal
+
+install_manager: default
+
+pkgs:
+  - pkg_type: jarvis_clio_core.clio_runtime
+    pkg_name: cte_runtime
+    # Use shared-memory IPC instead of TCP. wfbench spawns stress-ng
+    # subprocesses for its memory benchmarks which signal the parent
+    # frequently; ZMQ's DEALER send under TCP returns EINTR on those
+    # signals and chimaera's transport wrapper currently doesn't
+    # retry, wedging the FSM on the first request. SHM bypass avoids
+    # ZMQ entirely.
+    ipc_mode: shm
+
+  - pkg_type: builtin.wfcommons
+    pkg_name: wfcommons
+    recipe: montage
+    num_tasks: 100
+    cpu_work: 10
+    data_footprint: "0"
+    nprocs: 1
+    ppn: 1
+    out: $HOME/jarvis-runs/wfcommons_posix_baremetal
+    # Opt every wfbench task's input/output paths into the CTE POSIX
+    # adapter's interception namespace by prefixing them with "clio::".
+    clio_prefix: true
+    # Bind the cte_posix interceptor (declared below) to this package.
+    # jarvis-cd only invokes Interceptor.modify_env() — i.e. only
+    # prepends libclio_cte_posix.so onto LD_PRELOAD — for packages that
+    # explicitly reference the interceptor by name here. Without this
+    # binding the LD_PRELOAD never gets set and the adapter is loaded
+    # but never gets called.
+    interceptors: [cte_posix]
+
+interceptors:
+  - pkg_type: jarvis_clio_core.clio_adapters
+    pkg_name: cte_posix
+    posix: true

@@ -5,14 +5,14 @@
  * BSD 3-Clause License. See LICENSE file.
  */
 
-#include "chimaera/ipc/ipc_cpu2cpu.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/ipc/ipc_cpu2cpu.h"
+#include "clio_runtime/ipc_manager.h"
 
-namespace chi {
+namespace clio::run {
 
-hipc::FullPtr<Task> IpcCpu2Cpu::RuntimeRecv(
+ctp::ipc::FullPtr<Task> IpcCpu2Cpu::RuntimeRecv(
     IpcManager *ipc, Future<Task> &future, Container *container,
-    u32 method_id, hshm::lbm::Transport *recv_transport) {
+    u32 method_id, ctp::lbm::Transport *recv_transport) {
   auto future_shm = future.GetFutureShm();
   FullPtr<Task> task_full_ptr = future.GetTaskPtr();
 
@@ -23,14 +23,14 @@ hipc::FullPtr<Task> IpcCpu2Cpu::RuntimeRecv(
   }
 
   // Build SHM context for transfer
-  hshm::lbm::LbmContext ctx;
+  ctp::lbm::LbmContext ctx;
   ctx.copy_space = future_shm->copy_space;
   ctx.shm_info_ = &future_shm->input_;
 
   // Detect legacy GPU->CPU tasks by client_task_vaddr_ == 0
   bool is_gpu_task = (future_shm->client_task_vaddr_ == 0);
   if (is_gpu_task) {
-    chi::priv::vector<char> recv_buf(CHI_PRIV_ALLOC);
+    chi::priv::vector<char> recv_buf(CLIO_PRIV_ALLOC);
     recv_buf.reserve(256);
     DefaultLoadArchive local_archive(recv_buf);
     recv_transport->Recv(local_archive, ctx);
@@ -51,13 +51,13 @@ hipc::FullPtr<Task> IpcCpu2Cpu::RuntimeRecv(
 void IpcCpu2Cpu::RuntimeSend(
     IpcManager *ipc, const FullPtr<Task> &task_ptr,
     RunContext *run_ctx, Container *container,
-    hshm::lbm::Transport *send_transport) {
+    ctp::lbm::Transport *send_transport) {
   auto future_shm = run_ctx->future_.GetFutureShm();
 
   // Serialize outputs into SHM ring buffer
   future_shm->output_.copy_space_size_ =
       future_shm->input_.copy_space_size_;
-  hshm::lbm::LbmContext ctx;
+  ctp::lbm::LbmContext ctx;
   ctx.copy_space = future_shm->copy_space;
   ctx.shm_info_ = &future_shm->output_;
   SaveTaskArchive archive(MsgType::kSerializeOut, send_transport);
@@ -70,4 +70,4 @@ void IpcCpu2Cpu::RuntimeSend(
   container->DelTask(task_ptr->method_, task_ptr);
 }
 
-}  // namespace chi
+}  // namespace clio::run

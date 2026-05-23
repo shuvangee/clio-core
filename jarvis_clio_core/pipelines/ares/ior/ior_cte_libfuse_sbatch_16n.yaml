@@ -1,0 +1,95 @@
+# IOR + CTE (libfuse adapter) — SLURM sbatch, 16 nodes.
+#
+# 16-node scale-up of ior_cte_libfuse_sbatch_8n.yaml (proven pattern).
+# FUSE path is preferred over the clio POSIX LD_PRELOAD adapter for
+# multi-node: clio_cte_fuse is launched per-node via pssh (CLIO_MEMFD_DIR
+# ${HOSTNAME} expands correctly on the ssh hop), so it avoids the
+# mpiexec -x literal-env-forwarding hazard that breaks clio at scale.
+#
+# Layout:
+#   clio_runtime      -> chimaera daemon per node (shm IPC; peer
+#                       DEALER/ROUTER over the 40 GbE -40g fabric)
+#   clio_cte          -> CTE pool with a RAM tier per node, NO compressor
+#   clio_cte_libfuse  -> per-node FUSE mount at ${HOME}/cte_libfuse_sbatch_16n
+#   builtin.ior      -> POSIX fpp writes/reads through the mount
+#
+# IOR wall is capped at 5 min: an IOR run on this cluster never
+# legitimately exceeds that; past 5 min it is hanging, not working.
+
+name: ior_cte_libfuse_sbatch_16n
+
+ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
+
+mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include eno1 --prtemca prte_if_include eno1 --prtemca prte_tmpdir_base /home/llogan/iowarp_prte_tmp'
+
+env:
+  TMPDIR: "/home/llogan/iowarp_prte_tmp"
+  # FUSE path: clio_cte_fuse is launched per-node via pssh, so the ssh
+  # hop expands ${HOSTNAME} correctly per node (unlike the clio/mpiexec
+  # case). Node-local memfd dir, NFS-safe.
+  CLIO_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
+
+scheduler:
+  name: slurm
+  job_name: ior_cte_libfuse_sbatch_16n
+  nodes: 16
+  ntasks_per_node: 1
+  cpus_per_task: 40
+  partition: compute
+  # IOR never legitimately exceeds 5 min on this cluster; past that it
+  # is hanging (cancel + diagnose, do not wait).
+  time: "00:05:00"
+  output: slurm-%j.out
+  error: slurm-%j.err
+  suffix: "-40g"
+  pre_cmds:
+    - 'source /etc/profile.d/lmod.sh 2>/dev/null || source /etc/profile.d/modules.sh'
+    - 'module load gcc/11.4.0/openmpi/5.0.5-x2kvx5l ior/3.3.0-fihmxeb'
+    - 'mkdir -p /home/llogan/iowarp_prte_tmp'
+
+pkgs:
+  - pkg_type: jarvis_clio_core.clio_runtime
+    pkg_name: runtime
+    num_threads: 4
+    client_data_segment_size: "2G"
+    port: 9413
+    ipc_mode: "shm"
+    # info, not debug: debug emits a ZMQ-monitor line per connect event
+    # and produced ~500 MB of slurm output at 16n.
+    log_level: "info"
+    sleep: 4
+    swim_enabled: false
+
+  - pkg_type: jarvis_clio_core.clio_cte
+    pkg_name: cte_core
+    devices:
+      # 24 ranks/node x 64 MiB block = 1.5 GiB/node own writes; hash
+      # spreading adds the cross-hash half. 32 GB is generous headroom.
+      - ["ram::cte_ram_tier1", "32GB", 1.0]
+    dpe_type: "max_bw"
+    neighborhood: 1
+    default_target_timeout_ms: 30000
+    poll_period_ms: 5000
+    pool_query: "local"
+    # No compressor: iowarp_compress stays 'none' (default).
+
+  - pkg_type: jarvis_clio_core.clio_cte_libfuse
+    pkg_name: cte_fuse
+    mountpoint: ${HOME}/cte_libfuse_sbatch_16n
+    sleep: 2
+    extra_fuse_args: "-f"
+
+  - pkg_type: builtin.ior
+    pkg_name: ior
+    api: posix
+    write: true
+    read: true
+    # Each chimaera daemon + CTE pool + FUSE mount is node-local;
+    # shared-file IOR would cross nodes and break by construction.
+    # file-per-process: each rank writes a unique file on its own mount.
+    fpp: true
+    nprocs: 384
+    ppn: 24
+    xfer: 1m
+    block: 64m
+    out: ${HOME}/cte_libfuse_sbatch_16n/ior_sbatch.bin

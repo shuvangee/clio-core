@@ -31,21 +31,25 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/bdev/bdev_runtime.h>
-#include <chimaera/comutex.h>
-#include <chimaera/work_orchestrator.h>
-#include <chimaera/worker.h>
+#include <clio_runtime/bdev/bdev_runtime.h>
+#include <clio_runtime/comutex.h>
+#include <clio_runtime/device_memcpy.h>
+#include <clio_runtime/work_orchestrator.h>
+#include <clio_runtime/worker.h>
 
-#include <hermes_shm/serialize/msgpack_wrapper.h>
+#include <clio_ctp/introspect/system_info.h>
+#include <clio_ctp/serialize/msgpack_wrapper.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <thread>
 
-#include "hermes_shm/util/timer.h"
+#include "clio_ctp/util/timer.h"
 
-namespace chimaera::bdev {
+namespace clio::run::bdev {
 
 //===========================================================================
 // WorkerIOContext Implementation
@@ -58,10 +62,10 @@ bool WorkerIOContext::Init(const std::string &file_path, chi::u32 io_depth,
   }
 
   // Create async I/O backend via factory (io_depth passed at construction)
-#if HSHM_ENABLE_NIXL
-  async_io_ = hshm::AsyncIoFactory::Get(io_depth, hshm::AsyncIoBackend::kNixl);
+#if CTP_ENABLE_NIXL
+  async_io_ = ctp::AsyncIoFactory::Get(io_depth, ctp::AsyncIoBackend::kNixl);
 #else
-  async_io_ = hshm::AsyncIoFactory::Get(io_depth);
+  async_io_ = ctp::AsyncIoFactory::Get(io_depth);
 #endif
   if (!async_io_) {
     HLOG(kError, "Worker {} failed to create async I/O backend", worker_id);
@@ -138,20 +142,33 @@ WorkerBlockMap::WorkerBlockMap() {
   blocks_.resize(static_cast<size_t>(BlockSizeCategory::kMaxCategories));
 }
 
-bool WorkerBlockMap::AllocateBlock(int block_type, Block &block) {
+bool WorkerBlockMap::AllocateBlock(int block_type, Block &block,
+                                   size_t min_size) {
   if (block_type < 0 ||
       block_type >= static_cast<int>(BlockSizeCategory::kMaxCategories)) {
     return false;
   }
 
-  // Pop from the head of the list for this block type
-  if (blocks_[block_type].empty()) {
+  auto &list = blocks_[block_type];
+  if (list.empty()) {
     return false;
   }
 
-  block = blocks_[block_type].front();
-  blocks_[block_type].pop_front();
-  return true;
+  // For block_types where every freed block is exactly the bucket's nominal
+  // size, the head element is always a fit and we exit on the first pop.
+  // The largest bucket (kMaxCategories-1) is the fallthrough sink for any
+  // freed block whose actual size exceeds the largest cached class — those
+  // blocks can be any size >= kBlockSizes[max], so an explicit min_size
+  // check is needed to avoid returning an undersized block to a caller
+  // that asked for, say, 2 MiB.
+  for (auto it = list.begin(); it != list.end(); ++it) {
+    if (static_cast<size_t>(it->size_) >= min_size) {
+      block = *it;
+      list.erase(it);
+      return true;
+    }
+  }
+  return false;
 }
 
 void WorkerBlockMap::FreeBlock(Block block) {
@@ -188,17 +205,25 @@ bool GlobalBlockMap::AllocateBlock(int worker, size_t io_size, Block &block) {
 
   size_t worker_idx = static_cast<size_t>(worker);
 
-  // Find the next block size that is larger than this
+  // Find the next block size that is larger than this. When io_size exceeds
+  // every cached class FindBlockType returns -1; mirror FreeBlocks' fallthrough
+  // (which files such oversized blocks into the largest bucket via
+  // FindBlockTypeForSize) so they stay reachable here too.  Without this
+  // fallthrough, every freed 2 MiB block lands in bucket-max but AllocateBlock
+  // never consults that bucket — so 2 MiB AllocateBlocks always falls through
+  // to heap_.Allocate, growing the bdev's footprint monotonically with op
+  // count.  WorkerBlockMap::AllocateBlock validates min_size for the
+  // largest bucket so we don't accidentally return an undersized block.
   int block_type = FindBlockType(io_size);
   if (block_type == -1) {
-    return false;  // No suitable cached size
+    block_type = static_cast<int>(BlockSizeCategory::kMaxCategories) - 1;
   }
 
   // Acquire this worker's mutex using ScopedCoMutex
   {
     chi::ScopedCoMutex lock(worker_locks_[worker_idx]);
     // First attempt to allocate from this worker's map
-    if (worker_maps_[worker_idx].AllocateBlock(block_type, block)) {
+    if (worker_maps_[worker_idx].AllocateBlock(block_type, block, io_size)) {
       return true;
     }
   }
@@ -208,7 +233,7 @@ bool GlobalBlockMap::AllocateBlock(int worker, size_t io_size, Block &block) {
   for (size_t i = 1; i <= 4 && i < num_workers; ++i) {
     size_t other_worker = (worker_idx + i) % num_workers;
     chi::ScopedCoMutex lock(worker_locks_[other_worker]);
-    if (worker_maps_[other_worker].AllocateBlock(block_type, block)) {
+    if (worker_maps_[other_worker].AllocateBlock(block_type, block, io_size)) {
       return true;
     }
   }
@@ -284,32 +309,17 @@ Runtime::~Runtime() {
     CleanupWorkerIOContexts();
   }
 
-  // Clean up RAM backend
-  if (bdev_type_ == BdevType::kRam && ram_buffer_ != nullptr) {
-    delete[] ram_buffer_;
-    ram_buffer_ = nullptr;
-  }
+  // Clean up RAM backend (vector of unique_ptr<char[]> handles itself)
 
-#if HSHM_ENABLE_CUDA
-  // Clean up GPU HBM backend
-  if (bdev_type_ == BdevType::kHbm && hbm_buffer_ != nullptr) {
-    cudaFree(hbm_buffer_);
-    hbm_buffer_ = nullptr;
-  }
-
-  // Clean up pinned host backend
-  if (bdev_type_ == BdevType::kPinned && pinned_buffer_ != nullptr) {
-    cudaFreeHost(pinned_buffer_);
-    pinned_buffer_ = nullptr;
-  }
-#endif
+  // kHbm / kPinned bdev tiers were removed — kRam/kFile handle device
+  // USM source/dest pointers directly via chi::DeviceAwareMemcpy.
 
   // Note: GlobalBlockMap and Heap destructors will clean up automatically
 }
 
 bool Runtime::InitializeWorkerIOContexts() {
   // Pre-allocate vector based on actual number of workers
-  chi::WorkOrchestrator *work_orchestrator = CHI_WORK_ORCHESTRATOR;
+  chi::WorkOrchestrator *work_orchestrator = CLIO_WORK_ORCHESTRATOR;
   size_t num_workers =
       work_orchestrator ? work_orchestrator->GetWorkerCount() : 16;
   worker_io_contexts_.resize(num_workers);
@@ -343,7 +353,7 @@ WorkerIOContext *Runtime::GetWorkerIOContext(size_t worker_id) {
 
     // Register the eventfd with the worker's EventManager for completion notification
     int event_fd = ctx->async_io_ ? ctx->async_io_->GetEventFd() : -1;
-    chi::Worker *worker = CHI_CUR_WORKER;
+    chi::Worker *worker = CLIO_CUR_WORKER;
     if (worker != nullptr && event_fd >= 0) {
       auto &em = worker->GetEventManager();
       if (em.AddEvent(event_fd) < 0) {
@@ -359,13 +369,22 @@ WorkerIOContext *Runtime::GetWorkerIOContext(size_t worker_id) {
   return ctx;
 }
 
-chi::TaskStat Runtime::GetTaskStats(chi::u32 method_id) const {
-  switch (method_id) {
-    case Method::kWrite:
-    case Method::kRead: {
+chi::TaskStat Runtime::GetTaskStats(const chi::Task *task) const {
+  if (!task) return chi::TaskStat();
+  switch (task->method_) {
+    case Method::kWrite: {
+      auto *wt = static_cast<const WriteTask *>(task);
       chi::TaskStat stat;
-      stat.io_size_ = 1024 * 1024;
+      stat.io_size_ = wt->length_;
       // wall_time = aligned pages / 500 MB/s
+      size_t aligned = ((stat.io_size_ + 4095) / 4096) * 4096;
+      stat.wall_time_ = static_cast<float>(aligned) / 500.0f;
+      return stat;
+    }
+    case Method::kRead: {
+      auto *rt = static_cast<const ReadTask *>(task);
+      chi::TaskStat stat;
+      stat.io_size_ = rt->length_;
       size_t aligned = ((stat.io_size_ + 4095) / 4096) * 4096;
       stat.wall_time_ = static_cast<float>(aligned) / 500.0f;
       return stat;
@@ -374,14 +393,14 @@ chi::TaskStat Runtime::GetTaskStats(chi::u32 method_id) const {
   }
 }
 
-chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
+chi::TaskResume Runtime::Create(ctp::ipc::FullPtr<CreateTask> task,
                                 chi::RunContext &ctx) {
 #ifdef __NVCOMPILER
   chi::RunContext& rctx = ctx;
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Get the creation parameters
   CreateParams params = task->GetParams();
 
@@ -403,21 +422,21 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
     file_path_ = pool_name;
 
     // Use a temporary AsyncIO to set up the file (create/truncate)
-#if HSHM_ENABLE_NIXL
-    auto setup_io = hshm::AsyncIoFactory::Get(io_depth_, hshm::AsyncIoBackend::kNixl);
+#if CTP_ENABLE_NIXL
+    auto setup_io = ctp::AsyncIoFactory::Get(io_depth_, ctp::AsyncIoBackend::kNixl);
 #else
-    auto setup_io = hshm::AsyncIoFactory::Get(io_depth_);
+    auto setup_io = ctp::AsyncIoFactory::Get(io_depth_);
 #endif
     if (!setup_io) {
       HLOG(kError, "Failed to create setup async I/O backend");
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     if (!setup_io->Open(pool_name, O_RDWR | O_CREAT, 0644)) {
       HLOG(kError, "Failed to open file: {}", pool_name);
       task->return_code_ = 1;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Get file size
@@ -425,7 +444,7 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
     if (current_size < 0) {
       task->return_code_ = 2;
       setup_io->Close();
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     file_size_ = static_cast<chi::u64>(current_size);
@@ -447,7 +466,7 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
         task->return_code_ = 3;
         HLOG(kError, "Failed to truncate file: {}", pool_name);
         setup_io->Close();
-        CHI_CO_RETURN;
+        CLIO_CO_RETURN;
       }
       HLOG(kDebug, "Truncate succeeded, file_size_={}", file_size_);
     }
@@ -468,57 +487,47 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
     }
 
   } else if (bdev_type_ == BdevType::kRam) {
-    // RAM-based storage initialization
-    if (params.total_size_ == 0) {
-      // RAM backend requires explicit size
-      task->return_code_ = 4;
-      CHI_CO_RETURN;
-    }
+    // RAM-based storage initialization.
+    //   capacity == 0 → default to 80% of total system DRAM (NOT
+    //                    unbounded: an unbounded RAM tier lets the
+    //                    allocator hand out more than physical memory and
+    //                    OOM-kills the daemon on a shared compute node).
+    //   capacity  > 0 → bounded; size enforced lazily on AllocateBlocks /
+    //                    WriteToRam (see file_size_ in the Heap allocator).
+    //
+    // Either way we leave ram_pages_ empty here and grow it on the first
+    // write that targets each 1 GiB slot. The prior eager allocation
+    // path (new char[kRamPageSize] × N + memset) was a benchmark warm-
+    // up: it forced the kernel to commit all N GiB of physical pages
+    // before the timed loop. On a multi-tenant compute node — head node
+    // runs jarvis + ssh fan-outs + FUSE + many IOR ranks + the daemon
+    // itself — a 32 GiB upfront commit pushes physical RAM and the
+    // slurm cgroup vm budget past the limit and the daemon gets killed
+    // (silently: no SEGV trace, just disappears). For a 32 GiB × 4n
+    // workload that's 128 GiB cluster-wide of unneeded RSS at startup.
+    //
+    // Even the cheaper "reserve 1 GiB per slot, touch 1 byte" variant
+    // (which only commits ~128 KiB physical) costs 32 GiB of virtual
+    // address space — and the slurm cgroup or RLIMIT_AS can refuse that
+    // (libzmq inside the daemon then hits an unrelated allocation that
+    // returns EFAULT and asserts "Bad address" in tcp.cpp). Skipping the
+    // reservation entirely is the correct fix: the only producer of
+    // ram_pages_ entries is WriteToRam, which already handles "page not
+    // yet allocated" by allocating on the spot under ram_pages_mu_.
+    ram_capacity_ = (params.total_size_ == 0) ? DefaultRamCapacityBytes()
+                                               : params.total_size_;
+    HLOG(kInfo,
+         "RAM bdev '{}' capacity: configured={} -> using {} bytes "
+         "({}% of {} total DRAM when configured as 0/0g)",
+         pool_name, params.total_size_, ram_capacity_,
+         static_cast<int>(kDefaultRamCapacityFraction * 100),
+         ctp::SystemInfo::GetRamCapacity());
+    file_size_ = ram_capacity_;  // Heap allocator's soft cap
 
-    ram_size_ = params.total_size_;
-    ram_buffer_ = new (std::nothrow) char[ram_size_];
-    if (ram_buffer_ == nullptr) {
-      task->return_code_ = 5;
-      CHI_CO_RETURN;
-    }
-    memset(ram_buffer_, 0, ram_size_);
-    file_size_ = ram_size_;  // Use file_size_ for common allocation logic
-
-#if HSHM_ENABLE_CUDA
-  } else if (bdev_type_ == BdevType::kHbm) {
-    // GPU High-Bandwidth Memory via cudaMalloc
-    if (params.total_size_ == 0) {
-      task->return_code_ = 4;
-      co_return;
-    }
-    hbm_size_ = params.total_size_;
-    cudaError_t err = cudaMalloc(reinterpret_cast<void**>(&hbm_buffer_), hbm_size_);
-    if (err != cudaSuccess) {
-      HLOG(kError, "cudaMalloc failed for HBM bdev: {} bytes, err={}",
-           hbm_size_, static_cast<int>(err));
-      task->return_code_ = 5;
-      co_return;
-    }
-    cudaMemset(hbm_buffer_, 0, hbm_size_);
-    file_size_ = hbm_size_;
-
-  } else if (bdev_type_ == BdevType::kPinned) {
-    // Pinned host memory via cudaMallocHost
-    if (params.total_size_ == 0) {
-      task->return_code_ = 4;
-      co_return;
-    }
-    pinned_size_ = params.total_size_;
-    cudaError_t err = cudaMallocHost(reinterpret_cast<void**>(&pinned_buffer_), pinned_size_);
-    if (err != cudaSuccess) {
-      HLOG(kError, "cudaMallocHost failed for Pinned bdev: {} bytes, err={}",
-           pinned_size_, static_cast<int>(err));
-      task->return_code_ = 5;
-      co_return;
-    }
-    memset(pinned_buffer_, 0, pinned_size_);
-    file_size_ = pinned_size_;
-#endif
+  // BdevType::kHbm and BdevType::kPinned removed — supported tiers
+  // are kFile / kRam / kNoop. PutBlob/GetBlob with HBM-resident
+  // ShmPtr data buffers route through kRam (or kFile) and the bdev
+  // staging path uses chi::DeviceAwareMemcpy / IsDevicePointer.
   } else if (bdev_type_ == BdevType::kNoop) {
     // Noop backend: no storage buffer, just track allocatable size
     if (params.total_size_ == 0) {
@@ -548,19 +557,16 @@ chi::TaskResume Runtime::Create(hipc::FullPtr<CreateTask> task,
   // Store user-provided performance characteristics
   perf_metrics_ = params.perf_metrics_;
 
-  // Note: max_blocks_per_operation_ is already initialized in Runtime
-  // constructor to 64
-
   // Set success result
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
-chi::TaskResume Runtime::AllocateBlocks(hipc::FullPtr<AllocateBlocksTask> task,
+chi::TaskResume Runtime::AllocateBlocks(ctp::ipc::FullPtr<AllocateBlocksTask> task,
                                         chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug,
        "bdev::AllocateBlocks: ENTER - pool_id_=({},{}), size={}, "
        "container_id={}",
@@ -575,34 +581,26 @@ chi::TaskResume Runtime::AllocateBlocks(hipc::FullPtr<AllocateBlocksTask> task,
     HLOG(kDebug, "bdev::AllocateBlocks: size is 0, returning empty blocks");
     task->blocks_.clear();
     task->return_code_ = 0;  // Nothing to allocate
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Create local vector in private memory to build up the block list
   std::vector<Block> local_blocks;
 
-  // Divide the I/O request into blocks
-  // If I/O size >= largest cached block, divide into units of that size
-  // Else, just use this I/O size
+  // Allocate the request as a SINGLE contiguous block (no kMaxBlock-chunk
+  // splitting).  The old splitting path divided e.g. a 2 MiB ExtendBlob into
+  // two 1 MiB Blocks, but the only consumer (CTE's AllocateFromTarget) reads
+  // `allocated_blocks[0].offset_` and discards the rest — it tracks one
+  // `BlobBlock(size=2 MiB)` covering the first allocator chunk plus an
+  // un-tracked tail.  On overwrite, the corresponding FreeBlocks returns one
+  // 2 MiB block to the largest free-list bucket, but the heap had consumed
+  // two 1 MiB chunks; on the next AllocateBlocks the first 1 MiB sub-alloc
+  // pops the 2 MiB block (with my min_size filter) but wastes its tail,
+  // and the second 1 MiB falls through to heap_.  Net leak: 1 MiB per
+  // 2 MiB overwrite.  Keeping the alloc one block end-to-end matches what
+  // CTE actually stores and lets the free-list reuse cycle close cleanly.
   std::vector<size_t> io_divisions;
-
-  const size_t kMaxBlock =
-      kBlockSizes[static_cast<int>(BlockSizeCategory::kMaxCategories) - 1];
-  if (total_size >= kMaxBlock) {
-    // Divide into max-block-sized chunks
-    chi::u64 remaining = total_size;
-    while (remaining >= kMaxBlock) {
-      io_divisions.push_back(kMaxBlock);
-      remaining -= kMaxBlock;
-    }
-    // Add remaining bytes if any
-    if (remaining > 0) {
-      io_divisions.push_back(static_cast<size_t>(remaining));
-    }
-  } else {
-    // Use the entire I/O size as a single division
-    io_divisions.push_back(static_cast<size_t>(total_size));
-  }
+  io_divisions.push_back(static_cast<size_t>(total_size));
 
   // For each expected I/O size division, allocate a block
   for (size_t io_size : io_divisions) {
@@ -637,21 +635,7 @@ chi::TaskResume Runtime::AllocateBlocks(hipc::FullPtr<AllocateBlocksTask> task,
       task->blocks_.clear();
       // HLOG(kError, "Out of space: {} bytes requested", total_size);
       task->return_code_ = 1;  // Out of space
-      CHI_CO_RETURN;
-    }
-
-    // Check if we would exceed max_blocks limit
-    if (local_blocks.size() >= max_blocks_per_operation_) {
-      // Return all allocated blocks to the GlobalBlockMap
-      for (Block &allocated_block : local_blocks) {
-        global_block_map_.FreeBlock(worker_id, allocated_block);
-      }
-      task->blocks_.clear();
-      HLOG(kError,
-           "Operation requires {} blocks but max_blocks_per_operation is {}",
-           io_divisions.size(), max_blocks_per_operation_);
-      task->return_code_ = 2;  // Too many blocks required
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Add the allocated block to the local vector
@@ -661,9 +645,15 @@ chi::TaskResume Runtime::AllocateBlocks(hipc::FullPtr<AllocateBlocksTask> task,
   // Copy the local vector to the task's shared memory vector using assignment
   // operator
   // task->blocks_ = local_blocks;
+  chi::u64 alloc_bytes = 0;
   for (size_t i = 0; i < local_blocks.size(); i++) {
     task->blocks_.push_back(local_blocks[i]);
+    alloc_bytes += local_blocks[i].size_;
   }
+  // Track LIVE allocated bytes (same per-block size FreeBlocks subtracts),
+  // independent of free-list vs heap source. Drives GetStats' true
+  // remaining capacity instead of heap_'s monotonic bump high-water.
+  allocated_bytes_.fetch_add(alloc_bytes, std::memory_order_relaxed);
 
   HLOG(kDebug,
        "bdev::AllocateBlocks: SUCCESS - allocated {} blocks, "
@@ -671,48 +661,78 @@ chi::TaskResume Runtime::AllocateBlocks(hipc::FullPtr<AllocateBlocksTask> task,
        local_blocks.size(), task->blocks_.size());
 
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
-chi::TaskResume Runtime::FreeBlocks(hipc::FullPtr<FreeBlocksTask> task,
+chi::TaskResume Runtime::FreeBlocks(ctp::ipc::FullPtr<FreeBlocksTask> task,
                                     chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Get worker ID for free operation
   int worker_id = static_cast<int>(GetWorkerID(rctx));
 
-  // Free all blocks in the vector using GlobalBlockMap
+  // Free all blocks in the vector using GlobalBlockMap.
+  //
+  // Normalize block_type_ from the block's SIZE before filing it into the
+  // free list. AllocateBlock picks the free list via FindBlockType(size),
+  // so a freed block must be filed in that same size class to ever be
+  // reused. Callers do not (and cannot) reliably track the allocator's
+  // size class: BlobBlock carries only {offset,size}, so CTE's
+  // FreeAllBlobBlocks passes block_type_=0. Trusting that put every freed
+  // 1 MiB block in the 4 KiB list, so 1 MiB AllocateBlock never found
+  // them and fell through to the monotonic heap — RAM usage grew with op
+  // count regardless of the live key set until the tier cap was hit.
+  // Classifying by size here makes the allocator self-consistent for
+  // every caller.
+  chi::u64 freed_bytes = 0;
   for (size_t i = 0; i < task->blocks_.size(); ++i) {
     Block block_copy = task->blocks_[i];  // Make a copy since FreeBlock takes
                                           // non-const reference
+    size_t cat_size = 0;
+    int bt = FindBlockTypeForSize(static_cast<size_t>(block_copy.size_),
+                                  cat_size);
+    if (bt < 0) {
+      // Larger than every cached class — mirror AllocateBlocks, which
+      // uses the largest category for such sizes.
+      bt = static_cast<int>(BlockSizeCategory::kMaxCategories) - 1;
+    }
+    block_copy.block_type_ = static_cast<chi::u32>(bt);
+    freed_bytes += block_copy.size_;
     global_block_map_.FreeBlock(worker_id, block_copy);
+  }
+  // Reclaim live-byte accounting so GetStats' remaining recovers as
+  // blocks are reused (pairs with AllocateBlocks' fetch_add). Guard the
+  // subtraction so a double-free / mismatched free can't underflow the
+  // unsigned counter.
+  {
+    chi::u64 cur = allocated_bytes_.load(std::memory_order_relaxed);
+    chi::u64 dec = std::min(cur, freed_bytes);
+    allocated_bytes_.fetch_sub(dec, std::memory_order_relaxed);
   }
 
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
-chi::TaskResume Runtime::Write(hipc::FullPtr<WriteTask> task,
+chi::TaskResume Runtime::Write(ctp::ipc::FullPtr<WriteTask> task,
                                chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   switch (bdev_type_) {
     case BdevType::kFile:
-      CHI_CO_AWAIT(WriteToFile(task, rctx));
+      CLIO_CO_AWAIT(WriteToFile(task, rctx));
       break;
     case BdevType::kRam:
       WriteToRam(task);
       break;
-#if HSHM_ENABLE_CUDA
     case BdevType::kHbm:
-      co_await WriteToHbm(task, ctx);
-      break;
     case BdevType::kPinned:
-      co_await WriteToPinned(task, ctx);
+      // Removed tiers; reject as unsupported.
+      task->return_code_ = 1;
+      task->bytes_written_ = 0;
       break;
-#endif
     case BdevType::kNoop:
       task->return_code_ = 0;
       task->bytes_written_ = task->length_;
@@ -722,29 +742,27 @@ chi::TaskResume Runtime::Write(hipc::FullPtr<WriteTask> task,
       task->bytes_written_ = 0;
       break;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
-chi::TaskResume Runtime::Read(hipc::FullPtr<ReadTask> task,
+chi::TaskResume Runtime::Read(ctp::ipc::FullPtr<ReadTask> task,
                               chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   switch (bdev_type_) {
     case BdevType::kFile:
-      CHI_CO_AWAIT(ReadFromFile(task, rctx));
+      CLIO_CO_AWAIT(ReadFromFile(task, rctx));
       break;
     case BdevType::kRam:
       ReadFromRam(task);
       break;
-#if HSHM_ENABLE_CUDA
     case BdevType::kHbm:
-      co_await ReadFromHbm(task, ctx);
-      break;
     case BdevType::kPinned:
-      co_await ReadFromPinned(task, ctx);
+      // Removed tiers; reject as unsupported.
+      task->return_code_ = 1;
+      task->bytes_read_ = 0;
       break;
-#endif
     case BdevType::kNoop:
       task->return_code_ = 0;
       task->bytes_read_ = task->length_;
@@ -754,19 +772,30 @@ chi::TaskResume Runtime::Read(hipc::FullPtr<ReadTask> task,
       task->bytes_read_ = 0;
       break;
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
-chi::TaskResume Runtime::WriteToFile(hipc::FullPtr<WriteTask> task,
+chi::TaskResume Runtime::WriteToFile(ctp::ipc::FullPtr<WriteTask> task,
                                      chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   size_t worker_id = GetWorkerID(rctx);
   WorkerIOContext *io_ctx = GetWorkerIOContext(worker_id);
 
-  auto *ipc_mgr = CHI_IPC;
-  hipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
+  auto *ipc_mgr = CLIO_IPC;
+  ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
+
+  // libaio / POSIX-AIO can't dereference device USM, so stage through
+  // a host buffer when the data lives on device. The host staging
+  // buffer is sized to the largest single-block write — typical CTE
+  // PutBlob is one block, but worst-case loop bound is task->length_.
+  bool data_on_device = chi::IsDevicePointer(data_ptr.ptr_);
+  std::vector<char> staging;
+  if (data_on_device) {
+    staging.resize(task->length_);
+    chi::DeviceAwareMemcpy(staging.data(), data_ptr.ptr_, task->length_);
+  }
 
   chi::u64 total_bytes_written = 0;
   chi::u64 data_offset = 0;
@@ -778,36 +807,38 @@ chi::TaskResume Runtime::WriteToFile(hipc::FullPtr<WriteTask> task,
     if (remaining == 0) break;
     chi::u64 block_write_size = std::min(remaining, block.size_);
 
-    void *block_data = data_ptr.ptr_ + data_offset;
+    void *block_data = data_on_device
+                           ? static_cast<void *>(staging.data() + data_offset)
+                           : static_cast<void *>(data_ptr.ptr_ + data_offset);
 
     if (io_ctx == nullptr || !io_ctx->is_initialized_ || !io_ctx->async_io_) {
       HLOG(kError, "WriteToFile called with invalid I/O context");
       task->return_code_ = 1;
       task->bytes_written_ = total_bytes_written;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
-    hshm::IoToken token = io_ctx->async_io_->Write(
+    ctp::IoToken token = io_ctx->async_io_->Write(
         block_data, static_cast<size_t>(block_write_size),
         static_cast<off_t>(block.offset_));
-    if (token == hshm::kInvalidIoToken) {
+    if (token == ctp::kInvalidIoToken) {
       HLOG(kError, "Failed to submit async write: offset={}, size={}",
            block.offset_, block_write_size);
       task->return_code_ = 2;
       task->bytes_written_ = total_bytes_written;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
-    hshm::IoResult result;
+    ctp::IoResult result;
     while (!io_ctx->async_io_->IsComplete(token, result)) {
-      CHI_CO_AWAIT(chi::yield(10.0));
+      CLIO_CO_AWAIT(chi::yield(10.0));
     }
 
     if (result.error_code != 0) {
       HLOG(kError, "Async write failed: error_code={}", result.error_code);
       task->return_code_ = 4;
       task->bytes_written_ = total_bytes_written;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     chi::u64 actual_bytes = std::min(
@@ -820,19 +851,28 @@ chi::TaskResume Runtime::WriteToFile(hipc::FullPtr<WriteTask> task,
   task->bytes_written_ = total_bytes_written;
   total_writes_.fetch_add(1);
   total_bytes_written_.fetch_add(task->bytes_written_);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
-chi::TaskResume Runtime::ReadFromFile(hipc::FullPtr<ReadTask> task,
+chi::TaskResume Runtime::ReadFromFile(ctp::ipc::FullPtr<ReadTask> task,
                                       chi::RunContext &ctx) {
   chi::RunContext& rctx = ctx;
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   size_t worker_id = GetWorkerID(rctx);
   WorkerIOContext *io_ctx = GetWorkerIOContext(worker_id);
 
-  auto *ipc_mgr = CHI_IPC;
-  hipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
+  auto *ipc_mgr = CLIO_IPC;
+  ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
+
+  // libaio / POSIX-AIO can't write into device USM. When the dest is
+  // device, allocate a host staging buffer, AIO into it, then
+  // DeviceAwareMemcpy to the device dest at the end.
+  bool data_on_device = chi::IsDevicePointer(data_ptr.ptr_);
+  std::vector<char> staging;
+  if (data_on_device) {
+    staging.resize(task->length_);
+  }
 
   chi::u64 total_bytes_read = 0;
   chi::u64 data_offset = 0;
@@ -844,36 +884,38 @@ chi::TaskResume Runtime::ReadFromFile(hipc::FullPtr<ReadTask> task,
     if (remaining == 0) break;
     chi::u64 block_read_size = std::min(remaining, block.size_);
 
-    void *block_data = data_ptr.ptr_ + data_offset;
+    void *block_data = data_on_device
+                           ? static_cast<void *>(staging.data() + data_offset)
+                           : static_cast<void *>(data_ptr.ptr_ + data_offset);
 
     if (io_ctx == nullptr || !io_ctx->is_initialized_ || !io_ctx->async_io_) {
       HLOG(kError, "ReadFromFile called with invalid I/O context");
       task->return_code_ = 1;
       task->bytes_read_ = total_bytes_read;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
-    hshm::IoToken token = io_ctx->async_io_->Read(
+    ctp::IoToken token = io_ctx->async_io_->Read(
         block_data, static_cast<size_t>(block_read_size),
         static_cast<off_t>(block.offset_));
-    if (token == hshm::kInvalidIoToken) {
+    if (token == ctp::kInvalidIoToken) {
       HLOG(kError, "Failed to submit async read: offset={}, size={}",
            block.offset_, block_read_size);
       task->return_code_ = 2;
       task->bytes_read_ = total_bytes_read;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
-    hshm::IoResult result;
+    ctp::IoResult result;
     while (!io_ctx->async_io_->IsComplete(token, result)) {
-      CHI_CO_AWAIT(chi::yield(10.0));
+      CLIO_CO_AWAIT(chi::yield(10.0));
     }
 
     if (result.error_code != 0) {
       HLOG(kError, "Async read failed: error_code={}", result.error_code);
       task->return_code_ = 4;
       task->bytes_read_ = total_bytes_read;
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     chi::u64 actual_bytes = std::min(
@@ -882,15 +924,21 @@ chi::TaskResume Runtime::ReadFromFile(hipc::FullPtr<ReadTask> task,
     data_offset += actual_bytes;
   }
 
+  // If we staged through a host buffer, push the freshly-read bytes
+  // out to the device-USM destination. (No-op when data is on host.)
+  if (data_on_device && total_bytes_read > 0) {
+    chi::DeviceAwareMemcpy(data_ptr.ptr_, staging.data(), total_bytes_read);
+  }
+
   task->return_code_ = 0;
   task->bytes_read_ = total_bytes_read;
   total_reads_.fetch_add(1);
   total_bytes_read_.fetch_add(total_bytes_read);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
-chi::TaskResume Runtime::Update(hipc::FullPtr<UpdateTask> task,
+chi::TaskResume Runtime::Update(ctp::ipc::FullPtr<UpdateTask> task,
                                 chi::RunContext &ctx) {
   // UpdateTask is meant for the GPU container only.
   // The CPU runtime receives it as a no-op.
@@ -899,271 +947,25 @@ chi::TaskResume Runtime::Update(hipc::FullPtr<UpdateTask> task,
   co_return;
 }
 
-#if HSHM_ENABLE_CUDA
-chi::TaskResume Runtime::WriteToHbm(hipc::FullPtr<WriteTask> task,
-                                    chi::RunContext &ctx) {
-  auto *ipc_mgr = CHI_IPC;
-  hipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
 
-  chi::u64 total_bytes_written = 0;
-  chi::u64 data_offset = 0;
-
-  cudaStream_t stream;
-  cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
-
-  for (size_t i = 0; i < task->blocks_.size(); ++i) {
-    const Block &block = task->blocks_[i];
-    chi::u64 remaining = task->length_ - total_bytes_written;
-    if (remaining == 0) break;
-    chi::u64 copy_size = std::min(remaining, block.size_);
-
-    if (block.offset_ + copy_size > hbm_size_) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 1;
-      task->bytes_written_ = total_bytes_written;
-      co_return;
-    }
-
-    cudaError_t err = cudaMemcpyAsync(
-        hbm_buffer_ + block.offset_,
-        data_ptr.ptr_ + data_offset,
-        copy_size,
-        cudaMemcpyDefault,
-        stream);
-    if (err != cudaSuccess) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 2;
-      task->bytes_written_ = total_bytes_written;
-      co_return;
-    }
-
-    total_bytes_written += copy_size;
-    data_offset += copy_size;
-  }
-
-  // Poll for completion, yield if not ready
-  while (true) {
-    cudaError_t status = cudaStreamQuery(stream);
-    if (status == cudaSuccess) break;
-    if (status != cudaErrorNotReady) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 3;
-      task->bytes_written_ = 0;
-      co_return;
-    }
-    co_await chi::yield(5.0);
-  }
-
-  cudaStreamDestroy(stream);
-  task->return_code_ = 0;
-  task->bytes_written_ = total_bytes_written;
-  total_writes_.fetch_add(1);
-  total_bytes_written_.fetch_add(total_bytes_written);
-  (void)ctx;
-  co_return;
-}
-
-chi::TaskResume Runtime::ReadFromHbm(hipc::FullPtr<ReadTask> task,
-                                     chi::RunContext &ctx) {
-  auto *ipc_mgr = CHI_IPC;
-  hipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
-
-  chi::u64 total_bytes_read = 0;
-  chi::u64 data_offset = 0;
-
-  cudaStream_t stream;
-  cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
-
-  for (size_t i = 0; i < task->blocks_.size(); ++i) {
-    const Block &block = task->blocks_[i];
-    chi::u64 remaining = task->length_ - total_bytes_read;
-    if (remaining == 0) break;
-    chi::u64 copy_size = std::min(remaining, block.size_);
-
-    if (block.offset_ + copy_size > hbm_size_) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 1;
-      task->bytes_read_ = total_bytes_read;
-      co_return;
-    }
-
-    cudaError_t err = cudaMemcpyAsync(
-        data_ptr.ptr_ + data_offset,
-        hbm_buffer_ + block.offset_,
-        copy_size,
-        cudaMemcpyDefault,
-        stream);
-    if (err != cudaSuccess) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 2;
-      task->bytes_read_ = total_bytes_read;
-      co_return;
-    }
-
-    total_bytes_read += copy_size;
-    data_offset += copy_size;
-  }
-
-  // Poll for completion, yield if not ready
-  while (true) {
-    cudaError_t status = cudaStreamQuery(stream);
-    if (status == cudaSuccess) break;
-    if (status != cudaErrorNotReady) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 3;
-      task->bytes_read_ = 0;
-      co_return;
-    }
-    co_await chi::yield(5.0);
-  }
-
-  cudaStreamDestroy(stream);
-  task->return_code_ = 0;
-  task->bytes_read_ = total_bytes_read;
-  total_reads_.fetch_add(1);
-  total_bytes_read_.fetch_add(total_bytes_read);
-  (void)ctx;
-  co_return;
-}
-
-chi::TaskResume Runtime::WriteToPinned(hipc::FullPtr<WriteTask> task,
-                                       chi::RunContext &ctx) {
-  auto *ipc_mgr = CHI_IPC;
-  hipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
-
-  chi::u64 total_bytes_written = 0;
-  chi::u64 data_offset = 0;
-
-  cudaStream_t stream;
-  cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
-
-  for (size_t i = 0; i < task->blocks_.size(); ++i) {
-    const Block &block = task->blocks_[i];
-    chi::u64 remaining = task->length_ - total_bytes_written;
-    if (remaining == 0) break;
-    chi::u64 copy_size = std::min(remaining, block.size_);
-
-    if (block.offset_ + copy_size > pinned_size_) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 1;
-      task->bytes_written_ = total_bytes_written;
-      co_return;
-    }
-
-    cudaError_t err = cudaMemcpyAsync(
-        pinned_buffer_ + block.offset_,
-        data_ptr.ptr_ + data_offset,
-        copy_size,
-        cudaMemcpyDefault,
-        stream);
-    if (err != cudaSuccess) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 2;
-      task->bytes_written_ = total_bytes_written;
-      co_return;
-    }
-
-    total_bytes_written += copy_size;
-    data_offset += copy_size;
-  }
-
-  // Poll for completion, yield if not ready
-  while (true) {
-    cudaError_t status = cudaStreamQuery(stream);
-    if (status == cudaSuccess) break;
-    if (status != cudaErrorNotReady) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 3;
-      task->bytes_written_ = 0;
-      co_return;
-    }
-    co_await chi::yield(5.0);
-  }
-
-  cudaStreamDestroy(stream);
-  task->return_code_ = 0;
-  task->bytes_written_ = total_bytes_written;
-  total_writes_.fetch_add(1);
-  total_bytes_written_.fetch_add(total_bytes_written);
-  (void)ctx;
-  co_return;
-}
-
-chi::TaskResume Runtime::ReadFromPinned(hipc::FullPtr<ReadTask> task,
-                                        chi::RunContext &ctx) {
-  auto *ipc_mgr = CHI_IPC;
-  hipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
-
-  chi::u64 total_bytes_read = 0;
-  chi::u64 data_offset = 0;
-
-  cudaStream_t stream;
-  cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
-
-  for (size_t i = 0; i < task->blocks_.size(); ++i) {
-    const Block &block = task->blocks_[i];
-    chi::u64 remaining = task->length_ - total_bytes_read;
-    if (remaining == 0) break;
-    chi::u64 copy_size = std::min(remaining, block.size_);
-
-    if (block.offset_ + copy_size > pinned_size_) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 1;
-      task->bytes_read_ = total_bytes_read;
-      co_return;
-    }
-
-    cudaError_t err = cudaMemcpyAsync(
-        data_ptr.ptr_ + data_offset,
-        pinned_buffer_ + block.offset_,
-        copy_size,
-        cudaMemcpyDefault,
-        stream);
-    if (err != cudaSuccess) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 2;
-      task->bytes_read_ = total_bytes_read;
-      co_return;
-    }
-
-    total_bytes_read += copy_size;
-    data_offset += copy_size;
-  }
-
-  // Poll for completion, yield if not ready
-  while (true) {
-    cudaError_t status = cudaStreamQuery(stream);
-    if (status == cudaSuccess) break;
-    if (status != cudaErrorNotReady) {
-      cudaStreamDestroy(stream);
-      task->return_code_ = 3;
-      task->bytes_read_ = 0;
-      co_return;
-    }
-    co_await chi::yield(5.0);
-  }
-
-  cudaStreamDestroy(stream);
-  task->return_code_ = 0;
-  task->bytes_read_ = total_bytes_read;
-  total_reads_.fetch_add(1);
-  total_bytes_read_.fetch_add(total_bytes_read);
-  (void)ctx;
-  co_return;
-}
-#endif  // HSHM_ENABLE_CUDA
-
-chi::TaskResume Runtime::GetStats(hipc::FullPtr<GetStatsTask> task,
+chi::TaskResume Runtime::GetStats(ctp::ipc::FullPtr<GetStatsTask> task,
                                   chi::RunContext &ctx) {
 #ifdef __NVCOMPILER
   chi::RunContext& rctx = ctx;
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
-  // Predict wall time from learned model
-  chi::TaskStat read_stat = GetTaskStats(Method::kRead);
-  chi::TaskStat write_stat = GetTaskStats(Method::kWrite);
+  CLIO_TASK_BODY_BEGIN
+  // Predict wall time from learned model using a synthetic 1 MiB R/W
+  // task as the reference size for the bandwidth/latency estimate.
+  ReadTask r_synthetic;
+  r_synthetic.method_ = Method::kRead;
+  r_synthetic.length_ = 1024 * 1024;
+  WriteTask w_synthetic;
+  w_synthetic.method_ = Method::kWrite;
+  w_synthetic.length_ = 1024 * 1024;
+  chi::TaskStat read_stat = GetTaskStats(&r_synthetic);
+  chi::TaskStat write_stat = GetTaskStats(&w_synthetic);
   float read_wall_us = InferWallClockTime(Method::kRead, read_stat);
   float write_wall_us = InferWallClockTime(Method::kWrite, write_stat);
   double read_size_mb = static_cast<double>(read_stat.io_size_) / (1024.0 * 1024.0);
@@ -1175,33 +977,39 @@ chi::TaskResume Runtime::GetStats(hipc::FullPtr<GetStatsTask> task,
   task->metrics_.read_latency_us_ = read_wall_us;
   task->metrics_.write_latency_us_ = write_wall_us;
   task->metrics_.iops_ = perf_metrics_.iops_;
-  // Get remaining size from heap allocator
-  chi::u64 remaining = heap_.GetRemainingSize();
+  // Remaining = capacity - LIVE allocated bytes. NOT heap_.GetRemainingSize()
+  // (heap_ is a monotonic bump pointer never rolled back on free, so under
+  // concurrent free-list misses it raced past the true live set and
+  // collapsed CTE's StatTargets remaining_space_ to ~0 -> MaxBwDpe
+  // rejected the only target -> ExtendBlob=2 -> PutBlob rc=12). file_size_
+  // is what heap_ was Init'd with (= ram_capacity_ for kRam).
+  chi::u64 live = allocated_bytes_.load(std::memory_order_relaxed);
+  chi::u64 remaining = (file_size_ > live) ? (file_size_ - live) : 0;
   task->remaining_size_ = remaining;
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
-chi::TaskResume Runtime::Destroy(hipc::FullPtr<DestroyTask> task,
+chi::TaskResume Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task,
                                  chi::RunContext &ctx) {
 #ifdef __NVCOMPILER
   chi::RunContext& rctx = ctx;
 #else
   (void)ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   // Worker I/O contexts (and their AsyncIO instances) are cleaned up by destructor
   // Note: GlobalBlockMap and Heap cleanup is handled by their destructors
 
   task->return_code_ = 0;
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::InitializeAllocator() {
   // Initialize global block map with actual number of workers
-  chi::WorkOrchestrator *work_orchestrator = CHI_WORK_ORCHESTRATOR;
+  chi::WorkOrchestrator *work_orchestrator = CLIO_WORK_ORCHESTRATOR;
   size_t num_workers =
       work_orchestrator ? work_orchestrator->GetWorkerCount() : 16;
   global_block_map_.Init(num_workers);
@@ -1219,13 +1027,14 @@ size_t Runtime::GetBlockSize(int block_type) {
 }
 
 size_t Runtime::GetWorkerID(chi::RunContext &ctx) {
-  // Get current worker from thread-local storage using CHI_CUR_WORKER macro
-  chi::Worker *worker = CHI_CUR_WORKER;
+  // Get current worker from thread-local storage using CLIO_CUR_WORKER macro
+  chi::Worker *worker = CLIO_CUR_WORKER;
   if (worker == nullptr) {
     return 0;  // Fallback to worker 0 if not in worker context
   }
   return worker->GetId();
 }
+
 
 chi::u64 Runtime::AlignSize(chi::u64 size) {
   if (alignment_ == 0) {
@@ -1248,115 +1057,153 @@ void Runtime::CleanupAsyncIO() {
   // No cleanup needed for POSIX AIO fallback
 }
 
-void Runtime::WriteToRam(hipc::FullPtr<WriteTask> task) {
-  static thread_local size_t ram_write_count = 0;
-  static thread_local double t_resolve_ms = 0, t_memcpy_ms = 0;
-  hshm::Timer timer;
+char* Runtime::EnsureRamPage(size_t page_idx) {
+  std::lock_guard<std::mutex> lock(ram_pages_mu_);
+  if (page_idx >= ram_pages_.size()) {
+    ram_pages_.resize(page_idx + 1);
+  }
+  if (!ram_pages_[page_idx]) {
+    // Lazy alloc for pages beyond the eagerly-allocated range (or for
+    // unbounded-capacity bdevs). The default-init `new char[]` reserves
+    // virtual address space; physical pages fault in on first touch by
+    // WriteToRam's DeviceAwareMemcpy. We do NOT memset here — that would
+    // double the memory traffic (one pass to zero-fault the page, a
+    // second pass to memcpy the user's data), capping Put bandwidth at
+    // half of memory bandwidth. The bounded-capacity path in Create()
+    // pre-allocates and pre-faults so the cost lands outside any
+    // benchmark loop.
+    ram_pages_[page_idx].reset(new char[kRamPageSize]);
+  }
+  return ram_pages_[page_idx].get();
+}
 
-  // Convert hipc::ShmPtr<> to hipc::FullPtr<char> for data access
-  timer.Resume();
-  auto *ipc_mgr = CHI_IPC;
-  hipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
-  timer.Pause();
-  t_resolve_ms += timer.GetMsec();
-  timer.Reset();
+char* Runtime::GetRamPage(size_t page_idx) const {
+  std::lock_guard<std::mutex> lock(ram_pages_mu_);
+  if (page_idx >= ram_pages_.size()) return nullptr;
+  return ram_pages_[page_idx].get();
+}
+
+void Runtime::WriteToRam(ctp::ipc::FullPtr<WriteTask> task) {
+  auto *ipc_mgr = CLIO_IPC;
+  ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
 
   chi::u64 total_bytes_written = 0;
   chi::u64 data_offset = 0;
 
-  // Iterate over all blocks
-  timer.Resume();
   for (size_t i = 0; i < task->blocks_.size(); ++i) {
     const Block &block = task->blocks_[i];
 
-    // Calculate how much data to write to this block
     chi::u64 remaining = task->length_ - total_bytes_written;
-    if (remaining == 0) {
-      break;  // All data has been written
-    }
+    if (remaining == 0) break;
     chi::u64 block_write_size = std::min(remaining, block.size_);
 
-    // Check bounds
-    if (block.offset_ + block_write_size > ram_size_) {
-      task->return_code_ = 1;  // Write beyond buffer bounds
+    if (ram_capacity_ != std::numeric_limits<chi::u64>::max() &&
+        block.offset_ + block_write_size > ram_capacity_) {
+      task->return_code_ = 1;
       task->bytes_written_ = total_bytes_written;
       HLOG(kError,
-           "Write to RAM beyond buffer bounds offset: {}, length: {}, "
-           "ram_size: {}",
-           block.offset_, block_write_size, ram_size_);
+           "Write to RAM beyond capacity offset: {}, length: {}, "
+           "ram_capacity: {}",
+           block.offset_, block_write_size, ram_capacity_);
       return;
     }
 
-    // Simple memory copy
-    memcpy(ram_buffer_ + block.offset_, data_ptr.ptr_ + data_offset,
-           block_write_size);
+    // Walk the (offset, size) range across 1 GiB pages, allocating a page
+    // on first write only. Bench-sized writes (≤ block size, typically MBs)
+    // touch one page; this loop only runs >1 iteration when a block straddles
+    // a 1 GiB boundary. DeviceAwareMemcpy dispatches through
+    // sycl::queue::memcpy (or the CUDA equivalent) when the data ShmPtr
+    // resolves to device USM, and falls back to std::memcpy otherwise.
+    chi::u64 cur_off = block.offset_;
+    chi::u64 left = block_write_size;
+    while (left > 0) {
+      size_t page_idx = static_cast<size_t>(cur_off / kRamPageSize);
+      chi::u64 intra = cur_off % kRamPageSize;
+      chi::u64 chunk = std::min<chi::u64>(left, kRamPageSize - intra);
+      char* page = EnsureRamPage(page_idx);
+      chi::DeviceAwareMemcpy(page + intra,
+                             data_ptr.ptr_ + data_offset,
+                             chunk);
+      cur_off += chunk;
+      data_offset += chunk;
+      left -= chunk;
+    }
 
-    // Update counters
     total_bytes_written += block_write_size;
-    data_offset += block_write_size;
   }
-  timer.Pause();
-  t_memcpy_ms += timer.GetMsec();
-  timer.Reset();
 
   task->return_code_ = 0;
   task->bytes_written_ = total_bytes_written;
 
-  // Update performance metrics
   total_writes_.fetch_add(1);
   total_bytes_written_.fetch_add(task->bytes_written_);
-
-  ++ram_write_count;
-  if (ram_write_count % 100 == 0) {
-    HLOG(kDebug, "[WriteToRam] ops={} resolve={} ms memcpy={} ms",
-         ram_write_count, t_resolve_ms, t_memcpy_ms);
-    t_resolve_ms = t_memcpy_ms = 0;
-  }
 }
 
-void Runtime::ReadFromRam(hipc::FullPtr<ReadTask> task) {
-  // Convert hipc::ShmPtr<> to hipc::FullPtr<char> for data access
-  auto *ipc_mgr = CHI_IPC;
-  hipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
+void Runtime::ReadFromRam(ctp::ipc::FullPtr<ReadTask> task) {
+  auto *ipc_mgr = CLIO_IPC;
+  ctp::ipc::FullPtr<char> data_ptr = ipc_mgr->ToFullPtr(task->data_).Cast<char>();
 
   chi::u64 total_bytes_read = 0;
   chi::u64 data_offset = 0;
 
-  // Iterate over all blocks
   for (size_t i = 0; i < task->blocks_.size(); ++i) {
     const Block &block = task->blocks_[i];
 
-    // Calculate how much data to read from this block
     chi::u64 remaining = task->length_ - total_bytes_read;
-    if (remaining == 0) {
-      break;  // All data has been read
-    }
+    if (remaining == 0) break;
     chi::u64 block_read_size = std::min(remaining, block.size_);
 
-    // Check bounds
-    if (block.offset_ + block_read_size > ram_size_) {
-      task->return_code_ = 1;  // Read beyond buffer bounds
+    if (ram_capacity_ != std::numeric_limits<chi::u64>::max() &&
+        block.offset_ + block_read_size > ram_capacity_) {
+      task->return_code_ = 1;
       task->bytes_read_ = total_bytes_read;
       HLOG(kError,
-           "Read from RAM beyond buffer bounds offset: {}, length: {}, "
-           "ram_size: {}",
-           block.offset_, block_read_size, ram_size_);
+           "Read from RAM beyond capacity offset: {}, length: {}, "
+           "ram_capacity: {}",
+           block.offset_, block_read_size, ram_capacity_);
       return;
     }
 
-    // Copy data from RAM buffer to task output
-    memcpy(data_ptr.ptr_ + data_offset, ram_buffer_ + block.offset_,
-           block_read_size);
+    // Sparse semantics: a never-written page reads back as zeros, mirroring
+    // a sparse file. DeviceAwareMemcpy handles device-USM data buffers
+    // (see WriteToRam comment); for the zero-fill branch we copy from a
+    // static zero scratch when the dest is device-resident, since plain
+    // memset on a device USM pointer would segfault on the host.
+    chi::u64 cur_off = block.offset_;
+    chi::u64 left = block_read_size;
+    while (left > 0) {
+      size_t page_idx = static_cast<size_t>(cur_off / kRamPageSize);
+      chi::u64 intra = cur_off % kRamPageSize;
+      chi::u64 chunk = std::min<chi::u64>(left, kRamPageSize - intra);
+      char* page = GetRamPage(page_idx);
+      char *dst = data_ptr.ptr_ + data_offset;
+      if (page) {
+        chi::DeviceAwareMemcpy(dst, page + intra, chunk);
+      } else if (chi::IsDevicePointer(dst)) {
+        static const char kZeroScratch[4096] = {};
+        chi::u64 z_left = chunk;
+        chi::u64 z_off = 0;
+        while (z_left > 0) {
+          chi::u64 z_chunk =
+              std::min<chi::u64>(z_left, sizeof(kZeroScratch));
+          chi::DeviceAwareMemcpy(dst + z_off, kZeroScratch, z_chunk);
+          z_off += z_chunk;
+          z_left -= z_chunk;
+        }
+      } else {
+        memset(dst, 0, chunk);
+      }
+      cur_off += chunk;
+      data_offset += chunk;
+      left -= chunk;
+    }
 
-    // Update counters
     total_bytes_read += block_read_size;
-    data_offset += block_read_size;
   }
 
   task->return_code_ = 0;
   task->bytes_read_ = total_bytes_read;
 
-  // Update performance metrics
   total_reads_.fetch_add(1);
   total_bytes_read_.fetch_add(total_bytes_read);
 }
@@ -1365,14 +1212,21 @@ void Runtime::ReadFromRam(hipc::FullPtr<ReadTask> task) {
 
 chi::u64 Runtime::GetWorkRemaining() const { return 0; }
 
-chi::TaskResume Runtime::Monitor(hipc::FullPtr<MonitorTask> task,
+chi::TaskResume Runtime::Monitor(ctp::ipc::FullPtr<MonitorTask> task,
                                  chi::RunContext &rctx) {
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   (void)rctx;
   if (task->query_ == "stats") {
-    // Predict wall time from learned model
-    chi::TaskStat read_stat = GetTaskStats(Method::kRead);
-    chi::TaskStat write_stat = GetTaskStats(Method::kWrite);
+    // Predict wall time from learned model using a synthetic 1 MiB R/W
+    // task as the reference size (matches GetStats handler above).
+    ReadTask r_synthetic;
+    r_synthetic.method_ = Method::kRead;
+    r_synthetic.length_ = 1024 * 1024;
+    WriteTask w_synthetic;
+    w_synthetic.method_ = Method::kWrite;
+    w_synthetic.length_ = 1024 * 1024;
+    chi::TaskStat read_stat = GetTaskStats(&r_synthetic);
+    chi::TaskStat write_stat = GetTaskStats(&w_synthetic);
     float read_wall_us = InferWallClockTime(Method::kRead, read_stat);
     float write_wall_us = InferWallClockTime(Method::kWrite, write_stat);
     double read_size_mb = static_cast<double>(read_stat.io_size_) / (1024.0 * 1024.0);
@@ -1403,41 +1257,18 @@ chi::TaskResume Runtime::Monitor(hipc::FullPtr<MonitorTask> task,
     task->results_[container_id_] = std::string(sbuf.data(), sbuf.size());
   }
   task->SetReturnCode(0);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::PostGpuContainerCreate() {
-#if HSHM_ENABLE_CUDA
-  // For HBM/Pinned bdev: enqueue UpdateTask to the GPU container so it can
-  // service Write/Read tasks directly. Called after the GPU container is
-  // registered with the GPU work orchestrator, so the task arrives when the
-  // container is ready (avoids the race in Create()).
-  if (bdev_type_ == BdevType::kHbm || bdev_type_ == BdevType::kPinned) {
-    auto *ipc = CHI_IPC;
-    if (ipc) {
-      chi::u64 hbm_ptr = reinterpret_cast<chi::u64>(hbm_buffer_);
-      chi::u64 pin_ptr = reinterpret_cast<chi::u64>(pinned_buffer_);
-      auto update_task = ipc->NewTask<UpdateTask>(
-          chi::CreateTaskId(), pool_id_,
-          chi::PoolQuery::LocalGpuBcast(),
-          hbm_ptr, pin_ptr,
-          hbm_size_, pinned_size_,
-          file_size_,
-          static_cast<chi::u32>(bdev_type_),
-          alignment_);
-      HLOG(kInfo, "PostGpuContainerCreate: sending UpdateTask pool={} type={} ipc={:x} cpu2gpu_backends={}",
-           pool_id_, (int)bdev_type_,
-           reinterpret_cast<uintptr_t>(ipc),
-           ipc->gpu_ipc_ ? ipc->gpu_ipc_->gpu_devices_.size() : 0);
-      // fire-and-forget: worker frees the task after executing it
-      (void)ipc->Send(update_task);
-    }
-  }
-#endif
+  // The kHbm / kPinned tiers (which previously enqueued an UpdateTask
+  // to the GPU container so it could service Write/Read directly) are
+  // removed. PutBlob/GetBlob with HBM-resident data now route through
+  // kRam/kFile and use the device-aware memcpy hook.
 }
 
-}  // namespace chimaera::bdev
+}  // namespace clio::run::bdev
 
-// Define ChiMod entry points using CHI_TASK_CC macro
-CHI_TASK_CC(chimaera::bdev::Runtime)
+// Define ChiMod entry points using CLIO_TASK_CC macro
+CLIO_TASK_CC(clio::run::bdev::Runtime)

@@ -31,18 +31,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <wrp_cee/api/context_interface.h>
-#include <wrp_cae/core/core_client.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cae/core/constants.h>
-#include <chimaera/chimaera.h>
+#include <clio_cee/api/context_interface.h>
+#include <clio_cae/core/core_client.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cae/core/constants.h>
+#include <clio_runtime/clio_runtime.h>
 #include <iostream>
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 namespace iowarp {
 
 ContextInterface::ContextInterface() : is_initialized_(false) {
-  // Lazy initialization - defer Chimaera/CAE/CTE init until first operation
+  // Lazy initialization - defer CLIO Runtime/CAE/CTE init until first operation
   // This allows object construction without requiring a running runtime
 }
 
@@ -58,7 +58,7 @@ bool ContextInterface::EnsureInitialized() {
     return false;
   }
 
-  // Initialize Chimaera as a client for the context interface
+  // Initialize CLIO Runtime as a client for the context interface
   if (!chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, false)) {
     HLOG(kError, "Failed to initialize Chimaera client");
     init_failed = true;
@@ -66,13 +66,13 @@ bool ContextInterface::EnsureInitialized() {
   }
 
   // Initialize CAE client (which initializes CTE internally)
-  if (!WRP_CAE_CLIENT_INIT()) {
+  if (!CLIO_CAE_CLIENT_INIT()) {
     HLOG(kError, "Failed to initialize CAE client");
     return false;
   }
 
-  // Verify Chimaera IPC is available
-  auto* ipc_manager = CHI_IPC;
+  // Verify CLIO Runtime IPC is available
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) {
     HLOG(kError, "Chimaera IPC not initialized. Is the runtime running?");
     return false;
@@ -87,7 +87,7 @@ ContextInterface::~ContextInterface() {
 }
 
 int ContextInterface::ContextBundle(
-    const std::vector<wrp_cae::core::AssimilationCtx> &bundle) {
+    const std::vector<clio::cae::core::AssimilationCtx> &bundle) {
   if (!EnsureInitialized()) {
     HLOG(kError, "ContextInterface failed to initialize");
     return 1;
@@ -100,7 +100,7 @@ int ContextInterface::ContextBundle(
 
   try {
     // Connect to CAE core container using the standard pool ID
-    wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+    clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
 
     // Call AsyncParseOmni with vector of contexts and wait for completion
     auto task = cae_client.AsyncParseOmni(bundle);
@@ -136,7 +136,7 @@ std::vector<std::string> ContextInterface::ContextQuery(
 
   try {
     // Get the CTE client singleton
-    auto* cte_client = WRP_CTE_CLIENT;
+    auto* cte_client = CLIO_CTE_CLIENT;
     if (!cte_client) {
       HLOG(kError, "CTE client not initialized");
       return std::vector<std::string>();
@@ -178,14 +178,14 @@ std::vector<std::string> ContextInterface::ContextRetrieve(
 
   try {
     // Get the CTE client singleton
-    auto* cte_client = WRP_CTE_CLIENT;
+    auto* cte_client = CLIO_CTE_CLIENT;
     if (!cte_client) {
       HLOG(kError, "CTE client not initialized");
       return std::vector<std::string>();
     }
 
     // Get IPC manager for buffer allocation
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Chimaera IPC not initialized");
       return std::vector<std::string>();
@@ -214,7 +214,7 @@ std::vector<std::string> ContextInterface::ContextRetrieve(
     HLOG(kInfo, "ContextRetrieve: Found {} matching blobs", query_results.size());
 
     // Allocate buffer for packed context
-    hipc::FullPtr<char> context_buffer = ipc_manager->AllocateBuffer(max_context_size);
+    ctp::ipc::FullPtr<char> context_buffer = ipc_manager->AllocateBuffer(max_context_size);
     if (context_buffer.IsNull()) {
       HLOG(kError, "Failed to allocate context buffer");
       return std::vector<std::string>();
@@ -229,7 +229,7 @@ std::vector<std::string> ContextInterface::ContextRetrieve(
       size_t batch_count = batch_end - batch_start;
 
       // Schedule AsyncGetBlob operations for this batch
-      std::vector<chi::Future<wrp_cte::core::GetBlobTask>> tasks;
+      std::vector<chi::Future<clio::cte::core::GetBlobTask>> tasks;
       tasks.reserve(batch_count);
 
       for (size_t i = batch_start; i < batch_end; ++i) {
@@ -238,7 +238,7 @@ std::vector<std::string> ContextInterface::ContextRetrieve(
         // Get or create tag to get tag_id
         auto tag_task = cte_client->AsyncGetOrCreateTag(tag_name);
         tag_task.Wait();
-        wrp_cte::core::TagId tag_id = tag_task->tag_id_;
+        clio::cte::core::TagId tag_id = tag_task->tag_id_;
         if (tag_id.IsNull()) {
           HLOG(kWarning, "Failed to get tag '{}', skipping blob", tag_name);
           continue;
@@ -261,7 +261,7 @@ std::vector<std::string> ContextInterface::ContextRetrieve(
         }
 
         // Calculate buffer pointer for this blob
-        hipc::ShmPtr<> blob_buffer_ptr;
+        ctp::ipc::ShmPtr<> blob_buffer_ptr;
         blob_buffer_ptr.alloc_id_ = context_buffer.shm_.alloc_id_;
         blob_buffer_ptr.off_ = context_buffer.shm_.off_.load() + buffer_offset;
 
@@ -340,7 +340,7 @@ int ContextInterface::ContextDestroy(
 
   try {
     // Get the CTE client singleton
-    auto* cte_client = WRP_CTE_CLIENT;
+    auto* cte_client = CLIO_CTE_CLIENT;
     if (!cte_client) {
       HLOG(kError, "CTE client not initialized");
       return 1;

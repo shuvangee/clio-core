@@ -46,15 +46,20 @@
 
 #include "simple_test.h"
 
-#include <chimaera/admin/admin_tasks.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
-#include <chimaera/chimaera.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_runtime.h>
-#include <wrp_cte/core/core_tasks.h>
+#include <clio_runtime/admin/admin_tasks.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_runtime.h>
+#include <clio_cte/core/core_tasks.h>
 
 namespace fs = std::filesystem;
+
+static std::string chi_test_data_dir() {
+  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
+  return (d && *d) ? d : ".";
+}
 
 /**
  * Test fixture for Tag operation tests
@@ -74,11 +79,11 @@ class TagTestFixture {
     INFO("=== Initializing Tag Test Environment ===");
 
     // Initialize test storage path
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::GetHomeDir();
     REQUIRE(!home_dir.empty());
-    test_storage_path_ = home_dir + "/cte_tag_test.dat";
+    test_storage_path_ = chi_test_data_dir() + "/cte_tag_test.dat";
 
-    // Initialize Chimaera and CTE client once
+    // Initialize CLIO Runtime and CTE client once
     if (!g_cte_initialized) {
       // Clean up existing test file only on first init
       if (fs::exists(test_storage_path_)) {
@@ -91,25 +96,25 @@ class TagTestFixture {
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
       // Initialize CTE client subsystem (required for Tag API)
-      success = wrp_cte::core::WRP_CTE_CLIENT_INIT();
+      success = clio::cte::core::CLIO_CTE_CLIENT_INIT();
       REQUIRE(success);
 
       // Get the global CTE client and initialize it with kCtePoolId
-      auto *cte_client = WRP_CTE_CLIENT;
+      auto *cte_client = CLIO_CTE_CLIENT;
       REQUIRE(cte_client != nullptr);
 
       // Initialize the client's pool_id (required for Tag operations)
       INFO("Before Init: client pool_id=" << cte_client->pool_id_.ToU64());
-      cte_client->Init(wrp_cte::core::kCtePoolId);
+      cte_client->Init(clio::cte::core::kCtePoolId);
       INFO("After Init: client pool_id=" << cte_client->pool_id_.ToU64()
-           << " (expected: " << wrp_cte::core::kCtePoolId.ToU64() << ")");
+           << " (expected: " << clio::cte::core::kCtePoolId.ToU64() << ")");
 
       // Create the CTE core pool explicitly
-      wrp_cte::core::CreateParams params;
+      clio::cte::core::CreateParams params;
       auto create_task = cte_client->AsyncCreate(
           chi::PoolQuery::Dynamic(),
-          wrp_cte::core::kCtePoolName,
-          wrp_cte::core::kCtePoolId,
+          clio::cte::core::kCtePoolName,
+          clio::cte::core::kCtePoolId,
           params);
       create_task.Wait();
       REQUIRE(create_task->GetReturnCode() == 0);
@@ -138,15 +143,15 @@ class TagTestFixture {
       return;
     }
 
-    auto *cte_client = WRP_CTE_CLIENT;
+    auto *cte_client = CLIO_CTE_CLIENT;
     REQUIRE(cte_client != nullptr);
 
     // Create test storage target using bdev client
     chi::PoolId bdev_pool_id(800, 0);
-    chimaera::bdev::Client bdev_client(bdev_pool_id);
+    clio::run::bdev::Client bdev_client(bdev_pool_id);
     auto create_task = bdev_client.AsyncCreate(
         chi::PoolQuery::Dynamic(), test_storage_path_,
-        bdev_pool_id, chimaera::bdev::BdevType::kFile);
+        bdev_pool_id, clio::run::bdev::BdevType::kFile);
     create_task.Wait();
 
     // Wait for storage target creation
@@ -154,7 +159,7 @@ class TagTestFixture {
 
     // Register the storage target with CTE
     auto reg_task = cte_client->AsyncRegisterTarget(
-        test_storage_path_, chimaera::bdev::BdevType::kFile,
+        test_storage_path_, clio::run::bdev::BdevType::kFile,
         kTestTargetSize, chi::PoolQuery::Local(), bdev_pool_id);
     reg_task.Wait();
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -198,18 +203,18 @@ TEST_CASE("Tag - Construction with Name", "[cte][tag][construction]") {
   fixture.SetupCTEWithTarget();
 
   SECTION("Create tag with simple name") {
-    wrp_cte::core::Tag tag("test_tag");
+    clio::cte::core::Tag tag("test_tag");
     INFO("Tag created successfully with name: test_tag");
   }
 
   SECTION("Create tag with empty name") {
-    wrp_cte::core::Tag tag("");
+    clio::cte::core::Tag tag("");
     INFO("Tag created with empty name (allowed)");
   }
 
   SECTION("Create tag with long name") {
     std::string long_name(1024, 'X');
-    wrp_cte::core::Tag tag(long_name);
+    clio::cte::core::Tag tag(long_name);
     INFO("Tag created with long name (1024 chars)");
   }
 }
@@ -218,8 +223,8 @@ TEST_CASE("Tag - Construction with TagId", "[cte][tag][construction]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::TagId tag_id(42, 0);
-  wrp_cte::core::Tag tag(tag_id);
+  clio::cte::core::TagId tag_id(42, 0);
+  clio::cte::core::Tag tag(tag_id);
   INFO("Tag created with direct TagId");
 }
 
@@ -227,8 +232,8 @@ TEST_CASE("Tag - Multiple Tags Same Name", "[cte][tag][construction]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag1("shared_tag");
-  wrp_cte::core::Tag tag2("shared_tag");
+  clio::cte::core::Tag tag1("shared_tag");
+  clio::cte::core::Tag tag2("shared_tag");
   INFO("Multiple tags with same name created");
 }
 
@@ -240,7 +245,7 @@ TEST_CASE("Tag - PutBlob Basic Operation", "[cte][tag][putblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("putblob_basic");
+  clio::cte::core::Tag tag("putblob_basic");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'B');
 
   tag.PutBlob("test_blob", data.data(), data.size());
@@ -254,7 +259,7 @@ TEST_CASE("Tag - PutBlob with Offset", "[cte][tag][putblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("putblob_offset");
+  clio::cte::core::Tag tag("putblob_offset");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'O');
 
   // Write data at offset 1024
@@ -267,7 +272,7 @@ TEST_CASE("Tag - PutBlob with Custom Score", "[cte][tag][putblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("putblob_score");
+  clio::cte::core::Tag tag("putblob_score");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'S');
 
   // Put blob with custom score
@@ -278,16 +283,16 @@ TEST_CASE("Tag - PutBlob with Custom Score", "[cte][tag][putblob]") {
   REQUIRE(score == 0.9f);
 }
 
-#if HSHM_ENABLE_COMPRESS
+#if CTP_ENABLE_COMPRESS
 TEST_CASE("Tag - PutBlob with Context", "[cte][tag][putblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("putblob_context");
+  clio::cte::core::Tag tag("putblob_context");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'C');
 
   // Create compression context
-  wrp_cte::core::Context ctx;
+  clio::cte::core::Context ctx;
   ctx.dynamic_compress_ = 1;
   ctx.compress_lib_ = 2;
   ctx.max_performance_ = true;
@@ -302,19 +307,19 @@ TEST_CASE("Tag - PutBlob SHM Version", "[cte][tag][putblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("putblob_shm");
+  clio::cte::core::Tag tag("putblob_shm");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'M');
 
   // Allocate shared memory
-  auto *ipc = CHI_IPC;
-  hipc::FullPtr<char> shm_fullptr = ipc->AllocateBuffer(data.size());
+  auto *ipc = CLIO_IPC;
+  ctp::ipc::FullPtr<char> shm_fullptr = ipc->AllocateBuffer(data.size());
   REQUIRE(!shm_fullptr.IsNull());
 
   // Copy data to shared memory
   memcpy(shm_fullptr.ptr_, data.data(), data.size());
 
   // Convert to ShmPtr and call SHM version
-  hipc::ShmPtr<> shm_ptr(shm_fullptr.shm_);
+  ctp::ipc::ShmPtr<> shm_ptr(shm_fullptr.shm_);
   tag.PutBlob("shm_blob", shm_ptr, data.size());
 
   // Free shared memory
@@ -327,7 +332,7 @@ TEST_CASE("Tag - PutBlob Multiple Blobs", "[cte][tag][putblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("putblob_multi");
+  clio::cte::core::Tag tag("putblob_multi");
 
   // Put multiple blobs
   for (int i = 0; i < 5; ++i) {
@@ -349,7 +354,7 @@ TEST_CASE("Tag - GetBlob Basic Operation", "[cte][tag][getblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("getblob_basic");
+  clio::cte::core::Tag tag("getblob_basic");
   auto original_data = fixture.CreateTestData(fixture.kSmallDataSize, 'G');
 
   // Put data
@@ -367,7 +372,7 @@ TEST_CASE("Tag - GetBlob with Offset", "[cte][tag][getblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("getblob_offset");
+  clio::cte::core::Tag tag("getblob_offset");
   auto original_data = fixture.CreateTestData(fixture.kMediumDataSize, 'H');
 
   // Put full data
@@ -384,19 +389,19 @@ TEST_CASE("Tag - GetBlob SHM Version", "[cte][tag][getblob]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("getblob_shm");
+  clio::cte::core::Tag tag("getblob_shm");
   auto original_data = fixture.CreateTestData(fixture.kSmallDataSize, 'I');
 
   // Put data
   tag.PutBlob("shm_get_blob", original_data.data(), original_data.size());
 
   // Allocate shared memory for retrieval
-  auto *ipc = CHI_IPC;
-  hipc::FullPtr<char> shm_fullptr = ipc->AllocateBuffer(original_data.size());
+  auto *ipc = CLIO_IPC;
+  ctp::ipc::FullPtr<char> shm_fullptr = ipc->AllocateBuffer(original_data.size());
   REQUIRE(!shm_fullptr.IsNull());
 
   // Get blob using SHM version
-  hipc::ShmPtr<> shm_ptr(shm_fullptr.shm_);
+  ctp::ipc::ShmPtr<> shm_ptr(shm_fullptr.shm_);
   tag.GetBlob("shm_get_blob", shm_ptr, original_data.size());
 
   // Free shared memory
@@ -413,7 +418,7 @@ TEST_CASE("Tag - GetBlob Null Buffer", "[cte][tag][errors]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("error_null_buffer");
+  clio::cte::core::Tag tag("error_null_buffer");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'E');
   tag.PutBlob("error_blob", data.data(), data.size());
 
@@ -432,7 +437,7 @@ TEST_CASE("Tag - GetBlob Zero Size", "[cte][tag][errors]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("error_zero_size");
+  clio::cte::core::Tag tag("error_zero_size");
   std::vector<char> buffer(100);
 
   // Try to get blob with zero size
@@ -450,10 +455,10 @@ TEST_CASE("Tag - GetBlob SHM Null Pointer", "[cte][tag][errors]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("error_shm_null");
+  clio::cte::core::Tag tag("error_shm_null");
 
   // Try to get blob with null ShmPtr
-  hipc::ShmPtr<> null_ptr;
+  ctp::ipc::ShmPtr<> null_ptr;
   bool caught_exception = false;
   try {
     tag.GetBlob("any_blob", null_ptr, fixture.kSmallDataSize);
@@ -468,7 +473,7 @@ TEST_CASE("Tag - PutBlob Invalid Score", "[cte][tag][errors]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("error_invalid_score");
+  clio::cte::core::Tag tag("error_invalid_score");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'I');
 
   // Scores above 1.0 must be rejected
@@ -495,7 +500,7 @@ TEST_CASE("Tag - GetBlobSize", "[cte][tag][metadata]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("metadata_size");
+  clio::cte::core::Tag tag("metadata_size");
   auto data = fixture.CreateTestData(fixture.kMediumDataSize, 'Z');
   tag.PutBlob("size_blob", data.data(), data.size());
 
@@ -507,7 +512,7 @@ TEST_CASE("Tag - GetBlobScore", "[cte][tag][metadata]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("metadata_score");
+  clio::cte::core::Tag tag("metadata_score");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'Y');
   float expected_score = 0.75f;
   tag.PutBlob("score_blob", data.data(), data.size(), 0, expected_score);
@@ -520,7 +525,7 @@ TEST_CASE("Tag - GetContainedBlobs", "[cte][tag][metadata]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("metadata_contained");
+  clio::cte::core::Tag tag("metadata_contained");
 
   // Put multiple blobs with known names
   std::vector<std::string> blob_names = {"blob1", "blob2", "blob3"};
@@ -544,7 +549,7 @@ TEST_CASE("Tag - ReorganizeBlob Basic", "[cte][tag][reorganize]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("reorg_basic");
+  clio::cte::core::Tag tag("reorg_basic");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'R');
 
   // Put blob with initial score (valid range: 0.0-1.0)
@@ -566,7 +571,7 @@ TEST_CASE("Tag - ReorganizeBlob Multiple Times", "[cte][tag][reorganize]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("reorg_multi");
+  clio::cte::core::Tag tag("reorg_multi");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'Q');
 
   tag.PutBlob("multi_reorg", data.data(), data.size(), 0, 0.1f);
@@ -595,17 +600,17 @@ TEST_CASE("Tag - AsyncPutBlob", "[cte][tag][async]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("async_put");
+  clio::cte::core::Tag tag("async_put");
   auto data = fixture.CreateTestData(fixture.kSmallDataSize, 'A');
 
   // Allocate shared memory (must remain alive until task completes)
-  auto *ipc = CHI_IPC;
-  hipc::FullPtr<char> shm_fullptr = ipc->AllocateBuffer(data.size());
+  auto *ipc = CLIO_IPC;
+  ctp::ipc::FullPtr<char> shm_fullptr = ipc->AllocateBuffer(data.size());
   REQUIRE(!shm_fullptr.IsNull());
   memcpy(shm_fullptr.ptr_, data.data(), data.size());
 
   // Call async version
-  hipc::ShmPtr<> shm_ptr(shm_fullptr.shm_);
+  ctp::ipc::ShmPtr<> shm_ptr(shm_fullptr.shm_);
   auto future = tag.AsyncPutBlob("async_blob", shm_ptr, data.size());
 
   // Wait for completion
@@ -627,7 +632,7 @@ TEST_CASE("Tag - Large Data PutGet", "[cte][tag][large]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("large_data");
+  clio::cte::core::Tag tag("large_data");
   auto large_data = fixture.CreateTestData(fixture.kLargeDataSize, 'L');
 
   // Put large blob
@@ -651,7 +656,7 @@ TEST_CASE("Tag - Overwrite Blob", "[cte][tag][edge]") {
   TagTestFixture fixture;
   fixture.SetupCTEWithTarget();
 
-  wrp_cte::core::Tag tag("overwrite");
+  clio::cte::core::Tag tag("overwrite");
   auto data1 = fixture.CreateTestData(fixture.kSmallDataSize, 'F');
   auto data2 = fixture.CreateTestData(fixture.kSmallDataSize, 'S');
 

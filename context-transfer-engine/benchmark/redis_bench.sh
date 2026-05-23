@@ -5,7 +5,7 @@
 # Copyright by the Illinois Institute of Technology.                        *
 # All rights reserved.                                                      *
 #                                                                           *
-# This file is part of Hermes. The full Hermes copyright notice, including  *
+# This file is part of Clio. The full Clio copyright notice, including  *
 # terms governing use, modification, and redistribution, is contained in    *
 # the COPYING file, which can be found at the top directory. If you do not  *
 # have access to the file, you may request a copy from help@hdfgroup.org.   *
@@ -15,7 +15,7 @@
 # Redis Benchmark Script
 #
 # This benchmark measures the performance of SET, GET, and combined operations
-# in Redis, comparable to the CTE Core benchmark (wrp_cte_bench).
+# in Redis, comparable to the CTE Core benchmark (clio_cte_bench).
 #
 # Usage:
 #   ./redis_bench.sh <test_case> <num_clients> <io_size> <io_count>

@@ -31,15 +31,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "hermes_shm/lightbeam/lightbeam.h"
-#include "hermes_shm/lightbeam/thallium/server.h"
+#include "clio_ctp/lightbeam/lightbeam.h"
+#include "clio_ctp/lightbeam/thallium/server.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
 #include <atomic>
 #include <cstring>
 #include <string>
-#include "hermes_shm/data_structures/serialization/global_serialize.h"
+#include "clio_ctp/data_structures/serialization/global_serialize.h"
 
 // Global running flag
 std::atomic<bool> running{true};
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
     
     // Create server using the selected backend
     if (protocol == "thallium") {
-        hshm::lbm::thallium::Server server;
+        ctp::lbm::thallium::Server server;
 
         try {
             std::cout << "Starting Thallium server..." << std::endl;
@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     } else {
-        hshm::lbm::Server server;
+        ctp::lbm::Server server;
         std::cout << "Starting ZMQ server..." << std::endl;
         server.StartServer(url);
         

@@ -9,7 +9,7 @@ nanobind_add_module(
 )
 
 # Link against the admin client library (provides MonitorTask, admin::Client, chimaera headers)
-target_link_libraries(chimaera_runtime_ext PRIVATE chimaera_admin_client)
+target_link_libraries(chimaera_runtime_ext PRIVATE clio_admin_client)
 
 # Local includes only
 target_include_directories(chimaera_runtime_ext PRIVATE
@@ -39,7 +39,7 @@ if(BUILD_TESTING)
         PROPERTIES
         LABELS "python;bindings;monitor;msan_skip"
         TIMEOUT 120
-        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CLIO_BIND_ADDR=127.0.0.1;CLIO_PORT=10500"
     )
 
     set_tests_properties(

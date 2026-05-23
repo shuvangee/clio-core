@@ -5,7 +5,7 @@ project(external_chimod_test)
 set(CMAKE_CXX_STANDARD_20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find required Chimaera packages
+# Find required CLIO Runtime packages
 find_package(chimaera REQUIRED)
 find_package(chimaera_admin REQUIRED)
 
@@ -26,7 +26,7 @@ target_link_libraries(test_simple_mod
 
 # Include directories
 target_include_directories(test_simple_mod PUBLIC
-  ${CHIMAERA_ROOT}/modules/simple_mod/include
+  ${CLIO_RUN_ROOT}/modules/simple_mod/include
 )
 
 # Enable testing

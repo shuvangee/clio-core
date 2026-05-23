@@ -39,19 +39,23 @@
  */
 
 #include "simple_test.h"
-#include <wrp_cae/core/core_client.h>
-#include <wrp_cae/core/core_tasks.h>
-#include <wrp_cae/core/constants.h>
-#include <wrp_cae/core/factory/assimilation_ctx.h>
-#include <wrp_cte/core/core_client.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_cae/core/core_client.h>
+#include <clio_cae/core/core_tasks.h>
+#include <clio_cae/core/constants.h>
+#include <clio_cae/core/factory/assimilation_ctx.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 #include <fstream>
 #include <cstdlib>
+#include <filesystem>
+#include <system_error>
 
-using namespace wrp_cae::core;
+#include <clio_ctp/introspect/system_info.h>
+
+using namespace clio::cae::core;
 
 /**
  * Test fixture for CAE comprehensive tests
@@ -70,7 +74,7 @@ public:
     if (!g_initialized) {
       INFO("=== Initializing CAE Test Environment ===");
 
-      // Step 1: Initialize Chimaera runtime
+      // Step 1: Initialize CLIO Runtime runtime
       bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
       if (!success) {
         throw std::runtime_error("CHIMAERA_INIT failed");
@@ -78,21 +82,21 @@ public:
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
       // Step 2: Initialize CTE client subsystem
-      success = wrp_cte::core::WRP_CTE_CLIENT_INIT();
+      success = clio::cte::core::CLIO_CTE_CLIENT_INIT();
       if (!success) {
-        throw std::runtime_error("WRP_CTE_CLIENT_INIT failed");
+        throw std::runtime_error("CLIO_CTE_CLIENT_INIT failed");
       }
 
       // Step 3: Set pool ID on global CTE client
-      auto *cte_client = WRP_CTE_CLIENT;
-      cte_client->Init(wrp_cte::core::kCtePoolId);
+      auto *cte_client = CLIO_CTE_CLIENT;
+      cte_client->Init(clio::cte::core::kCtePoolId);
 
       // Step 4: Create CTE core pool
-      wrp_cte::core::CreateParams cte_params;
+      clio::cte::core::CreateParams cte_params;
       auto cte_create = cte_client->AsyncCreate(
           chi::PoolQuery::Dynamic(),
-          wrp_cte::core::kCtePoolName,
-          wrp_cte::core::kCtePoolId,
+          clio::cte::core::kCtePoolName,
+          clio::cte::core::kCtePoolId,
           cte_params);
       cte_create.Wait();
 
@@ -104,7 +108,10 @@ public:
       g_initialized = true;
     }
 
-    test_data_dir_ = std::string(std::getenv("HOME")) + "/cae_test_data";
+    // ctp::SystemInfo::GetHomeDir() returns HOME on POSIX, USERPROFILE
+    // on Windows. Plain getenv("HOME") segfaults on Windows because the
+    // var isn't set and std::string(nullptr) is UB.
+    test_data_dir_ = ctp::SystemInfo::GetHomeDir() + "/cae_test_data";
     test_binary_file_ = test_data_dir_ + "/test_binary.bin";
     test_hdf5_file_ = "/workspace/context-assimilation-engine/data/A46_xx.h5";
   }
@@ -117,15 +124,15 @@ public:
     INFO("Initializing CAE client");
 
     // Initialize CAE client subsystem
-    WRP_CAE_CLIENT_INIT();
+    CLIO_CAE_CLIENT_INIT();
 
     // Create CAE client and pool
-    wrp_cae::core::Client cae_client;
-    wrp_cae::core::CreateParams cae_params;
+    clio::cae::core::Client cae_client;
+    clio::cae::core::CreateParams cae_params;
     auto cae_create = cae_client.AsyncCreate(
         chi::PoolQuery::Local(),
         "test_cae_pool",
-        wrp_cae::core::kCaePoolId,
+        clio::cae::core::kCaePoolId,
         cae_params);
     cae_create.Wait();
 
@@ -138,8 +145,12 @@ public:
   }
 
   void SetupTestData() {
-    // Create test data directory
-    (void)system(("mkdir -p " + test_data_dir_).c_str());
+    // Use std::filesystem instead of `system("mkdir -p ...")` — Windows
+    // cmd.exe doesn't take -p and a forked `mkdir` against a path with
+    // spaces or backslashes blows up. create_directories returns false
+    // if the dir already exists, which is harmless.
+    std::error_code _ec;
+    std::filesystem::create_directories(test_data_dir_, _ec);
 
     // Generate small binary test file
     GenerateBinaryFile(test_binary_file_, kSmallFileSize);
@@ -194,7 +205,7 @@ TEST_CASE("CAE - Client Initialization", "[cae][core][init]") {
   fixture.InitializeCAE();
 
   // Create a client connected to the existing pool
-  wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+  clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
   INFO("CAE client initialized successfully");
 }
 
@@ -251,7 +262,7 @@ TEST_CASE("CAE - ParseOmni Binary File", "[cae][parseomni][binary]") {
   fixture.InitializeCAE();
   fixture.SetupTestData();
 
-  wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+  clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
 
   // Create assimilation context for binary file
   std::string src_url = "file::" + fixture.test_binary_file_;
@@ -274,7 +285,7 @@ TEST_CASE("CAE - ParseOmni Binary With Range", "[cae][parseomni][binary][range]"
   fixture.InitializeCAE();
   fixture.SetupTestData();
 
-  wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+  clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
 
   // Create assimilation context with range
   std::string src_url = "file::" + fixture.test_binary_file_;
@@ -298,7 +309,7 @@ TEST_CASE("CAE - ParseOmni Multiple Contexts", "[cae][parseomni][multi]") {
   fixture.InitializeCAE();
   fixture.SetupTestData();
 
-  wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+  clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
 
   // Create multiple assimilation contexts
   std::vector<AssimilationCtx> contexts;
@@ -325,7 +336,7 @@ TEST_CASE("CAE - ParseOmni Empty Context List", "[cae][parseomni][error]") {
   CAEComprehensiveFixture fixture;
   fixture.InitializeCAE();
 
-  wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+  clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
 
   // Execute ParseOmni with empty context list
   std::vector<AssimilationCtx> contexts;
@@ -345,7 +356,7 @@ TEST_CASE("CAE - ProcessHdf5Dataset Basic", "[cae][hdf5]") {
   CAEComprehensiveFixture fixture;
   fixture.InitializeCAE();
 
-  wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+  clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
 
   // Process HDF5 dataset
   auto task = cae_client.AsyncProcessHdf5Dataset(
@@ -362,7 +373,7 @@ TEST_CASE("CAE - ProcessHdf5Dataset NonExistent File", "[cae][hdf5][error]") {
   CAEComprehensiveFixture fixture;
   fixture.InitializeCAE();
 
-  wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+  clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
 
   // Try to process non-existent file
   auto task = cae_client.AsyncProcessHdf5Dataset(
@@ -381,7 +392,7 @@ TEST_CASE("CAE - ProcessHdf5Dataset Empty Dataset Path", "[cae][hdf5][error]") {
   CAEComprehensiveFixture fixture;
   fixture.InitializeCAE();
 
-  wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+  clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
 
   // Try with empty dataset path
   auto task = cae_client.AsyncProcessHdf5Dataset(
@@ -407,7 +418,7 @@ TEST_CASE("CAE - AssimilationCtx Serialization", "[cae][ctx][serialization]") {
   // Serialize using GlobalSerialize
   std::vector<char> buf;
   {
-    hshm::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
+    ctp::ipc::GlobalSerialize<std::vector<char>> oarchive(buf);
     oarchive(ctx);
     oarchive.Finalize();
   }
@@ -415,7 +426,7 @@ TEST_CASE("CAE - AssimilationCtx Serialization", "[cae][ctx][serialization]") {
   // Deserialize
   AssimilationCtx ctx_restored;
   {
-    hshm::ipc::GlobalDeserialize<std::vector<char>> iarchive(buf);
+    ctp::ipc::GlobalDeserialize<std::vector<char>> iarchive(buf);
     iarchive(ctx_restored);
   }
 
@@ -441,7 +452,7 @@ TEST_CASE("CAE - Verify Binary Data in CTE", "[cae][integration][binary]") {
   fixture.InitializeCAE();
   fixture.SetupTestData();
 
-  wrp_cae::core::Client cae_client(wrp_cae::core::kCaePoolId);
+  clio::cae::core::Client cae_client(clio::cae::core::kCaePoolId);
 
   // Assimilate binary file
   std::string src_url = "file::" + fixture.test_binary_file_;
@@ -459,7 +470,7 @@ TEST_CASE("CAE - Verify Binary Data in CTE", "[cae][integration][binary]") {
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   // Verify data exists in CTE
-  auto tag = wrp_cte::core::Tag(tag_name);
+  auto tag = clio::cte::core::Tag(tag_name);
   auto blobs = tag.GetContainedBlobs();
 
   INFO("Assimilated file created " << blobs.size() << " blob(s) in CTE");

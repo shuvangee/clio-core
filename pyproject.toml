@@ -32,6 +32,9 @@ visualizer = [
 
 [project.scripts]
 chimaera = "iowarp_core._cli:main"
+clio_cte_bench = "iowarp_core._cli:cte_bench_main"
+clio_run_thrpt_bench = "iowarp_core._cli:run_thrpt_main"
+context-visualizer = "context_visualizer.__main__:main"
 
 [project.urls]
 Homepage = "https://iowarp.ai"
@@ -42,32 +45,42 @@ Documentation = "https://docs.iowarp.ai"
 cmake.source-dir = "."
 cmake.build-type = "Release"
 install.components = ["pip_package"]
-wheel.packages = ["installers/pip/iowarp_core"]
+wheel.packages = [
+    "installers/pip/iowarp_core",
+    "context-visualizer/context_visualizer",
+]
+# Sets CMAKE_INSTALL_PREFIX = <wheel>/platlib/iowarp_core, so every install()
+# DESTINATION is package-relative ("lib", "bin", "ext", ...) instead of having
+# to manually prefix each one with iowarp_core/.  The single exception is the
+# .pth file, which uses DESTINATION ".." in CMakeLists.txt to escape one level
+# up so it lands at site-packages root.  Must stay in sync with the
+# installers/pip/pyproject.toml copy used by local `pip install installers/pip`.
+wheel.install-dir = "iowarp_core"
 build-dir = "build/{wheel_tag}"
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "ON"
-WRP_CORE_STATIC_DEPS = "ON"
-WRP_CORE_ENABLE_RUNTIME = "ON"
-WRP_CORE_ENABLE_CTE = "ON"
-WRP_CORE_ENABLE_CAE = "ON"
-WRP_CORE_ENABLE_CEE = "ON"
-WRP_CORE_ENABLE_PYTHON = "ON"
-WRP_CORE_ENABLE_TESTS = "OFF"
-WRP_CORE_ENABLE_BENCHMARKS = "OFF"
-WRP_CORE_ENABLE_RPATH = "OFF"
-WRP_CORE_ENABLE_ZMQ = "ON"
-WRP_CORE_ENABLE_CEREAL = "ON"
-WRP_CORE_ENABLE_MPI = "OFF"
-WRP_CORE_ENABLE_HDF5 = "OFF"
-WRP_CORE_ENABLE_ELF = "OFF"
-WRP_CTE_ENABLE_COMPRESS = "OFF"
-WRP_CORE_ENABLE_ENCRYPT = "OFF"
-WRP_CORE_ENABLE_CUDA = "OFF"
-WRP_CORE_ENABLE_ROCM = "OFF"
-WRP_CORE_ENABLE_OPENMP = "OFF"
-WRP_CORE_ENABLE_IO_URING = "ON"
-HSHM_LOG_LEVEL = "1"
+CLIO_CORE_STATIC_DEPS = "ON"
+CLIO_CORE_ENABLE_RUNTIME = "ON"
+CLIO_CORE_ENABLE_CTE = "ON"
+CLIO_CORE_ENABLE_CAE = "ON"
+CLIO_CORE_ENABLE_CEE = "ON"
+CLIO_CORE_ENABLE_PYTHON = "ON"
+CLIO_CORE_ENABLE_TESTS = "OFF"
+CLIO_CORE_ENABLE_BENCHMARKS = "ON"
+CLIO_CORE_ENABLE_RPATH = "OFF"
+CLIO_CORE_ENABLE_ZMQ = "ON"
+CLIO_CORE_ENABLE_CEREAL = "ON"
+CLIO_CORE_ENABLE_MPI = "OFF"
+CLIO_CORE_ENABLE_HDF5 = "OFF"
+CLIO_CORE_ENABLE_ELF = "OFF"
+CLIO_CTE_ENABLE_COMPRESS = "OFF"
+CLIO_CORE_ENABLE_ENCRYPT = "OFF"
+CLIO_CORE_ENABLE_CUDA = "OFF"
+CLIO_CORE_ENABLE_ROCM = "OFF"
+CLIO_CORE_ENABLE_OPENMP = "OFF"
+CLIO_CORE_ENABLE_IO_URING = "ON"
+CTP_LOG_LEVEL = "1"
 
 [tool.scikit-build.metadata.version]
 provider = "scikit_build_core.metadata.regex"

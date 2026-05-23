@@ -37,12 +37,12 @@
  * Tests Intel GPU compute using SYCL USM (Unified Shared Memory) on
  * Aurora's Intel Data Center GPU Max (Ponte Vecchio / PVC).
  *
- * Uses #ifdef HSHM_ENABLE_SYCL so this file compiles only when SYCL is
+ * Uses #ifdef CTP_ENABLE_SYCL so this file compiles only when SYCL is
  * enabled. Existing CUDA/ROCm code is not affected since no CUDA/ROCm
  * headers or keywords are used here.
  */
 
-#ifdef HSHM_ENABLE_SYCL
+#ifdef CTP_ENABLE_SYCL
 
 #include <catch2/catch_all.hpp>
 #include <sycl/sycl.hpp>
@@ -97,7 +97,7 @@ TEST_CASE("GpuSyclVectorFill", "[gpu][sycl]") {
   }
 }
 
-#else  // HSHM_ENABLE_SYCL not defined
+#else  // CTP_ENABLE_SYCL not defined
 
 #include <catch2/catch_all.hpp>
 
@@ -105,4 +105,4 @@ TEST_CASE("GpuSyclVectorFill_Disabled", "[gpu][sycl]") {
   SUCCEED("SYCL not enabled in this build");
 }
 
-#endif  // HSHM_ENABLE_SYCL
+#endif  // CTP_ENABLE_SYCL

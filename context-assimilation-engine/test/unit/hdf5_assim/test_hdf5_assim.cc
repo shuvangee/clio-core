@@ -49,7 +49,7 @@
  * - Tests integration with CTE (tag creation, blob storage)
  *
  * Environment Variables:
- * - INIT_CHIMAERA: If set to "1", initializes Chimaera runtime
+ * - INIT_CHIMAERA: If set to "1", initializes CLIO Runtime runtime
  * - TEST_HDF5_FILE: Override default test file path
  */
 
@@ -65,17 +65,17 @@
 // HDF5 library
 #include <hdf5.h>
 
-// Chimaera and CAE headers
-#include <chimaera/chimaera.h>
-#include <wrp_cae/core/core_client.h>
-#include <wrp_cae/core/constants.h>
-#include <wrp_cae/core/factory/assimilation_ctx.h>
+// CLIO Runtime and CAE headers
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cae/core/core_client.h>
+#include <clio_cae/core/constants.h>
+#include <clio_cae/core/factory/assimilation_ctx.h>
 
 // CTE headers
-#include <wrp_cte/core/core_client.h>
+#include <clio_cte/core/core_client.h>
 
 // Logging
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 // Test configuration
 const std::string kTestFileName = "/tmp/test_hdf5_assim_file.h5";
@@ -188,7 +188,7 @@ bool GenerateTestHDF5File(const std::string& file_path) {
 bool VerifyDatasetData(const std::string& file_path,
                        const std::string& dataset_path,
                        const std::string& tag_name,
-                       wrp_cte::core::Client* cte_client) {
+                       clio::cte::core::Client* cte_client) {
   HLOG(kInfo, "Verifying data for dataset: {}", dataset_path);
 
   // Open HDF5 file and dataset
@@ -242,7 +242,7 @@ bool VerifyDatasetData(const std::string& file_path,
   // Get CTE tag
   auto tag_task = cte_client->AsyncGetOrCreateTag(tag_name);
   tag_task.Wait();
-  wrp_cte::core::TagId tag_id = tag_task->tag_id_;
+  clio::cte::core::TagId tag_id = tag_task->tag_id_;
   if (tag_id.IsNull()) {
     HLOG(kError, "Tag not found in CTE: {}", tag_name);
     H5Tclose(datatype_id);
@@ -320,16 +320,16 @@ bool VerifyDatasetData(const std::string& file_path,
     }
 
     // Allocate shared memory buffer for this blob
-    auto blob_buffer = CHI_IPC->AllocateBuffer(blob_size);
+    auto blob_buffer = CLIO_IPC->AllocateBuffer(blob_size);
 
     // Read blob into shared memory buffer
-    hipc::ShmPtr<> blob_shm_ptr = blob_buffer.shm_.template Cast<void>();
+    ctp::ipc::ShmPtr<> blob_shm_ptr = blob_buffer.shm_.template Cast<void>();
     auto get_blob_task = cte_client->AsyncGetBlob(tag_id, blob_name, 0, blob_size, 0, blob_shm_ptr);
     get_blob_task.Wait();
     bool success = (get_blob_task->GetReturnCode() == 0);
     if (!success) {
       HLOG(kError, "Failed to read blob '{}'", blob_name);
-      CHI_IPC->FreeBuffer(blob_buffer);
+      CLIO_IPC->FreeBuffer(blob_buffer);
       H5Tclose(datatype_id);
       H5Sclose(dataspace_id);
       H5Dclose(dataset_id);
@@ -341,7 +341,7 @@ bool VerifyDatasetData(const std::string& file_path,
     std::memcpy(cte_data.data() + bytes_read, blob_buffer.ptr_, blob_size);
 
     // Free the shared memory buffer
-    CHI_IPC->FreeBuffer(blob_buffer);
+    CLIO_IPC->FreeBuffer(blob_buffer);
 
     bytes_read += blob_size;
   }
@@ -476,7 +476,7 @@ int main(int argc, char* argv[]) {
   int exit_code = 0;
 
   try {
-    // Initialize Chimaera runtime (CHI_WITH_RUNTIME controls behavior)
+    // Initialize CLIO Runtime runtime (CHI_WITH_RUNTIME controls behavior)
     HLOG(kInfo, "Initializing Chimaera...");
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
     if (!success) {
@@ -485,8 +485,8 @@ int main(int argc, char* argv[]) {
     }
     HLOG(kSuccess, "Chimaera initialized successfully");
 
-    // Verify Chimaera IPC is available
-    auto* ipc_manager = CHI_IPC;
+    // Verify CLIO Runtime IPC is available
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Chimaera IPC not initialized");
       return 1;
@@ -501,23 +501,23 @@ int main(int argc, char* argv[]) {
 
     // Step 2: Connect to CTE
     HLOG(kInfo, "[STEP 2] Connecting to CTE...");
-    wrp_cte::core::WRP_CTE_CLIENT_INIT();
+    clio::cte::core::CLIO_CTE_CLIENT_INIT();
     HLOG(kSuccess, "CTE client initialized");
 
     // Step 2.5: Initialize CAE client
     HLOG(kInfo, "[STEP 2.5] Initializing CAE client...");
-    WRP_CAE_CLIENT_INIT();
+    CLIO_CAE_CLIENT_INIT();
     HLOG(kSuccess, "CAE client initialized");
 
     // Step 3: Create CAE pool
     HLOG(kInfo, "[STEP 3] Creating CAE pool...");
-    wrp_cae::core::Client cae_client;
-    wrp_cae::core::CreateParams params;
+    clio::cae::core::Client cae_client;
+    clio::cae::core::CreateParams params;
 
     auto create_task = cae_client.AsyncCreate(
         chi::PoolQuery::Local(),
         "test_cae_pool",
-        wrp_cae::core::kCaePoolId,
+        clio::cae::core::kCaePoolId,
         params);
     create_task.Wait();
 
@@ -525,7 +525,7 @@ int main(int argc, char* argv[]) {
 
     // Step 4: Create AssimilationCtx for HDF5
     HLOG(kInfo, "[STEP 4] Creating AssimilationCtx for HDF5...");
-    wrp_cae::core::AssimilationCtx ctx;
+    clio::cae::core::AssimilationCtx ctx;
     ctx.src = "hdf5::" + kTestFileName;
     ctx.dst = "iowarp::" + kTestTagBase;
     ctx.format = "hdf5";
@@ -540,7 +540,7 @@ int main(int argc, char* argv[]) {
 
     // Step 5: Call ParseOmni with vector containing single context
     HLOG(kInfo, "[STEP 5] Calling ParseOmni...");
-    std::vector<wrp_cae::core::AssimilationCtx> contexts = {ctx};
+    std::vector<clio::cae::core::AssimilationCtx> contexts = {ctx};
     auto parse_task = cae_client.AsyncParseOmni(contexts);
     parse_task.Wait();
     chi::u32 result_code = parse_task->GetReturnCode();
@@ -567,7 +567,7 @@ int main(int argc, char* argv[]) {
     HLOG(kInfo, "[STEP 7] Verifying datasets in CTE...");
 
     // Get CTE client
-    auto cte_client = WRP_CTE_CLIENT;
+    auto cte_client = CLIO_CTE_CLIENT;
 
     // Expected dataset names (based on HDF5 file structure)
     std::vector<std::string> expected_datasets = {
@@ -590,7 +590,7 @@ int main(int argc, char* argv[]) {
       // Check if tag exists
       auto tag_task = cte_client->AsyncGetOrCreateTag(full_tag_name);
       tag_task.Wait();
-      wrp_cte::core::TagId tag_id = tag_task->tag_id_;
+      clio::cte::core::TagId tag_id = tag_task->tag_id_;
       if (tag_id.IsNull()) {
         HLOG(kWarning, "Tag not found in CTE: {}", full_tag_name);
         continue;

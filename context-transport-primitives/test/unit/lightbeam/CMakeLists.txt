@@ -1,7 +1,7 @@
-if(WRP_CORE_ENABLE_ZMQ)
+if(CLIO_CORE_ENABLE_ZMQ)
     add_executable(lightbeam_transport_test lightbeam_transport_test.cc)
-    target_link_libraries(lightbeam_transport_test hermes_shm_host hshm::lightbeam hshm::serialize)
-    target_compile_definitions(lightbeam_transport_test PRIVATE HSHM_ENABLE_ZMQ)
+    target_link_libraries(lightbeam_transport_test clio_ctp_host ctp::lightbeam ctp::serialize)
+    target_compile_definitions(lightbeam_transport_test PRIVATE CTP_ENABLE_ZMQ)
     add_test(NAME lightbeam_transport_test COMMAND lightbeam_transport_test)
     set_tests_properties(lightbeam_transport_test PROPERTIES
         LABELS "msan_skip"
@@ -13,8 +13,8 @@ if(WRP_CORE_ENABLE_ZMQ)
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
     add_executable(test_lightbeam_new test_lightbeam_new.cc)
-    target_link_libraries(test_lightbeam_new hermes_shm_host hshm::lightbeam hshm::serialize)
-    target_compile_definitions(test_lightbeam_new PRIVATE HSHM_ENABLE_ZMQ)
+    target_link_libraries(test_lightbeam_new clio_ctp_host ctp::lightbeam ctp::serialize)
+    target_compile_definitions(test_lightbeam_new PRIVATE CTP_ENABLE_ZMQ)
     add_test(NAME ctp_lightbeam_new COMMAND test_lightbeam_new)
     set_tests_properties(ctp_lightbeam_new PROPERTIES
         LABELS "msan_skip"
@@ -27,7 +27,7 @@ if(WRP_CORE_ENABLE_ZMQ)
 endif()
 
 add_executable(socket_transport_test socket_transport_test.cc)
-target_link_libraries(socket_transport_test hermes_shm_host hshm::lightbeam hshm::serialize)
+target_link_libraries(socket_transport_test clio_ctp_host ctp::lightbeam ctp::serialize)
 add_test(NAME ctp_socket_transport COMMAND socket_transport_test)
 set_tests_properties(ctp_socket_transport PROPERTIES
     LABELS "msan_skip"
@@ -39,7 +39,7 @@ install(TARGETS socket_transport_test
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 add_executable(shm_transport_test shm_transport_test.cc)
-target_link_libraries(shm_transport_test hermes_shm_host hshm::lightbeam hshm::serialize)
+target_link_libraries(shm_transport_test clio_ctp_host ctp::lightbeam ctp::serialize)
 add_test(NAME ctp_shm_transport COMMAND shm_transport_test)
 # Skip under MSan: shm_transport uses mmap-backed shared memory regions that
 # MSan cannot instrument (no instrumented allocator backing).
@@ -52,7 +52,7 @@ install(TARGETS shm_transport_test
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 add_executable(shm_transfer_test shm_transfer_test.cc)
-target_link_libraries(shm_transfer_test hermes_shm_host hshm::lightbeam Catch2::Catch2WithMain)
+target_link_libraries(shm_transfer_test clio_ctp_host ctp::lightbeam Catch2::Catch2WithMain)
 add_test(NAME ctp_shm_transfer COMMAND shm_transfer_test)
 # Skip under MSan: Catch2 precompiled without MSan ignorelist; ConsoleReporter
 # and FatalConditionHandler produce false positives.
@@ -66,9 +66,9 @@ install(TARGETS shm_transfer_test
 
 # EventManager test (always enabled - uses pipe/epoll + socket transport)
 add_executable(event_manager_test event_manager_test.cc)
-target_link_libraries(event_manager_test hermes_shm_host hshm::lightbeam hshm::serialize)
-if(WRP_CORE_ENABLE_ZMQ)
-    target_compile_definitions(event_manager_test PRIVATE HSHM_ENABLE_ZMQ)
+target_link_libraries(event_manager_test clio_ctp_host ctp::lightbeam ctp::serialize)
+if(CLIO_CORE_ENABLE_ZMQ)
+    target_compile_definitions(event_manager_test PRIVATE CTP_ENABLE_ZMQ)
 endif()
 add_test(NAME ctp_event_manager COMMAND event_manager_test)
 # Skip under MSan: uses socket/epoll system calls with uninstrumented kernel data.
@@ -81,10 +81,10 @@ install(TARGETS event_manager_test
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 # ZMQ transport full test (conditional on ZMQ)
-if(WRP_CORE_ENABLE_ZMQ)
+if(CLIO_CORE_ENABLE_ZMQ)
     add_executable(zmq_transport_full_test zmq_transport_full_test.cc)
-    target_link_libraries(zmq_transport_full_test hermes_shm_host hshm::lightbeam hshm::serialize)
-    target_compile_definitions(zmq_transport_full_test PRIVATE HSHM_ENABLE_ZMQ)
+    target_link_libraries(zmq_transport_full_test clio_ctp_host ctp::lightbeam ctp::serialize)
+    target_compile_definitions(zmq_transport_full_test PRIVATE CTP_ENABLE_ZMQ)
     add_test(NAME ctp_zmq_transport_full COMMAND zmq_transport_full_test)
     set_tests_properties(ctp_zmq_transport_full PROPERTIES
         LABELS "msan_skip"
@@ -96,9 +96,24 @@ if(WRP_CORE_ENABLE_ZMQ)
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 
+# Thallium transport test (conditional on Thallium)
+if(CLIO_CORE_ENABLE_THALLIUM)
+    add_executable(thallium_transport_test thallium_transport_test.cc)
+    target_link_libraries(thallium_transport_test clio_ctp_host ctp::lightbeam ctp::serialize)
+    add_test(NAME ctp_thallium_transport COMMAND thallium_transport_test)
+    set_tests_properties(ctp_thallium_transport PROPERTIES
+        LABELS "msan_skip"
+        RESOURCE_LOCK "lightbeam_port"
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}")
+    install(TARGETS thallium_transport_test
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 # Socket transport full test (always enabled)
 add_executable(socket_transport_full_test socket_transport_full_test.cc)
-target_link_libraries(socket_transport_full_test hermes_shm_host hshm::lightbeam hshm::serialize)
+target_link_libraries(socket_transport_full_test clio_ctp_host ctp::lightbeam ctp::serialize)
 add_test(NAME ctp_socket_transport_full COMMAND socket_transport_full_test)
 set_tests_properties(ctp_socket_transport_full PROPERTIES
     LABELS "msan_skip"
@@ -110,7 +125,7 @@ install(TARGETS socket_transport_full_test
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 # NIXL transport test (conditional on NIXL)
-if(WRP_CORE_ENABLE_NIXL)
+if(CLIO_CORE_ENABLE_NIXL)
     find_library(NIXL_LIB_TEST NAMES nixl PATHS /usr/local/lib /usr/local/lib/x86_64-linux-gnu
                  /usr/lib /usr/lib/x86_64-linux-gnu)
     find_library(NIXL_BUILD_LIB_TEST NAMES nixl_build PATHS /usr/local/lib /usr/local/lib/x86_64-linux-gnu
@@ -122,9 +137,9 @@ if(WRP_CORE_ENABLE_NIXL)
             list(APPEND NIXL_LINK_LIBS_TEST ${NIXL_BUILD_LIB_TEST})
         endif()
         add_executable(nixl_transport_test nixl_transport_test.cc)
-        target_link_libraries(nixl_transport_test hermes_shm_host hshm::lightbeam ${NIXL_LINK_LIBS_TEST})
+        target_link_libraries(nixl_transport_test clio_ctp_host ctp::lightbeam ${NIXL_LINK_LIBS_TEST})
         target_include_directories(nixl_transport_test PRIVATE ${NIXL_INCLUDE_TEST})
-        target_compile_definitions(nixl_transport_test PRIVATE HSHM_ENABLE_NIXL=1)
+        target_compile_definitions(nixl_transport_test PRIVATE CTP_ENABLE_NIXL=1)
         add_test(NAME ctp_nixl_transport COMMAND nixl_transport_test)
         set_tests_properties(ctp_nixl_transport PROPERTIES
             LABELS "msan_skip"
@@ -137,15 +152,15 @@ if(WRP_CORE_ENABLE_NIXL)
 endif()
 
 # distributed_lightbeam_test requires MPI
-if(WRP_CORE_ENABLE_MPI AND WRP_CORE_ENABLE_ZMQ)
+if(CLIO_CORE_ENABLE_MPI AND CLIO_CORE_ENABLE_ZMQ)
     add_executable(distributed_lightbeam_test distributed_lightbeam_test.cc)
     target_link_libraries(distributed_lightbeam_test
-        hermes_shm_host
-        hshm::lightbeam
-        hshm::mpi
-        hshm::serialize
+        clio_ctp_host
+        ctp::lightbeam
+        ctp::mpi
+        ctp::serialize
     )
-    target_compile_definitions(distributed_lightbeam_test PRIVATE HSHM_ENABLE_ZMQ)
+    target_compile_definitions(distributed_lightbeam_test PRIVATE CTP_ENABLE_ZMQ)
     install(TARGETS distributed_lightbeam_test
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

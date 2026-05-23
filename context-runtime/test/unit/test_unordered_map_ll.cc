@@ -32,11 +32,20 @@
  */
 
 /**
- * Unit tests for hshm::priv::unordered_map_ll
+ * Unit tests for ctp::priv::unordered_map_ll
  *
  * Tests the unordered map implementation without requiring
- * the Chimaera runtime to be started.
- * NOTE: External locking is required for thread safety.
+ * the CLIO Runtime runtime to be started.
+ *
+ * Thread-safety note: unordered_map_ll defaults to EnableLocking=true,
+ * which gives every bucket its own RwLock. The primary API
+ * (insert/find/erase/...) is therefore self-locking -- no external
+ * mutex is required for concurrent single-key operations. The older
+ * Concurrent* tests below still wrap calls in an external std::mutex;
+ * that is overly conservative and does NOT exercise the map's internal
+ * locking. ConcurrentInsertReadNoExternalLock is the faithful test:
+ * it drops the external mutex and hammers the per-bucket locks with
+ * simultaneous inserters and readers.
  */
 
 #include <iostream>
@@ -46,9 +55,9 @@
 #include <atomic>
 #include <mutex>
 #include <cassert>
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
-#include <hermes_shm/data_structures/priv/unordered_map_ll.h>
+#include <clio_ctp/data_structures/priv/unordered_map_ll.h>
 
 // Simple test helper macros
 #define EXPECT_EQ(a, b) do { \
@@ -102,7 +111,7 @@
  * Test basic insertion and retrieval
  */
 TEST_F(UnorderedMapLLTest, BasicInsertAndFind) {
-  hshm::priv::unordered_map_ll<int, std::string> map(16);
+  ctp::priv::unordered_map_ll<int, std::string> map(16);
 
   // Insert some elements
   auto [inserted1, val1] = map.insert(1, "one");
@@ -147,7 +156,7 @@ TEST_F(UnorderedMapLLTest, BasicInsertAndFind) {
  * Test duplicate insertion
  */
 TEST_F(UnorderedMapLLTest, DuplicateInsertion) {
-  hshm::priv::unordered_map_ll<int, std::string> map(8);
+  ctp::priv::unordered_map_ll<int, std::string> map(8);
 
   // First insertion should succeed
   auto [inserted1, val1] = map.insert(42, "first");
@@ -169,7 +178,7 @@ TEST_F(UnorderedMapLLTest, DuplicateInsertion) {
  * Test insert_or_assign
  */
 TEST_F(UnorderedMapLLTest, InsertOrAssign) {
-  hshm::priv::unordered_map_ll<int, std::string> map(8);
+  ctp::priv::unordered_map_ll<int, std::string> map(8);
 
   // First insertion
   auto [inserted1, val1] = map.insert_or_assign(10, "original");
@@ -194,7 +203,7 @@ TEST_F(UnorderedMapLLTest, InsertOrAssign) {
  * Test operator[]
  */
 TEST_F(UnorderedMapLLTest, OperatorBracket) {
-  hshm::priv::unordered_map_ll<std::string, int> map(16);
+  ctp::priv::unordered_map_ll<std::string, int> map(16);
 
   // Access non-existent key creates default value
   int& val1 = map["key1"];
@@ -216,7 +225,7 @@ TEST_F(UnorderedMapLLTest, OperatorBracket) {
  * Test at() method
  */
 TEST_F(UnorderedMapLLTest, AtMethod) {
-  hshm::priv::unordered_map_ll<int, std::string> map(8);
+  ctp::priv::unordered_map_ll<int, std::string> map(8);
 
   map.insert(5, "five");
   map.insert(10, "ten");
@@ -240,7 +249,7 @@ TEST_F(UnorderedMapLLTest, AtMethod) {
  * Test erase operation
  */
 TEST_F(UnorderedMapLLTest, Erase) {
-  hshm::priv::unordered_map_ll<int, std::string> map(8);
+  ctp::priv::unordered_map_ll<int, std::string> map(8);
 
   map.insert(1, "one");
   map.insert(2, "two");
@@ -268,7 +277,7 @@ TEST_F(UnorderedMapLLTest, Erase) {
  * Test clear operation
  */
 TEST_F(UnorderedMapLLTest, Clear) {
-  hshm::priv::unordered_map_ll<int, std::string> map(8);
+  ctp::priv::unordered_map_ll<int, std::string> map(8);
 
   map.insert(1, "one");
   map.insert(2, "two");
@@ -291,7 +300,7 @@ TEST_F(UnorderedMapLLTest, Clear) {
  * Test contains and count methods
  */
 TEST_F(UnorderedMapLLTest, ContainsAndCount) {
-  hshm::priv::unordered_map_ll<int, std::string> map(8);
+  ctp::priv::unordered_map_ll<int, std::string> map(8);
 
   map.insert(10, "ten");
   map.insert(20, "twenty");
@@ -312,7 +321,7 @@ TEST_F(UnorderedMapLLTest, ContainsAndCount) {
  * Test for_each iteration
  */
 TEST_F(UnorderedMapLLTest, ForEach) {
-  hshm::priv::unordered_map_ll<int, int> map(8);
+  ctp::priv::unordered_map_ll<int, int> map(8);
 
   map.insert(1, 10);
   map.insert(2, 20);
@@ -342,7 +351,7 @@ TEST_F(UnorderedMapLLTest, ForEach) {
  * NOTE: Uses external mutex for thread safety
  */
 TEST_F(UnorderedMapLLTest, ConcurrentInsertions) {
-  hshm::priv::unordered_map_ll<int, std::string> map(2048);  // Need capacity > total insertions for open addressing
+  ctp::priv::unordered_map_ll<int, std::string> map(2048);  // Need capacity > total insertions for open addressing
   const int num_threads = 8;
   const int insertions_per_thread = 100;
 
@@ -383,7 +392,7 @@ TEST_F(UnorderedMapLLTest, ConcurrentInsertions) {
  * NOTE: Uses external mutex for thread safety
  */
 TEST_F(UnorderedMapLLTest, ConcurrentInsertionsWithCollisions) {
-  hshm::priv::unordered_map_ll<int, int> map(128);  // Need capacity > num_keys for open addressing
+  ctp::priv::unordered_map_ll<int, int> map(128);  // Need capacity > num_keys for open addressing
   const int num_threads = 10;
   const int num_keys = 50;
 
@@ -420,7 +429,7 @@ TEST_F(UnorderedMapLLTest, ConcurrentInsertionsWithCollisions) {
  * NOTE: Uses external mutex for thread safety
  */
 TEST_F(UnorderedMapLLTest, ConcurrentMixedOperations) {
-  hshm::priv::unordered_map_ll<int, int> map(32);
+  ctp::priv::unordered_map_ll<int, int> map(32);
   const int num_threads = 6;
   const int operations_per_thread = 100;
 
@@ -466,11 +475,123 @@ TEST_F(UnorderedMapLLTest, ConcurrentMixedOperations) {
 }
 
 /**
+ * Faithful concurrency test: genuinely parallel inserts and reads with
+ * NO external mutex, so correctness depends entirely on the map's own
+ * per-bucket RwLocks (EnableLocking=true, the default).
+ *
+ * The map is pre-sized larger than the total key count so the load
+ * factor never exceeds 1 and no rehash is triggered during the
+ * concurrent phase (verified afterward via bucket_count()). This
+ * isolates the per-bucket read/write locking from the separate
+ * resize-vs-lookup concern, and is a direct regression guard for the
+ * two rehash-path bugs (priv::vector move dropping its allocator, and
+ * the double lock-release in maybe_rehash/rehash): a single rehash
+ * here would corrupt state and surface as a crash, hang, or a reader
+ * observing a torn value.
+ *
+ * Each inserter owns a disjoint key range and writes a deterministic
+ * value f(k)=k*3+7, so any key a reader observes MUST carry exactly
+ * that value -- a mismatch proves a torn/garbage read slipped past the
+ * locking.
+ */
+static inline int kv_value_for(int key) { return key * 3 + 7; }
+
+TEST_F(UnorderedMapLLTest, ConcurrentInsertReadNoExternalLock) {
+  const int num_inserters = 8;
+  const int keys_per_inserter = 1000;
+  const int num_readers = 4;
+  const int total_keys = num_inserters * keys_per_inserter;  // 8000
+
+  // bucket_count (16384) > total_keys (8000): size never exceeds the
+  // bucket count, so maybe_rehash() always early-returns -> no rehash.
+  const size_t initial_buckets = 16384;
+  ctp::priv::unordered_map_ll<int, int> map(initial_buckets);
+
+  std::atomic<bool> stop_readers{false};
+  std::atomic<bool> value_corruption{false};
+  std::atomic<long> reader_hits{0};
+  std::atomic<int> bad_key{-1};
+
+  std::vector<std::thread> threads;
+
+  // Inserter threads: disjoint key ranges, deterministic values.
+  for (int t = 0; t < num_inserters; ++t) {
+    threads.emplace_back([&map, t, keys_per_inserter]() {
+      const int begin = t * keys_per_inserter;
+      const int end = begin + keys_per_inserter;
+      for (int k = begin; k < end; ++k) {
+        map.insert(k, kv_value_for(k));
+      }
+    });
+  }
+
+  // Reader threads: concurrently look up keys across the whole space
+  // while inserts are in flight. A key may legitimately not be present
+  // yet (returns nullptr); but if it IS present its value must be
+  // exactly f(k). Bounded iteration count is a belt-and-suspenders
+  // guard so a logic bug can't hang the suite.
+  for (int r = 0; r < num_readers; ++r) {
+    threads.emplace_back([&, r]() {
+      unsigned int seed = 0x9E3779B9u ^ static_cast<unsigned int>(r);
+      long iters = 0;
+      const long kMaxIters = 50'000'000;
+      while (!stop_readers.load(std::memory_order_relaxed) &&
+             iters < kMaxIters) {
+        ++iters;
+        // xorshift for a cheap, lock-free key stream.
+        seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+        int key = static_cast<int>(seed % static_cast<unsigned>(total_keys));
+        int *val = map.find(key);
+        if (val != nullptr) {
+          reader_hits.fetch_add(1, std::memory_order_relaxed);
+          if (*val != kv_value_for(key)) {
+            value_corruption.store(true, std::memory_order_relaxed);
+            bad_key.store(key, std::memory_order_relaxed);
+          }
+        }
+      }
+    });
+  }
+
+  // Inserters are the first num_inserters threads.
+  for (int t = 0; t < num_inserters; ++t) {
+    threads[t].join();
+  }
+  stop_readers.store(true, std::memory_order_relaxed);
+  for (int r = 0; r < num_readers; ++r) {
+    threads[num_inserters + r].join();
+  }
+
+  // No reader may have observed a torn / wrong value.
+  if (value_corruption.load()) {
+    HLOG(kError, "FAIL: reader saw wrong value for key {} (expected {})",
+         bad_key.load(), kv_value_for(bad_key.load()));
+    return 1;
+  }
+
+  // Readers must have actually observed inserted entries (otherwise the
+  // test would be vacuously "passing" without real concurrency).
+  EXPECT_GT(reader_hits.load(), 0);
+
+  // No rehash must have occurred (pre-sized scope guarantee).
+  EXPECT_EQ(map.bucket_count(), initial_buckets);
+
+  // Every key present exactly once with the correct value.
+  EXPECT_EQ(map.size(), static_cast<size_t>(total_keys));
+  for (int k = 0; k < total_keys; ++k) {
+    int *val = map.find(k);
+    EXPECT_NE(val, nullptr);
+    EXPECT_EQ(*val, kv_value_for(k));
+  }
+  return 0;
+}
+
+/**
  * Test bucket distribution
  */
 TEST_F(UnorderedMapLLTest, BucketDistribution) {
   const size_t num_buckets = 2048;  // Need capacity > num elements for open addressing
-  hshm::priv::unordered_map_ll<int, int> map(num_buckets);
+  ctp::priv::unordered_map_ll<int, int> map(num_buckets);
 
   EXPECT_EQ(map.bucket_count(), num_buckets);
 
@@ -511,6 +632,7 @@ int main() {
   RUN_TEST(UnorderedMapLLTest, ConcurrentInsertions);
   RUN_TEST(UnorderedMapLLTest, ConcurrentInsertionsWithCollisions);
   RUN_TEST(UnorderedMapLLTest, ConcurrentMixedOperations);
+  RUN_TEST(UnorderedMapLLTest, ConcurrentInsertReadNoExternalLock);
   RUN_TEST(UnorderedMapLLTest, BucketDistribution);
 
   HIPRINT("{}/{} tests passed", (total - failed), total);

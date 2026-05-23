@@ -40,16 +40,16 @@ cd test/integration/globus_matsci
 
 The `run_test.sh` script performs the following steps:
 
-1. **Start Chimaera Runtime**: Launches the Chimaera runtime in the background
+1. **Start Chimaera Runtime**: Launches the Clio runtime in the background
 2. **Launch CTE**: Starts the Content Transfer Engine
 3. **Launch CAE**: Starts the Content Assimilation Engine with Globus support
-4. **Process OMNI File**: Uses `wrp_cae_omni` to process the transfer requests
-5. **Cleanup**: Stops the Chimaera runtime
+4. **Process OMNI File**: Uses `clio_cae` to process the transfer requests
+5. **Cleanup**: Stops the Clio runtime
 
 ## Test Files
 
 - **`matsci_transfer.omni`**: OMNI configuration file defining the Globus-to-local transfers
-- **`wrp_conf.yaml`**: CTE configuration (RAM-only storage for testing)
+- **`clio_conf.yaml`**: CTE configuration (RAM-only storage for testing)
 - **`run_test.sh`**: Bash script to orchestrate the test
 - **`README.md`**: This file
 
@@ -101,8 +101,8 @@ To transfer different files from the Globus dataset:
 
 ### "Failed to launch CTE/CAE"
 - Ensure the executables are installed and available in your PATH
-- Check that `WRP_CTE_CONF` points to a valid configuration file
-- Verify installation with: `which chimaera runtime start wrp_launch_cte wrp_launch_cae wrp_cae_omni`
+- Check that `CLIO_CTE_CONF` points to a valid configuration file
+- Verify installation with: `which clio_run runtime start clio_launch_cte clio_launch_cae clio_cae`
 
 ### Transfer Timeout
 - Large files may take longer to transfer

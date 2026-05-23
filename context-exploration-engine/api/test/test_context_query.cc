@@ -40,16 +40,17 @@
  * 3. Testing different regex patterns
  *
  * Environment Variables:
- * - INIT_CHIMAERA: If set to "1", initializes Chimaera runtime
+ * - INIT_CHIMAERA: If set to "1", initializes CLIO Runtime runtime
  */
 
-#include <wrp_cee/api/context_interface.h>
-#include <chimaera/chimaera.h>
+#include <clio_cee/api/context_interface.h>
+#include <clio_ctp/introspect/system_info.h>
+#include <clio_runtime/clio_runtime.h>
 #include <iostream>
 #include <cassert>
 #include <cstring>
 #include <set>
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 /**
  * Test that context_query can be called and returns a vector
@@ -97,7 +98,7 @@ int main(int argc, char** argv) {
   HLOG(kInfo, "========================================");
 
   try {
-    // Initialize Chimaera runtime if requested (for unit tests)
+    // Initialize CLIO Runtime runtime if requested (for unit tests)
     const char* init_chimaera = std::getenv("INIT_CHIMAERA");
     if (init_chimaera && std::strcmp(init_chimaera, "1") == 0) {
       HLOG(kInfo, "Initializing Chimaera (INIT_CHIMAERA=1)...");
@@ -105,11 +106,12 @@ int main(int argc, char** argv) {
       HLOG(kSuccess, "Chimaera initialized");
     }
 
-    // Verify Chimaera IPC is available
-    auto* ipc_manager = CHI_IPC;
+    // Verify CLIO Runtime IPC is available
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Chimaera IPC not initialized. Is the runtime running?");
       HLOG(kInfo, "HINT: Set INIT_CHIMAERA=1 to initialize runtime or start runtime externally");
+      ctp::SystemInfo::TerminateProcessNow(1);
       return 1;
     }
     HLOG(kSuccess, "Chimaera IPC verified");
@@ -120,9 +122,11 @@ int main(int argc, char** argv) {
     test_specific_patterns();
 
     HLOG(kSuccess, "All tests PASSED!");
+    ctp::SystemInfo::TerminateProcessNow(0);
     return 0;
   } catch (const std::exception& e) {
     HLOG(kError, "Test FAILED with exception: {}", e.what());
+    ctp::SystemInfo::TerminateProcessNow(1);
     return 1;
   }
 }

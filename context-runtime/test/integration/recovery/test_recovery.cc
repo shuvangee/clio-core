@@ -56,16 +56,16 @@
 #include <thread>
 #include <vector>
 
-#include <chimaera/chimaera.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 
-#include <chimaera/MOD_NAME/MOD_NAME_client.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_client.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
 
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 using namespace std::chrono_literals;
 
@@ -90,10 +90,10 @@ class RecoveryTestFixture {
         g_initialized = true;
         SimpleTest::g_test_finalize = chi::CHIMAERA_FINALIZE;
         std::this_thread::sleep_for(500ms);
-        REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-        REQUIRE(CHI_IPC != nullptr);
-        REQUIRE(CHI_POOL_MANAGER != nullptr);
-        REQUIRE(CHI_IPC->IsInitialized());
+        REQUIRE(CLIO_RUNTIME_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC != nullptr);
+        REQUIRE(CLIO_POOL_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC->IsInitialized());
         INFO("Chimaera initialization successful");
       } else {
         FAIL("Failed to initialize Chimaera");
@@ -106,7 +106,7 @@ class RecoveryTestFixture {
   bool createModNamePool(const std::string &pool_name) {
     try {
       chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
-      chimaera::MOD_NAME::Client mod_name_client(kRecoveryPoolId);
+      clio::run::MOD_NAME::Client mod_name_client(kRecoveryPoolId);
       auto create_task =
           mod_name_client.AsyncCreate(pool_query, pool_name, kRecoveryPoolId);
       create_task.Wait();
@@ -131,7 +131,7 @@ TEST_CASE("Pre-failure: verify tasks work on all nodes",
     REQUIRE(g_initialized);
     REQUIRE(fixture.createModNamePool("test_recovery_pool"));
 
-    chimaera::MOD_NAME::Client mod_name_client(kRecoveryPoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kRecoveryPoolId);
     chi::PoolQuery create_query = chi::PoolQuery::Dynamic();
     std::string pool_name = "test_recovery_pool";
     auto create_task = mod_name_client.AsyncCreate(
@@ -174,7 +174,7 @@ TEST_CASE("Post-failure: verify recovery re-routes tasks",
     // because Dynamic() would try to reach the dead node and hang.
     // The recovery system should have re-created container 3 on a
     // surviving node after SWIM detected node 4's death.
-    chimaera::MOD_NAME::Client mod_name_client(kRecoveryPoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kRecoveryPoolId);
     mod_name_client.pool_id_ = kRecoveryPoolId;
     INFO("Reusing pool from Phase 1: " << kRecoveryPoolId.ToU64());
 

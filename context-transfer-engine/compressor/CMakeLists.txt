@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(wrp_cte_compressor)
+project(clio_cte_compressor)
 
 #------------------------------------------------------------------------------
 # Build compressor chimod
@@ -11,7 +11,6 @@ set(COMPRESSOR_SOURCES
     src/models/linreg_table_predictor.cc
     src/models/qtable_predictor.cc
     src/autogen/compressor_lib_exec.cc
-    src/compressor_runtime_gpu.cc
 )
 
 # Add dense NN predictor if Eigen is available
@@ -32,30 +31,30 @@ else()
     message(STATUS "Compressor: XGBoost predictor disabled")
 endif()
 
-add_chimod_runtime(
+add_clio_module_runtime(
   SOURCES
     ${COMPRESSOR_SOURCES}
   LINK_LIBRARIES
-    hshm::compress
+    ctp::compress
 )
 
 # Link optional dependencies if available
 if(Eigen3_FOUND)
-    target_link_libraries(wrp_cte_compressor_runtime PRIVATE Eigen3::Eigen)
+    target_link_libraries(clio_cte_compressor_runtime PRIVATE Eigen3::Eigen)
 endif()
 if(xgboost_FOUND)
-    target_link_libraries(wrp_cte_compressor_runtime PRIVATE xgboost::xgboost)
+    target_link_libraries(clio_cte_compressor_runtime PRIVATE xgboost::xgboost)
 endif()
 
-add_chimod_client(
+add_clio_module_client(
   SOURCES
     src/compressor_client.cc
 )
 
 # Add core include directory for Context struct
-target_include_directories(wrp_cte_compressor_runtime PRIVATE
+target_include_directories(clio_cte_compressor_runtime PRIVATE
     ${CMAKE_SOURCE_DIR}/context-transfer-engine/core/include)
-target_include_directories(wrp_cte_compressor_client PRIVATE
+target_include_directories(clio_cte_compressor_client PRIVATE
     ${CMAKE_SOURCE_DIR}/context-transfer-engine/core/include)
 
 #------------------------------------------------------------------------------

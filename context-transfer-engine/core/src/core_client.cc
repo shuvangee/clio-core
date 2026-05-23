@@ -31,17 +31,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/chimaera.h>
-#include <wrp_cte/core/content_transfer_engine.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_config.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/core/content_transfer_engine.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_config.h>
 
-namespace wrp_cte::core {
+namespace clio::cte::core {
 
 // Define global pointer variable for CTE client in source file
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(wrp_cte::core::Client, g_cte_client);
+CLIO_CTE_DEFINE_GLOBAL_PTR_VAR_CC(clio::cte::core::Client, g_cte_client);
 
-bool WRP_CTE_CLIENT_INIT(const std::string &config_path,
+bool CLIO_CTE_CLIENT_INIT(const std::string &config_path,
                          const chi::PoolQuery &pool_query) {
   // Static guard to prevent double initialization
   static bool s_initialized = false;
@@ -51,7 +51,7 @@ bool WRP_CTE_CLIENT_INIT(const std::string &config_path,
 
   // Allocate the global client object if not already allocated
   if (g_cte_client == nullptr) {
-    g_cte_client = new wrp_cte::core::Client();
+    g_cte_client = new clio::cte::core::Client();
   }
 
   // config_path is no longer used - configuration now provided via chimaera compose
@@ -67,4 +67,4 @@ bool WRP_CTE_CLIENT_INIT(const std::string &config_path,
   return result;
 }
 
-} // namespace wrp_cte::core
+} // namespace clio::cte::core

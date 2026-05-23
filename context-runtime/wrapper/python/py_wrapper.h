@@ -34,16 +34,16 @@
 #ifndef PY_WRAPPER_H_
 #define PY_WRAPPER_H_
 
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
-#include <chimaera/chimaera.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include <string>
 #include <thread>
 #include <unordered_map>
 
 /**
- * Initialize the Chimaera runtime from Python.
+ * Initialize the CLIO Runtime runtime from Python.
  *
  * Runs CHIMAERA_INIT on a dedicated background thread so that the
  * ZMQ I/O threads it spawns never touch the calling (Python) thread's
@@ -62,7 +62,7 @@ inline bool py_chimaera_init(int mode) {
 }
 
 /**
- * Finalize the Chimaera runtime.
+ * Finalize the CLIO Runtime runtime.
  *
  * Closes ZMQ sockets and joins background threads.
  */
@@ -77,11 +77,11 @@ inline void py_chimaera_finalize() {
  * the result map and frees the underlying C++ task.
  */
 class PyMonitorTask {
-  chi::Future<chimaera::admin::MonitorTask> future_;
+  chi::Future<clio::run::admin::MonitorTask> future_;
 
  public:
   /** @param f Moved-from future returned by AsyncMonitor */
-  explicit PyMonitorTask(chi::Future<chimaera::admin::MonitorTask>&& f)
+  explicit PyMonitorTask(chi::Future<clio::run::admin::MonitorTask>&& f)
       : future_(std::move(f)) {}
 
   PyMonitorTask(const PyMonitorTask&) = delete;
@@ -143,7 +143,7 @@ class PyMonitorTask {
  */
 inline PyMonitorTask py_async_monitor(const std::string& pool_query_str,
                                       const std::string& query) {
-  auto* admin = CHI_ADMIN;
+  auto* admin = CLIO_ADMIN;
   chi::PoolQuery pq = chi::PoolQuery::FromString(pool_query_str);
   auto future = admin->AsyncMonitor(pq, query);
   return PyMonitorTask(std::move(future));
@@ -164,7 +164,7 @@ inline PyMonitorTask py_async_monitor(const std::string& pool_query_str,
  */
 inline void py_stop_runtime(const std::string& pool_query_str,
                             uint32_t grace_period_ms = 5000) {
-  auto* admin = CHI_ADMIN;
+  auto* admin = CLIO_ADMIN;
   chi::PoolQuery pq = chi::PoolQuery::FromString(pool_query_str);
   admin->AsyncStopRuntime(pq, 0, grace_period_ms);
 }

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run IOWarp Distributed Integration Test (Chimaera Runtime)
+# Run IOWarp Distributed Integration Test (CLIO Runtime Runtime)
 #
 # This script manages the distributed test environment, including:
 # - Docker cluster setup using deps-cpu container
@@ -113,18 +113,25 @@ matches_filter() {
 
 # Run a single test case inside the Docker cluster
 # $1: test filter name
+# Returns the docker exec's exit code so callers can detect failures
+# (including the "container is not running" case from a daemon that
+# crashed during clio_run runtime init).
 run_single_test() {
     local filter="$1"
     local ipc_mode="${2:-}"
-    docker exec iowarp-distributed-node1 bash -c "
-        export CHI_WITH_RUNTIME=0
-        ${ipc_mode:+export CHI_IPC_MODE=$ipc_mode}
+    if ! docker exec iowarp-distributed-node1 bash -c "
+        export CLIO_WITH_RUNTIME=0
+        ${ipc_mode:+export CLIO_IPC_MODE=$ipc_mode}
         chimaera_bdev_chimod_tests '$filter'
-    "
+    "; then
+        return 1
+    fi
+    return 0
 }
 
 # Run test directly in Docker
 # Each IPC mode runs as a separate process to ensure clean initialization.
+# Returns non-zero if ANY sub-test failed.
 run_test_docker_direct() {
     log_info "Running distributed test with filter: $TEST_FILTER"
     cd "$SCRIPT_DIR"
@@ -134,16 +141,26 @@ run_test_docker_direct() {
     sleep 5
 
     # Execute each IPC mode variant as a separate process invocation
+    local any_failed=0
     for mode in shm tcp ipc; do
         local test_name="bdev_file_explicit_backend_${mode}"
         if matches_filter "$test_name" "$TEST_FILTER"; then
-            log_info "Running $test_name (CHI_IPC_MODE=${mode^^})..."
-            run_single_test "$test_name" "${mode^^}"
-            log_success "$test_name passed"
+            log_info "Running $test_name (CLIO_IPC_MODE=${mode^^})..."
+            if run_single_test "$test_name" "${mode^^}"; then
+                log_success "$test_name passed"
+            else
+                log_error "$test_name FAILED"
+                any_failed=1
+            fi
         fi
     done
 
+    if [ $any_failed -ne 0 ]; then
+        log_error "One or more sub-tests failed"
+        return 1
+    fi
     log_success "All tests completed"
+    return 0
 }
 
 

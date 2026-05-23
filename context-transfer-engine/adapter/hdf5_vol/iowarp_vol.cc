@@ -21,16 +21,16 @@
 #include <vector>
 #include <memory>
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 /* transport_factory_impl.h provides the inline definitions of
-   hshm::lbm::Transport::ClearRecvHandles / Send<...>. They are required
+   ctp::lbm::Transport::ClearRecvHandles / Send<...>. They are required
    when AsyncPutBlob template-instantiates here (it doesn't fire from
    chimaera.h alone). Without this include the linker leaves the
    templated symbols undefined in our .so. */
-#include <hermes_shm/lightbeam/transport_factory_impl.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
-#include <wrp_cte/core/content_transfer_engine.h>
+#include <clio_ctp/lightbeam/transport_factory_impl.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
+#include <clio_cte/core/content_transfer_engine.h>
 
 /* ========================================================================
  * Internal state structures
@@ -51,7 +51,7 @@ struct iowarp_obj_t {
 
 struct iowarp_file_t {
   iowarp_obj_t obj;
-  wrp_cte::core::TagId tag_id;
+  clio::cte::core::TagId tag_id;
   std::string file_name;
   size_t chunk_size;
 };
@@ -61,16 +61,16 @@ struct iowarp_dataset_t {
   iowarp_file_t *file;
   std::string dataset_path;
   /* Pending async writes flushed on close */
-  std::vector<chi::Future<wrp_cte::core::PutBlobTask>> pending_puts;
-  std::vector<hipc::FullPtr<char>> pending_buffers;
+  std::vector<chi::Future<clio::cte::core::PutBlobTask>> pending_puts;
+  std::vector<ctp::ipc::FullPtr<char>> pending_buffers;
 };
 
 /* ========================================================================
  * Helper: Get CTE client
  * ======================================================================== */
 
-static wrp_cte::core::Client *get_cte_client() {
-  return WRP_CTE_CLIENT;
+static clio::cte::core::Client *get_cte_client() {
+  return CLIO_CTE_CLIENT;
 }
 
 /* ========================================================================
@@ -372,17 +372,17 @@ static herr_t iowarp_dataset_write(size_t count, void *dset[],
       size_t this_size = std::min(chunk_size, total_size - offset);
 
       /* Allocate SHM buffer and copy data */
-      auto buffer = CHI_IPC->AllocateBuffer(this_size);
+      auto buffer = CLIO_IPC->AllocateBuffer(this_size);
       if (buffer.IsNull()) return -1;
       std::memcpy(buffer.ptr_, src + offset, this_size);
 
-      hipc::ShmPtr<> blob_data = buffer.shm_.template Cast<void>();
+      ctp::ipc::ShmPtr<> blob_data = buffer.shm_.template Cast<void>();
       std::string blob_name = dataset->dataset_path + "/chunk_" +
                               std::to_string(i);
 
       auto future = cte_client->AsyncPutBlob(
           dataset->file->tag_id, blob_name, offset, this_size,
-          blob_data, -1.0f, wrp_cte::core::Context(), 0);
+          blob_data, -1.0f, clio::cte::core::Context(), 0);
 
       dataset->pending_puts.push_back(std::move(future));
       dataset->pending_buffers.push_back(std::move(buffer));
@@ -445,17 +445,17 @@ static herr_t iowarp_dataset_read(size_t count, void *dset[],
     char *dst = static_cast<char *>(buf[d]);
 
     /* Submit async GetBlob for each chunk */
-    std::vector<chi::Future<wrp_cte::core::GetBlobTask>> futures;
-    std::vector<hipc::FullPtr<char>> buffers;
+    std::vector<chi::Future<clio::cte::core::GetBlobTask>> futures;
+    std::vector<ctp::ipc::FullPtr<char>> buffers;
 
     for (size_t i = 0; i < num_chunks; ++i) {
       size_t offset = i * chunk_size;
       size_t this_size = std::min(chunk_size, total_size - offset);
 
-      auto buffer = CHI_IPC->AllocateBuffer(this_size);
+      auto buffer = CLIO_IPC->AllocateBuffer(this_size);
       if (buffer.IsNull()) return -1;
 
-      hipc::ShmPtr<> blob_data = buffer.shm_.template Cast<void>();
+      ctp::ipc::ShmPtr<> blob_data = buffer.shm_.template Cast<void>();
       std::string blob_name = dataset->dataset_path + "/chunk_" +
                               std::to_string(i);
 

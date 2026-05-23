@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run IOWarp Leader Election Integration Test (Chimaera Runtime)
+# Run IOWarp Leader Election Integration Test (CLIO Runtime Runtime)
 #
 # Tests leader shutdown, client failover, and leader restart:
 # Phase 1: Client on node 1 kills local runtime, fails over to another node
@@ -90,7 +90,7 @@ stop_docker_cluster() {
 run_single_test() {
     local filter="$1"
     docker exec iowarp-leader-elect-node1 bash -c "
-        export CHI_WITH_RUNTIME=0
+        export CLIO_WITH_RUNTIME=0
         chimaera_leader_elect_tests '$filter'
     "
 }
@@ -142,7 +142,7 @@ run_test_docker_direct() {
     # Restart node 1's runtime (the leader) in detached mode
     log_info "Restarting node 1's runtime..."
     docker exec -d iowarp-leader-elect-node1 \
-        /workspace/build/bin/chimaera runtime restart
+        /workspace/build/bin/clio_run runtime restart
 
     # Wait for the restarted runtime to initialize and rejoin the cluster
     log_info "Waiting 10s for restarted runtime to initialize..."

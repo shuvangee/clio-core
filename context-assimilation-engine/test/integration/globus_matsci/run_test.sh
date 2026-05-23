@@ -3,13 +3,13 @@
 # run_test.sh - Integration test for Globus data assimilation
 #
 # This script:
-# 1. Starts the Chimaera runtime (with CTE + CAE compose) in the background
-# 2. Runs wrp_cae_omni to process the OMNI file
+# 1. Starts the CLIO Runtime runtime (with CTE + CAE compose) in the background
+# 2. Runs clio_cae to process the OMNI file
 #
 # Prerequisites:
 # - GLOBUS_ACCESS_TOKEN environment variable must be set
 # - Globus endpoint must be accessible
-# - chimaera and wrp_cae_omni must be installed and in PATH
+# - chimaera and clio_cae must be installed and in PATH
 # - Built with -DCAE_ENABLE_GLOBUS=ON
 #
 # Usage:
@@ -26,7 +26,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 BIN_DIR="${BIN_DIR:-${REPO_ROOT}/build/bin}"
 
 # Runtime configuration (includes compose section for CTE + CAE pools)
-RUNTIME_CONF="${RUNTIME_CONF:-${SCRIPT_DIR}/wrp_runtime_conf.yaml}"
+RUNTIME_CONF="${RUNTIME_CONF:-${SCRIPT_DIR}/clio_runtime_conf.yaml}"
 
 # OMNI file (override with OMNI_FILE env var)
 OMNI_FILE="${OMNI_FILE:-${SCRIPT_DIR}/matsci_globus_omni.yaml}"
@@ -35,7 +35,7 @@ OMNI_FILE="${OMNI_FILE:-${SCRIPT_DIR}/matsci_globus_omni.yaml}"
 OUTPUT_DIR="${OUTPUT_DIR:-/tmp/globus_matsci}"
 
 # Ensure build/bin is on PATH and LD_LIBRARY_PATH so the runtime can
-# discover libwrp_cae_core_runtime.so / libwrp_cte_core_runtime.so.
+# discover libclio_cae_core_runtime.so / libclio_cte_core_runtime.so.
 # Conda iowarp lib must come before base miniconda3/lib so that libcurl's
 # OPENSSL_3.2.0 dependency is satisfied by the conda-provided libssl.so.3.
 CONDA_IOWARP_LIB="${HOME}/miniconda3/envs/iowarp/lib"
@@ -75,12 +75,12 @@ mkdir -p "${OUTPUT_DIR}"
 echo "Created output directory: ${OUTPUT_DIR}"
 echo ""
 
-# Start Chimaera runtime in the background
+# Start CLIO Runtime runtime in the background
 # The runtime config contains a compose section that creates both
 # CTE (pool 512.0) and CAE (pool 400.0) automatically on startup.
 echo "Starting Chimaera runtime..."
-export CHI_SERVER_CONF="${RUNTIME_CONF}"
-chimaera runtime start &
+export CLIO_SERVER_CONF="${RUNTIME_CONF}"
+clio_run runtime start &
 CHIMAERA_PID=$!
 echo "Chimaera runtime started (PID: ${CHIMAERA_PID})"
 echo ""
@@ -109,7 +109,7 @@ echo ""
 
 # Process OMNI file
 echo "Processing OMNI file..."
-wrp_cae_omni "${OMNI_FILE}"
+clio_cae "${OMNI_FILE}"
 OMNI_STATUS=$?
 
 echo ""
@@ -128,10 +128,10 @@ else
     echo "OMNI processing failed with exit code: ${OMNI_STATUS}"
 fi
 
-# Cleanup: Stop Chimaera runtime
+# Cleanup: Stop CLIO Runtime runtime
 echo ""
 echo "Stopping Chimaera runtime..."
-chimaera runtime stop 2>/dev/null || kill ${CHIMAERA_PID} 2>/dev/null || true
+clio_run runtime stop 2>/dev/null || kill ${CHIMAERA_PID} 2>/dev/null || true
 wait ${CHIMAERA_PID} 2>/dev/null || true
 echo "Chimaera runtime stopped"
 

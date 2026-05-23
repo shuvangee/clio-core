@@ -31,16 +31,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WRP_CTE_ADAPTER_STDIO_H
-#define WRP_CTE_ADAPTER_STDIO_H
+#ifndef CLIO_CTE_ADAPTER_STDIO_H
+#define CLIO_CTE_ADAPTER_STDIO_H
 #include <dlfcn.h>
 
 #include <cstdio>
 #include <iostream>
 #include <string>
 
-#include "hermes_shm/util/logging.h"
-#include "hermes_shm/util/real_api.h"
+#include "clio_ctp/util/logging.h"
+#include "clio_ctp/util/real_api.h"
 
 extern "C" {
 typedef FILE* (*fopen_t)(const char* path, const char* mode);
@@ -72,9 +72,9 @@ typedef int (*fsetpos64_t)(FILE* stream, const fpos64_t* pos);
 typedef long int (*ftell_t)(FILE* fp);
 }
 
-namespace wrp::cae {
+namespace clio::cae {
 
-using hshm::RealApi;
+using ctp::RealApi;
 
 /** Pointers to the real stdio API */
 class StdioApi : public RealApi {
@@ -187,13 +187,13 @@ class StdioApi : public RealApi {
     REQUIRE_API(ftell)
   }
 };
-}  // namespace wrp::cae
+}  // namespace clio::cae
 
-#include "hermes_shm/util/singleton.h"
+#include "clio_ctp/util/singleton.h"
 
 // Singleton macros
-#define WRP_CTE_STDIO_API \
-  hshm::Singleton<::wrp::cae::StdioApi>::GetInstance()
-#define WRP_CTE_STDIO_API_T wrp::cae::StdioApi*
+#define CLIO_CTE_STDIO_API \
+  ctp::Singleton<::clio::cae::StdioApi>::GetInstance()
+#define CLIO_CTE_STDIO_API_T clio::cae::StdioApi*
 
-#endif  // WRP_CTE_ADAPTER_STDIO_H
+#endif  // CLIO_CTE_ADAPTER_STDIO_H

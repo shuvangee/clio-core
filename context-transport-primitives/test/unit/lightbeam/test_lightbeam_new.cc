@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <hermes_shm/lightbeam/zmq_transport.h>
+#include <clio_ctp/lightbeam/zmq_transport.h>
 
 #include <cassert>
 #include <chrono>
@@ -40,7 +40,7 @@
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 // Custom metadata class that inherits from LbmMeta
 class TestMeta : public LbmMeta<> {
@@ -58,7 +58,7 @@ class TestMeta : public LbmMeta<> {
 void TestBasicTransfer() {
   std::cout << "\n==== Testing Basic Transfer with New API ====\n";
 
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
   // Create server
   std::string addr = "127.0.0.1";
   std::string protocol = "tcp";
@@ -82,9 +82,9 @@ void TestBasicTransfer() {
   send_meta.operation = "test_op";
 
   Bulk bulk1 = client->Expose(
-      hipc::FullPtr<char>(const_cast<char*>(data1)), size1, BULK_XFER);
+      ctp::ipc::FullPtr<char>(const_cast<char*>(data1)), size1, BULK_XFER);
   Bulk bulk2 = client->Expose(
-      hipc::FullPtr<char>(const_cast<char*>(data2)), size2, BULK_XFER);
+      ctp::ipc::FullPtr<char>(const_cast<char*>(data2)), size2, BULK_XFER);
 
   send_meta.send.push_back(bulk1);
   send_meta.send.push_back(bulk2);
@@ -135,7 +135,7 @@ void TestBasicTransfer() {
 void TestMultipleBulks() {
   std::cout << "\n==== Testing Multiple Bulks Transfer ====\n";
 
-#if HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
   std::string addr = "127.0.0.1";
   std::string protocol = "tcp";
   int port = 8196;
@@ -153,7 +153,7 @@ void TestMultipleBulks() {
   LbmMeta<> send_meta;
   for (const auto& chunk : data_chunks) {
     Bulk bulk = client->Expose(
-        hipc::FullPtr<char>(const_cast<char*>(chunk.data())),
+        ctp::ipc::FullPtr<char>(const_cast<char*>(chunk.data())),
         chunk.size(), BULK_XFER);
     send_meta.send.push_back(bulk);
   }

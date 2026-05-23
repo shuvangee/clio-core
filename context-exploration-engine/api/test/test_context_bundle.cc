@@ -47,15 +47,16 @@
  * - Tests query functionality after bundling
  *
  * Environment Variables:
- * - INIT_CHIMAERA: If set to "1", initializes Chimaera runtime
+ * - INIT_CHIMAERA: If set to "1", initializes CLIO Runtime runtime
  */
 
-#include <wrp_cee/api/context_interface.h>
-#include <wrp_cae/core/factory/assimilation_ctx.h>
-#include <wrp_cae/core/core_client.h>
-#include <wrp_cae/core/constants.h>
-#include <wrp_cte/core/core_client.h>
-#include <chimaera/chimaera.h>
+#include <clio_cee/api/context_interface.h>
+#include <clio_cae/core/factory/assimilation_ctx.h>
+#include <clio_cae/core/core_client.h>
+#include <clio_cae/core/constants.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_ctp/introspect/system_info.h>
+#include <clio_runtime/clio_runtime.h>
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -63,7 +64,7 @@
 #include <cstring>
 #include <thread>
 #include <chrono>
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 // Test configuration
 const std::string kTestFileName = "/tmp/test_cee_bundle_file.bin";
@@ -110,7 +111,7 @@ void test_empty_bundle() {
   HLOG(kInfo, "TEST: Empty bundle");
 
   iowarp::ContextInterface ctx_interface;
-  std::vector<wrp_cae::core::AssimilationCtx> empty_bundle;
+  std::vector<clio::cae::core::AssimilationCtx> empty_bundle;
 
   // Empty bundle should return success (0)
   int result = ctx_interface.ContextBundle(empty_bundle);
@@ -125,7 +126,7 @@ void test_empty_bundle() {
 void test_assimilation_ctx_constructor() {
   HLOG(kInfo, "TEST: AssimilationCtx constructor");
 
-  wrp_cae::core::AssimilationCtx ctx(
+  clio::cae::core::AssimilationCtx ctx(
       "file::/path/to/source.dat",
       "iowarp::dest_tag",
       "binary",
@@ -165,14 +166,14 @@ void test_bundle_and_retrieve_workflow() {
 
   // Step 2: Initialize CTE client
   HLOG(kInfo, "[STEP 2] Initializing CTE client...");
-  wrp_cte::core::WRP_CTE_CLIENT_INIT();
+  clio::cte::core::CLIO_CTE_CLIENT_INIT();
 
   // Step 2.5: Register a RAM storage target with CTE
   HLOG(kInfo, "[STEP 2.5] Registering RAM storage target with CTE...");
-  auto* cte_client = WRP_CTE_CLIENT;
+  auto* cte_client = CLIO_CTE_CLIENT;
   auto register_task = cte_client->AsyncRegisterTarget(
       "ram::cee_test_storage",  // Target name (RAM storage)
-      chimaera::bdev::BdevType::kRam,  // RAM block device type
+      clio::run::bdev::BdevType::kRam,  // RAM block device type
       4ULL * 1024 * 1024 * 1024,  // 4GB capacity
       chi::PoolQuery::Local(),  // Local pool query for single-node
       chi::PoolId(800, 0));  // Explicit bdev pool ID
@@ -183,13 +184,13 @@ void test_bundle_and_retrieve_workflow() {
 
   // Step 3: Create CAE pool
   HLOG(kInfo, "[STEP 3] Creating CAE pool...");
-  wrp_cae::core::Client cae_client;
-  wrp_cae::core::CreateParams params;
+  clio::cae::core::Client cae_client;
+  clio::cae::core::CreateParams params;
 
   auto create_task = cae_client.AsyncCreate(
       chi::PoolQuery::Local(),
       "test_cee_cae_pool",
-      wrp_cae::core::kCaePoolId,
+      clio::cae::core::kCaePoolId,
       params);
   create_task.Wait();
 
@@ -199,8 +200,8 @@ void test_bundle_and_retrieve_workflow() {
   HLOG(kInfo, "[STEP 4] Bundling test file...");
   iowarp::ContextInterface ctx_interface;
 
-  std::vector<wrp_cae::core::AssimilationCtx> bundle;
-  wrp_cae::core::AssimilationCtx ctx;
+  std::vector<clio::cae::core::AssimilationCtx> bundle;
+  clio::cae::core::AssimilationCtx ctx;
   ctx.src = "file::" + kTestFileName;
   ctx.dst = "iowarp::" + kTestTagName;
   ctx.format = "binary";
@@ -260,7 +261,7 @@ int main(int argc, char** argv) {
   HLOG(kInfo, "========================================");
 
   try {
-    // Initialize Chimaera runtime if requested (for unit tests)
+    // Initialize CLIO Runtime runtime if requested (for unit tests)
     const char* init_chimaera = std::getenv("INIT_CHIMAERA");
     if (init_chimaera && std::strcmp(init_chimaera, "1") == 0) {
       HLOG(kInfo, "Initializing Chimaera (INIT_CHIMAERA=1)...");
@@ -268,11 +269,12 @@ int main(int argc, char** argv) {
       HLOG(kSuccess, "Chimaera initialized");
     }
 
-    // Verify Chimaera IPC is available
-    auto* ipc_manager = CHI_IPC;
+    // Verify CLIO Runtime IPC is available
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Chimaera IPC not initialized. Is the runtime running?");
       HLOG(kInfo, "HINT: Set INIT_CHIMAERA=1 to initialize runtime or start runtime externally");
+      ctp::SystemInfo::TerminateProcessNow(1);
       return 1;
     }
     HLOG(kSuccess, "Chimaera IPC verified");
@@ -285,9 +287,11 @@ int main(int argc, char** argv) {
     test_bundle_and_retrieve_workflow();
 
     HLOG(kSuccess, "All tests PASSED!");
+    ctp::SystemInfo::TerminateProcessNow(0);
     return 0;
   } catch (const std::exception& e) {
     HLOG(kError, "Test FAILED with exception: {}", e.what());
+    ctp::SystemInfo::TerminateProcessNow(1);
     return 1;
   }
 }

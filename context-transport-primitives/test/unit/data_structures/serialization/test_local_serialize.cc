@@ -32,7 +32,7 @@
  */
 
 #include "../../../../../context-runtime/test/simple_test.h"
-#include "hermes_shm/data_structures/serialization/local_serialize.h"
+#include "clio_ctp/data_structures/serialization/local_serialize.h"
 #include <string>
 #include <vector>
 #include <list>
@@ -47,12 +47,12 @@ TEST_CASE("LocalSerialize: int", "[local_serialize][basic]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   int restored = 0;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -67,12 +67,12 @@ TEST_CASE("LocalSerialize: multiple ints", "[local_serialize][basic]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << val1 << val2 << val3;
 
   // Deserialize
   int restored1 = 0, restored2 = 0, restored3 = 0;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored1 >> restored2 >> restored3;
 
   // Verify
@@ -86,12 +86,12 @@ TEST_CASE("LocalSerialize: float", "[local_serialize][basic]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   float restored = 0.0f;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -103,12 +103,12 @@ TEST_CASE("LocalSerialize: double", "[local_serialize][basic]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   double restored = 0.0;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -121,13 +121,13 @@ TEST_CASE("LocalSerialize: bool", "[local_serialize][basic]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original_true << original_false;
 
   // Deserialize
   bool restored_true = false;
   bool restored_false = true;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored_true >> restored_false;
 
   // Verify
@@ -140,12 +140,12 @@ TEST_CASE("LocalSerialize: char", "[local_serialize][basic]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   char restored = '\0';
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -159,13 +159,13 @@ TEST_CASE("LocalSerialize: unsigned types", "[local_serialize][basic]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << uint_val << ulong_val;
 
   // Deserialize
   unsigned int restored_uint = 0;
   unsigned long restored_ulong = 0;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored_uint >> restored_ulong;
 
   // Verify
@@ -178,12 +178,12 @@ TEST_CASE("LocalSerialize: size_t", "[local_serialize][basic]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   size_t restored = 0;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -199,12 +199,12 @@ TEST_CASE("LocalSerialize: std::string", "[local_serialize][string]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::string restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -217,12 +217,12 @@ TEST_CASE("LocalSerialize: empty std::string", "[local_serialize][string]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::string restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -238,12 +238,12 @@ TEST_CASE("LocalSerialize: large std::string", "[local_serialize][string]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::string restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -258,12 +258,12 @@ TEST_CASE("LocalSerialize: multiple std::strings", "[local_serialize][string]") 
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << str1 << str2 << str3;
 
   // Deserialize
   std::string restored1, restored2, restored3;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored1 >> restored2 >> restored3;
 
   // Verify
@@ -281,12 +281,12 @@ TEST_CASE("LocalSerialize: std::vector<int>", "[local_serialize][vector]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::vector<int> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -301,12 +301,12 @@ TEST_CASE("LocalSerialize: empty std::vector", "[local_serialize][vector]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::vector<int> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -319,12 +319,12 @@ TEST_CASE("LocalSerialize: std::vector<double>", "[local_serialize][vector]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::vector<double> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -339,12 +339,12 @@ TEST_CASE("LocalSerialize: std::vector<std::string>", "[local_serialize][vector]
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::vector<std::string> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -362,12 +362,12 @@ TEST_CASE("LocalSerialize: large std::vector", "[local_serialize][vector]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::vector<int> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -386,12 +386,12 @@ TEST_CASE("LocalSerialize: std::list<int>", "[local_serialize][list]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::list<int> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -410,12 +410,12 @@ TEST_CASE("LocalSerialize: empty std::list", "[local_serialize][list]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::list<int> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -435,12 +435,12 @@ TEST_CASE("LocalSerialize: std::unordered_map<int, int>", "[local_serialize][map
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::unordered_map<int, int> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -458,12 +458,12 @@ TEST_CASE("LocalSerialize: std::unordered_map<std::string, std::string>", "[loca
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::unordered_map<std::string, std::string> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -478,12 +478,12 @@ TEST_CASE("LocalSerialize: empty std::unordered_map", "[local_serialize][map]") 
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::unordered_map<int, int> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify
@@ -503,7 +503,7 @@ TEST_CASE("LocalSerialize: mixed types", "[local_serialize][mixed]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << int_val << double_val << str_val << vec_val;
 
   // Deserialize
@@ -511,7 +511,7 @@ TEST_CASE("LocalSerialize: mixed types", "[local_serialize][mixed]") {
   double restored_double = 0.0;
   std::string restored_str;
   std::vector<int> restored_vec;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored_int >> restored_double >> restored_str >> restored_vec;
 
   // Verify
@@ -531,14 +531,14 @@ TEST_CASE("LocalSerialize: operator() with multiple types", "[local_serialize][m
 
   // Serialize using operator()
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer(int_val, str_val, double_val);
 
   // Deserialize using operator()
   int restored_int = 0;
   std::string restored_str;
   double restored_double = 0.0;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer(restored_int, restored_str, restored_double);
 
   // Verify
@@ -556,12 +556,12 @@ TEST_CASE("LocalSerialize: nested containers", "[local_serialize][nested]") {
 
   // Serialize
   std::vector<char> buffer;
-  hshm::ipc::LocalSerialize<> serializer(buffer);
+  ctp::ipc::LocalSerialize<> serializer(buffer);
   serializer << original;
 
   // Deserialize
   std::vector<std::vector<int>> restored;
-  hshm::ipc::LocalDeserialize<> deserializer(buffer);
+  ctp::ipc::LocalDeserialize<> deserializer(buffer);
   deserializer >> restored;
 
   // Verify

@@ -60,16 +60,16 @@
 #include <chrono>
 #include <thread>
 
-#include <chimaera/chimaera.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 
-#include <chimaera/MOD_NAME/MOD_NAME_client.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_client.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
 
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 using namespace std::chrono_literals;
 
@@ -88,10 +88,10 @@ class LeaderElectFixture {
       if (success) {
         g_initialized = true;
         std::this_thread::sleep_for(500ms);
-        REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-        REQUIRE(CHI_IPC != nullptr);
-        REQUIRE(CHI_POOL_MANAGER != nullptr);
-        REQUIRE(CHI_IPC->IsInitialized());
+        REQUIRE(CLIO_RUNTIME_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC != nullptr);
+        REQUIRE(CLIO_POOL_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC->IsInitialized());
         INFO("Chimaera initialization successful");
       } else {
         FAIL("Failed to initialize Chimaera");
@@ -114,7 +114,7 @@ TEST_CASE("Leader shutdown and failover to new host",
     // Step 1: Create a MOD_NAME pool and verify a task completes locally
     // ------------------------------------------------------------------
     INFO("Step 1: Creating MOD_NAME pool and running pre-shutdown task");
-    chimaera::MOD_NAME::Client mod_name_client(kLeaderElectPoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kLeaderElectPoolId);
     {
       auto create_task = mod_name_client.AsyncCreate(
           chi::PoolQuery::Dynamic(), "leader_elect_test_pool",
@@ -139,7 +139,7 @@ TEST_CASE("Leader shutdown and failover to new host",
     // ------------------------------------------------------------------
     INFO("Step 2: Sending AsyncStopRuntime to local runtime");
     {
-      chimaera::admin::Client admin_client(chi::kAdminPoolId);
+      clio::run::admin::Client admin_client(chi::kAdminPoolId);
       admin_client.AsyncStopRuntime(
           chi::PoolQuery::Local(), 0, 1000);
     }
@@ -153,7 +153,7 @@ TEST_CASE("Leader shutdown and failover to new host",
     // ------------------------------------------------------------------
     INFO("Step 3: Creating pool on new host after reconnection");
     {
-      chimaera::MOD_NAME::Client new_client(kLeaderElectPoolId);
+      clio::run::MOD_NAME::Client new_client(kLeaderElectPoolId);
       auto create_task = new_client.AsyncCreate(
           chi::PoolQuery::Dynamic(), "leader_elect_post_failover_pool",
           kLeaderElectPoolId);
@@ -185,10 +185,10 @@ TEST_CASE("System healthy after leader restart",
   bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
   REQUIRE(success);
   std::this_thread::sleep_for(500ms);
-  REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-  REQUIRE(CHI_IPC != nullptr);
-  REQUIRE(CHI_POOL_MANAGER != nullptr);
-  REQUIRE(CHI_IPC->IsInitialized());
+  REQUIRE(CLIO_RUNTIME_MANAGER != nullptr);
+  REQUIRE(CLIO_IPC != nullptr);
+  REQUIRE(CLIO_POOL_MANAGER != nullptr);
+  REQUIRE(CLIO_IPC->IsInitialized());
   INFO("Fresh Chimaera initialization successful");
 
   SECTION("post_restart_task") {
@@ -196,7 +196,7 @@ TEST_CASE("System healthy after leader restart",
     // Create a pool and run a task on the restarted leader
     // ------------------------------------------------------------------
     INFO("Creating MOD_NAME pool on restarted leader");
-    chimaera::MOD_NAME::Client mod_name_client(kLeaderElectPoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kLeaderElectPoolId);
     {
       auto create_task = mod_name_client.AsyncCreate(
           chi::PoolQuery::Dynamic(), "leader_elect_post_restart_pool",

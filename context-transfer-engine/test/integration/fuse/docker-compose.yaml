@@ -8,7 +8,7 @@
 # Requirements:
 #   - Docker with --cap-add SYS_ADMIN and /dev/fuse access
 #   - libfuse3 installed in the container image
-#   - wrp_cte_fuse binary built with -DWRP_CTE_ENABLE_FUSE_ADAPTER=ON
+#   - clio_cte_fuse binary built with -DCLIO_CTE_ENABLE_FUSE_ADAPTER=ON
 
 services:
   cte-fuse-test:
@@ -28,7 +28,7 @@ services:
       - /tmp:mode=1777
       - /mnt:mode=1777
     environment:
-      - CHI_SERVER_CONF=/workspace/context-transfer-engine/test/integration/fuse/wrp_config.yaml
+      - CLIO_SERVER_CONF=/workspace/context-transfer-engine/test/integration/fuse/clio_config.yaml
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:$LD_LIBRARY_PATH
     mem_limit: 4g

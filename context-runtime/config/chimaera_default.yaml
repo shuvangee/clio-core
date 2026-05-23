@@ -7,8 +7,8 @@
 #   - Context Assimilation Engine / CAE (context-assimilation-engine)
 #
 # Config lookup order:
-#   1. CHI_SERVER_CONF environment variable
-#   2. WRP_RUNTIME_CONF environment variable
+#   1. CLIO_SERVER_CONF environment variable
+#   2. CLIO_SERVER_CONF environment variable
 #   3. ~/.chimaera/chimaera.yaml
 #
 # Size values accept: B, KB, MB, GB, TB (case-insensitive)
@@ -24,8 +24,8 @@ networking:
 
 # -- Logging ------------------------------------------------------------------
 # Logging is controlled by environment variables, not this file.
-#   HSHM_LOG_LEVEL : debug, info, success, warning, error, fatal (default: info)
-#   HSHM_LOG_OUT   : path to a log file (default: console only)
+#   CTP_LOG_LEVEL : debug, info, success, warning, error, fatal (default: info)
+#   CTP_LOG_OUT   : path to a log file (default: console only)
 
 # -- Runtime ------------------------------------------------------------------
 runtime:
@@ -37,22 +37,22 @@ runtime:
 
 # -- Compose ------------------------------------------------------------------
 # Modules started automatically with the runtime.
-# Only chimaera_bdev is required. CTE (wrp_cte_core) and CAE (wrp_cae_core)
+# Only clio_bdev is required. CTE (clio_cte_core) and CAE (clio_cae_core)
 # are optional — remove their entries if you do not need them.
 compose:
 
   # === Block Device (DRAM) ===
   # Required: provides the shared memory allocator used by other modules.
-  - mod_name: chimaera_bdev
+  - mod_name: clio_bdev
     pool_name: "ram::chi_default_bdev"
     pool_query: local
     pool_id: "301.0"
     bdev_type: ram                       # Options: file, ram, hbm, pinned, noop
-    capacity: "512MB"
+    capacity: "0g"                       # 0/0g = default to 80% of total system DRAM
 
   # === Block Device (File) ===
   # Uncomment to add a file-backed block device (e.g., for NVMe or HDD storage).
-  # - mod_name: chimaera_bdev
+  # - mod_name: clio_bdev
   #   pool_name: "/mnt/nvme/chi_bdev"
   #   pool_query: local
   #   pool_id: "302.0"
@@ -62,7 +62,7 @@ compose:
   # === Context Transfer Engine (CTE) — optional ===
   # High-performance data buffering and transfer engine.
   # Remove this section if CTE is not needed.
-  - mod_name: wrp_cte_core
+  - mod_name: clio_cte_core
     pool_name: cte_main
     pool_query: local
     pool_id: "512.0"
@@ -74,7 +74,7 @@ compose:
     storage:
       - path: "ram::cte_ram_tier1"       # "ram::<name>" for DRAM, filesystem path for disk
         bdev_type: "ram"                 # Options: file, ram, hbm, pinned, noop
-        capacity_limit: "512MB"
+        capacity_limit: "0g"             # 0/0g = default to 80% of total system DRAM
         score: 1.0                       # DRAM = highest-performance tier
 
     # Data Placement Engine ------------------------------------------------
@@ -102,7 +102,7 @@ compose:
   # === Context Assimilation Engine (CAE) — optional ===
   # Data ingestion and assimilation engine.
   # Remove this section if CAE is not needed.
-  - mod_name: wrp_cae_core
-    pool_name: wrp_cae_core_pool
+  - mod_name: clio_cae_core
+    pool_name: clio_cae_core_pool
     pool_query: local
     pool_id: "400.0"

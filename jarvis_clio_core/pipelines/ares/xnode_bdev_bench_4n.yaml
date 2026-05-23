@@ -1,0 +1,93 @@
+# Cross-node chimaera bdev throughput benchmark — SLURM sbatch deployment.
+#
+# Layout:
+#   clio_runtime              -> chimaera daemon (one per node)
+#   clio_xnode_bdev_bench     -> mpiexec across all ranks, each issuing
+#                               AsyncWrite to DirectHash((my_node + 1)
+#                               % num_nodes) so every op crosses the
+#                               network.
+#
+# No clio_cte / clio_cte_libfuse: the bench creates its own bdev pool
+# (id 777.0) directly via admin Broadcast at rank 0, then ranks issue
+# bdev::Client::AsyncWrite. CTE and FUSE are not on the path.
+#
+# Usage:
+#   IOWARP=/mnt/common/llogan/iowarp/core \
+#     jarvis ppl submit \
+#       ${IOWARP}/jarvis_clio_core/pipelines/ares/xnode_bdev_bench_4n.yaml
+#
+# Watch slurm-<jobid>.out in this directory. The aggregate result lands
+# as a `CLUSTER ranks=... aggregate=... MiB/s` line from rank 0.
+
+name: xnode_bdev_bench_4n
+
+# /usr/bin/ssh was built against OpenSSL 3.0.x; if it inherits a conda
+# env's LD_LIBRARY_PATH (which has libcrypto 3.6.x), ssh aborts with
+# "OpenSSL version mismatch". Strip LD_LIBRARY_PATH for the ssh hop.
+# OpenMpiExec / our bench's mpiexec command forwards this into
+# `--mca plm_rsh_agent <ssh_cmd>` so prted's remote spawn uses the
+# same fix. Harmless on single-node.
+ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
+
+# Pipeline-level mpiexec base — picked up by clio_xnode_bdev_bench when
+# it builds the mpiexec invocation. Same set of flags the manual
+# /mnt/common/llogan/xnode_bdev_bench.sbatch script uses.
+#   --mca btl_tcp_if_include enp47s0np0  -> 40 GbE data plane
+#   --mca oob_tcp_if_include eno1        -> 1 GbE control plane
+#   --prtemca prte_if_include eno1       -> PRTE control on 1 GbE
+#   --prtemca prte_tmpdir_base ...       -> avoid small /tmp on some nodes
+mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include eno1 --prtemca prte_if_include eno1 --prtemca prte_tmpdir_base /home/llogan/iowarp_prte_tmp'
+
+# CLIO_MEMFD_DIR MUST be node-local (or have hostname baked in); see
+# project_chi_memfd_dir_must_be_node_local. ${HOSTNAME} expands on the
+# remote shell when ssh_exec inlines KEY="value" prefixes.
+env:
+  TMPDIR: "/home/llogan/iowarp_prte_tmp"
+  CLIO_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
+
+scheduler:
+  name: slurm
+  job_name: xnode_bdev_bench_4n
+  nodes: 4
+  ntasks_per_node: 1
+  # Wide cpus_per_task: chimaera spawns net + task workers per daemon
+  # and we run 24 ranks/node; need slack for the kernel + libfabric
+  # threads. Matches the IOR pipeline's value.
+  cpus_per_task: 40
+  partition: debug
+  time: "00:15:00"
+  output: slurm-%j.out
+  error: slurm-%j.err
+  # `-40g` suffix routes daemon<->daemon DEALER/ROUTER over enp47s0np0
+  # (40 GbE) instead of eno1 (1 GbE). /etc/hosts maps
+  # `ares-comp-N-40g` -> `172.25.101.N`.
+  suffix: "-40g"
+  pre_cmds:
+    - 'source /etc/profile.d/lmod.sh 2>/dev/null || source /etc/profile.d/modules.sh'
+    # Spec hash on this cluster: gcc@11.4.0 / openmpi@5.0.5-x2kvx5l
+    # (no ior needed — we don't run IOR in this pipeline).
+    - 'module load gcc/11.4.0/openmpi/5.0.5-x2kvx5l'
+    # PRTE/PMIx default to /tmp for their session dir; route to NFS.
+    - 'mkdir -p /home/llogan/iowarp_prte_tmp'
+
+pkgs:
+  - pkg_type: jarvis_clio_core.clio_runtime
+    pkg_name: runtime
+    num_threads: 4
+    client_data_segment_size: "2G"
+    port: 9413
+    ipc_mode: "shm"
+    log_level: "info"
+    sleep: 4
+    # SWIM disabled: matches the working IOR fix. HeartbeatProbe is a
+    # no-op and IsAlive() trivially returns true so transient TCP/ZMQ
+    # errors don't promote a peer to dead mid-bench.
+    swim_enabled: false
+
+  - pkg_type: jarvis_clio_core.clio_xnode_bdev_bench
+    pkg_name: xnode_bdev_bench
+    nprocs: 96       # 4 nodes * 24 ranks/node
+    ppn: 24
+    io_size: 1048576 # 1 MiB
+    num_ops: 512
+    depth: 16

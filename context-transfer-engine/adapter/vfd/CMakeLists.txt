@@ -25,18 +25,18 @@ set(HDF5_HERMES_VFD_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/H5FDhermes.h
   ${CMAKE_CURRENT_SOURCE_DIR}/H5FDhermes.cc)
 
-add_library(wrp_cte_hdf5_vfd SHARED ${HDF5_HERMES_VFD_SRCS})
-target_include_directories(wrp_cte_hdf5_vfd
+add_library(clio_cte_hdf5_vfd SHARED ${HDF5_HERMES_VFD_SRCS})
+target_include_directories(clio_cte_hdf5_vfd
   SYSTEM PUBLIC ${HDF5_HERMES_VFD_EXT_INCLUDE_DEPENDENCIES}
 )
-add_dependencies(wrp_cte_hdf5_vfd
-  ${Hermes_CLIENT_DEPS} wrp_cte_fs_base)
-target_link_libraries(wrp_cte_hdf5_vfd
-  ${Hermes_CLIENT_DEPS} wrp_cte_fs_base
+add_dependencies(clio_cte_hdf5_vfd
+  ${Hermes_CLIENT_DEPS} clio_cte_fs_base)
+target_link_libraries(clio_cte_hdf5_vfd
+  ${Hermes_CLIENT_DEPS} clio_cte_fs_base
   MPI::MPI_CXX
   ${HDF5_HERMES_VFD_EXT_LIB_DEPENDENCIES})
 
-set(HDF5_HERMES_VFD_EXPORTED_LIBS wrp_cte_hdf5_vfd ${HDF5_HERMES_VFD_EXPORTED_LIBS} PARENT_SCOPE)
+set(HDF5_HERMES_VFD_EXPORTED_LIBS clio_cte_hdf5_vfd ${HDF5_HERMES_VFD_EXPORTED_LIBS} PARENT_SCOPE)
 
 # -----------------------------------------------------------------------------
 # Specify project header files to be installed
@@ -61,7 +61,7 @@ install(
 # -----------------------------------------------------------------------------
 install(
   TARGETS
-  wrp_cte_hdf5_vfd
+  clio_cte_hdf5_vfd
   LIBRARY DESTINATION lib/${HERMES_VFD_DIR_NAME}
   ARCHIVE DESTINATION lib/${HERMES_VFD_DIR_NAME}
   RUNTIME DESTINATION bin
@@ -76,14 +76,14 @@ if(CMAKE_BUILD_TYPE)
   string(TOLOWER ${CMAKE_BUILD_TYPE} lower_cmake_build_type)
 endif()
 
-# Hermes VFD package dependencies
+# Clio VFD package dependencies
 foreach(pkg_dep ${HDF5_HERMES_VFD_EXT_PKG_DEPENDENCIES})
   set(HDF5_HERMES_VFD_PKG_DEPENDENCIES ${HDF5_HERMES_VFD_PKG_DEPENDENCIES} ${pkg_dep})
 endforeach()
 
 set(HDF5_HERMES_VFD_PKG_DEPENDENCIES ${HDF5_HERMES_VFD_PKG_DEPENDENCIES} PARENT_SCOPE)
 
-# Hermes VFD private library dependencies
+# Clio VFD private library dependencies
 foreach(exported_lib ${HDF5_HERMES_VFD_EXPORTED_LIBS})
   if(lower_cmake_build_type MATCHES "debug")
     get_target_property(HDF5_HERMES_VFD_LIBRARY ${exported_lib} DEBUG_OUTPUT_NAME)
@@ -96,7 +96,7 @@ endforeach()
 
 set(HDF5_HERMES_VFD_LIBRARIES ${HDF5_HERMES_VFD_LIBRARIES} PARENT_SCOPE)
 
-# Hermes VFD external library dependencies
+# Clio VFD external library dependencies
 # Need to generate -lib if not already passed
 set(HDF5_HERMES_VFD_EXT_LIB_DEPENDENCIES
   ${HDF5_HERMES_VFD_EXT_LIB_DEPENDENCIES}
@@ -162,10 +162,10 @@ set(HDF5_HERMES_VFD_INCLUDES_INSTALL_TIME
 # -----------------------------------------------------------------------------
 # Install headers
 # -----------------------------------------------------------------------------
-file(GLOB_RECURSE WRP_CTE_HEADERS "*.h")
+file(GLOB_RECURSE CLIO_CTE_HEADERS "*.h")
 install(
   FILES
-  ${WRP_CTE_HEADERS}
+  ${CLIO_CTE_HEADERS}
   DESTINATION
   include/adapter/vfd
   COMPONENT

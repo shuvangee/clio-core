@@ -4,12 +4,12 @@ interceptors: []
 
 # IOWarp Engine Test Pipeline
 # Tests the gray-scott + pdf_calc workflow using the IOWarp ADIOS2 plugin engine
-# IMPORTANT: CHI_WITH_RUNTIME should be 0 (client mode only)
+# IMPORTANT: CLIO_WITH_RUNTIME should be 0 (client mode only)
 
 environment:
   PATH: /workspace/external/iowarp-gray-scott/build/bin:${PATH}
   ADIOS2_PLUGIN_PATH: /workspace/build/bin  # Path to IOWarp engine plugin library
-  CHI_WITH_RUNTIME: '0'  # CRITICAL: IOWarp engine requires runtime=0 for clients
+  CLIO_WITH_RUNTIME: '0'  # CRITICAL: IOWarp engine requires runtime=0 for clients
 
 # Container configuration (optional)
 container_base: iowarp/iowarp-build:latest

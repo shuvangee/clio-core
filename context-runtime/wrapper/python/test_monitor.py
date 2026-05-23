@@ -4,7 +4,7 @@ import threading
 import time
 
 sys.path.insert(0, os.getcwd())
-os.environ.pop("CHI_WITH_RUNTIME", None)
+os.environ.pop("CLIO_WITH_RUNTIME", None)
 
 import chimaera_runtime_ext as chi
 

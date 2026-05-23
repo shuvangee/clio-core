@@ -29,13 +29,13 @@ target_include_directories(test_adios2_adapter PRIVATE
 # Link against required libraries
 target_link_libraries(test_adios2_adapter
     iowarp_engine                # IOWarp ADIOS2 engine adapter
-    wrp_cte_core_runtime         # CTE core runtime library
-    wrp_cte_core_client          # CTE core client library
+    clio_cte_core_runtime         # CTE core runtime library
+    clio_cte_core_client          # CTE core client library
     chimaera::admin_runtime      # Admin module runtime (required for runtime mode)
     chimaera::admin_client       # Admin module client
     chimaera::bdev_runtime       # Bdev module runtime (required for runtime mode)
     chimaera::bdev_client        # Bdev client
-    hshm::cxx                    # HermesShm library
+    ctp::cxx                    # ClioCtp library
     adios2::adios2               # ADIOS2 library
     ${CMAKE_THREAD_LIBS_INIT}    # Threading support
 )
@@ -90,7 +90,7 @@ set_tests_properties(
     PROPERTIES
         TIMEOUT 300  # 5 minute timeout for each test
         LABELS "unit;adapter;adios2"
-        ENVIRONMENT "ADIOS2_PLUGIN_PATH=${CMAKE_BINARY_DIR}/bin;CHI_WITH_RUNTIME=1;WRP_RUNTIME_CONF=${CMAKE_CURRENT_SOURCE_DIR}/cte_config.yaml;LD_LIBRARY_PATH=${ADIOS2_TEST_LD_PATH}:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "ADIOS2_PLUGIN_PATH=${CMAKE_BINARY_DIR}/bin;CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/cte_config.yaml;LD_LIBRARY_PATH=${ADIOS2_TEST_LD_PATH}:$ENV{LD_LIBRARY_PATH};CLIO_BIND_ADDR=127.0.0.1;CLIO_PORT=10500"
 )
 
 # Install test target

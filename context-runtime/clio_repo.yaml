@@ -1,0 +1,23 @@
+# CLIO Runtime repository configuration.
+# Read by read_repo_namespace() in cmake/ClioCoreCommon.cmake to set
+# CLIO_RUN_NAMESPACE. Without this file the function falls through to a
+# hardcoded fallback and CLIO_RUN_NAMESPACE ends up as the legacy
+# project name, which then breaks the install(EXPORT) GPU-target check
+# in CMakeLists.txt.
+#
+# NOTE to future editors: do NOT write the literal text
+#   <ns>:<space>... in a comment (the marker word + colon + space)
+# anywhere ABOVE the real entry below. read_repo_namespace's regex is
+# anchored to line-start as of this commit, but earlier (and still on
+# other repo branches) it was not -- a comment containing that marker
+# silently shadows the real value and produces a target name like
+# `<garbage>::cxx`.
+name: runtime
+# Legacy value (kept until the chimaera::* -> clio_run::* alias migration
+# is finished; see context-runtime/src/CMakeLists.txt ~L234 and downstream
+# references in context-runtime/test, context-transfer-engine,
+# context-assimilation-engine, context-exploration-engine, which still
+# link against chimaera::cxx / chimaera::admin_* / chimaera::bdev_*).
+namespace: chimaera
+version: 1.0.0
+description: CLIO Runtime - task dispatch, IPC, ChiMod orchestration

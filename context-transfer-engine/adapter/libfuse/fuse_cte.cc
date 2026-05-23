@@ -39,16 +39,20 @@
 #include <vector>
 
 #include <fuse3/fuse_lowlevel.h>  // fuse_session_custom_io, struct fuse_custom_io
+#include <dlfcn.h>                // dlsym (resolve fuse_session_custom_io at runtime
+                                  // so we can link against system libfuse 3.10.5
+                                  // which lacks the symbol; only used in the
+                                  // apptainer --fusemount fd-injection path)
 #include <sys/uio.h>              // struct iovec, writev
 #include <sys/mount.h>            // mount syscall
 #include <unistd.h>               // read, getuid, getgid
 #include <cerrno>                 // errno
 #include <cstdio>                 // snprintf, fprintf
 
-#include "chimaera/chimaera.h"
-#include "wrp_cte/core/content_transfer_engine.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_cte/core/content_transfer_engine.h"
 
-using namespace wrp::cae::fuse;
+using namespace clio::cae::fuse;
 
 // ============================================================================
 // Helpers
@@ -73,7 +77,7 @@ static void *cte_fuse_init(struct fuse_conn_info *conn,
     fprintf(stderr, "ERROR: CHIMAERA_INIT failed\n");
     return nullptr;
   }
-  wrp_cte::core::WRP_CTE_CLIENT_INIT();
+  clio::cte::core::CLIO_CTE_CLIENT_INIT();
   return nullptr;
 }
 
@@ -167,11 +171,11 @@ static int cte_fuse_readdir(const char *path, void *buf,
   // Sentinel tags under "/a/b" look like "/a/b/childdir/" — match with
   // regex "^/a/b/[^/]+/$" to find direct child sentinels.
   {
-    auto *cte_client = WRP_CTE_CLIENT;
+    auto *cte_client = CLIO_CTE_CLIENT;
     std::string escaped = RegexEscape(p);
     if (!escaped.empty() && escaped.back() != '/') escaped += '/';
     std::string regex = "^" + escaped + "[^/]+/$";
-    auto task = cte_client->AsyncTagQuery(regex);
+    auto task = cte_client->AsyncTagQuery(regex, 0, chi::PoolQuery::Local());
     task.Wait();
     if (task->GetReturnCode() == 0) {
       size_t prefix_len = p.size();
@@ -261,11 +265,39 @@ static int cte_fuse_open(const char *path, struct fuse_file_info *fi) {
   return 0;
 }
 
+// flush is what close() actually triggers per-fd (release only fires once
+// the LAST reference drops). Without a handler libfuse returns 0
+// immediately and close() returns to userspace while async puts are still
+// queued — the next op (barrier, read, unmount) then races the in-flight
+// writes. Drain here so close() blocks until every page-put on this fd is
+// retired.
+static int cte_fuse_flush(const char *path, struct fuse_file_info *fi) {
+  (void)path;
+  auto *handle = GetHandle(fi);
+  if (!handle) return 0;
+  return DrainPendingWrites(handle);
+}
+
+// fsync / fdatasync must also drain so durability semantics hold for
+// callers that explicitly sync mid-stream.
+static int cte_fuse_fsync(const char *path, int /*datasync*/,
+                          struct fuse_file_info *fi) {
+  (void)path;
+  auto *handle = GetHandle(fi);
+  if (!handle) return 0;
+  return DrainPendingWrites(handle);
+}
+
 static int cte_fuse_release(const char *path, struct fuse_file_info *fi) {
   (void)path;
-  delete GetHandle(fi);
+  auto *handle = GetHandle(fi);
+  // Belt-and-suspenders: flush already drained on close(), but release
+  // can also fire after a non-close fd-drop path (mmap teardown, etc.)
+  // and we still own SHM buffers / Futures in pending_writes.
+  int rc = DrainPendingWrites(handle);
+  delete handle;
   fi->fh = 0;
-  return 0;
+  return rc;
 }
 
 // ============================================================================
@@ -279,6 +311,15 @@ static int cte_fuse_read(const char *path, char *buf, size_t size,
 
   if (size > static_cast<size_t>(INT_MAX))
     size = static_cast<size_t>(INT_MAX);
+
+  // Drain any in-flight async puts for this fd before reading. Without
+  // this, an interleaved write+read pattern can return stale data: the
+  // last write's CtePutBlobAsync may still be parked in pending_writes
+  // when the read fires, and GetBlob would observe the pre-write blob.
+  // (cte_fuse_release/flush also drain, but the kernel can dispatch
+  // read() to a worker thread before release() is sent, so we need this
+  // here too.)
+  DrainPendingWrites(handle);
 
   size_t file_size = CteGetTagSize(handle->tag_id);
   if (static_cast<size_t>(offset) >= file_size) return 0;
@@ -319,8 +360,11 @@ static int cte_fuse_write(const char *path, const char *buf, size_t size,
     size_t poff = cur % kDefaultPageSize;
     size_t to_write = std::min(kDefaultPageSize - poff, size - bytes_written);
 
-    if (!CtePutBlob(handle->tag_id, std::to_string(page),
-                    buf + bytes_written, to_write, poff)) {
+    // Submit the put without waiting; the Future + SHM buf are parked on
+    // the handle and drained at release()/fsync(). FUSE write() returns
+    // bytes_written immediately, letting the kernel pipeline more writes.
+    if (!CtePutBlobAsync(handle, std::to_string(page),
+                         buf + bytes_written, to_write, poff)) {
       if (bytes_written == 0) return -EIO;
       break;
     }
@@ -365,7 +409,9 @@ static const struct fuse_operations cte_fuse_ops = {
     .open = cte_fuse_open,
     .read = cte_fuse_read,
     .write = cte_fuse_write,
+    .flush = cte_fuse_flush,
     .release = cte_fuse_release,
+    .fsync = cte_fuse_fsync,
     .readdir = cte_fuse_readdir,
     .init = cte_fuse_init,
     .destroy = cte_fuse_destroy,
@@ -420,13 +466,13 @@ int main(int argc, char *argv[]) {
   // bind that fd to a mountpoint ourselves (this requires CAP_SYS_ADMIN
   // in the current user_ns, which we have via apptainer's userns
   // mapping). The mountpoint isn't communicated to us through argv or
-  // env by apptainer, so the caller MUST set WRP_CTE_FUSE_MOUNTPOINT
+  // env by apptainer, so the caller MUST set CLIO_CTE_FUSE_MOUNTPOINT
   // before exec'ing the FUSE binary via --fusemount.
-  const char *mountpoint = std::getenv("WRP_CTE_FUSE_MOUNTPOINT");
+  const char *mountpoint = std::getenv("CLIO_CTE_FUSE_MOUNTPOINT");
   if (mountpoint == nullptr) {
     std::fprintf(stderr,
-                 "wrp_cte_fuse: got pre-opened fd %d but "
-                 "WRP_CTE_FUSE_MOUNTPOINT env var is not set\n", prefd);
+                 "clio_cte_fuse: got pre-opened fd %d but "
+                 "CLIO_CTE_FUSE_MOUNTPOINT env var is not set\n", prefd);
     return 1;
   }
   char mount_opts[256];
@@ -435,11 +481,11 @@ int main(int argc, char *argv[]) {
                 prefd, (unsigned)getuid(), (unsigned)getgid());
   if (mount("nodev", mountpoint, "fuse", MS_NODEV | MS_NOSUID,
             mount_opts) != 0) {
-    std::fprintf(stderr, "wrp_cte_fuse: mount(\"%s\", fuse) failed: %s\n",
+    std::fprintf(stderr, "clio_cte_fuse: mount(\"%s\", fuse) failed: %s\n",
                  mountpoint, std::strerror(errno));
     return 1;
   }
-  std::fprintf(stderr, "wrp_cte_fuse: mounted FUSE at %s with fd=%d\n",
+  std::fprintf(stderr, "clio_cte_fuse: mounted FUSE at %s with fd=%d\n",
                mountpoint, prefd);
 
   struct fuse_args args = FUSE_ARGS_INIT(new_argc, argv);
@@ -458,14 +504,61 @@ int main(int argc, char *argv[]) {
       .splice_send = nullptr,
   };
 
-  if (fuse_session_custom_io(se, &custom_io, prefd) != 0) {
+  // Resolve fuse_session_custom_io at runtime via dlsym so this binary
+  // links against system libfuse 3.10.5 (which has setuid
+  // /usr/bin/fusermount3) without needing the 3.14+ symbol present at
+  // link time. The symbol IS present at runtime when the caller uses
+  // a newer libfuse runtime (e.g. apptainer --fusemount).
+  using FuseSessionCustomIoFn = int (*)(struct fuse_session *,
+                                        const struct fuse_custom_io *, int);
+  auto fuse_session_custom_io_dyn = reinterpret_cast<FuseSessionCustomIoFn>(
+      dlsym(RTLD_DEFAULT, "fuse_session_custom_io"));
+  if (!fuse_session_custom_io_dyn) {
+    std::fprintf(stderr,
+                 "clio_cte_fuse: fuse_session_custom_io not available in "
+                 "the loaded libfuse (need 3.14+); --fusemount mode "
+                 "requires a newer libfuse runtime.\n");
+    fuse_destroy(fuse);
+    fuse_opt_free_args(&args);
+    return 1;
+  }
+  if (fuse_session_custom_io_dyn(se, &custom_io, prefd) != 0) {
     fuse_destroy(fuse);
     fuse_opt_free_args(&args);
     return 1;
   }
 
-  // Single-threaded loop: simpler, sufficient for adapter testing.
-  int ret = fuse_loop(fuse);
+  // Multi-threaded FUSE loop. Single-threaded `fuse_loop()` serializes
+  // every fs op through one handler -- each call blocks on
+  // AsyncPutBlob.Wait() before the next can run -- so 24 concurrent
+  // ranks per node effectively run sequentially and a workload that
+  // should finish in seconds hangs past the test timeout. fuse_loop_mt
+  // spawns worker threads that handle ops in parallel; AsyncPutBlobs
+  // from different ranks now overlap.
+  //
+  // The libfuse 3.16 headers we compile against rewrite `fuse_loop_mt`
+  // to `fuse_loop_mt_32` (via macro), but the runtime libfuse 3.10.5
+  // (system) only exports `fuse_loop_mt@@FUSE_3.2` (the unversioned
+  // default), not `fuse_loop_mt_32`. Resolve the unversioned symbol
+  // via dlsym -- same pattern this file already uses for
+  // fuse_session_custom_io -- so the binary works against any
+  // libfuse runtime >= 3.2.
+  using FuseLoopMtFn = int (*)(struct fuse *, struct fuse_loop_config *);
+  auto fuse_loop_mt_dyn = reinterpret_cast<FuseLoopMtFn>(
+      dlsym(RTLD_DEFAULT, "fuse_loop_mt"));
+
+  int ret;
+  if (fuse_loop_mt_dyn != nullptr) {
+    struct fuse_loop_config loop_cfg = {0};
+    loop_cfg.clone_fd = 0;            // share /dev/fuse fd across workers
+    loop_cfg.max_idle_threads = 32;   // headroom for 24 ranks/node
+    ret = fuse_loop_mt_dyn(fuse, &loop_cfg);
+  } else {
+    std::fprintf(stderr,
+                 "clio_cte_fuse: fuse_loop_mt not in runtime libfuse, "
+                 "falling back to single-threaded loop.\n");
+    ret = fuse_loop(fuse);
+  }
   fuse_destroy(fuse);
   fuse_opt_free_args(&args);
   return ret;

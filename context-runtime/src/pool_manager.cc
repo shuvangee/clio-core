@@ -35,24 +35,24 @@
  * Pool manager implementation
  */
 
-#include "chimaera/pool_manager.h"
+#include "clio_runtime/pool_manager.h"
 
-#include "chimaera/admin/admin_tasks.h"
-#include "chimaera/config_manager.h"
-#include "chimaera/container.h"
-#include "chimaera/module_manager.h"
-#include "chimaera/task.h"
+#include "clio_runtime/admin/admin_tasks.h"
+#include "clio_runtime/config_manager.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/module_manager.h"
+#include "clio_runtime/task.h"
 
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 
 // Global pointer variable definition for Pool manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::PoolManager, g_pool_manager);
+CLIO_RUN_DEFINE_GLOBAL_PTR_VAR_CC(chi::PoolManager, g_pool_manager);
 
-namespace chi {
+namespace clio::run {
 
-// Constructor and destructor removed - handled by HSHM singleton pattern
+// Constructor and destructor removed - handled by CTP singleton pattern
 
 bool PoolManager::ServerInit() {
   if (is_initialized_) {
@@ -69,16 +69,16 @@ bool PoolManager::ServerInit() {
   PoolId admin_pool_id;
 
   // Create proper admin task and RunContext for pool creation
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) {
     HLOG(kError, "PoolManager: IPC manager not available during ServerInit");
     return false;
   }
 
-  auto admin_task = ipc_manager->NewTask<chimaera::admin::CreateTask>(
+  auto admin_task = ipc_manager->NewTask<clio::run::admin::CreateTask>(
       CreateTaskId(),
       kAdminPoolId,  // Use admin pool for admin container creation
-      PoolQuery::Local(), "chimaera_admin", "admin", kAdminPoolId,
+      PoolQuery::Local(), "clio_admin", "admin", kAdminPoolId,
       nullptr);  // No client for internal admin pool creation
 
   RunContext run_ctx;
@@ -270,7 +270,7 @@ void PoolManager::PlugContainer(PoolId pool_id, ContainerId container_id) {
   }
   container->SetPlugged();
   while (container->GetWorkRemaining() > 0) {
-    HSHM_THREAD_MODEL->Yield();
+    CTP_THREAD_MODEL->Yield();
   }
 }
 
@@ -363,7 +363,7 @@ PoolId PoolManager::GeneratePoolId() {
 
   // Use atomic fetch_add to get unique minor number, then construct PoolId
   u32 minor = next_pool_minor_.fetch_add(1);
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   u32 major = ipc_manager->GetNodeId();  // Use this node's ID as major number
   return PoolId(major, minor);
 }
@@ -381,7 +381,7 @@ bool PoolManager::ValidatePoolParams(const std::string& chimod_name,
   }
 
   // Check if the ChiMod exists
-  auto* module_manager = CHI_MODULE_MANAGER;
+  auto* module_manager = CLIO_MODULE_MANAGER;
   if (!module_manager) {
     HLOG(kError, "PoolManager: Module manager not available for validation");
     return false;
@@ -423,20 +423,20 @@ void PoolManager::InitAddressMap(PoolId pool_id, u32 num_containers) {
 }
 
 TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
-  // For NVHPC: create a RunContext reference alias so CHI_TASK_BODY_BEGIN
+  // For NVHPC: create a RunContext reference alias so CLIO_TASK_BODY_BEGIN
   // lambda can capture it by reference (the macro uses [=, &rctx])
 #ifdef __NVCOMPILER
   RunContext& rctx = *run_ctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   if (!is_initialized_) {
     HLOG(kError, "PoolManager: Not initialized for pool creation");
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Cast generic Task to BaseCreateTask to access pool operation parameters
   auto* create_task = reinterpret_cast<
-      chimaera::admin::BaseCreateTask<chimaera::admin::CreateParams>*>(
+      clio::run::admin::BaseCreateTask<clio::run::admin::CreateParams>*>(
       task.ptr_);
 
   // Debug: Log do_compose_ value after cast
@@ -449,7 +449,7 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
   const std::string chimod_params = create_task->chimod_params_.str();
 
   // Set num_containers equal to number of nodes in the cluster
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   std::vector<Host> all_hosts = ipc_manager->GetAllHosts();
   const u32 num_containers = static_cast<u32>(all_hosts.size());
 
@@ -462,7 +462,7 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
 
   // Validate pool parameters
   if (!ValidatePoolParams(chimod_name, pool_name)) {
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Check if pool already exists by name (get-or-create semantics)
@@ -475,7 +475,7 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
          "PoolManager: Pool with name '{}' for ChiMod '{}' already exists "
          "with PoolId {}, returning existing pool",
          pool_name, chimod_name, existing_pool_id);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Get the target pool ID from the task
@@ -486,7 +486,7 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
     HLOG(kError,
          "PoolManager: Cannot create pool with null PoolId. Users must provide "
          "explicit pool ID.");
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Check if pool already exists by ID (should not happen with proper
@@ -497,7 +497,7 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
     HLOG(kInfo,
          "PoolManager: Pool {} already exists by ID, returning existing pool",
          target_pool_id);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Create pool metadata
@@ -512,15 +512,15 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
 
   // Create local pool with containers (merged from CreateLocalPool)
   // Get module manager to create containers
-  auto* module_manager = CHI_MODULE_MANAGER;
+  auto* module_manager = CLIO_MODULE_MANAGER;
   if (!module_manager) {
     HLOG(kError, "PoolManager: Module manager not available");
     pool_metadata_.erase(target_pool_id);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   Container* container = nullptr;
-  auto* ipc_manager2 = CHI_IPC;
+  auto* ipc_manager2 = CLIO_IPC;
   u32 node_id = ipc_manager2->GetNodeId();
   try {
     // Create container
@@ -530,7 +530,7 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
       HLOG(kError, "PoolManager: Failed to create container for ChiMod: {}",
            chimod_name);
       pool_metadata_.erase(target_pool_id);
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // node_id already obtained above try block
@@ -564,7 +564,7 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
       HLOG(kError, "PoolManager: Failed to register container");
       module_manager->DestroyContainer(chimod_name, container);
       pool_metadata_.erase(target_pool_id);
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
     // Run create method on container as a coroutine
@@ -573,7 +573,7 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
     // By using co_await, we properly suspend and resume, allowing the worker
     // to process nested tasks while we wait.
     HLOG(kInfo, "CreatePool: Running Create method for pool {}", target_pool_id);
-    CHI_CO_AWAIT(container->Run(0, task, *run_ctx));  // Method::kCreate = 0
+    CLIO_CO_AWAIT(container->Run(0, task, *run_ctx));  // Method::kCreate = 0
     HLOG(kInfo, "CreatePool: Create method completed for pool {}", target_pool_id);
 
     if (task->GetReturnCode() != 0) {
@@ -583,37 +583,13 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
       UnregisterContainer(target_pool_id, node_id);
       module_manager->DestroyContainer(chimod_name, container);
       pool_metadata_.erase(target_pool_id);
-      CHI_CO_RETURN;
+      CLIO_CO_RETURN;
     }
 
-    // Create GPU container via the work orchestrator.
-    // Skip when orchestrator is already paused by an external caller
-    // (e.g., a GPU test kernel is running) — cudaMalloc is a device-
-    // synchronizing call that would deadlock with the busy-waiting kernel.
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
-    {
-      auto *gpu_mgr = ipc_manager2->GetGpuIpcManager();
-      bool did_pause = gpu_mgr ? gpu_mgr->PauseGpuOrchestrator() : false;
-      if (did_pause) {
-        void *gpu_container_ptr = ipc_manager2->AllocGpuContainer(
-            target_pool_id, node_id, chimod_name);
-        if (gpu_container_ptr) {
-          auto it = pool_metadata_.find(target_pool_id);
-          if (it != pool_metadata_.end()) {
-            it->second.gpu_container_ptr_ = gpu_container_ptr;
-          }
-          gpu_mgr->RegisterGpuOrchestratorContainer(target_pool_id,
-                                                    gpu_container_ptr);
-        }
-        gpu_mgr->ResumeGpuOrchestrator();
-        // Allow container to send GPU-init tasks now that the GPU container
-        // is registered and the orchestrator is running.
-        if (gpu_container_ptr) {
-          container->PostGpuContainerCreate();
-        }
-      }
-    }
-#endif
+    // GPU container allocation removed along with the GPU runtime.
+    // ChiMods now have CPU-only handlers; kernels submit tasks via
+    // gpu2cpu_queue and the CPU dispatches into the standard
+    // chi::Container path.
 
   } catch (const std::exception& e) {
     HLOG(kError, "PoolManager: Exception during pool creation: {}", e.what());
@@ -623,7 +599,7 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
       module_manager->DestroyContainer(chimod_name, container);
     }
     pool_metadata_.erase(target_pool_id);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Set success results
@@ -634,28 +610,28 @@ TaskResume PoolManager::CreatePool(FullPtr<Task> task, RunContext* run_ctx) {
   HLOG(kInfo,
        "PoolManager: Created complete pool {} with ChiMod {} ({} containers)",
        target_pool_id, chimod_name, num_containers);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 TaskResume PoolManager::DestroyPool(PoolId pool_id) {
-  // For NVHPC: provide a dummy RunContext reference so CHI_TASK_BODY_BEGIN
+  // For NVHPC: provide a dummy RunContext reference so CLIO_TASK_BODY_BEGIN
   // lambda can compile (the macro captures rctx by ref, but we never use it).
 #ifdef __NVCOMPILER
   chi::RunContext _dummy_rctx;
   chi::RunContext& rctx = _dummy_rctx;
 #endif
-  CHI_TASK_BODY_BEGIN
+  CLIO_TASK_BODY_BEGIN
   if (!is_initialized_) {
     HLOG(kError, "PoolManager: Not initialized for pool destruction");
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Check if pool exists in metadata
   auto metadata_it = pool_metadata_.find(pool_id);
   if (metadata_it == pool_metadata_.end()) {
     HLOG(kError, "PoolManager: Pool {} metadata not found", pool_id);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Destroy local pool components
@@ -663,15 +639,15 @@ TaskResume PoolManager::DestroyPool(PoolId pool_id) {
     HLOG(kError,
          "PoolManager: Failed to destroy local pool components for pool {}",
          pool_id);
-    CHI_CO_RETURN;
+    CLIO_CO_RETURN;
   }
 
   // Remove pool metadata
   pool_metadata_.erase(metadata_it);
 
   HLOG(kInfo, "PoolManager: Destroyed complete pool {}", pool_id);
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 const PoolInfo* PoolManager::GetPoolInfo(PoolId pool_id) const {
@@ -751,7 +727,7 @@ bool PoolManager::UpdateContainerNodeMapping(PoolId pool_id,
 void PoolManager::WriteAddressTableWAL(PoolId pool_id,
                                         ContainerId container_id,
                                         u32 old_node, u32 new_node) {
-  auto *config_manager = CHI_CONFIG_MANAGER;
+  auto *config_manager = CLIO_CONFIG_MANAGER;
   if (!config_manager) {
     HLOG(kError, "PoolManager: ConfigManager not available for WAL write");
     return;
@@ -762,7 +738,7 @@ void PoolManager::WriteAddressTableWAL(PoolId pool_id,
   std::filesystem::create_directories(wal_dir);
 
   // Determine this node's ID for the WAL filename
-  auto *ipc_manager = CHI_IPC;
+  auto *ipc_manager = CLIO_IPC;
   u32 node_id = ipc_manager->GetNodeId();
 
   std::string wal_path = wal_dir + "/domain_table." +
@@ -794,7 +770,7 @@ void PoolManager::WriteAddressTableWAL(PoolId pool_id,
 }
 
 void PoolManager::ReplayAddressTableWAL() {
-  auto *config_manager = CHI_CONFIG_MANAGER;
+  auto *config_manager = CLIO_CONFIG_MANAGER;
   if (!config_manager) {
     HLOG(kError, "ReplayAddressTableWAL: ConfigManager not available");
     return;
@@ -836,4 +812,4 @@ void PoolManager::ReplayAddressTableWAL() {
   HLOG(kInfo, "ReplayAddressTableWAL: Replayed {} entries", entries_replayed);
 }
 
-}  // namespace chi
+}  // namespace clio::run

@@ -1,7 +1,7 @@
 #ifndef SIMPLE_MOD_AUTOGEN_METHODS_H_
 #define SIMPLE_MOD_AUTOGEN_METHODS_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 /**
  * Auto-generated method definitions for simple_mod

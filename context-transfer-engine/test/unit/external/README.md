@@ -24,8 +24,8 @@ This test serves multiple purposes:
    ```
 
 2. **Dependencies**: Ensure all CTE Core dependencies are available:
-   - Chimaera framework (chimaera-core, chimaera-admin)
-   - HSHM (Hermes Shared Memory)
+   - Clio framework (chimaera-core, chimaera-admin)
+   - CTP (Clio Shared Memory)
    - yaml-cpp
 
 ### Build the External Test
@@ -59,7 +59,7 @@ make run_external_test
 The test performs a comprehensive validation of CTE Core functionality:
 
 ### 1. Initialization Sequence
-- Initializes Chimaera runtime and client
+- Initializes Clio runtime and client
 - Initializes CTE subsystem
 - Creates CTE container with configuration
 
@@ -96,7 +96,7 @@ When successful, the test produces output like:
 ```
 === External CTE Core Integration Test ===
 Initializing CTE Core system...
-1. Initializing Chimaera runtime...
+1. Initializing Clio runtime...
 2. Initializing Chimaera client...
 3. Initializing CTE subsystem...
 4. Getting CTE client instance...
@@ -147,34 +147,34 @@ The `CMakeLists.txt` in this directory demonstrates the **proper MODULE_DEVELOPM
 
 1. **Package Discovery** (Modern Pattern):
    ```cmake
-   # Find required Chimaera framework packages
+   # Find required Clio framework packages
    find_package(chimaera REQUIRED)              # Core library
-   find_package(chimaera_admin REQUIRED)        # Admin ChiMod
+   find_package(chimaera_admin REQUIRED)        # Admin Module
    
-   # Find CTE Core ChiMod package
-   find_package(wrp_cte_core REQUIRED)          # CTE Core ChiMod
+   # Find CTE Core Module package
+   find_package(clio_cte_core REQUIRED)          # CTE Core Module
    ```
 
 2. **Library Linking** (Modern Target Names):
    ```cmake
    target_link_libraries(your_app
-       # CTE Core ChiMod libraries (recommended aliases)
-       wrp_cte::core_client                     # CTE Core client
-       wrp_cte::core_runtime                    # CTE Core runtime (optional)
+       # CTE Core Module libraries (recommended aliases)
+       clio::cte::core_client                     # CTE Core client
+       clio::cte::core_runtime                    # CTE Core runtime (optional)
        
        # Framework dependencies automatically included
-       # chimaera::cxx                          # NOT needed - auto-included
-       # chimaera::admin_client                 # Optional - if needed
+       # clio::run::cxx                          # NOT needed - auto-included
+       # clio::run::admin_client                 # Optional - if needed
    )
    ```
 
 3. **Target Naming System**:
-   - **Package Names**: `wrp_cte_core` (for `find_package()`)
-   - **Target Aliases**: `wrp_cte::core_client`, `wrp_cte::core_runtime` (recommended)
-   - **Actual Targets**: `wrp_cte_core_client`, `wrp_cte_core_runtime`
+   - **Package Names**: `clio_cte_core` (for `find_package()`)
+   - **Target Aliases**: `clio::cte::core_client`, `clio::cte::core_runtime` (recommended)
+   - **Actual Targets**: `clio_cte_core_client`, `clio_cte_core_runtime`
 
 4. **Automatic Dependencies**:
-   - ChiMod targets automatically include `chimaera::cxx` framework
+   - Module targets automatically include `clio::run::cxx` framework
    - No need to manually link core framework libraries
    - `add_chimod_both()` handles all standard dependencies
 
@@ -183,7 +183,7 @@ The `CMakeLists.txt` in this directory demonstrates the **proper MODULE_DEVELOPM
 ### Common Issues:
 
 1. **Library Not Found**: Ensure CTE Core is built and libraries exist in the build directory
-2. **Missing Dependencies**: Verify all dependencies (Chimaera, HSHM, etc.) are properly installed
+2. **Missing Dependencies**: Verify all dependencies (Chimaera, CTP, etc.) are properly installed
 3. **Runtime Initialization Failure**: Check that the runtime environment is properly configured
 4. **Permission Issues**: Ensure write permissions for temporary files (e.g., `/tmp/cte_external_test_target`)
 
@@ -207,8 +207,8 @@ export LD_LIBRARY_PATH=/path/to/chimaera/lib:$LD_LIBRARY_PATH
 
 This test demonstrates several important patterns for external CTE Core integration:
 
-1. **Proper Initialization Order**: Chimaera runtime → Chimaera client → CTE subsystem
-2. **Memory Management**: Using HSHM allocators for shared data
+1. **Proper Initialization Order**: Clio runtime → Chimaera client → CTE subsystem
+2. **Memory Management**: Using CTP allocators for shared data
 3. **Error Handling**: Checking return codes and handling exceptions
 4. **Resource Cleanup**: Proper cleanup of tags, blobs, and resources
 5. **API Usage**: Correct parameter passing and result handling

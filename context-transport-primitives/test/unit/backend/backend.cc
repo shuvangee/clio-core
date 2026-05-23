@@ -32,19 +32,19 @@
  */
 
 #include "basic_test.h"
-#include "hermes_shm/memory/backend/posix_shm_mmap.h"
+#include "clio_ctp/memory/backend/posix_shm_mmap.h"
 
-using hshm::ipc::PosixShmMmap;
+using ctp::ipc::PosixShmMmap;
 
 TEST_CASE("BackendReserve") {
   PosixShmMmap b1;
 
   // Reserve + Map 8GB of memory
-  b1.shm_init(hipc::MemoryBackendId::GetRoot(), hshm::Unit<size_t>::Gigabytes(8),
+  b1.shm_init(ctp::ipc::MemoryBackendId::GetRoot(), ctp::Unit<size_t>::Gigabytes(8),
               "shmem_test");
 
   // Set 2MB of SHMEM
-  memset(b1.data_, 0, hshm::Unit<size_t>::Megabytes(2));
+  memset(b1.data_, 0, ctp::Unit<size_t>::Megabytes(2));
 
   // Destroy SHMEM
 }

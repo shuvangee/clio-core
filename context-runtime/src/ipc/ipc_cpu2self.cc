@@ -31,16 +31,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "chimaera/ipc/ipc_cpu2self.h"
-#include "chimaera/ipc_manager.h"
-#include "chimaera/worker.h"
-#include "chimaera/singletons.h"
+#include "clio_runtime/ipc/ipc_cpu2self.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/worker.h"
+#include "clio_runtime/singletons.h"
 
-namespace chi {
+namespace clio::run {
 
 Future<Task> IpcCpu2Self::ClientSend(IpcManager *ipc,
-                                      const hipc::FullPtr<Task> &task_ptr) {
-  Worker *worker = CHI_CUR_WORKER;
+                                      const ctp::ipc::FullPtr<Task> &task_ptr) {
+  Worker *worker = CLIO_CUR_WORKER;
 
   // Create pointer future (no serialization)
   Future<Task> future = ipc->MakePointerFuture(task_ptr);
@@ -62,11 +62,9 @@ Future<Task> IpcCpu2Self::ClientSend(IpcManager *ipc,
       u32 lane_id = ipc->scheduler_->ClientMapTask(ipc, future);
       if (!ipc->worker_queues_.IsNull()) {
         auto &dest_lane = ipc->worker_queues_->GetLane(lane_id, 0);
-        bool was_empty = dest_lane.Empty();
         dest_lane.Push(future);
-        if (was_empty) {
-          ipc->AwakenWorker(&dest_lane);
-        }
+        // Always signal — see ipc_cpu2cpu_impl.h for the race.
+        ipc->AwakenWorker(&dest_lane);
       }
     }
   } else {
@@ -80,7 +78,7 @@ Future<Task> IpcCpu2Self::ClientSend(IpcManager *ipc,
   return future;
 }
 
-hipc::FullPtr<Task> IpcCpu2Self::RuntimeRecv(Future<Task> &future) {
+ctp::ipc::FullPtr<Task> IpcCpu2Self::RuntimeRecv(Future<Task> &future) {
   // No deserialization needed — task is a direct pointer
   return future.GetTaskPtr();
 }
@@ -88,7 +86,7 @@ hipc::FullPtr<Task> IpcCpu2Self::RuntimeRecv(Future<Task> &future) {
 void IpcCpu2Self::RuntimeSend(const FullPtr<Task> &task_ptr,
                                RunContext *run_ctx,
                                Container *container,
-                               hshm::lbm::Transport *send_transport) {
+                               ctp::lbm::Transport *send_transport) {
   auto future_shm = run_ctx->future_.GetFutureShm();
   if (future_shm.IsNull()) {
     return;
@@ -98,7 +96,7 @@ void IpcCpu2Self::RuntimeSend(const FullPtr<Task> &task_ptr,
 
   // Delegate to origin-based SendRuntime for non-self origins
   if (was_copied || origin != FutureShm::FUTURE_CLIENT_SHM) {
-    CHI_IPC->SendRuntime(task_ptr, run_ctx, container, send_transport);
+    CLIO_IPC->SendRuntime(task_ptr, run_ctx, container, send_transport);
     return;
   }
 
@@ -108,13 +106,13 @@ void IpcCpu2Self::RuntimeSend(const FullPtr<Task> &task_ptr,
     // queue. FUTURE_COMPLETE is NOT set here — it will be set by
     // ProcessEventQueue on the parent's worker thread.
     auto *parent_event_queue =
-        reinterpret_cast<hipc::mpsc_ring_buffer<Future<Task, CHI_QUEUE_ALLOC_T>,
-                                                hshm::ipc::MallocAllocator> *>(
+        reinterpret_cast<ctp::ipc::mpsc_ring_buffer<Future<Task, CLIO_QUEUE_ALLOC_T>,
+                                                ctp::ipc::MallocAllocator> *>(
             parent_task->event_queue_);
-    bool was_empty = parent_event_queue->Empty();
     parent_event_queue->Emplace(run_ctx->future_);
-    if (was_empty && parent_task->lane_) {
-      CHI_IPC->AwakenWorker(parent_task->lane_);
+    if (parent_task->lane_) {
+      // Always signal — see ipc_cpu2cpu_impl.h for the race.
+      CLIO_IPC->AwakenWorker(parent_task->lane_);
     }
   } else {
     // Top-level client task: set FUTURE_COMPLETE directly.
@@ -123,4 +121,4 @@ void IpcCpu2Self::RuntimeSend(const FullPtr<Task> &task_ptr,
   }
 }
 
-}  // namespace chi
+}  // namespace clio::run

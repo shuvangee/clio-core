@@ -38,12 +38,12 @@
  * batch task submission.
  */
 
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/ipc_manager.h>
-#include <chimaera/pool_manager.h>
-#include <chimaera/work_orchestrator.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/ipc_manager.h>
+#include <clio_runtime/pool_manager.h>
+#include <clio_runtime/work_orchestrator.h>
 #include <simple_test.h>
 
 #include <chrono>
@@ -52,12 +52,12 @@
 namespace {
 
 /**
- * Test helper to initialize Chimaera system
+ * Test helper to initialize CLIO Runtime system
  */
 class ChimaeraTestFixture {
  public:
   ChimaeraTestFixture() {
-    // Use the unified Chimaera initialization
+    // Use the unified CLIO Runtime initialization
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
     REQUIRE(success);
     SimpleTest::g_test_finalize = chi::CHIMAERA_FINALIZE;
@@ -66,8 +66,8 @@ class ChimaeraTestFixture {
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Verify initialization
-    REQUIRE(CHI_IPC != nullptr);
-    REQUIRE(CHI_IPC->IsInitialized());
+    REQUIRE(CLIO_IPC != nullptr);
+    REQUIRE(CLIO_IPC->IsInitialized());
   }
 
   ~ChimaeraTestFixture() {
@@ -81,17 +81,17 @@ TEST_CASE("TaskBatch Basic Functionality", "[submit_batch][admin]") {
   ChimaeraTestFixture fixture;
 
   SECTION("TaskBatch starts empty") {
-    chimaera::admin::TaskBatch batch;
+    clio::run::admin::TaskBatch batch;
     REQUIRE(batch.GetTaskCount() == 0);
     REQUIRE(batch.GetTaskInfos().empty());
     REQUIRE(batch.GetSerializedData().empty());
   }
 
   SECTION("TaskBatch Add increments task count") {
-    chimaera::admin::TaskBatch batch;
+    clio::run::admin::TaskBatch batch;
 
     // Add a FlushTask to the batch
-    batch.Add<chimaera::admin::FlushTask>(
+    batch.Add<clio::run::admin::FlushTask>(
         chi::CreateTaskId(),
         chi::kAdminPoolId,
         chi::PoolQuery::Local());
@@ -102,11 +102,11 @@ TEST_CASE("TaskBatch Basic Functionality", "[submit_batch][admin]") {
   }
 
   SECTION("TaskBatch can add multiple tasks") {
-    chimaera::admin::TaskBatch batch;
+    clio::run::admin::TaskBatch batch;
 
     // Add multiple FlushTasks to the batch
     for (int i = 0; i < 5; ++i) {
-      batch.Add<chimaera::admin::FlushTask>(
+      batch.Add<clio::run::admin::FlushTask>(
           chi::CreateTaskId(),
           chi::kAdminPoolId,
           chi::PoolQuery::Local());
@@ -122,10 +122,10 @@ TEST_CASE("SubmitBatch Empty Batch", "[submit_batch][admin]") {
 
   SECTION("SubmitBatch with empty batch returns success immediately") {
     // Create admin client
-    chimaera::admin::Client admin_client(chi::kAdminPoolId);
+    clio::run::admin::Client admin_client(chi::kAdminPoolId);
 
     // Create empty batch
-    chimaera::admin::TaskBatch batch;
+    clio::run::admin::TaskBatch batch;
 
     // Submit empty batch
     auto submit_task = admin_client.AsyncSubmitBatch(
@@ -145,11 +145,11 @@ TEST_CASE("SubmitBatch Single Task", "[submit_batch][admin]") {
 
   SECTION("SubmitBatch with single FlushTask succeeds") {
     // Create admin client
-    chimaera::admin::Client admin_client(chi::kAdminPoolId);
+    clio::run::admin::Client admin_client(chi::kAdminPoolId);
 
     // Create batch with one task
-    chimaera::admin::TaskBatch batch;
-    batch.Add<chimaera::admin::FlushTask>(
+    clio::run::admin::TaskBatch batch;
+    batch.Add<clio::run::admin::FlushTask>(
         chi::CreateTaskId(),
         chi::kAdminPoolId,
         chi::PoolQuery::Local());
@@ -174,14 +174,14 @@ TEST_CASE("SubmitBatch Multiple Tasks", "[submit_batch][admin]") {
 
   SECTION("SubmitBatch with multiple FlushTasks succeeds") {
     // Create admin client
-    chimaera::admin::Client admin_client(chi::kAdminPoolId);
+    clio::run::admin::Client admin_client(chi::kAdminPoolId);
 
     // Create batch with multiple tasks
     const size_t num_tasks = 10;
-    chimaera::admin::TaskBatch batch;
+    clio::run::admin::TaskBatch batch;
 
     for (size_t i = 0; i < num_tasks; ++i) {
-      batch.Add<chimaera::admin::FlushTask>(
+      batch.Add<clio::run::admin::FlushTask>(
           chi::CreateTaskId(),
           chi::kAdminPoolId,
           chi::PoolQuery::Local());
@@ -208,14 +208,14 @@ TEST_CASE("SubmitBatch Large Batch", "[submit_batch][admin]") {
 
   SECTION("SubmitBatch with batch larger than parallel limit (32) succeeds") {
     // Create admin client
-    chimaera::admin::Client admin_client(chi::kAdminPoolId);
+    clio::run::admin::Client admin_client(chi::kAdminPoolId);
 
     // Create batch with more tasks than parallel limit (32)
     const size_t num_tasks = 50;
-    chimaera::admin::TaskBatch batch;
+    clio::run::admin::TaskBatch batch;
 
     for (size_t i = 0; i < num_tasks; ++i) {
-      batch.Add<chimaera::admin::FlushTask>(
+      batch.Add<clio::run::admin::FlushTask>(
           chi::CreateTaskId(),
           chi::kAdminPoolId,
           chi::PoolQuery::Local());
@@ -242,14 +242,14 @@ TEST_CASE("SubmitBatch with MonitorTask", "[submit_batch][admin]") {
 
   SECTION("SubmitBatch with MonitorTasks succeeds") {
     // Create admin client
-    chimaera::admin::Client admin_client(chi::kAdminPoolId);
+    clio::run::admin::Client admin_client(chi::kAdminPoolId);
 
     // Create batch with multiple MonitorTasks
     const size_t num_tasks = 5;
-    chimaera::admin::TaskBatch batch;
+    clio::run::admin::TaskBatch batch;
 
     for (size_t i = 0; i < num_tasks; ++i) {
-      batch.Add<chimaera::admin::MonitorTask>(
+      batch.Add<clio::run::admin::MonitorTask>(
           chi::CreateTaskId(),
           chi::kAdminPoolId,
           chi::PoolQuery::Local(),

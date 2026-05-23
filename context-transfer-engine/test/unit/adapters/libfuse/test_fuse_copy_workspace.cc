@@ -47,10 +47,10 @@
  *   CteDelTag          -> cleanup
  */
 
-#include <chimaera/chimaera.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
 
 #include <algorithm>
 #include <chrono>
@@ -64,7 +64,7 @@
 #include "simple_test.h"
 
 namespace fs = std::filesystem;
-using namespace wrp::cae::fuse;
+using namespace clio::cae::fuse;
 
 // ============================================================================
 // Constants
@@ -115,7 +115,7 @@ static std::vector<char> ReadFileFromDisk(const fs::path &path) {
  * Write a buffer into CTE as page-indexed blobs under the given tag.
  * Mirrors the I/O path that cte_fuse_write() would take.
  */
-static bool WriteFileToCte(const wrp_cte::core::TagId &tag_id,
+static bool WriteFileToCte(const clio::cte::core::TagId &tag_id,
                            const char *data, size_t size) {
   size_t offset = 0;
   while (offset < size) {
@@ -134,7 +134,7 @@ static bool WriteFileToCte(const wrp_cte::core::TagId &tag_id,
  * Read a file back from CTE page-by-page.
  * Mirrors the I/O path that cte_fuse_read() would take.
  */
-static std::vector<char> ReadFileFromCte(const wrp_cte::core::TagId &tag_id,
+static std::vector<char> ReadFileFromCte(const clio::cte::core::TagId &tag_id,
                                          size_t size) {
   std::vector<char> buf(size);
   size_t offset = 0;
@@ -200,17 +200,17 @@ class CopyWorkspaceFixture {
 
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-      success = wrp_cte::core::WRP_CTE_CLIENT_INIT();
+      success = clio::cte::core::CLIO_CTE_CLIENT_INIT();
       REQUIRE(success);
 
-      auto *cte_client = WRP_CTE_CLIENT;
+      auto *cte_client = CLIO_CTE_CLIENT;
       REQUIRE(cte_client != nullptr);
-      cte_client->Init(wrp_cte::core::kCtePoolId);
+      cte_client->Init(clio::cte::core::kCtePoolId);
 
-      wrp_cte::core::CreateParams params;
+      clio::cte::core::CreateParams params;
       auto create_task = cte_client->AsyncCreate(
-          chi::PoolQuery::Dynamic(), wrp_cte::core::kCtePoolName,
-          wrp_cte::core::kCtePoolId, params);
+          chi::PoolQuery::Dynamic(), clio::cte::core::kCtePoolName,
+          clio::cte::core::kCtePoolId, params);
       create_task.Wait();
       REQUIRE(create_task->GetReturnCode() == 0);
 
@@ -227,7 +227,7 @@ class CopyWorkspaceFixture {
 struct IngestedFile {
   fs::path disk_path;
   std::string tag_name;
-  wrp_cte::core::TagId tag_id;
+  clio::cte::core::TagId tag_id;
   size_t size;
 };
 
@@ -237,7 +237,7 @@ struct IngestedFile {
 
 TEST_CASE("FUSE Copy Workspace - Ingest and verify files",
           "[fuse][copy_workspace]") {
-  auto *fixture = hshm::Singleton<CopyWorkspaceFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<CopyWorkspaceFixture>::GetInstance();
   (void)fixture;
 
   auto files = CollectFiles();

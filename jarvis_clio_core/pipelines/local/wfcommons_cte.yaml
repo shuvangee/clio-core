@@ -1,0 +1,51 @@
+# WfCommons + CTE via POSIX adapter (containerized).
+#
+# wfbench tasks issue plain POSIX read/write on their data/* files; we
+# intercept those calls with libclio_cte_posix.so injected via LD_PRELOAD
+# by the clio_adapters Interceptor. The CTE adapter sees every read/write
+# the workflow performs.
+#
+# (wfcommons/wfbench has no native ADIOS2 path — adios2:true on
+# clio_adapters would set ADIOS2_PLUGIN_PATH but intercept nothing
+# because the runner emits no ADIOS2 calls.)
+
+name: wfcommons_cte
+
+install_manager: container
+container_engine: docker
+container_base: ubuntu:24.04
+
+container_extensions:
+  pull_policy: never
+  security_opt:
+    - seccomp=unconfined
+
+pkgs:
+  - pkg_type: builtin.hdf5
+    deploy_mode: container
+  - pkg_type: builtin.adios2
+    deploy_mode: container
+
+  - pkg_type: jarvis_clio_core.clio_runtime
+    deploy_mode: container
+    git_branch: transparent-compress
+    cmake_preset: release-adapter
+
+  - pkg_type: jarvis_clio_core.clio_cte
+    deploy_mode: container
+
+  - pkg_type: jarvis_clio_core.clio_adapters
+    deploy_mode: container
+    posix: true
+    # Path selection is now per-call: any open() with a path beginning
+    # "clio::" is intercepted, everything else passes through. wfbench's
+    # workflow_infile_* / *_outfile_* paths would need that prefix; this
+    # pipeline currently runs as a build/wiring smoke test only.
+
+  - pkg_type: builtin.wfcommons
+    deploy_mode: container
+    recipe: montage
+    num_tasks: 100
+    cpu_work: 10
+    data_footprint: "0"
+    out: /data/wfcommons

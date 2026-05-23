@@ -35,18 +35,18 @@
  * Configuration manager implementation
  */
 
-#include "chimaera/config_manager.h"
-#include "chimaera/task.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/config_manager.h"
+#include "clio_runtime/task.h"
+#include "clio_runtime/ipc_manager.h"
 #include <cstdlib>
 #include <filesystem>
 
 // Global pointer variable definition for Configuration manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::ConfigManager, g_config_manager);
+CLIO_RUN_DEFINE_GLOBAL_PTR_VAR_CC(chi::ConfigManager, g_config_manager);
 
-namespace chi {
+namespace clio::run {
 
-// Constructor and destructor removed - handled by HSHM singleton pattern
+// Constructor and destructor removed - handled by CTP singleton pattern
 
 bool ConfigManager::ClientInit() {
   if (is_initialized_) {
@@ -66,16 +66,22 @@ bool ConfigManager::ClientInit() {
     }
   }
 
-  // Check CHI_PORT env var (overrides YAML and default)
-  std::string port_env = hshm::SystemInfo::Getenv("CHI_PORT");
-  if (!port_env.empty()) {
-    port_ = std::stoul(port_env);
+  // Check CLIO_PORT env var (overrides YAML and default).
+  // GetCompat reads CLIO_PORT first, falls back to CHI_PORT for old deployments.
+  if (const char *env = chi::env::GetCompat("PORT")) {
+    std::string port_env(env);
+    if (!port_env.empty()) {
+      port_ = std::stoul(port_env);
+    }
   }
 
-  // Check CHI_SERVER_ADDR env var (overrides default 127.0.0.1)
-  std::string addr_env = hshm::SystemInfo::Getenv("CHI_SERVER_ADDR");
-  if (!addr_env.empty()) {
-    server_addr_ = addr_env;
+  // Check CLIO_SERVER_ADDR env var (overrides default 127.0.0.1).
+  // GetCompat reads CLIO_SERVER_ADDR first, falls back to CHI_SERVER_ADDR.
+  if (const char *env = chi::env::GetCompat("SERVER_ADDR")) {
+    std::string addr_env(env);
+    if (!addr_env.empty()) {
+      server_addr_ = addr_env;
+    }
   }
 
   is_initialized_ = true;
@@ -89,7 +95,7 @@ bool ConfigManager::ServerInit() {
 
 bool ConfigManager::LoadYaml(const std::string &config_path) {
   try {
-    // Use HSHM BaseConfig methods
+    // Use CTP BaseConfig methods
     LoadFromFile(config_path, true);
     return true;
   } catch (const std::exception &e) {
@@ -98,23 +104,30 @@ bool ConfigManager::LoadYaml(const std::string &config_path) {
 }
 
 std::string ConfigManager::GetServerConfigPath() const {
-  // Check CHI_SERVER_CONF first (primary)
-  const char *chi_env_path = std::getenv("CHI_SERVER_CONF");
-  if (chi_env_path) {
-    return std::string(chi_env_path);
+  // Check env var first: CLIO_SERVER_CONF preferred, CHI_SERVER_CONF legacy.
+  const char *env_path = chi::env::GetCompat("SERVER_CONF");
+  if (env_path) {
+    return std::string(env_path);
   }
 
-  // Fall back to WRP_RUNTIME_CONF (secondary)
-  const char *wrp_env_path = std::getenv("WRP_RUNTIME_CONF");
-  if (wrp_env_path) {
-    return std::string(wrp_env_path);
-  }
-
-  // Fall back to ~/.chimaera/chimaera.yaml (tertiary)
-  std::string home_config =
-      hshm::ConfigParse::ExpandPath("${HOME}/.chimaera/chimaera.yaml");
-  if (std::filesystem::exists(home_config)) {
-    return home_config;
+  // Fall back to a per-user config file. Lookup order, first hit wins:
+  //   1. ~/.clio/clio.yaml      (new canonical name)
+  //   2. ~/.clio/chimaera.yaml  (legacy filename in the new dir)
+  //   3. ~/.chimaera/clio.yaml  (new filename in the legacy dir)
+  //   4. ~/.chimaera/chimaera.yaml  (legacy)
+  // All four are supported; installers seed both ~/.clio/ AND ~/.chimaera/
+  // with identical content so either layout works in the wild.
+  const char *kCandidates[] = {
+      "${HOME}/.clio/clio.yaml",
+      "${HOME}/.clio/chimaera.yaml",
+      "${HOME}/.chimaera/clio.yaml",
+      "${HOME}/.chimaera/chimaera.yaml",
+  };
+  for (const char *tmpl : kCandidates) {
+    std::string path = ctp::ConfigParse::ExpandPath(tmpl);
+    if (std::filesystem::exists(path)) {
+      return path;
+    }
   }
 
   return std::string();
@@ -157,8 +170,8 @@ ConfigManager::GetSharedMemorySegmentName(MemorySegment segment) const {
     return "";
   }
 
-  // Use HSHM's ExpandPath to resolve environment variables
-  return hshm::ConfigParse::ExpandPath(segment_name);
+  // Use CTP's ExpandPath to resolve environment variables
+  return ctp::ConfigParse::ExpandPath(segment_name);
 }
 
 std::string ConfigManager::GetHostfilePath() const {
@@ -166,8 +179,8 @@ std::string ConfigManager::GetHostfilePath() const {
     return "";
   }
 
-  // Use HSHM's ExpandPath to resolve environment variables in hostfile path
-  return hshm::ConfigParse::ExpandPath(hostfile_path_);
+  // Use CTP's ExpandPath to resolve environment variables in hostfile path
+  return ctp::ConfigParse::ExpandPath(hostfile_path_);
 }
 
 bool ConfigManager::IsValid() const { return is_initialized_; }
@@ -195,7 +208,7 @@ void ConfigManager::LoadDefault() {
   wait_for_restart_poll_period_ = 1;   // 1 second
 
   // Set default worker sleep configuration (in microseconds)
-  first_busy_wait_ = 50;               // 50us busy wait
+  first_busy_wait_ = 1000;             // 1000us busy wait
   max_sleep_ = 50000;                  // 50000us (50ms) maximum sleep
 
   // Set default task load prediction model learning rate
@@ -258,10 +271,10 @@ void ConfigManager::ParseYAML(YAML::Node &yaml_conf) {
   // Environment variable overrides for GPU config (higher priority than YAML).
   // Allows benchmarks to set the partition count dynamically from their
   // thread parameters before CHIMAERA_INIT().
-  if (const char *env = std::getenv("CHI_GPU_BLOCKS")) {
+  if (const char *env = chi::env::GetCompat("GPU_BLOCKS")) {
     gpu_blocks_ = static_cast<u32>(std::stoul(env));
   }
-  if (const char *env = std::getenv("CHI_GPU_THREADS")) {
+  if (const char *env = chi::env::GetCompat("GPU_THREADS")) {
     gpu_threads_per_block_ = static_cast<u32>(std::stoul(env));
   }
 
@@ -282,6 +295,28 @@ void ConfigManager::ParseYAML(YAML::Node &yaml_conf) {
     }
     if (networking["wait_for_restart_poll_period"]) {
       wait_for_restart_poll_period_ = networking["wait_for_restart_poll_period"].as<u32>();
+    }
+  }
+
+  // Parse SWIM membership-detection configuration. All fields optional;
+  // unspecified fields keep their compile-time defaults (matches the
+  // prior hard-coded constants in admin_runtime.cc).
+  if (yaml_conf["swim"]) {
+    auto swim = yaml_conf["swim"];
+    if (swim["enabled"]) {
+      swim_enabled_ = swim["enabled"].as<bool>();
+    }
+    if (swim["direct_probe_timeout_sec"]) {
+      swim_direct_probe_timeout_sec_ =
+          swim["direct_probe_timeout_sec"].as<float>();
+    }
+    if (swim["indirect_probe_timeout_sec"]) {
+      swim_indirect_probe_timeout_sec_ =
+          swim["indirect_probe_timeout_sec"].as<float>();
+    }
+    if (swim["suspicion_timeout_sec"]) {
+      swim_suspicion_timeout_sec_ =
+          swim["suspicion_timeout_sec"].as<float>();
     }
   }
 
@@ -339,7 +374,7 @@ size_t ConfigManager::CalculateMainSegmentSize() const {
 
   // Main segment holds task data (FutureShm, BuddyAllocator metadata) — no queues
   // Use 1 GB default for task/data allocations
-  return hshm::Unit<size_t>::Gigabytes(1);
+  return ctp::Unit<size_t>::Gigabytes(1);
 }
 
 size_t ConfigManager::CalculateQueueSegmentSize() const {
@@ -365,4 +400,4 @@ size_t ConfigManager::CalculateQueueSegmentSize() const {
   return BASE_OVERHEAD + worker_queues_size + net_queue_size;
 }
 
-} // namespace chi
+}  // namespace clio::run

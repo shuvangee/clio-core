@@ -2,7 +2,7 @@
 Prepends the preabmle to all files in the repo
 
 USAGE:
-    python3 scripts/preamble.py ${HSHM_ROOT}
+    python3 scripts/preamble.py ${CTP_ROOT}
 """
 
 import sys,os,re
@@ -15,7 +15,7 @@ hermes_preamble = """
  * Copyright by the Illinois Institute of Technology.                        *
  * All rights reserved.                                                      *
  *                                                                           *
- * This file is part of Hermes. The full Hermes copyright notice, including  *
+ * This file is part of Clio. The full Clio copyright notice, including  *
  * terms governing use, modification, and redistribution, is contained in    *
  * the COPYING file, which can be found at the top directory. If you do not  *
  * have access to the file, you may request a copy from help@hdfgroup.org.   *
@@ -29,7 +29,7 @@ preamble2 = """
 * Copyright by the Illinois Institute of Technology.                        *
 * All rights reserved.                                                      *
 *                                                                           *
-* This file is part of Hermes. The full Hermes copyright notice, including  *
+* This file is part of Clio. The full Clio copyright notice, including  *
 * terms governing use, modification, and redistribution, is contained in    *
 * the COPYING file, which can be found at the top directory. If you do not  *
 * have access to the file, you may request a copy from help@hdfgroup.org.   *
@@ -45,9 +45,9 @@ labstor_preamble = """
  * Anthony Kougkas <akougkas@iit.edu>,
  * Xian-He Sun <sun@iit.edu>
  *
- * This file is part of HermesShm
+ * This file is part of ClioCtp
  *
- * HermesShm is free software: you can redistribute it and/or modify
+ * ClioCtp is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.

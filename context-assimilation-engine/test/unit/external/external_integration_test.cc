@@ -11,20 +11,20 @@
 #include <memory>
 
 // CAE Core includes
-#include <wrp_cae/core/core_client.h>
-#include <wrp_cae/core/core_tasks.h>
-#include <wrp_cae/core/constants.h>
-#include <chimaera/chimaera.h>
+#include <clio_cae/core/core_client.h>
+#include <clio_cae/core/core_tasks.h>
+#include <clio_cae/core/constants.h>
+#include <clio_runtime/clio_runtime.h>
 
-// HSHM includes
-#include <hermes_shm/util/singleton.h>
+// CTP includes
+#include <clio_ctp/util/singleton.h>
 
 // Logging
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 class ExternalCaeTest {
 private:
-    std::unique_ptr<wrp_cae::core::Client> cae_client_;
+    std::unique_ptr<clio::cae::core::Client> cae_client_;
     bool initialized_;
 
 public:
@@ -39,7 +39,7 @@ public:
         HLOG(kInfo, "Initializing CAE Core system...");
 
         try {
-            // Step 1: Initialize Chimaera (runtime + client)
+            // Step 1: Initialize CLIO Runtime (runtime + client)
             HLOG(kInfo, "1. Initializing Chimaera...");
             bool chimaera_init = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
             if (!chimaera_init) {
@@ -49,16 +49,16 @@ public:
 
             // Step 2: Create CAE client instance
             HLOG(kInfo, "2. Creating CAE client instance...");
-            cae_client_ = std::make_unique<wrp_cae::core::Client>();
+            cae_client_ = std::make_unique<clio::cae::core::Client>();
 
             // Step 3: Create CAE container
             HLOG(kInfo, "3. Creating CAE container...");
-            wrp_cae::core::CreateParams create_params;
+            clio::cae::core::CreateParams create_params;
 
             try {
-                cae_client_->Create(hipc::MemContext(), chi::PoolQuery::Dynamic(),
+                cae_client_->Create(ctp::ipc::MemContext(), chi::PoolQuery::Dynamic(),
                                    "cae_test_pool",
-                                   wrp_cae::core::kCaePoolId, create_params);
+                                   clio::cae::core::kCaePoolId, create_params);
                 HLOG(kSuccess, "CAE container created successfully");
             } catch (const std::exception& e) {
                 HLOG(kError, "Failed to create CAE container: {}", e.what());
@@ -121,7 +121,7 @@ private:
             HLOG(kInfo, "=== Cleanup ===");
             HLOG(kInfo, "Cleaning up CAE Core resources...");
 
-            // CAE and Chimaera cleanup would happen automatically
+            // CAE and CLIO Runtime cleanup would happen automatically
             // through destructors and singleton cleanup
 
             initialized_ = false;

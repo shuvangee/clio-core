@@ -37,7 +37,7 @@
  * Tests concurrent I/O across multiple transport modes using MPI.
  *
  * Architecture:
- *   Rank 0: Chimaera server
+ *   Rank 0: CLIO Runtime server
  *   Rank 1: Client with SHM mode
  *   Rank 2: Client with TCP mode
  *   Rank 3: Client with IPC mode
@@ -59,21 +59,21 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
-#include "chimaera/chimaera.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/ipc_manager.h"
 
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 
 using namespace chi;
 
 // --- Helpers ---
 
-inline chi::priv::vector<chimaera::bdev::Block> WrapBlock(
-    const chimaera::bdev::Block& block) {
-  chi::priv::vector<chimaera::bdev::Block> blocks(HSHM_MALLOC);
+inline chi::priv::vector<clio::run::bdev::Block> WrapBlock(
+    const clio::run::bdev::Block& block) {
+  chi::priv::vector<clio::run::bdev::Block> blocks(CTP_MALLOC);
   blocks.push_back(block);
   return blocks;
 }
@@ -114,13 +114,13 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
 
   // Rank-specific pool to avoid conflicts
   chi::PoolId pool_id(9000 + rank, 0);
-  chimaera::bdev::Client client(pool_id);
+  clio::run::bdev::Client client(pool_id);
   std::string pool_name = "mpi_bdev_" + mode_name + "_rank" + std::to_string(rank);
 
   // Create pool
   auto create_task = client.AsyncCreate(
       chi::PoolQuery::Dynamic(), pool_name, pool_id,
-      chimaera::bdev::BdevType::kRam, kRamSize);
+      clio::run::bdev::BdevType::kRam, kRamSize);
   create_task.Wait();
   if (create_task->return_code_ != 0) {
     HLOG(kError, "[Rank {}] Create pool failed: {}", rank, create_task->return_code_);
@@ -136,16 +136,16 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
     HLOG(kError, "[Rank {}] AllocateBlocks failed", rank);
     return false;
   }
-  chimaera::bdev::Block block = alloc_task->blocks_[0];
+  clio::run::bdev::Block block = alloc_task->blocks_[0];
 
   // Generate rank-specific test data
-  std::vector<hshm::u8> write_data(io_size);
+  std::vector<ctp::u8> write_data(io_size);
   for (size_t i = 0; i < io_size; ++i) {
-    write_data[i] = static_cast<hshm::u8>((0xAB + rank * 37 + i) % 256);
+    write_data[i] = static_cast<ctp::u8>((0xAB + rank * 37 + i) % 256);
   }
 
   // Write
-  auto write_buffer = CHI_IPC->AllocateBuffer(write_data.size());
+  auto write_buffer = CLIO_IPC->AllocateBuffer(write_data.size());
   if (write_buffer.IsNull()) {
     HLOG(kError, "[Rank {}] AllocateBuffer for write failed", rank);
     return false;
@@ -158,16 +158,16 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
   write_task.Wait();
   if (write_task->return_code_ != 0) {
     HLOG(kError, "[Rank {}] Write failed: {}", rank, write_task->return_code_);
-    CHI_IPC->FreeBuffer(write_buffer);
+    CLIO_IPC->FreeBuffer(write_buffer);
     return false;
   }
   size_t actual_written = write_task->bytes_written_;
 
   // Read
-  auto read_buffer = CHI_IPC->AllocateBuffer(io_size);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(io_size);
   if (read_buffer.IsNull()) {
     HLOG(kError, "[Rank {}] AllocateBuffer for read failed", rank);
-    CHI_IPC->FreeBuffer(write_buffer);
+    CLIO_IPC->FreeBuffer(write_buffer);
     return false;
   }
   auto read_task = client.AsyncRead(
@@ -177,18 +177,18 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
   read_task.Wait();
   if (read_task->return_code_ != 0) {
     HLOG(kError, "[Rank {}] Read failed: {}", rank, read_task->return_code_);
-    CHI_IPC->FreeBuffer(write_buffer);
-    CHI_IPC->FreeBuffer(read_buffer);
+    CLIO_IPC->FreeBuffer(write_buffer);
+    CLIO_IPC->FreeBuffer(read_buffer);
     return false;
   }
 
   // Verify data
-  hipc::FullPtr<char> data_ptr =
-      CHI_IPC->ToFullPtr(read_task->data_.template Cast<char>());
+  ctp::ipc::FullPtr<char> data_ptr =
+      CLIO_IPC->ToFullPtr(read_task->data_.template Cast<char>());
   if (data_ptr.IsNull()) {
     HLOG(kError, "[Rank {}] Read data pointer is null", rank);
-    CHI_IPC->FreeBuffer(write_buffer);
-    CHI_IPC->FreeBuffer(read_buffer);
+    CLIO_IPC->FreeBuffer(write_buffer);
+    CLIO_IPC->FreeBuffer(read_buffer);
     return false;
   }
   size_t actual_read = read_task->bytes_read_;
@@ -196,17 +196,17 @@ bool RunBdevIoTest(int rank, const std::string& mode_name, size_t io_size) {
 
   int mismatches = 0;
   for (size_t i = 0; i < verify_size; ++i) {
-    if (static_cast<hshm::u8>(data_ptr.ptr_[i]) != write_data[i]) {
+    if (static_cast<ctp::u8>(data_ptr.ptr_[i]) != write_data[i]) {
       mismatches++;
       if (mismatches <= 3) {
         HLOG(kError, "[Rank {}] Mismatch at byte {}: got {} expected {}", rank, i,
-             (int)(hshm::u8)data_ptr.ptr_[i], (int)write_data[i]);
+             (int)(ctp::u8)data_ptr.ptr_[i], (int)write_data[i]);
       }
     }
   }
 
-  CHI_IPC->FreeBuffer(write_buffer);
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(write_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
 
   if (mismatches > 0) {
     HLOG(kError, "[Rank {}] {} mismatches in {} bytes", rank, mismatches, verify_size);
@@ -258,7 +258,7 @@ int main(int argc, char* argv[]) {
     // Cleanup stale shared memory
     CleanupSharedMemory();
 
-    setenv("CHI_WITH_RUNTIME", "1", 1);
+    setenv("CLIO_WITH_RUNTIME", "1", 1);
     bool success = CHIMAERA_INIT(ChimaeraMode::kServer, true);
     if (!success) {
       HLOG(kError, "[Rank 0] CHIMAERA_INIT(kServer) failed!");
@@ -307,8 +307,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Set transport mode
-    setenv("CHI_IPC_MODE", mode_name.c_str(), 1);
-    setenv("CHI_WITH_RUNTIME", "0", 1);
+    setenv("CLIO_IPC_MODE", mode_name.c_str(), 1);
+    setenv("CLIO_WITH_RUNTIME", "0", 1);
 
     HLOG(kInfo, "[Rank {}] Connecting as {} client...", rank, mode_name);
 

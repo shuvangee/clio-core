@@ -39,8 +39,8 @@
 #include <cstring>
 
 #include <adios2.h>
-#include <chimaera/chimaera.h>
-#include <wrp_cte/core/core_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/core/core_client.h>
 
 namespace fs = std::filesystem;
 
@@ -74,7 +74,7 @@ public:
   std::atomic<size_t> test_counter_;
 
   ADIOS2AdapterTestFixture() : test_counter_(0) {
-    // Initialize Chimaera runtime and CTE client
+    // Initialize CLIO Runtime runtime and CTE client
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
     REQUIRE(success);
 
@@ -82,20 +82,20 @@ public:
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Verify initialization
-    REQUIRE(CHI_IPC != nullptr);
-    REQUIRE(CHI_IPC->IsInitialized());
+    REQUIRE(CLIO_IPC != nullptr);
+    REQUIRE(CLIO_IPC->IsInitialized());
 
     // Initialize CTE client using singleton
-    if (!wrp_cte::core::WRP_CTE_CLIENT_INIT()) {
+    if (!clio::cte::core::CLIO_CTE_CLIENT_INIT()) {
       FAIL("Failed to initialize CTE client");
     }
 
     // Verify CTE client is accessible
-    auto *cte_client = WRP_CTE_CLIENT;
+    auto *cte_client = CLIO_CTE_CLIENT;
     REQUIRE(cte_client != nullptr);
 
     // Setup test paths
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::GetHomeDir();
     REQUIRE(!home_dir.empty());
 
     test_config_path_ = home_dir + "/adios2_test_config.xml";
@@ -107,16 +107,18 @@ public:
   }
 
   ~ADIOS2AdapterTestFixture() {
-    // Clean up test config
-    if (fs::exists(test_config_path_)) {
-      fs::remove(test_config_path_);
+    // Clean up test config (use error_code to avoid throwing on Windows
+    // where files may be locked)
+    std::error_code ec;
+    if (fs::exists(test_config_path_, ec)) {
+      fs::remove(test_config_path_, ec);
     }
 
     // Clean up all test output files
     for (size_t i = 0; i <= test_counter_.load(); ++i) {
       std::string test_path = test_output_base_path_ + "_" + std::to_string(i) + ".bp";
-      if (fs::exists(test_path)) {
-        fs::remove_all(test_path);
+      if (fs::exists(test_path, ec)) {
+        fs::remove_all(test_path, ec);
       }
     }
   }
@@ -184,7 +186,7 @@ public:
  * - Init() method executes successfully
  */
 TEST_CASE("ADIOS2 Engine Initialization", "[adios2][adapter][init]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("Plugin engine configuration") {
     // Create unique IO for this test
@@ -222,7 +224,7 @@ TEST_CASE("ADIOS2 Engine Initialization", "[adios2][adapter][init]") {
  * wrapper does not delegate CurrentStep() to the plugin implementation.
  */
 TEST_CASE("ADIOS2 BeginStep and EndStep", "[adios2][adapter][step]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("Single step workflow") {
     auto io = fixture->CreateTestIO();
@@ -276,7 +278,7 @@ TEST_CASE("ADIOS2 BeginStep and EndStep", "[adios2][adapter][step]") {
  * - Multiple variables in single step
  */
 TEST_CASE("ADIOS2 DoPutSync", "[adios2][adapter][putsync]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("Single variable synchronous write") {
     auto io = fixture->CreateTestIO();
@@ -350,7 +352,7 @@ TEST_CASE("ADIOS2 DoPutSync", "[adios2][adapter][putsync]") {
  * - Buffer lifetime is managed correctly
  */
 TEST_CASE("ADIOS2 DoPutDeferred", "[adios2][adapter][putdeferred]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("Single deferred write") {
     auto io = fixture->CreateTestIO();
@@ -432,7 +434,7 @@ TEST_CASE("ADIOS2 DoPutDeferred", "[adios2][adapter][putdeferred]") {
  * wrapper does not delegate CurrentStep() to the plugin implementation.
  */
 TEST_CASE("ADIOS2 Multi-Step Write Workflow", "[adios2][adapter][multistep]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("Multiple steps with mixed write modes") {
     auto io = fixture->CreateTestIO();
@@ -485,7 +487,7 @@ TEST_CASE("ADIOS2 Multi-Step Write Workflow", "[adios2][adapter][multistep]") {
  * This is a known limitation of ADIOS2's plugin architecture.
  */
 TEST_CASE("ADIOS2 CurrentStep Management", "[adios2][adapter][currentstep]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("Step counter behavior") {
     auto io = fixture->CreateTestIO();
@@ -534,7 +536,7 @@ TEST_CASE("ADIOS2 CurrentStep Management", "[adios2][adapter][currentstep]") {
  * - Multiple open/close cycles work
  */
 TEST_CASE("ADIOS2 DoClose", "[adios2][adapter][close]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("Single open/close cycle") {
     auto io = fixture->CreateTestIO();
@@ -581,7 +583,7 @@ TEST_CASE("ADIOS2 DoClose", "[adios2][adapter][close]") {
  * - Scalar and array variables work
  */
 TEST_CASE("ADIOS2 Variable Definition", "[adios2][adapter][variable]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("Array variable definition") {
     auto io = fixture->CreateTestIO();
@@ -647,7 +649,7 @@ TEST_CASE("ADIOS2 Variable Definition", "[adios2][adapter][variable]") {
  * - Performance is acceptable for large data
  */
 TEST_CASE("ADIOS2 Large Data Handling", "[adios2][adapter][large]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("Large array write") {
     auto io = fixture->CreateTestIO();
@@ -688,7 +690,7 @@ TEST_CASE("ADIOS2 Large Data Handling", "[adios2][adapter][large]") {
  * - Proper cleanup
  */
 TEST_CASE("ADIOS2 Comprehensive Integration", "[adios2][adapter][integration]") {
-  auto *fixture = hshm::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
+  auto *fixture = ctp::Singleton<ADIOS2AdapterTestFixture>::GetInstance();
 
   SECTION("End-to-end workflow") {
     INFO("=== ADIOS2 Adapter Comprehensive Integration Test ===");

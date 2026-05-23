@@ -38,13 +38,13 @@
  * Contains the server-side task processing logic with basic functionality.
  */
 
-#include "chimaera/simple_mod/simple_mod_runtime.h"
+#include "clio_runtime/simple_mod/simple_mod_runtime.h"
 
-#include <chimaera/chimaera_manager.h>
-#include <chimaera/module_manager.h>
-#include <chimaera/pool_manager.h>
-#include <chimaera/task_archives.h>
-#include <hermes_shm/memory/allocator/malloc_allocator.h>
+#include <clio_runtime/manager.h>
+#include <clio_runtime/module_manager.h>
+#include <clio_runtime/pool_manager.h>
+#include <clio_runtime/task_archives.h>
+#include <clio_ctp/memory/allocator/malloc_allocator.h>
 
 #include <iostream>
 
@@ -66,7 +66,7 @@ void Runtime::Init(const chi::PoolId &pool_id, const std::string &pool_name) {
 // Method implementations
 //===========================================================================
 
-void Runtime::Create(hipc::FullPtr<CreateTask> task, chi::RunContext &rctx) {
+void Runtime::Create(ctp::ipc::FullPtr<CreateTask> task, chi::RunContext &rctx) {
   // Simple mod container creation logic
   HLOG(kInfo, "SimpleMod: Initializing simple_mod container");
 
@@ -84,7 +84,7 @@ void Runtime::Create(hipc::FullPtr<CreateTask> task, chi::RunContext &rctx) {
        pool_name_, task->pool_id_, create_count_);
 }
 
-void Runtime::Destroy(hipc::FullPtr<DestroyTask> task, chi::RunContext &rctx) {
+void Runtime::Destroy(ctp::ipc::FullPtr<DestroyTask> task, chi::RunContext &rctx) {
   HLOG(kInfo, "SimpleMod: Executing Destroy task - Pool ID: {}", task->target_pool_id_);
 
   // Initialize output values
@@ -101,13 +101,13 @@ void Runtime::Destroy(hipc::FullPtr<DestroyTask> task, chi::RunContext &rctx) {
   } catch (const std::exception &e) {
     task->return_code_ = 99;
     task->error_message_ = chi::priv::string(
-        HSHM_MALLOC,
+        CTP_MALLOC,
         std::string("Exception during simple_mod destruction: ") + e.what());
     HLOG(kError, "SimpleMod: Destruction failed with exception: {}", e.what());
   }
 }
 
-void Runtime::Flush(hipc::FullPtr<FlushTask> task, chi::RunContext &rctx) {
+void Runtime::Flush(ctp::ipc::FullPtr<FlushTask> task, chi::RunContext &rctx) {
   HLOG(kInfo, "SimpleMod: Executing Flush task");
 
   // Simple flush implementation - just report no work remaining

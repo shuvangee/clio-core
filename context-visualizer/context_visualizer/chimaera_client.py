@@ -7,8 +7,8 @@ import threading
 
 # The dashboard client should never block retrying a dead runtime.
 # 0 = fail immediately; the dashboard relies on TCP liveness checks instead.
-os.environ.setdefault("CHI_CLIENT_RETRY_TIMEOUT", "0")
-os.environ.setdefault("CHI_CLIENT_TRY_NEW_SERVERS", "16")
+os.environ.setdefault("CLIO_CLIENT_RETRY_TIMEOUT", "0")
+os.environ.setdefault("CLIO_CLIENT_TRY_NEW_SERVERS", "16")
 
 try:
     import msgpack
@@ -272,7 +272,7 @@ def restart_node(ip_address, port=9413):
     """Restart a node's Chimaera runtime (non-blocking).
 
     Assumes the runtime is already dead (shutdown_node was called first).
-    Launches ``chimaera runtime restart`` (WAL replay) so the node rejoins
+    Launches ``clio_run runtime restart`` (WAL replay) so the node rejoins
     the existing cluster. Returns immediately — the dashboard's topology
     polling (TCP-based) will detect when the node comes back.
     """
@@ -306,7 +306,7 @@ def restart_node(ip_address, port=9413):
     else:
         env_parts = []
         for var in ("PATH", "LD_LIBRARY_PATH",
-                    "CHI_SERVER_CONF", "CHI_NUM_CONTAINERS",
+                    "CLIO_SERVER_CONF", "CLIO_NUM_CONTAINERS",
                     "CONTAINER_HOSTFILE"):
             val = os.environ.get(var)
             if val:
@@ -314,7 +314,7 @@ def restart_node(ip_address, port=9413):
         env_str = ("export " + " ".join(env_parts) + " && ") if env_parts else ""
         remote_cmd = (
             f"{env_str}"
-            f"nohup setsid chimaera runtime restart "
+            f"nohup setsid clio_run runtime restart "
             f"</dev/null >/dev/null 2>&1 & disown; exit 0"
         )
         cmd = [

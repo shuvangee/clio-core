@@ -1,8 +1,8 @@
-project(hermes_shm)
+project(clio_ctp)
 
 
 
-if (WRP_CORE_ENABLE_OPENMP)
+if (CLIO_CORE_ENABLE_OPENMP)
     #------------------------------------------------------------------------------
     # Build Tests
     #------------------------------------------------------------------------------
@@ -10,12 +10,12 @@ if (WRP_CORE_ENABLE_OPENMP)
             ${TEST_MAIN}/main.cc
             test_init.cc
             test_lock.cc)
-    add_dependencies(test_thread_exec hermes_shm_host)
+    add_dependencies(test_thread_exec clio_ctp_host)
     target_link_libraries(test_thread_exec
-            hermes_shm_host
-            $<$<BOOL:${WRP_CORE_ENABLE_THALLIUM}>:thallium>
+            clio_ctp_host
+            $<$<BOOL:${CLIO_CORE_ENABLE_THALLIUM}>:thallium>
             Catch2::Catch2
-            hshm::thread_all)
+            ctp::thread_all)
 
     #------------------------------------------------------------------------------
     # Test Cases

@@ -40,12 +40,12 @@
 
 using namespace std::chrono_literals;
 
-#include <chimaera/chimaera.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 namespace fs = std::filesystem;
 
@@ -76,7 +76,7 @@ public:
   static constexpr chi::u64 kTestTargetSize = 1024 * 1024 * 10;  // 10MB test target
   static constexpr chi::u32 kTestWorkerCount = 2;
   
-  std::unique_ptr<wrp_cte::core::Client> core_client_;
+  std::unique_ptr<clio::cte::core::Client> core_client_;
   std::string test_storage_path_;
   chi::PoolId core_pool_id_;
 
@@ -84,18 +84,22 @@ public:
     INFO("=== Initializing CTE Core Test Environment ===");
 
     // Initialize test storage path in home directory
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::GetHomeDir();
     REQUIRE(!home_dir.empty());
 
     test_storage_path_ = home_dir + "/cte_test_storage.dat";
     
-    // Clean up any existing test file
-    if (fs::exists(test_storage_path_)) {
-      fs::remove(test_storage_path_);
-      INFO("Cleaned up existing test file: " << test_storage_path_);
+    // Clean up any existing test file (use error_code to avoid throwing on
+    // Windows where the file may be locked by bdev)
+    std::error_code ec;
+    if (fs::exists(test_storage_path_, ec)) {
+      fs::remove(test_storage_path_, ec);
+      if (!ec) {
+        INFO("Cleaned up existing test file: " << test_storage_path_);
+      }
     }
     
-    // Initialize Chimaera runtime and client for proper functionality
+    // Initialize CLIO Runtime runtime and client for proper functionality
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
     REQUIRE(success);
     
@@ -105,7 +109,7 @@ public:
     INFO("Generated pool ID: " << core_pool_id_.ToU64());
     
     // Create and initialize core client with the generated pool ID
-    core_client_ = std::make_unique<wrp_cte::core::Client>(core_pool_id_);
+    core_client_ = std::make_unique<clio::cte::core::Client>(core_pool_id_);
     INFO("CTE Core client created successfully");
     
     INFO("=== CTE Core Test Environment Ready ===");
@@ -117,10 +121,14 @@ public:
     // Reset core client
     core_client_.reset();
     
-    // Cleanup test storage file
-    if (fs::exists(test_storage_path_)) {
-      fs::remove(test_storage_path_);
-      INFO("Cleaned up test file: " << test_storage_path_);
+    // Cleanup test storage file (use error_code to avoid throwing on Windows
+    // where the file may be locked by bdev)
+    std::error_code ec;
+    if (fs::exists(test_storage_path_, ec)) {
+      fs::remove(test_storage_path_, ec);
+      if (!ec) {
+        INFO("Cleaned up test file: " << test_storage_path_);
+      }
     }
     
     // Cleanup handled automatically by framework
@@ -151,12 +159,12 @@ public:
   }
 
   /**
-   * Initialize Chimaera runtime following the module test guide pattern
+   * Initialize CLIO Runtime runtime following the module test guide pattern
    * This sets up the shared memory infrastructure needed for real API calls
    */
 
   /**
-   * Initialize Chimaera client following the module test guide pattern
+   * Initialize CLIO Runtime client following the module test guide pattern
    */
 
   /**
@@ -182,7 +190,7 @@ private:
  */
 TEST_CASE("CTE Core Client Creation", "[cte][core][client][creation]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Client creation with pool ID") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Client creation with pool ID") {
     // Client should be successfully created in fixture
     REQUIRE(fixture->core_client_ != nullptr);
     
@@ -207,26 +215,26 @@ TEST_CASE("CTE Core Client Creation", "[cte][core][client][creation]") {
  */
 TEST_CASE("CTE CreateParams Configuration", "[cte][core][params]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Default CreateParams") {
-    wrp_cte::core::CreateParams params;
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Default CreateParams") {
+    clio::cte::core::CreateParams params;
 
     // Check default values
-    REQUIRE(std::string(wrp_cte::core::CreateParams::chimod_lib_name) == "wrp_cte_core");
+    REQUIRE(std::string(clio::cte::core::CreateParams::chimod_lib_name) == "clio_cte_core");
 
     INFO("Default CreateParams validated successfully");
   }
 
   SECTION("CreateParams constructor validation") {
     // NOTE: The allocator-based constructor test is commented out because it requires
-    // proper HSHM memory manager initialization which is complex to set up in unit tests.
+    // proper CTP memory manager initialization which is complex to set up in unit tests.
     // This test validates that the constructor signature is correct and compiles properly.
 
     // Test that we can construct parameters with default values
-    wrp_cte::core::CreateParams params_default;
-    REQUIRE(std::string(wrp_cte::core::CreateParams::chimod_lib_name) == "wrp_cte_core");
+    clio::cte::core::CreateParams params_default;
+    REQUIRE(std::string(clio::cte::core::CreateParams::chimod_lib_name) == "clio_cte_core");
 
     // The allocator-based constructor would be tested in integration tests
-    // where the full Chimaera runtime is properly initialized
+    // where the full CLIO Runtime runtime is properly initialized
     INFO("CreateParams constructor signatures validated");
   }
 }
@@ -241,15 +249,15 @@ TEST_CASE("CTE CreateParams Configuration", "[cte][core][params]") {
  */
 TEST_CASE("Target Configuration Validation", "[cte][core][target][config]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("File-based target configuration") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("File-based target configuration") {
     const std::string target_name = "test_target_validation";
-    const chimaera::bdev::BdevType bdev_type = chimaera::bdev::BdevType::kFile;
+    const clio::run::bdev::BdevType bdev_type = clio::run::bdev::BdevType::kFile;
     
     // Verify configuration parameters are valid
     REQUIRE(!target_name.empty());
     REQUIRE(!fixture->test_storage_path_.empty());
     REQUIRE(CTECoreTestFixture::kTestTargetSize > 0);
-    REQUIRE(bdev_type == chimaera::bdev::BdevType::kFile);  // Use bdev_type to avoid unused warning
+    REQUIRE(bdev_type == clio::run::bdev::BdevType::kFile);  // Use bdev_type to avoid unused warning
     
     INFO("Target configuration validated:");
     INFO("  Name: " << target_name);
@@ -284,8 +292,8 @@ TEST_CASE("Target Configuration Validation", "[cte][core][target][config]") {
  */
 TEST_CASE("Tag Information Structure", "[cte][core][tag][info]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("TagInfo structure validation") {
-    // NOTE: Allocator-based constructor tests are commented out due to HSHM memory manager 
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("TagInfo structure validation") {
+    // NOTE: Allocator-based constructor tests are commented out due to CTP memory manager 
     // initialization complexity. These tests validate that the constructor signatures 
     // are correct and the code compiles properly.
     
@@ -324,8 +332,8 @@ TEST_CASE("Tag Information Structure", "[cte][core][tag][info]") {
  */
 TEST_CASE("Blob Information Structure", "[cte][core][blob][info]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("BlobInfo parameter validation") {
-    // NOTE: Allocator-based constructor tests are commented out due to HSHM memory manager
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("BlobInfo parameter validation") {
+    // NOTE: Allocator-based constructor tests are commented out due to CTP memory manager
     // initialization complexity. These tests validate parameter ranges and types.
     
     // Test BlobInfo parameters
@@ -375,22 +383,22 @@ TEST_CASE("Blob Information Structure", "[cte][core][blob][info]") {
  */
 TEST_CASE("Task Structure Validation", "[cte][core][tasks]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Task structure compilation validation") {
-    // NOTE: Allocator-based task constructor tests are commented out due to HSHM memory 
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Task structure compilation validation") {
+    // NOTE: Allocator-based task constructor tests are commented out due to CTP memory 
     // manager initialization complexity. These tests validate that the task structures
     // compile correctly and have the expected member variables.
     
     // Test task parameter types and ranges
     const chi::u32 test_result_code = 0;
     const chi::u64 test_total_size = 1024 * 1024;  // 1MB
-    const chimaera::bdev::BdevType test_bdev_type = chimaera::bdev::BdevType::kFile;
+    const clio::run::bdev::BdevType test_bdev_type = clio::run::bdev::BdevType::kFile;
     const chi::u32 test_tag_id = 100;
     const chi::u32 test_blob_id = 200;
     const float test_score = 0.5f;
     
     REQUIRE(test_result_code == 0);
     REQUIRE(test_total_size > 0);
-    REQUIRE(test_bdev_type == chimaera::bdev::BdevType::kFile);
+    REQUIRE(test_bdev_type == clio::run::bdev::BdevType::kFile);
     REQUIRE(test_tag_id > 0);
     REQUIRE(test_blob_id > 0);
     REQUIRE(test_score >= 0.0f);
@@ -424,7 +432,7 @@ TEST_CASE("Task Structure Validation", "[cte][core][tasks]") {
  */
 TEST_CASE("Data Helper Functions", "[cte][core][helpers]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Test data creation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Test data creation") {
     const size_t test_size = 1024;
     const char test_pattern = 'X';
     
@@ -473,7 +481,7 @@ TEST_CASE("Data Helper Functions", "[cte][core][helpers]") {
  */
 TEST_CASE("CTE Core Workflow Validation", "[cte][core][workflow]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Component initialization validation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Component initialization validation") {
     // Verify all test components are properly initialized
     REQUIRE(fixture->core_client_ != nullptr);
     REQUIRE(!fixture->test_storage_path_.empty());
@@ -536,7 +544,7 @@ TEST_CASE("CTE Core Workflow Validation", "[cte][core][workflow]") {
  */
 TEST_CASE("Performance Test Structure", "[cte][core][performance]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Large data handling simulation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Large data handling simulation") {
     // Test with progressively larger data sizes
     std::vector<size_t> data_sizes = {
       1024,           // 1KB
@@ -577,3 +585,5 @@ TEST_CASE("Performance Test Structure", "[cte][core][performance]") {
     INFO("Multiple operation simulation completed with " << operation_count << " operations");
   }
 }
+
+SIMPLE_TEST_MAIN()

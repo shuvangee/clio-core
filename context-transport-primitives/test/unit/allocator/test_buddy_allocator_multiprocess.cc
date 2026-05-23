@@ -52,12 +52,12 @@
 #include <thread>
 #include <chrono>
 
-#include "hermes_shm/memory/allocator/buddy_allocator.h"
-#include "hermes_shm/memory/backend/posix_shm_mmap.h"
+#include "clio_ctp/memory/allocator/buddy_allocator.h"
+#include "clio_ctp/memory/backend/posix_shm_mmap.h"
 #include "allocator_test.h"
 
-using namespace hshm::ipc;
-using namespace hshm::testing;
+using namespace ctp::ipc;
+using namespace ctp::testing;
 
 // Shared memory configuration
 constexpr size_t kShmSize = 512UL * 1024UL * 1024UL;  // 512 MB

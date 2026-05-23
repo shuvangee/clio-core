@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run IOWarp Reconnect Integration Test (Chimaera Runtime)
+# Run IOWarp Reconnect Integration Test (CLIO Runtime Runtime)
 #
 # Tests client failover to a new host when the connected server dies:
 # 1. Starts 4-node Docker cluster
@@ -92,7 +92,7 @@ stop_docker_cluster() {
 run_single_test() {
     local filter="$1"
     docker exec iowarp-reconnect-node1 bash -c "
-        export CHI_WITH_RUNTIME=0
+        export CLIO_WITH_RUNTIME=0
         chimaera_reconnect_tests '$filter'
     "
 }

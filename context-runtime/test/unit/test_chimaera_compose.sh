@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test script for chimaera compose utility
+# Test script for clio_run compose utility
 # Tests that the compose utility can successfully create pools from a YAML configuration
 
 set -e  # Exit on error
@@ -17,8 +17,8 @@ BIN_DIR="${BUILD_DIR}/bin"
 TEST_CONFIG="/tmp/test_chimaera compose_config.yaml"
 
 # Executables
-CHIMAERA_START_RUNTIME="${BIN_DIR}/chimaera runtime start"
-CHIMAERA_COMPOSE="${BIN_DIR}/chimaera compose"
+CHIMAERA_START_RUNTIME="${BIN_DIR}/clio_run runtime start"
+CHIMAERA_COMPOSE="${BIN_DIR}/clio_run compose"
 
 echo -e "${YELLOW}=== Chimaera Compose Utility Test ===${NC}"
 
@@ -31,7 +31,7 @@ fi
 # Create test configuration file
 echo -e "${YELLOW}Creating test configuration file...${NC}"
 cat > "${TEST_CONFIG}" << 'EOF'
-# Test compose configuration for chimaera compose utility
+# Test compose configuration for clio_run compose utility
 runtime:
   num_threads: 4
 
@@ -39,7 +39,7 @@ networking:
   port: 9413
 
 compose:
-- mod_name: chimaera_bdev
+- mod_name: clio_bdev
   pool_name: /tmp/test_compose_util_bdev.dat
   pool_query: dynamic
   pool_id: 300.0
@@ -52,15 +52,15 @@ EOF
 echo -e "${GREEN}Test configuration created at ${TEST_CONFIG}${NC}"
 
 # Set environment variable
-export CHI_REPO_PATH="${BIN_DIR}"
-export CHI_SERVER_CONF="${TEST_CONFIG}"
+export CLIO_REPO_PATH="${BIN_DIR}"
+export CLIO_SERVER_CONF="${TEST_CONFIG}"
 
 # Cleanup function
 cleanup() {
     echo -e "${YELLOW}Cleaning up...${NC}"
     # Kill all chimaera processes
-    pkill -9 -f "chimaera runtime start" 2>/dev/null || true
-    pkill -9 -f "chimaera compose" 2>/dev/null || true
+    pkill -9 -f "clio_run runtime start" 2>/dev/null || true
+    pkill -9 -f "clio_run compose" 2>/dev/null || true
 
     # Clean up test files
     rm -f "${TEST_CONFIG}" 2>/dev/null || true
@@ -76,7 +76,7 @@ cleanup() {
 # Set trap to cleanup on exit
 trap cleanup EXIT INT TERM
 
-# Start chimaera runtime in background
+# Start clio_run runtime in background
 echo -e "${YELLOW}Starting Chimaera runtime...${NC}"
 "${CHIMAERA_START_RUNTIME}" &
 RUNTIME_PID=$!
@@ -93,12 +93,12 @@ fi
 
 echo -e "${GREEN}Runtime started successfully (PID: ${RUNTIME_PID})${NC}"
 
-# Run chimaera compose utility
-echo -e "${YELLOW}Running chimaera compose utility...${NC}"
+# Run clio_run compose utility
+echo -e "${YELLOW}Running clio_run compose utility...${NC}"
 if "${CHIMAERA_COMPOSE}" "${TEST_CONFIG}"; then
-    echo -e "${GREEN}chimaera compose completed successfully${NC}"
+    echo -e "${GREEN}clio_run compose completed successfully${NC}"
 else
-    echo -e "${RED}Error: chimaera compose failed${NC}"
+    echo -e "${RED}Error: clio_run compose failed${NC}"
     exit 1
 fi
 

@@ -22,9 +22,9 @@ services:
     environment:
       - NODE_ID=1
       - NODE_IP=172.22.0.10
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/expand/wrp_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/expand/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/expand/hostfile_initial
-      - CHI_WITH_RUNTIME=0
+      - CLIO_WITH_RUNTIME=0
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -33,7 +33,7 @@ services:
     command: >
       "
         echo 'Node 1: Starting runtime...' &&
-        /workspace/build/bin/chimaera runtime start &
+        /workspace/build/bin/clio_run runtime start &
         RUNTIME_PID=\$! &&
         echo 'Node 1: Runtime started (PID \$RUNTIME_PID)' &&
         wait \$RUNTIME_PID
@@ -55,9 +55,9 @@ services:
     environment:
       - NODE_ID=2
       - NODE_IP=172.22.0.11
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/expand/wrp_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/expand/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/expand/hostfile_initial
-      - CHI_WITH_RUNTIME=0
+      - CLIO_WITH_RUNTIME=0
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -66,7 +66,7 @@ services:
     command: >
       "
         echo 'Node 2: Starting runtime...' &&
-        /workspace/build/bin/chimaera runtime start
+        /workspace/build/bin/clio_run runtime start
       "
 
   # Node 3 - Inducted node (joins after cluster is up)
@@ -88,9 +88,9 @@ services:
     environment:
       - NODE_ID=3
       - NODE_IP=172.22.0.12
-      - CHI_SERVER_CONF=/workspace/context-runtime/test/integration/expand/wrp_conf.yaml
+      - CLIO_SERVER_CONF=/workspace/context-runtime/test/integration/expand/clio_conf.yaml
       - CONTAINER_HOSTFILE=/workspace/context-runtime/test/integration/expand/hostfile_full
-      - CHI_WITH_RUNTIME=0
+      - CLIO_WITH_RUNTIME=0
       - PATH=/workspace/build/bin:/usr/local/bin:/usr/bin:/bin
       - LD_LIBRARY_PATH=/workspace/build/bin:/usr/local/cuda/lib64:/usr/local/lib
     mem_limit: 16g
@@ -101,7 +101,7 @@ services:
         echo 'Node 3: Waiting 15s for initial cluster to start...' &&
         sleep 15 &&
         echo 'Node 3: Starting runtime with --induct...' &&
-        /workspace/build/bin/chimaera runtime start --induct
+        /workspace/build/bin/clio_run runtime start --induct
       "
 
 networks:

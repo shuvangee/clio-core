@@ -33,12 +33,12 @@
 
 #ifndef _WIN32
 
-#include "hermes_shm/lightbeam/posix_socket.h"
+#include "clio_ctp/lightbeam/posix_socket.h"
 
 #include <cerrno>
 #include <cstring>
 
-namespace hshm::lbm::sock {
+namespace ctp::lbm::sock {
 
 void InitSocketLib() {
   // No-op on POSIX
@@ -186,6 +186,6 @@ int PollReadMulti(const socket_t* fds, int count, int timeout_ms) {
   return -1;
 }
 
-}  // namespace hshm::lbm::sock
+}  // namespace ctp::lbm::sock
 
 #endif  // !_WIN32

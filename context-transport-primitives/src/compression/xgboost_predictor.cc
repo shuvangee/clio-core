@@ -36,14 +36,14 @@
  * @brief Implementation of XGBoost-based compression predictor
  */
 
-#include "hermes_shm/compress/dynamic/compression/xgboost_predictor.h"
+#include "clio_ctp/compress/dynamic/compression/xgboost_predictor.h"
 #include <fstream>
 #include <sstream>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
 
-namespace hshm {
+namespace ctp {
 namespace compress {
 
 namespace fs = std::filesystem;
@@ -676,4 +676,4 @@ void XGBoostPredictor::ClearExperiences() {
 }
 
 }  // namespace compress
-}  // namespace hshm
+}  // namespace ctp

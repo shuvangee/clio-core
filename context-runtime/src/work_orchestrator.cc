@@ -35,38 +35,36 @@
  * Work orchestrator implementation
  */
 
-#include "chimaera/work_orchestrator.h"
+#include "clio_runtime/work_orchestrator.h"
 
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
-#include <pthread.h>
-#include <unistd.h>
 
-#include "chimaera/container.h"
-#include "chimaera/pool_manager.h"
-#include "chimaera/singletons.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/pool_manager.h"
+#include "clio_runtime/singletons.h"
+#include "clio_runtime/ipc_manager.h"
 
 // Global pointer variable definition for Work Orchestrator singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::WorkOrchestrator, g_work_orchestrator);
+CLIO_RUN_DEFINE_GLOBAL_PTR_VAR_CC(chi::WorkOrchestrator, g_work_orchestrator);
 
-namespace chi {
+namespace clio::run {
 
 //===========================================================================
 // Work Orchestrator Implementation
 //===========================================================================
 
-// Constructor and destructor removed - handled by HSHM singleton pattern
+// Constructor and destructor removed - handled by CTP singleton pattern
 
 bool WorkOrchestrator::Init() {
   if (is_initialized_) {
     return true;
   }
 
-  // Initialize HSHM TLS key for workers
+  // Initialize CTP TLS key for workers
   if (!chi_cur_worker_key_created_) {
-    HSHM_THREAD_MODEL->CreateTls<class Worker>(chi_cur_worker_key_, nullptr);
+    CTP_THREAD_MODEL->CreateTls<class Worker>(chi_cur_worker_key_, nullptr);
     chi_cur_worker_key_created_ = true;
   }
 
@@ -74,11 +72,11 @@ bool WorkOrchestrator::Init() {
   next_worker_index_for_scheduling_.store(0);
   active_lanes_ = nullptr;
 
-  // Initialize HSHM thread group first
-  auto thread_model = HSHM_THREAD_MODEL;
+  // Initialize CTP thread group first
+  auto thread_model = CTP_THREAD_MODEL;
   thread_group_ = thread_model->CreateThreadGroup({});
 
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
   if (!config) {
     return false;  // Configuration manager not initialized
   }
@@ -109,7 +107,7 @@ bool WorkOrchestrator::Init() {
   is_initialized_ = true;
 
   // Get scheduler from IpcManager (IpcManager is the single owner)
-  scheduler_ = CHI_IPC->GetScheduler();
+  scheduler_ = CLIO_IPC->GetScheduler();
   HLOG(kDebug, "WorkOrchestrator: Using scheduler from IpcManager");
 
   // Let the scheduler partition workers into groups (sched, slow, net)
@@ -147,7 +145,7 @@ bool WorkOrchestrator::StartWorkers() {
     return false;
   }
 
-  // Spawn worker threads using HSHM thread model
+  // Spawn worker threads using CTP thread model
   if (!SpawnWorkerThreads()) {
     return false;
   }
@@ -164,65 +162,34 @@ void WorkOrchestrator::StopWorkers() {
   HLOG(kDebug, "Stopping {} worker threads...", all_workers_.size());
 
   // Stop all workers and wake them from epoll_wait
-  pid_t runtime_pid = getpid();
+  int runtime_pid = ctp::SystemInfo::GetPid();
   for (auto *worker : all_workers_) {
     if (worker) {
       worker->Stop();
       // Wake worker from epoll_wait so it can observe is_running_ == false
       TaskLane *lane = worker->GetLane();
       if (lane) {
-        pid_t tid = lane->GetTid();
+        int tid = lane->GetTid();
         if (tid > 0) {
-          hshm::lbm::EventManager::Signal(runtime_pid, tid);
+          ctp::lbm::EventManager::Signal(runtime_pid, tid);
         }
       }
     }
   }
 
-  // Wait for worker threads with a hard 5-second deadline per thread.
-  // hshm::Thread uses pthread_create internally, so we use pthread_thread_
-  // directly — std_thread_ is never populated when using the Pthread model.
-  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-
+  // Wait for worker threads with a hard 5-second deadline (5000 ms) per
+  // thread; detach if a thread doesn't exit in time so the destructor
+  // can't block. The thread-model abstraction handles the per-OS join
+  // mechanism (pthread_timedjoin_np on Linux, blocking std::thread::join
+  // on others).
+  auto thread_model = CTP_THREAD_MODEL;
   size_t joined_count = 0;
+  constexpr uint64_t kJoinTimeoutMs = 5000;
   for (auto &thread : worker_threads_) {
-    // pthread_thread_ is 0 when the hshm Thread was never started
-    if (thread.pthread_thread_ == 0) {
+    if (thread_model->TimedJoinOrDetach(thread, kJoinTimeoutMs)) {
       ++joined_count;
-      continue;
-    }
-
-    // Compute absolute deadline for this join attempt.
-    auto remaining =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            deadline - std::chrono::steady_clock::now()).count();
-    if (remaining <= 0) {
-      HLOG(kError, "StopWorkers: deadline exceeded, detaching remaining "
-                   "worker threads");
-      pthread_detach(thread.pthread_thread_);
-      thread.pthread_thread_ = 0;
-      continue;
-    }
-
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec  += remaining / 1000000000LL;
-    ts.tv_nsec += remaining % 1000000000LL;
-    if (ts.tv_nsec >= 1000000000LL) {
-      ts.tv_sec++;
-      ts.tv_nsec -= 1000000000LL;
-    }
-
-    int r = pthread_timedjoin_np(thread.pthread_thread_, nullptr, &ts);
-    if (r == 0) {
-      ++joined_count;
-      thread.pthread_thread_ = 0;
     } else {
-      // ETIMEDOUT or other error — detach so the destructor doesn't block.
-      HLOG(kError, "StopWorkers: thread join timed out (err={}), detaching",
-           r);
-      pthread_detach(thread.pthread_thread_);
-      thread.pthread_thread_ = 0;
+      HLOG(kError, "StopWorkers: thread join timed out, detached");
     }
   }
 
@@ -249,7 +216,7 @@ bool WorkOrchestrator::AreWorkersRunning() const { return workers_running_; }
 
 bool WorkOrchestrator::SpawnWorkerThreads() {
   // Get IPC Manager to access worker queues
-  IpcManager *ipc = CHI_IPC;
+  IpcManager *ipc = CLIO_IPC;
   if (!ipc) {
     return false;
   }
@@ -324,16 +291,16 @@ bool WorkOrchestrator::SpawnWorkerThreads() {
     }
   }
 
-  // Use HSHM thread model to spawn worker threads
-  auto thread_model = HSHM_THREAD_MODEL;
+  // Use CTP thread model to spawn worker threads
+  auto thread_model = CTP_THREAD_MODEL;
   worker_threads_.reserve(all_workers_.size());
 
   try {
     for (size_t i = 0; i < all_workers_.size(); ++i) {
       auto *worker = all_workers_[i];
       if (worker) {
-        // Spawn thread using HSHM thread model
-        hshm::thread::Thread thread = thread_model->Spawn(
+        // Spawn thread using CTP thread model
+        ctp::thread::Thread thread = thread_model->Spawn(
             thread_group_, [worker](int tid) { worker->Run(); },
             static_cast<int>(i));
         worker_threads_.emplace_back(std::move(thread));
@@ -392,7 +359,7 @@ bool WorkOrchestrator::HasWorkRemaining(u64 &total_work_remaining) const {
   total_work_remaining = 0;
 
   // Get PoolManager to access all containers in the system
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   if (!pool_manager || !pool_manager->IsInitialized()) {
     return false; // No pool manager means no work
   }
@@ -413,4 +380,4 @@ bool WorkOrchestrator::HasWorkRemaining(u64 &total_work_remaining) const {
   return total_work_remaining > 0;
 }
 
-} // namespace chi
+}  // namespace clio::run

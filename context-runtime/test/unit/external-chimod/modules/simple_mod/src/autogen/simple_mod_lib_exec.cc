@@ -9,8 +9,8 @@
 
 #include "external_test/simple_mod/simple_mod_runtime.h"
 #include "external_test/simple_mod/autogen/simple_mod_methods.h"
-#include <chimaera/chimaera.h>
-#include <chimaera/task.h>  // For TaskResume coroutine return type
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/task.h>  // For TaskResume coroutine return type
 
 namespace external_test::simple_mod {
 
@@ -27,20 +27,20 @@ void Runtime::Init(const chi::PoolId &pool_id, const std::string &pool_name,
   client_ = Client(pool_id);
 }
 
-chi::TaskResume Runtime::Run(chi::u32 method, hipc::FullPtr<chi::Task> task_ptr, chi::RunContext& rctx) {
-  CHI_TASK_BODY_BEGIN
+chi::TaskResume Runtime::Run(chi::u32 method, ctp::ipc::FullPtr<chi::Task> task_ptr, chi::RunContext& rctx) {
+  CLIO_TASK_BODY_BEGIN
   switch (method) {
     default: {
       // Unknown method - do nothing
       break;
     }
   }
-  CHI_CO_RETURN;
-  CHI_TASK_BODY_END
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 void Runtime::SaveTask(chi::u32 method, chi::SaveTaskArchive& archive, 
-                        hipc::FullPtr<chi::Task> task_ptr) {
+                        ctp::ipc::FullPtr<chi::Task> task_ptr) {
   switch (method) {
     default: {
       // Unknown method - do nothing
@@ -50,7 +50,7 @@ void Runtime::SaveTask(chi::u32 method, chi::SaveTaskArchive& archive,
 }
 
 void Runtime::LoadTask(chi::u32 method, chi::LoadTaskArchive& archive,
-                        hipc::FullPtr<chi::Task> task_ptr) {
+                        ctp::ipc::FullPtr<chi::Task> task_ptr) {
   switch (method) {
     default: {
       // Unknown method - do nothing
@@ -59,8 +59,8 @@ void Runtime::LoadTask(chi::u32 method, chi::LoadTaskArchive& archive,
   }
 }
 
-hipc::FullPtr<chi::Task> Runtime::AllocLoadTask(chi::u32 method, chi::LoadTaskArchive& archive) {
-  hipc::FullPtr<chi::Task> task_ptr = NewTask(method);
+ctp::ipc::FullPtr<chi::Task> Runtime::AllocLoadTask(chi::u32 method, chi::LoadTaskArchive& archive) {
+  ctp::ipc::FullPtr<chi::Task> task_ptr = NewTask(method);
   if (!task_ptr.IsNull()) {
     LoadTask(method, archive, task_ptr);
   }
@@ -68,7 +68,7 @@ hipc::FullPtr<chi::Task> Runtime::AllocLoadTask(chi::u32 method, chi::LoadTaskAr
 }
 
 void Runtime::LocalLoadTask(chi::u32 method, chi::DefaultLoadArchive& archive,
-                            hipc::FullPtr<chi::Task> task_ptr) {
+                            ctp::ipc::FullPtr<chi::Task> task_ptr) {
   switch (method) {
     default: {
       // Unknown method - do nothing
@@ -77,8 +77,8 @@ void Runtime::LocalLoadTask(chi::u32 method, chi::DefaultLoadArchive& archive,
   }
 }
 
-hipc::FullPtr<chi::Task> Runtime::LocalAllocLoadTask(chi::u32 method, chi::DefaultLoadArchive& archive) {
-  hipc::FullPtr<chi::Task> task_ptr = NewTask(method);
+ctp::ipc::FullPtr<chi::Task> Runtime::LocalAllocLoadTask(chi::u32 method, chi::DefaultLoadArchive& archive) {
+  ctp::ipc::FullPtr<chi::Task> task_ptr = NewTask(method);
   if (!task_ptr.IsNull()) {
     LocalLoadTask(method, archive, task_ptr);
   }
@@ -86,7 +86,7 @@ hipc::FullPtr<chi::Task> Runtime::LocalAllocLoadTask(chi::u32 method, chi::Defau
 }
 
 void Runtime::LocalSaveTask(chi::u32 method, chi::DefaultSaveArchive& archive, 
-                             hipc::FullPtr<chi::Task> task_ptr) {
+                             ctp::ipc::FullPtr<chi::Task> task_ptr) {
   switch (method) {
     default: {
       // Unknown method - do nothing
@@ -95,10 +95,10 @@ void Runtime::LocalSaveTask(chi::u32 method, chi::DefaultSaveArchive& archive,
   }
 }
 
-hipc::FullPtr<chi::Task> Runtime::NewCopyTask(chi::u32 method, hipc::FullPtr<chi::Task> orig_task_ptr, bool deep) {
-  auto* ipc_manager = CHI_IPC;
+ctp::ipc::FullPtr<chi::Task> Runtime::NewCopyTask(chi::u32 method, ctp::ipc::FullPtr<chi::Task> orig_task_ptr, bool deep) {
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) {
-    return hipc::FullPtr<chi::Task>();
+    return ctp::ipc::FullPtr<chi::Task>();
   }
   
   switch (method) {
@@ -114,25 +114,25 @@ hipc::FullPtr<chi::Task> Runtime::NewCopyTask(chi::u32 method, hipc::FullPtr<chi
   }
   
   (void)deep;    // Deep copy parameter reserved for future use
-  return hipc::FullPtr<chi::Task>();
+  return ctp::ipc::FullPtr<chi::Task>();
 }
 
-hipc::FullPtr<chi::Task> Runtime::NewTask(chi::u32 method) {
-  auto* ipc_manager = CHI_IPC;
+ctp::ipc::FullPtr<chi::Task> Runtime::NewTask(chi::u32 method) {
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) {
-    return hipc::FullPtr<chi::Task>();
+    return ctp::ipc::FullPtr<chi::Task>();
   }
   
   switch (method) {
     default: {
       // For unknown methods, return null pointer
-      return hipc::FullPtr<chi::Task>();
+      return ctp::ipc::FullPtr<chi::Task>();
     }
   }
 }
 
-void Runtime::Aggregate(chi::u32 method, hipc::FullPtr<chi::Task> orig_task,
-                        const hipc::FullPtr<chi::Task>& replica_task) {
+void Runtime::Aggregate(chi::u32 method, ctp::ipc::FullPtr<chi::Task> orig_task,
+                        const ctp::ipc::FullPtr<chi::Task>& replica_task) {
   switch (method) {
     default: {
       orig_task->Aggregate(replica_task);
@@ -141,8 +141,8 @@ void Runtime::Aggregate(chi::u32 method, hipc::FullPtr<chi::Task> orig_task,
   }
 }
 
-void Runtime::DelTask(chi::u32 method, hipc::FullPtr<chi::Task> task_ptr) {
-  auto* ipc_manager = CHI_IPC;
+void Runtime::DelTask(chi::u32 method, ctp::ipc::FullPtr<chi::Task> task_ptr) {
+  auto* ipc_manager = CLIO_IPC;
   if (!ipc_manager) return;
   switch (method) {
     default: {

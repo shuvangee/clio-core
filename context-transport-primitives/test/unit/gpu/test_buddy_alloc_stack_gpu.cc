@@ -45,31 +45,31 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "hermes_shm/memory/allocator/buddy_allocator.h"
-#include "hermes_shm/memory/backend/gpu_malloc.h"
-#include "hermes_shm/memory/backend/gpu_shm_mmap.h"
-#include "hermes_shm/util/gpu_api.h"
+#include "clio_ctp/memory/allocator/buddy_allocator.h"
+#include "clio_ctp/memory/backend/gpu_malloc.h"
+#include "clio_ctp/memory/backend/gpu_shm_mmap.h"
+#include "clio_ctp/util/gpu_api.h"
 
-using hipc::PrivateBuddyAllocator;
-using hshm::ipc::GpuMalloc;
-using hshm::ipc::GpuShmMmap;
-using hshm::ipc::MemoryBackend;
-using hshm::ipc::MemoryBackendId;
+using ctp::ipc::PrivateBuddyAllocator;
+using ctp::ipc::GpuMalloc;
+using ctp::ipc::GpuShmMmap;
+using ctp::ipc::MemoryBackend;
+using ctp::ipc::MemoryBackendId;
 
 // ─── Test struct ─────────────────────────────────────────────────────────────
 
 struct TestObj {
-  hshm::u32 magic_;
+  ctp::u32 magic_;
   char data_[60];
 
-  HSHM_INLINE_CROSS_FUN void Init(hshm::u32 val) {
+  CTP_INLINE_CROSS_FUN void Init(ctp::u32 val) {
     magic_ = val;
     for (int i = 0; i < 60; ++i) {
       data_[i] = static_cast<char>(val + i);
     }
   }
 
-  HSHM_INLINE_CROSS_FUN bool Check(hshm::u32 val) const {
+  CTP_INLINE_CROSS_FUN bool Check(ctp::u32 val) const {
     if (magic_ != val) return false;
     for (int i = 0; i < 60; ++i) {
       if (data_[i] != static_cast<char>(val + i)) return false;
@@ -94,7 +94,7 @@ struct TestObj {
  *  >0   number of successful allocations (on success path)
  */
 __global__ void StackBuddyAllocSharedKernel(
-    const hipc::MemoryBackend backend,
+    const ctp::ipc::MemoryBackend backend,
     int *d_results,
     int *d_alloc_count) {
   __shared__ char alloc_bytes[sizeof(PrivateBuddyAllocator)];
@@ -116,7 +116,7 @@ __global__ void StackBuddyAllocSharedKernel(
       while (true) {
         auto fp2 = alloc.template AllocateObjs<TestObj>(1);
         if (fp2.IsNull()) break;
-        fp2.ptr_->Init(static_cast<hshm::u32>(count + 1));
+        fp2.ptr_->Init(static_cast<ctp::u32>(count + 1));
         ++count;
       }
     }
@@ -139,7 +139,7 @@ __global__ void StackBuddyAllocSharedKernel(
  * in __shared__ memory over that slice.
  */
 __global__ void StackBuddyAllocMultiBlockKernel(
-    const hipc::MemoryBackend backend,
+    const ctp::ipc::MemoryBackend backend,
     size_t per_block_size,
     int *d_results,
     int *d_alloc_counts) {
@@ -155,7 +155,7 @@ __global__ void StackBuddyAllocMultiBlockKernel(
 
     // Clip the backend to this block's slice
     size_t block_off = static_cast<size_t>(bid) * per_block_size;
-    hipc::MemoryBackend clip = backend.Clip(block_off, per_block_size);
+    ctp::ipc::MemoryBackend clip = backend.Clip(block_off, per_block_size);
 
     alloc.shm_init(clip, 0, /*shifted=*/true);
 
@@ -165,7 +165,7 @@ __global__ void StackBuddyAllocMultiBlockKernel(
       auto fp = alloc.template AllocateObjs<TestObj>(1);
       if (fp.IsNull()) break;
 
-      hshm::u32 val = static_cast<hshm::u32>(bid * 10000 + count + 1);
+      ctp::u32 val = static_cast<ctp::u32>(bid * 10000 + count + 1);
       fp.ptr_->Init(val);
 
       if (!fp.ptr_->Check(val)) {
@@ -192,7 +192,7 @@ __global__ void StackBuddyAllocMultiBlockKernel(
  * Verifies that freed memory can be reused by the shifted allocator.
  */
 __global__ void StackBuddyAllocFreeKernel(
-    const hipc::MemoryBackend backend,
+    const ctp::ipc::MemoryBackend backend,
     int *d_results) {
   __shared__ char alloc_bytes[sizeof(PrivateBuddyAllocator)];
   PrivateBuddyAllocator &alloc =
@@ -208,14 +208,14 @@ __global__ void StackBuddyAllocFreeKernel(
     }
 
     // Phase 1: Allocate 100 objects
-    hipc::FullPtr<TestObj> ptrs[100];
+    ctp::ipc::FullPtr<TestObj> ptrs[100];
     for (int i = 0; i < 100; ++i) {
       ptrs[i] = alloc.template AllocateObjs<TestObj>(1);
       if (ptrs[i].IsNull()) {
         d_results[0] = -2;  // Could not allocate 100 objects
         return;
       }
-      ptrs[i].ptr_->Init(static_cast<hshm::u32>(i + 1));
+      ptrs[i].ptr_->Init(static_cast<ctp::u32>(i + 1));
     }
 
     // Phase 2: Free all
@@ -230,8 +230,8 @@ __global__ void StackBuddyAllocFreeKernel(
         d_results[0] = -3;  // Reallocation failed
         return;
       }
-      fp.ptr_->Init(static_cast<hshm::u32>(i + 1000));
-      if (!fp.ptr_->Check(static_cast<hshm::u32>(i + 1000))) {
+      fp.ptr_->Init(static_cast<ctp::u32>(i + 1000));
+      if (!fp.ptr_->Check(static_cast<ctp::u32>(i + 1000))) {
         d_results[0] = -4;  // Data corruption after realloc
         return;
       }
@@ -260,8 +260,8 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
     MemoryBackendId bid(50, 0);
     REQUIRE(backend.shm_init(bid, kBackendSize, "/test_stack_buddy_gpu", 0));
 
-    int *d_results = hshm::GpuApi::Malloc<int>(kBlockSize * sizeof(int));
-    int *d_count = hshm::GpuApi::Malloc<int>(sizeof(int));
+    int *d_results = ctp::GpuApi::Malloc<int>(kBlockSize * sizeof(int));
+    int *d_count = ctp::GpuApi::Malloc<int>(sizeof(int));
 
     StackBuddyAllocSharedKernel<<<1, kBlockSize>>>(
         static_cast<MemoryBackend &>(backend), d_results, d_count);
@@ -269,20 +269,20 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
     REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
 
     int h_count = 0;
-    hshm::GpuApi::Memcpy(&h_count, d_count, sizeof(int));
+    ctp::GpuApi::Memcpy(&h_count, d_count, sizeof(int));
     INFO("Allocated " << h_count << " TestObj (64 bytes each)");
     REQUIRE(h_count > 0);
 
     std::vector<int> h_results(kBlockSize, -99);
-    hshm::GpuApi::Memcpy(h_results.data(), d_results,
+    ctp::GpuApi::Memcpy(h_results.data(), d_results,
                           kBlockSize * sizeof(int));
     for (int i = 0; i < kBlockSize; ++i) {
       INFO("Thread " << i << " result: " << h_results[i]);
       REQUIRE(h_results[i] == 0);
     }
 
-    hshm::GpuApi::Free(d_results);
-    hshm::GpuApi::Free(d_count);
+    ctp::GpuApi::Free(d_results);
+    ctp::GpuApi::Free(d_count);
   }
 
   SECTION("Single block, __shared__ allocator, GpuMalloc backend (2)") {
@@ -294,8 +294,8 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
     REQUIRE(backend.shm_init(bid, kBackendSize,
                              "/test_stack_buddy_gpu2", 0));
 
-    int *d_results = hshm::GpuApi::Malloc<int>(kBlockSize * sizeof(int));
-    int *d_count = hshm::GpuApi::Malloc<int>(sizeof(int));
+    int *d_results = ctp::GpuApi::Malloc<int>(kBlockSize * sizeof(int));
+    int *d_count = ctp::GpuApi::Malloc<int>(sizeof(int));
 
     StackBuddyAllocSharedKernel<<<1, kBlockSize>>>(
         static_cast<MemoryBackend &>(backend), d_results, d_count);
@@ -303,20 +303,20 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
     REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
 
     int h_count = 0;
-    hshm::GpuApi::Memcpy(&h_count, d_count, sizeof(int));
+    ctp::GpuApi::Memcpy(&h_count, d_count, sizeof(int));
     INFO("Allocated " << h_count << " TestObj (64 bytes each)");
     REQUIRE(h_count > 0);
 
     std::vector<int> h_results(kBlockSize, -99);
-    hshm::GpuApi::Memcpy(h_results.data(), d_results,
+    ctp::GpuApi::Memcpy(h_results.data(), d_results,
                           kBlockSize * sizeof(int));
     for (int i = 0; i < kBlockSize; ++i) {
       INFO("Thread " << i << " result: " << h_results[i]);
       REQUIRE(h_results[i] == 0);
     }
 
-    hshm::GpuApi::Free(d_results);
-    hshm::GpuApi::Free(d_count);
+    ctp::GpuApi::Free(d_results);
+    ctp::GpuApi::Free(d_count);
   }
 
   SECTION("Multi-block, per-block __shared__ allocator with Clip") {
@@ -324,7 +324,7 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
     constexpr int kBlockSize = 32;
     constexpr size_t kPerBlockSize = 1 * 1024 * 1024;  // 1 MB per block
     // Account for kBackendHeaderSize so each block gets a full kPerBlockSize of data
-    constexpr size_t kBackendSize = kNumBlocks * kPerBlockSize + hshm::ipc::kBackendHeaderSize;
+    constexpr size_t kBackendSize = kNumBlocks * kPerBlockSize + ctp::ipc::kBackendHeaderSize;
 
     GpuMalloc backend;
     MemoryBackendId bid(52, 0);
@@ -332,8 +332,8 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
                              "/test_stack_buddy_multi", 0));
 
     int total_threads = kNumBlocks * kBlockSize;
-    int *d_results = hshm::GpuApi::Malloc<int>(total_threads * sizeof(int));
-    int *d_counts = hshm::GpuApi::Malloc<int>(kNumBlocks * sizeof(int));
+    int *d_results = ctp::GpuApi::Malloc<int>(total_threads * sizeof(int));
+    int *d_counts = ctp::GpuApi::Malloc<int>(kNumBlocks * sizeof(int));
     cudaMemset(d_results, 0, total_threads * sizeof(int));
     cudaMemset(d_counts, 0, kNumBlocks * sizeof(int));
 
@@ -344,7 +344,7 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
     REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
 
     std::vector<int> h_counts(kNumBlocks);
-    hshm::GpuApi::Memcpy(h_counts.data(), d_counts,
+    ctp::GpuApi::Memcpy(h_counts.data(), d_counts,
                           kNumBlocks * sizeof(int));
     for (int b = 0; b < kNumBlocks; ++b) {
       INFO("Block " << b << " allocated " << h_counts[b] << " objects");
@@ -352,15 +352,15 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
     }
 
     std::vector<int> h_results(total_threads, -99);
-    hshm::GpuApi::Memcpy(h_results.data(), d_results,
+    ctp::GpuApi::Memcpy(h_results.data(), d_results,
                           total_threads * sizeof(int));
     for (int i = 0; i < total_threads; ++i) {
       INFO("Global thread " << i << " result: " << h_results[i]);
       REQUIRE(h_results[i] == 0);
     }
 
-    hshm::GpuApi::Free(d_results);
-    hshm::GpuApi::Free(d_counts);
+    ctp::GpuApi::Free(d_results);
+    ctp::GpuApi::Free(d_counts);
   }
 
   SECTION("Alloc-free-realloc cycle") {
@@ -372,7 +372,7 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
     REQUIRE(backend.shm_init(bid, kBackendSize,
                              "/test_stack_buddy_free", 0));
 
-    int *d_results = hshm::GpuApi::Malloc<int>(kBlockSize * sizeof(int));
+    int *d_results = ctp::GpuApi::Malloc<int>(kBlockSize * sizeof(int));
 
     StackBuddyAllocFreeKernel<<<1, kBlockSize>>>(
         static_cast<MemoryBackend &>(backend), d_results);
@@ -380,13 +380,13 @@ TEST_CASE("PrivateBuddyAllocator shifted on GPU",
     REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
 
     std::vector<int> h_results(kBlockSize, -99);
-    hshm::GpuApi::Memcpy(h_results.data(), d_results,
+    ctp::GpuApi::Memcpy(h_results.data(), d_results,
                           kBlockSize * sizeof(int));
     for (int i = 0; i < kBlockSize; ++i) {
       INFO("Thread " << i << " result: " << h_results[i]);
       REQUIRE(h_results[i] == 0);
     }
 
-    hshm::GpuApi::Free(d_results);
+    ctp::GpuApi::Free(d_results);
   }
 }

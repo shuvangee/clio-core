@@ -356,7 +356,7 @@ cmake --preset=debug -DWRP_CORE_ENABLE_COMPRESS=ON
 - **CUDA Setup**: [CUDA_SETUP.md](CUDA_SETUP.md)
 - **Project Documentation**: [../CLAUDE.md](../CLAUDE.md)
 - **Contributing Guide**: [../docs/contributing.md](../docs/contributing.md)
-- **ChiMod Development**: [../context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md](../context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md)
+- **Module Development**: [../context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md](../context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md)
 
 ## Quick Reference
 

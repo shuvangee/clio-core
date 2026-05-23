@@ -49,19 +49,19 @@
 
 using namespace std::chrono_literals;
 
-// Include Chimaera headers
-#include <chimaera/chimaera.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+// Include CLIO Runtime headers
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 
 // Include MOD_NAME client and tasks for testing
-#include <chimaera/MOD_NAME/MOD_NAME_client.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_client.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
 
 // Include admin client for pool management
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 namespace {
 // Test configuration constants
@@ -99,7 +99,7 @@ chi::PoolId getSharedTestPoolId() {
 class StreamingTestFixture {
 public:
   StreamingTestFixture() : test_pool_id_(getSharedTestPoolId()) {
-    // Initialize Chimaera once per test suite
+    // Initialize CLIO Runtime once per test suite
     if (!g_initialized) {
       INFO("Initializing Chimaera for streaming tests...");
       bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
@@ -109,14 +109,14 @@ public:
         std::this_thread::sleep_for(500ms);
 
         // Verify core managers are available
-        REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-        REQUIRE(CHI_IPC != nullptr);
-        REQUIRE(CHI_POOL_MANAGER != nullptr);
-        REQUIRE(CHI_MODULE_MANAGER != nullptr);
-        REQUIRE(CHI_WORK_ORCHESTRATOR != nullptr);
+        REQUIRE(CLIO_RUNTIME_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC != nullptr);
+        REQUIRE(CLIO_POOL_MANAGER != nullptr);
+        REQUIRE(CLIO_MODULE_MANAGER != nullptr);
+        REQUIRE(CLIO_WORK_ORCHESTRATOR != nullptr);
 
         // Verify client can access IPC manager
-        REQUIRE(CHI_IPC->IsInitialized());
+        REQUIRE(CLIO_IPC->IsInitialized());
 
         INFO("Chimaera initialization successful");
       } else {
@@ -131,7 +131,7 @@ public:
    * Wait for task completion with timeout
    */
   template <typename TaskT>
-  bool waitForTaskCompletion(hipc::FullPtr<TaskT> task,
+  bool waitForTaskCompletion(ctp::ipc::FullPtr<TaskT> task,
                              chi::u32 timeout_ms = kTestTimeoutMs) {
     if (task.IsNull()) {
       return false;
@@ -147,7 +147,7 @@ public:
         return false;
       }
 
-      HSHM_THREAD_MODEL->Yield();
+      CTP_THREAD_MODEL->Yield();
     }
 
     return true;
@@ -183,11 +183,11 @@ public:
   bool createModNamePool() {
     try {
       // Initialize admin client
-      // Admin client is automatically initialized via CHI_ADMIN singleton
+      // Admin client is automatically initialized via CLIO_ADMIN singleton
       chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
 
       // Create MOD_NAME client and container directly with dynamic pool ID
-      chimaera::MOD_NAME::Client mod_name_client(test_pool_id_);
+      clio::run::MOD_NAME::Client mod_name_client(test_pool_id_);
       std::string mod_pool_name = "test_streaming_pool";
       auto create_task =
           mod_name_client.AsyncCreate(pool_query, mod_pool_name, test_pool_id_);
@@ -228,7 +228,7 @@ TEST_CASE("MOD_NAME Small Output Test", "[streaming][small]") {
   REQUIRE(fixture.createModNamePool());
 
   // Create client
-  chimaera::MOD_NAME::Client client(fixture.test_pool_id_);
+  clio::run::MOD_NAME::Client client(fixture.test_pool_id_);
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
 
   // Create a custom task with 2KB of data (fits in default copy space)
@@ -275,7 +275,7 @@ TEST_CASE("MOD_NAME Large Output Streaming Test", "[streaming][large]") {
   REQUIRE(fixture.createModNamePool());
 
   // Create client
-  chimaera::MOD_NAME::Client client(fixture.test_pool_id_);
+  clio::run::MOD_NAME::Client client(fixture.test_pool_id_);
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
 
   // Create a TestLargeOutput task (returns 1MB of data)
@@ -331,12 +331,12 @@ TEST_CASE("MOD_NAME Concurrent Streaming Test", "[streaming][concurrent]") {
   REQUIRE(fixture.createModNamePool());
 
   // Create client
-  chimaera::MOD_NAME::Client client(fixture.test_pool_id_);
+  clio::run::MOD_NAME::Client client(fixture.test_pool_id_);
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
 
   // Create 5 concurrent tasks with large outputs
   constexpr size_t kNumTasks = 5;
-  std::vector<chi::Future<chimaera::MOD_NAME::TestLargeOutputTask>> tasks;
+  std::vector<chi::Future<clio::run::MOD_NAME::TestLargeOutputTask>> tasks;
 
   INFO("Creating " << kNumTasks << " concurrent TestLargeOutput tasks...");
   auto start_time = std::chrono::high_resolution_clock::now();

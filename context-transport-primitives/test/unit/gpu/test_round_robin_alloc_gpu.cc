@@ -43,10 +43,10 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "hermes_shm/memory/allocator/round_robin_allocator.h"
-#include "hermes_shm/util/gpu_api.h"
+#include "clio_ctp/memory/allocator/round_robin_allocator.h"
+#include "clio_ctp/util/gpu_api.h"
 
-using hipc::RoundRobinAllocator;
+using ctp::ipc::RoundRobinAllocator;
 
 // ============================================================================
 // CDP child kernel: allocate, write pattern, read back, verify, free
@@ -137,7 +137,7 @@ __global__ void RrChildKernel(
 
   // Free the buffer
   if (threadIdx.x == 0) {
-    hipc::OffsetPtr<> off;
+    ctp::ipc::OffsetPtr<> off;
     off = s_off;
     alloc->FreeOffset(off);
   }
@@ -176,10 +176,10 @@ __global__ void RrParentKernel(
   auto *alloc = reinterpret_cast<RoundRobinAllocator *>(alloc_base);
   new (alloc) RoundRobinAllocator();
 
-  hipc::MemoryBackend backend;
+  ctp::ipc::MemoryBackend backend;
   backend.data_ = alloc_base;
   backend.data_capacity_ = alloc_capacity;
-  backend.id_ = hipc::MemoryBackendId(999, 0);
+  backend.id_ = ctp::ipc::MemoryBackendId(999, 0);
 
   alloc->shm_init(backend, 0, num_partitions, 0);
   alloc->MarkReady();
@@ -215,7 +215,7 @@ TEST_CASE("RoundRobinAllocator - CDP concurrent alloc/free", "[gpu][allocator]")
   cudaDeviceSetLimit(cudaLimitStackSize, 16384);
 
   // Allocate device memory for the allocator
-  char *d_alloc = hshm::GpuApi::Malloc<char>(kAllocatorCapacity);
+  char *d_alloc = ctp::GpuApi::Malloc<char>(kAllocatorCapacity);
   REQUIRE(d_alloc != nullptr);
 
   // Allocate pinned host memory for results + done flag
@@ -227,7 +227,7 @@ TEST_CASE("RoundRobinAllocator - CDP concurrent alloc/free", "[gpu][allocator]")
   *h_done = 0;
 
   // Launch parent kernel
-  void *stream = hshm::GpuApi::CreateStream();
+  void *stream = ctp::GpuApi::CreateStream();
   RrParentKernel<<<1, 1, 0, static_cast<cudaStream_t>(stream)>>>(
       d_alloc, kAllocatorCapacity, kNumPartitions, kNumChildren,
       kAllocSize, h_results, h_done);
@@ -236,8 +236,8 @@ TEST_CASE("RoundRobinAllocator - CDP concurrent alloc/free", "[gpu][allocator]")
   REQUIRE(launch_err == cudaSuccess);
 
   // Wait for parent to complete (includes all children via cudaDeviceSynchronize)
-  hshm::GpuApi::Synchronize(stream);
-  hshm::GpuApi::DestroyStream(stream);
+  ctp::GpuApi::Synchronize(stream);
+  ctp::GpuApi::DestroyStream(stream);
 
   REQUIRE(*h_done == 1);
 
@@ -256,7 +256,7 @@ TEST_CASE("RoundRobinAllocator - CDP concurrent alloc/free", "[gpu][allocator]")
   REQUIRE(fail_count == 0);
 
   // Cleanup
-  hshm::GpuApi::Free(d_alloc);
+  ctp::GpuApi::Free(d_alloc);
   cudaFreeHost(h_results);
   cudaFreeHost(h_done);
 }
@@ -270,7 +270,7 @@ TEST_CASE("RoundRobinAllocator - CDP many children stress", "[gpu][allocator][st
   cudaDeviceSetLimit(cudaLimitDevRuntimePendingLaunchCount, 256);
   cudaDeviceSetLimit(cudaLimitStackSize, 16384);
 
-  char *d_alloc = hshm::GpuApi::Malloc<char>(kAllocatorCapacity);
+  char *d_alloc = ctp::GpuApi::Malloc<char>(kAllocatorCapacity);
   REQUIRE(d_alloc != nullptr);
 
   int *h_results;
@@ -280,14 +280,14 @@ TEST_CASE("RoundRobinAllocator - CDP many children stress", "[gpu][allocator][st
   memset(h_results, 0, kNumChildren * sizeof(int));
   *h_done = 0;
 
-  void *stream = hshm::GpuApi::CreateStream();
+  void *stream = ctp::GpuApi::CreateStream();
   RrParentKernel<<<1, 1, 0, static_cast<cudaStream_t>(stream)>>>(
       d_alloc, kAllocatorCapacity, kNumPartitions, kNumChildren,
       kAllocSize, h_results, h_done);
 
   REQUIRE(cudaGetLastError() == cudaSuccess);
-  hshm::GpuApi::Synchronize(stream);
-  hshm::GpuApi::DestroyStream(stream);
+  ctp::GpuApi::Synchronize(stream);
+  ctp::GpuApi::DestroyStream(stream);
 
   REQUIRE(*h_done == 1);
 
@@ -299,7 +299,7 @@ TEST_CASE("RoundRobinAllocator - CDP many children stress", "[gpu][allocator][st
   INFO("Passed: " << pass_count << " / " << kNumChildren);
   REQUIRE(pass_count == kNumChildren);
 
-  hshm::GpuApi::Free(d_alloc);
+  ctp::GpuApi::Free(d_alloc);
   cudaFreeHost(h_results);
   cudaFreeHost(h_done);
 }

@@ -21,10 +21,10 @@ enable_testing()
 # yaml-cpp is already found by root CMakeLists.txt
 
 # Conditionally find HDF5 if enabled
-if(WRP_CAE_ENABLE_HDF5)
+if(CLIO_CAE_ENABLE_HDF5)
   # HDF5 is already found by root CMakeLists.txt
   if(NOT HDF5_FOUND)
-    message(WARNING "WRP_CAE_ENABLE_HDF5 is ON but HDF5 not found. HDF5 tests will be disabled.")
+    message(WARNING "CLIO_CAE_ENABLE_HDF5 is ON but HDF5 not found. HDF5 tests will be disabled.")
     set(HDF5_ENABLED FALSE)
   else()
     set(HDF5_ENABLED TRUE)
@@ -57,10 +57,10 @@ function(add_cae_unit_test TEST_NAME TEST_SOURCE)
   # Link common dependencies
   target_link_libraries(${TEST_NAME}
     PRIVATE
-      wrp_cae_core_client
-      wrp_cte_core_client
+      clio_cae_core_client
+      clio_cte_core_client
       chimaera::cxx
-      hshm::configure
+      ctp::configure
       ${ARG_EXTRA_LIBS}
   )
 
@@ -79,7 +79,7 @@ function(add_cae_unit_test TEST_NAME TEST_SOURCE)
 
   # Set test environment variables
   set_tests_properties(${TEST_NAME} PROPERTIES
-    ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/wrp_config.yaml;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+    ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/clio_config.yaml;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CLIO_BIND_ADDR=127.0.0.1;CLIO_PORT=10500"
     TIMEOUT 300  # 5 minute timeout
   )
 endfunction()
@@ -100,7 +100,7 @@ add_cae_unit_test(cae_binary_assim
 # Install test configuration
 install(FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/binary_assim/binary_assim_omni.yaml
-  DESTINATION share/wrp_cae/test/binary_assim
+  DESTINATION share/clio_cae/test/binary_assim
 )
 
 #------------------------------------------------------------------------------
@@ -117,7 +117,7 @@ add_cae_unit_test(cae_range_assim
 
 # Set smaller file size for range test to speed up CI
 set_tests_properties(cae_range_assim PROPERTIES
-  ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/wrp_config.yaml;TEST_FILE_SIZE=10;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"  # 10MB instead of default
+  ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/clio_config.yaml;TEST_FILE_SIZE=10;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CLIO_BIND_ADDR=127.0.0.1;CLIO_PORT=10500"  # 10MB instead of default
 )
 
 #------------------------------------------------------------------------------
@@ -156,11 +156,11 @@ target_include_directories(test_cae_comprehensive
 
 target_link_libraries(test_cae_comprehensive
   PRIVATE
-    wrp_cae_core_client
-    wrp_cte_core_client
+    clio_cae_core_client
+    clio_cte_core_client
     chimaera::admin_runtime
     chimaera::bdev_runtime
-    hshm::cxx
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -198,7 +198,7 @@ set_tests_properties(
   PROPERTIES
     TIMEOUT 120
     LABELS "coverage;comprehensive;msan_skip"
-    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CLIO_BIND_ADDR=127.0.0.1;CLIO_PORT=10500"
 )
 
 #------------------------------------------------------------------------------
@@ -209,7 +209,7 @@ set_tests_properties(
 # - Tests dataset discovery and transfer
 # - Validates metadata and tensor information
 # - Tests hierarchical group structures
-# Note: Requires WRP_CORE_ENABLE_HDF5=ON
+# Note: Requires CLIO_CORE_ENABLE_HDF5=ON
 #------------------------------------------------------------------------------
 if(HDF5_ENABLED)
   add_cae_unit_test(cae_hdf5_assim
@@ -252,7 +252,7 @@ set_tests_properties(cae_error_handling PROPERTIES LABELS "core;validation;msan_
 # - Autogen core_lib_exec.cc kExportData cases exercised via AsyncExportData
 #
 # NOTE: All ExportData tests are consolidated into two CTest targets (task and
-# runtime) to avoid starting the Chimaera runtime multiple times on the same
+# runtime) to avoid starting the CLIO Runtime runtime multiple times on the same
 # port (which causes TIME_WAIT failures for subsequent processes).
 #------------------------------------------------------------------------------
 add_executable(test_export_data
@@ -267,15 +267,15 @@ target_include_directories(test_export_data
 
 target_link_libraries(test_export_data
   PRIVATE
-    wrp_cae_core_client
-    wrp_cte_core_client
+    clio_cae_core_client
+    clio_cte_core_client
     chimaera::cxx
-    hshm::configure
+    ctp::configure
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
 if(HDF5_ENABLED)
-  target_compile_definitions(test_export_data PRIVATE WRP_CAE_ENABLE_HDF5)
+  target_compile_definitions(test_export_data PRIVATE CLIO_CAE_ENABLE_HDF5)
   target_link_libraries(test_export_data PRIVATE ${HDF5_LIBRARIES})
   target_include_directories(test_export_data PRIVATE ${HDF5_INCLUDE_DIRS})
 endif()
@@ -296,7 +296,7 @@ set_tests_properties(
   PROPERTIES
     TIMEOUT 300
     LABELS "coverage;export;msan_skip"
-    ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/wrp_config.yaml;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+    ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/clio_config.yaml;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CLIO_BIND_ADDR=127.0.0.1;CLIO_PORT=10500"
 )
 
 #------------------------------------------------------------------------------

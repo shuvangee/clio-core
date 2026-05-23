@@ -56,7 +56,7 @@
  *   Example: grayscott:70,gaussian:20,uniform:10
  *
  * Environment variables:
- *   WRP_CTE_COMPRESS_TRACE: Set to "on" to enable compression tracing
+ *   CLIO_CTE_COMPRESS_TRACE: Set to "on" to enable compression tracing
  */
 
 #include <mpi.h>
@@ -74,18 +74,18 @@
 #include <getopt.h>
 #include <ctime>
 
-#include <chimaera/chimaera.h>
-#include <hermes_shm/util/logging.h>
-#include <hermes_shm/util/config_parse.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/compressor/compressor_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_ctp/util/logging.h>
+#include <clio_ctp/util/config_parse.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/compressor/compressor_client.h>
 
 #include "synthetic_data_generator.h"
 
 // Use the pattern types from the header
-using PatternType = wrp_cte::PatternType;
-using PatternSpec = wrp_cte::PatternSpec;
-using DataGenerator = wrp_cte::SyntheticDataGenerator;
+using PatternType = clio::cte::PatternType;
+using PatternSpec = clio::cte::PatternSpec;
+using DataGenerator = clio::cte::SyntheticDataGenerator;
 
 // Configuration structure
 struct WorkloadConfig {
@@ -177,10 +177,10 @@ WorkloadConfig ParseArgs(int argc, char** argv) {
   while ((opt = getopt_long(argc, argv, "i:t:c:n:p:x:o:Th", long_options, &option_index)) != -1) {
     switch (opt) {
       case 'i':
-        config.io_size_per_rank = hshm::ConfigParse::ParseSize(optarg);
+        config.io_size_per_rank = ctp::ConfigParse::ParseSize(optarg);
         break;
       case 't':
-        config.transfer_size = hshm::ConfigParse::ParseSize(optarg);
+        config.transfer_size = ctp::ConfigParse::ParseSize(optarg);
         break;
       case 'c':
         config.compute_time_ms = std::stoi(optarg);
@@ -262,8 +262,8 @@ int main(int argc, char** argv) {
     HLOG(kInfo, "======================================");
   }
 
-  // Initialize CTE client (assumes Chimaera runtime is already running)
-  if (!wrp_cte::core::WRP_CTE_CLIENT_INIT("", chi::PoolQuery::Local())) {
+  // Initialize CTE client (assumes CLIO Runtime runtime is already running)
+  if (!clio::cte::core::CLIO_CTE_CLIENT_INIT("", chi::PoolQuery::Local())) {
     if (rank == 0) {
       HLOG(kError, "Failed to initialize CTE client. Make sure chimaera runtime is started.");
     }
@@ -272,16 +272,16 @@ int main(int argc, char** argv) {
   }
 
   // Get the global CTE client
-  (void)wrp_cte::core::g_cte_client;  // Client is accessed via Tag class
+  (void)clio::cte::core::g_cte_client;  // Client is accessed via Tag class
 
   // Create compressor client if compression is enabled
-  std::unique_ptr<wrp_cte::compressor::Client> compressor_client;
+  std::unique_ptr<clio::cte::compressor::Client> compressor_client;
 
   if (config.compress_option != "none") {
-    compressor_client = std::make_unique<wrp_cte::compressor::Client>();
+    compressor_client = std::make_unique<clio::cte::compressor::Client>();
     auto create_task = compressor_client->AsyncCreate(
         chi::PoolQuery::Local(),
-        "wrp_cte_compressor",
+        "clio_cte_compressor",
         chi::PoolId(513, 0));
     create_task.Wait();
     if (create_task->GetReturnCode() == 0) {
@@ -299,7 +299,7 @@ int main(int argc, char** argv) {
 
   // Create tag for this workload
   std::string tag_name = "synthetic_workload_" + std::to_string(rank);
-  wrp_cte::core::Tag tag(tag_name);
+  clio::cte::core::Tag tag(tag_name);
 
   // Timing statistics
   std::vector<double> compute_times;
@@ -312,8 +312,8 @@ int main(int argc, char** argv) {
   bool use_dynamic = (compress_lib == -1);
 
   // Pending async operations from previous iteration
-  std::vector<chi::Future<wrp_cte::core::PutBlobTask>> pending_futures;
-  std::vector<hipc::FullPtr<char>> pending_buffers;  // Keep SHM buffers alive
+  std::vector<chi::Future<clio::cte::core::PutBlobTask>> pending_futures;
+  std::vector<ctp::ipc::FullPtr<char>> pending_buffers;  // Keep SHM buffers alive
 
   // Start end-to-end wall clock timer
   MPI_Barrier(MPI_COMM_WORLD);
@@ -332,7 +332,7 @@ int main(int argc, char** argv) {
       pending_futures.clear();
       // Release SHM buffers now that operations are complete
       for (auto& buf : pending_buffers) {
-        CHI_IPC->FreeBuffer(buf);
+        CLIO_IPC->FreeBuffer(buf);
       }
       pending_buffers.clear();
     }
@@ -350,7 +350,7 @@ int main(int argc, char** argv) {
     auto io_start = std::chrono::steady_clock::now();
 
     // Create context for compression
-    wrp_cte::core::Context context;
+    clio::cte::core::Context context;
     context.dynamic_compress_ = use_dynamic ? 2 : (compress_lib > 0 ? 1 : 0);
     context.compress_lib_ = use_dynamic ? 0 : compress_lib;
     context.compress_preset_ = 2;  // Balanced
@@ -369,7 +369,7 @@ int main(int argc, char** argv) {
                               "_chunk" + std::to_string(bytes_written / config.transfer_size);
 
       // Allocate shared memory for async operation
-      auto shm_buffer = CHI_IPC->AllocateBuffer(chunk_size);
+      auto shm_buffer = CLIO_IPC->AllocateBuffer(chunk_size);
 
       // Copy data to shared memory
       const char* chunk_ptr = reinterpret_cast<const char*>(
@@ -377,7 +377,7 @@ int main(int argc, char** argv) {
       std::memcpy(shm_buffer.ptr_, chunk_ptr, chunk_size);
 
       // Convert ShmPtr<char> to ShmPtr<void> for async put
-      hipc::ShmPtr<> shm_ptr(shm_buffer.shm_);
+      ctp::ipc::ShmPtr<> shm_ptr(shm_buffer.shm_);
 
       // Async put blob with compression context
       auto future = tag.AsyncPutBlob(blob_name, shm_ptr, chunk_size,
@@ -413,7 +413,7 @@ int main(int argc, char** argv) {
     future.Wait();
   }
   for (auto& buf : pending_buffers) {
-    CHI_IPC->FreeBuffer(buf);
+    CLIO_IPC->FreeBuffer(buf);
   }
   pending_futures.clear();
   pending_buffers.clear();

@@ -32,11 +32,11 @@
  */
 
 #include "basic_test.h"
-#include "hermes_shm/thread/lock.h"
+#include "clio_ctp/thread/lock.h"
 #include "omp.h"
 
-using hshm::Mutex;
-using hshm::RwLock;
+using ctp::Mutex;
+using ctp::RwLock;
 
 void MutexTest(int nthreads) {
   size_t loop_count = 10000;
@@ -101,11 +101,11 @@ TEST_CASE("RwLock") {
   RwLockTest(4, 4, 1000000);
 }
 
-#if HSHM_ENABLE_THALLIUM
+#if CTP_ENABLE_THALLIUM
 TEST_CASE("AbtThread") {
-  hshm::thread::Argobots argobots;
-  hshm::thread::ThreadGroup group = argobots.CreateThreadGroup({});
-  hshm::thread::Thread thread = argobots.Spawn(
+  ctp::thread::Argobots argobots;
+  ctp::thread::ThreadGroup group = argobots.CreateThreadGroup({});
+  ctp::thread::Thread thread = argobots.Spawn(
       group,
       [](int tid) { std::cout << "Hello, world! (abt) " << tid << std::endl; },
       1);
@@ -113,11 +113,11 @@ TEST_CASE("AbtThread") {
 }
 #endif
 
-#ifdef HSHM_ENABLE_PTHREADS
+#ifdef CTP_ENABLE_PTHREADS
 TEST_CASE("Pthread") {
-  hshm::thread::Pthread pthread;
-  hshm::thread::ThreadGroup group = pthread.CreateThreadGroup({});
-  hshm::thread::Thread thread = pthread.Spawn(
+  ctp::thread::Pthread pthread;
+  ctp::thread::ThreadGroup group = pthread.CreateThreadGroup({});
+  ctp::thread::Thread thread = pthread.Spawn(
       group,
       [](int tid) {
         std::cout << "Hello, world! (pthread) " << tid << std::endl;
@@ -128,9 +128,9 @@ TEST_CASE("Pthread") {
 #endif
 
 TEST_CASE("StdThread") {
-  hshm::thread::StdThread std_thread;
-  hshm::thread::ThreadGroup group = std_thread.CreateThreadGroup({});
-  hshm::thread::Thread thread = std_thread.Spawn(
+  ctp::thread::StdThread std_thread;
+  ctp::thread::ThreadGroup group = std_thread.CreateThreadGroup({});
+  ctp::thread::Thread thread = std_thread.Spawn(
       group,
       [](int tid) { std::cout << "Hello, world! (std) " << tid << std::endl; },
       1);

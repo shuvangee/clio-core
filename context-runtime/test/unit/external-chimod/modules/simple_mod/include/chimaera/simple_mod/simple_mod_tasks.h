@@ -34,8 +34,8 @@
 #ifndef SIMPLE_MOD_TASKS_H_
 #define SIMPLE_MOD_TASKS_H_
 
-#include <chimaera/chimaera.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 #include "autogen/simple_mod_methods.h"
 
@@ -72,13 +72,13 @@ struct CreateParams {
  * CreateTask - Simple mod container creation task
  * Uses the standard BaseCreateTask template from admin module
  */
-using CreateTask = chimaera::admin::GetOrCreatePoolTask<CreateParams>;
+using CreateTask = clio::run::admin::GetOrCreatePoolTask<CreateParams>;
 
 /**
  * Standard DestroyTask for simple_mod
  * Uses the reusable DestroyTask from admin module
  */
-using DestroyTask = chimaera::admin::DestroyTask;
+using DestroyTask = clio::run::admin::DestroyTask;
 
 /**
  * FlushTask - Simple flush task for simple_mod
@@ -111,7 +111,7 @@ struct FlushTask : public chi::Task {
    * No additional parameters for FlushTask
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeIn(Archive &ar) {
+  CTP_CROSS_FUN void SerializeIn(Archive &ar) {
     Task::SerializeIn(ar);
     // No parameters to serialize for flush
     (void)ar;
@@ -122,7 +122,7 @@ struct FlushTask : public chi::Task {
    * This includes: total_work_done_
    */
   template <typename Archive>
-  HSHM_CROSS_FUN void SerializeOut(Archive &ar) {
+  CTP_CROSS_FUN void SerializeOut(Archive &ar) {
     Task::SerializeOut(ar);
     ar(total_work_done_);
   }
@@ -130,7 +130,7 @@ struct FlushTask : public chi::Task {
   /**
    * Copy from another FlushTask
    */
-  void Copy(const hipc::FullPtr<FlushTask> &other) {
+  void Copy(const ctp::ipc::FullPtr<FlushTask> &other) {
     // Copy base Task fields
     Task::Copy(other.template Cast<Task>());
     total_work_done_ = other->total_work_done_;
@@ -140,7 +140,7 @@ struct FlushTask : public chi::Task {
    * Aggregate replica results into this task
    * @param other Pointer to the replica task to aggregate from
    */
-  void Aggregate(const hipc::FullPtr<chi::Task> &other_base) {
+  void Aggregate(const ctp::ipc::FullPtr<chi::Task> &other_base) {
     Task::Aggregate(other_base);
     Copy(other_base.template Cast<FlushTask>());
   }

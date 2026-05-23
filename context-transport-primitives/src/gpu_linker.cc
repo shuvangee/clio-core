@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "hermes_shm/util/gpu_linker.h"
-#include "hermes_shm/util/logging.h"
+#include "clio_ctp/util/gpu_linker.h"
+#include "clio_ctp/util/logging.h"
 
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
 #include <cuda.h>
 #endif
 
-namespace hshm {
+namespace ctp {
 
 GpuLinker::GpuLinker() = default;
 
@@ -53,7 +53,7 @@ void GpuLinker::AddModule(const std::string &name, const void *fatbin,
 }
 
 bool GpuLinker::Link() {
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
   if (modules_.empty()) {
     HLOG(kError, "GpuLinker::Link: No modules registered");
     return false;
@@ -166,7 +166,7 @@ bool GpuLinker::Link() {
 }
 
 void *GpuLinker::GetFunction(const char *kernel_name) {
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
   if (!linked_ || !cu_module_) {
     HLOG(kError, "GpuLinker::GetFunction: Not linked");
     return nullptr;
@@ -193,7 +193,7 @@ bool GpuLinker::LaunchKernel(void *func, unsigned gridX, unsigned gridY,
                              unsigned gridZ, unsigned blockX, unsigned blockY,
                              unsigned blockZ, unsigned sharedMem,
                              void *stream, void **params) {
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
   if (!func) {
     HLOG(kError, "GpuLinker::LaunchKernel: null function");
     return false;
@@ -220,7 +220,7 @@ bool GpuLinker::LaunchKernel(void *func, unsigned gridX, unsigned gridY,
 }
 
 void GpuLinker::Unload() {
-#if HSHM_ENABLE_CUDA
+#if CTP_ENABLE_CUDA
   if (cu_module_) {
     cuModuleUnload(reinterpret_cast<CUmodule>(cu_module_));
     cu_module_ = nullptr;
@@ -233,4 +233,4 @@ bool GpuLinker::IsLinked() const {
   return linked_;
 }
 
-}  // namespace hshm
+}  // namespace ctp

@@ -35,19 +35,19 @@
  * Unit tests for ShmTransport Send/Recv (SPSC ring buffer)
  *
  * Tests the chunked data transfer mechanism using ShmTransferInfo and
- * copy_space directly, without requiring the full Chimaera runtime.
+ * copy_space directly, without requiring the full CLIO Runtime runtime.
  */
 
 #include <catch2/catch_all.hpp>
 
-#include <hermes_shm/lightbeam/shm_transport.h>
+#include <clio_ctp/lightbeam/shm_transport.h>
 
 #include <chrono>
 #include <cstring>
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 // Helper context for tests
 template <size_t N>
@@ -95,10 +95,10 @@ static LbmMeta<> MakeSendMeta(std::vector<char>& data) {
   LbmMeta<> meta;
   Bulk bulk;
   bulk.data.ptr_ = data.data();
-  bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
+  bulk.data.shm_.alloc_id_ = ctp::ipc::AllocatorId::GetNull();
   bulk.data.shm_.off_ = 0;
   bulk.size = data.size();
-  bulk.flags = hshm::bitfield32_t(BULK_XFER);
+  bulk.flags = ctp::bitfield32_t(BULK_XFER);
   meta.send.push_back(bulk);
   meta.send_bulks = 1;
   return meta;
@@ -344,10 +344,10 @@ TEST_CASE("ShmTransfer - Send/Recv Basic", "[shm_transfer][sendrecv]") {
   std::vector<char> bulk_data = GenerateTestData(DATA_SIZE);
   Bulk bulk;
   bulk.data.ptr_ = bulk_data.data();
-  bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
+  bulk.data.shm_.alloc_id_ = ctp::ipc::AllocatorId::GetNull();
   bulk.data.shm_.off_ = 0;
   bulk.size = DATA_SIZE;
-  bulk.flags = hshm::bitfield32_t(BULK_XFER);
+  bulk.flags = ctp::bitfield32_t(BULK_XFER);
   send_meta.send.push_back(bulk);
   send_meta.send_bulks = 1;
 
@@ -399,10 +399,10 @@ TEST_CASE("ShmTransfer - Send/Recv Large Multi-Chunk", "[shm_transfer][sendrecv]
   std::vector<char> bulk_data = GenerateTestData(DATA_SIZE);
   Bulk bulk;
   bulk.data.ptr_ = bulk_data.data();
-  bulk.data.shm_.alloc_id_ = hipc::AllocatorId::GetNull();
+  bulk.data.shm_.alloc_id_ = ctp::ipc::AllocatorId::GetNull();
   bulk.data.shm_.off_ = 0;
   bulk.size = DATA_SIZE;
-  bulk.flags = hshm::bitfield32_t(BULK_XFER);
+  bulk.flags = ctp::bitfield32_t(BULK_XFER);
   send_meta.send.push_back(bulk);
   send_meta.send_bulks = 1;
 

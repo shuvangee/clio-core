@@ -17,8 +17,8 @@ PID_DIR="$SCRIPT_DIR/.pids"
 
 export PATH="$BUILD_BIN:$PATH"
 export LD_LIBRARY_PATH="$BUILD_BIN:${LD_LIBRARY_PATH:-}"
-export WRP_RUNTIME_CONF="$SCRIPT_DIR/cte_config.yaml"
-export HSHM_LOG_LEVEL=info
+export CLIO_SERVER_CONF="$SCRIPT_DIR/cte_config.yaml"
+export CTP_LOG_LEVEL=info
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -32,7 +32,8 @@ die()   { echo -e "${RED}[ERR]${NC}  $1" >&2; exit 1; }
 # --- Preflight checks -------------------------------------------------------
 
 [ -x "$BUILD_BIN/chimaera" ]      || die "chimaera not found — build with: cmake --preset release-fuse && cmake --build build -j\$(nproc)"
-[ -x "$BUILD_BIN/wrp_cte_fuse" ]  || die "wrp_cte_fuse not found — build with: cmake --preset release-fuse && cmake --build build -j\$(nproc)"
+[ -x "$BUILD_BIN/clio_cte_fuse" ]  || die "clio_cte_fuse not found — build with: cmake --preset release-fuse && cmake --build build -j\$(nproc)"
+[ -f "$SCRIPT_DIR/cte_compose.yaml" ] || die "cte_compose.yaml missing next to cte_config.yaml"
 command -v fusermount3 &>/dev/null || die "fusermount3 not found — install fuse3: sudo apt install fuse3"
 [ -c /dev/fuse ]                   || die "/dev/fuse not available"
 
@@ -45,11 +46,11 @@ fi
 
 mkdir -p "$PID_DIR" "$MOUNT_POINT"
 
-# --- Start Chimaera runtime -------------------------------------------------
+# --- Start CLIO Runtime runtime -------------------------------------------------
 
 info "Starting Chimaera runtime..."
-export CHI_SERVER_CONF="$WRP_RUNTIME_CONF"
-chimaera runtime start &
+export CLIO_SERVER_CONF="$CLIO_SERVER_CONF"
+clio_run runtime start &
 RUNTIME_PID=$!
 echo "$RUNTIME_PID" > "$PID_DIR/runtime.pid"
 sleep 3
@@ -59,19 +60,27 @@ if ! kill -0 "$RUNTIME_PID" 2>/dev/null; then
 fi
 ok "Chimaera runtime started (PID $RUNTIME_PID)"
 
+# --- Compose the CTE pool (separate step, mirrors jarvis clio_cte) -----------
+
+info "Running clio_run compose for the CTE pool..."
+if ! clio_run compose "$SCRIPT_DIR/cte_compose.yaml"; then
+    die "clio_run compose failed -- check that the runtime is reachable"
+fi
+ok "CTE pool composed (clio_cte_core)"
+
 # --- Start FUSE daemon -------------------------------------------------------
 
 info "Mounting FUSE filesystem at $MOUNT_POINT ..."
 # Run FUSE daemon as a pure client via shared memory — connect to the
 # already-running runtime instead of trying to start its own.
-CHI_WITH_RUNTIME=0 CHI_IPC_MODE=SHM wrp_cte_fuse "$MOUNT_POINT" -f &
+CLIO_WITH_RUNTIME=0 CLIO_IPC_MODE=SHM clio_cte_fuse "$MOUNT_POINT" -f &
 FUSE_PID=$!
 echo "$FUSE_PID" > "$PID_DIR/fuse.pid"
 echo "$MOUNT_POINT" > "$PID_DIR/mount_point"
 sleep 2
 
 if ! kill -0 "$FUSE_PID" 2>/dev/null; then
-    die "wrp_cte_fuse failed to start"
+    die "clio_cte_fuse failed to start"
 fi
 ok "FUSE filesystem mounted (PID $FUSE_PID)"
 

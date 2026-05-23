@@ -1,6 +1,6 @@
 # ------------------------------------------------------------------------------
 # IOWarp HDF5 VOL Connector
-# Requires: WRP_CTE_ENABLE_HDF5_VOL=ON and HDF5 >= 2.0
+# Requires: CLIO_CTE_ENABLE_HDF5_VOL=ON and HDF5 >= 2.0
 # ------------------------------------------------------------------------------
 
 if(NOT HDF5_FOUND)
@@ -27,13 +27,13 @@ target_include_directories(iowarp_hdf5_vol PRIVATE
 )
 
 target_link_libraries(iowarp_hdf5_vol
-    wrp_cte_core_client
-    wrp_cte_core_runtime
+    clio_cte_core_client
+    clio_cte_core_runtime
     chimaera::admin_runtime
     chimaera::admin_client
     chimaera::bdev_runtime
     chimaera::bdev_client
-    hshm::cxx
+    ctp::cxx
     ${HDF5_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )

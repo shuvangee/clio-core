@@ -5,31 +5,36 @@ cmake_minimum_required(VERSION 3.10)
 add_executable(test_restart test_restart.cc)
 
 target_link_libraries(test_restart
-    wrp_cte_core_runtime
-    wrp_cte_core_client
+    clio_cte_core_runtime
+    clio_cte_core_client
     chimaera::admin_runtime
     chimaera::admin_client
     chimaera::bdev_runtime
     chimaera::bdev_client
-    hshm::cxx
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
 # Get the directory containing the test scripts
 set(RESTART_TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Shell script test that orchestrates multi-process restart workflow
-add_test(NAME cte_restart_integration
-    COMMAND bash ${RESTART_TEST_DIR}/test_restart.sh
-    WORKING_DIRECTORY ${RESTART_TEST_DIR}
-)
+# Shell script test that orchestrates multi-process restart workflow.
+# POSIX-only: the .sh launches background processes via bash, sleeps, kills
+# them with `kill -9`, and inspects /tmp. No clean Windows equivalent; the
+# C++ binary still builds so it can be invoked manually if needed.
+if(UNIX)
+    add_test(NAME cte_restart_integration
+        COMMAND bash ${RESTART_TEST_DIR}/test_restart.sh
+        WORKING_DIRECTORY ${RESTART_TEST_DIR}
+    )
 
-set_tests_properties(cte_restart_integration
-    PROPERTIES
-        TIMEOUT 300
-        LABELS "integration;restart;cte;msan_skip"
-        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};BIN_DIR=${CMAKE_BINARY_DIR}/bin"
-)
+    set_tests_properties(cte_restart_integration
+        PROPERTIES
+            TIMEOUT 300
+            LABELS "integration;restart;cte;msan_skip"
+            ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};BIN_DIR=${CMAKE_BINARY_DIR}/bin;CLIO_BIND_ADDR=127.0.0.1;CLIO_PORT=10500"
+    )
+endif()
 
 install(TARGETS test_restart
     RUNTIME DESTINATION bin

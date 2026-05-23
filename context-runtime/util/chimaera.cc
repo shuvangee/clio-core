@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 
+#include "hermes_shm/introspect/system_info.h"
 #include "chimaera_commands.h"
 
 namespace {
@@ -22,6 +23,7 @@ void PrintUsage() {
 }  // namespace
 
 int main(int argc, char* argv[]) {
+  hshm::SystemInfo::SuppressErrorDialogs();
   if (argc < 2) {
     PrintUsage();
     return 1;

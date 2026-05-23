@@ -185,7 +185,7 @@ run_sanitizer_mode() {
     # Exclude tests that produce false-positive or un-fixable sanitizer reports:
     #   msan_skip  - tests with uninstrumented deps (ZMQ, bdev I/O, Catch2, etc.)
     #   asan_skip  - tests with non-deterministic use-after-free in async runtime
-    #                shutdown paths that are not actionable (chimaera runtime).
+    #                shutdown paths that are not actionable (clio_run runtime).
     local EXCLUDE_LABEL="manual"
     if [ "${MODE}" = "msan" ]; then
         EXCLUDE_LABEL="manual|msan_skip"

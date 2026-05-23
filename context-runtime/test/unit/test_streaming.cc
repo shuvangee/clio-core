@@ -37,11 +37,11 @@
  */
 
 #include "../simple_test.h"
-#include "chimaera/chimaera.h"
-#include "chimaera/task.h"
-#include "chimaera/ipc_manager.h"
-#include "chimaera/MOD_NAME/MOD_NAME_client.h"
-#include "chimaera/MOD_NAME/MOD_NAME_tasks.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/task.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/MOD_NAME/MOD_NAME_client.h"
+#include "clio_runtime/MOD_NAME/MOD_NAME_tasks.h"
 
 #include <vector>
 #include <chrono>
@@ -78,7 +78,7 @@ TEST_CASE("Task Streaming - Small Output", "[streaming][small]") {
   REQUIRE(g_initialized);
 
   // Initialize MOD_NAME client
-  chimaera::MOD_NAME::Client client(kTestModNamePoolId);
+  clio::run::MOD_NAME::Client client(kTestModNamePoolId);
 
   // Create the MOD_NAME container
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
@@ -104,7 +104,7 @@ TEST_CASE("Task Streaming - Large Output (1MB)", "[streaming][large]") {
   REQUIRE(g_initialized);
 
   // Initialize MOD_NAME client
-  chimaera::MOD_NAME::Client client(kTestModNamePoolId);
+  clio::run::MOD_NAME::Client client(kTestModNamePoolId);
 
   // Create the MOD_NAME container
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
@@ -155,7 +155,7 @@ TEST_CASE("FutureShm Bitfield Operations", "[streaming][bitfield]") {
   REQUIRE(g_initialized);
 
   // Initialize MOD_NAME client
-  chimaera::MOD_NAME::Client client(kTestModNamePoolId);
+  clio::run::MOD_NAME::Client client(kTestModNamePoolId);
 
   // Create the MOD_NAME container
   chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
@@ -185,7 +185,7 @@ TEST_CASE("FutureShm Bitfield Operations", "[streaming][bitfield]") {
   REQUIRE(future_shm->flags_.Any(FutureShm::FUTURE_COMPLETE));
 
   // Test manual flag operations on a separate bitfield
-  hshm::abitfield32_t test_flags;
+  ctp::abitfield32_t test_flags;
   test_flags.SetBits(0);  // Initialize
 
   INFO("Testing manual FUTURE_COMPLETE flag set");

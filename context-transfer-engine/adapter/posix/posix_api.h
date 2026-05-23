@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WRP_CTE_ADAPTER_POSIX_H
-#define WRP_CTE_ADAPTER_POSIX_H
+#ifndef CLIO_CTE_ADAPTER_POSIX_H
+#define CLIO_CTE_ADAPTER_POSIX_H
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -41,8 +41,8 @@
 #include <iostream>
 #include <string>
 
-#include "hermes_shm/util/logging.h"
-#include "hermes_shm/util/real_api.h"
+#include "clio_ctp/util/logging.h"
+#include "clio_ctp/util/real_api.h"
 #include "adapter/adapter_constants.h"
 
 #ifndef O_TMPFILE
@@ -116,11 +116,11 @@ typedef int (*ftruncate_t)(int fd, off_t length);
 typedef int (*ftruncate64_t)(int fd, off64_t length);
 }
 
-namespace wrp::cae {
+namespace clio::cae {
 
 template <typename PosixT>
-using PreloadProgress = hshm::PreloadProgress<PosixT>;
-using hshm::RealApi;
+using PreloadProgress = ctp::PreloadProgress<PosixT>;
+using ctp::RealApi;
 
 /** Used for compatability with older kernel versions */
 int fxstat_to_fstat(int fd, struct stat *stbuf);
@@ -237,7 +237,7 @@ class PosixApi : public RealApi {
     REQUIRE_API(stat || __xstat || __lxstat)
     if (!fstat) {
       // NOTE(llogan): We use real_api->fstat in a couple of places
-      // fstat does need to be mapped always, or Hermes may segfault.
+      // fstat does need to be mapped always, or Clio may segfault.
       fstat = fxstat_to_fstat;
     }
 
@@ -276,21 +276,21 @@ class PosixApi : public RealApi {
   }
 };
 
-}  // namespace wrp::cae
+}  // namespace clio::cae
 
 // Global pointer-based singleton
-#include "hermes_shm/util/singleton.h"
+#include "clio_ctp/util/singleton.h"
 
-namespace wrp::cae {
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(PosixApi, g_posix_api);
+namespace clio::cae {
+CTP_DEFINE_GLOBAL_PTR_VAR_H(PosixApi, g_posix_api);
 }
 
-#define WRP_CTE_POSIX_API (HSHM_GET_GLOBAL_PTR_VAR(wrp::cae::PosixApi, wrp::cae::g_posix_api))
-#define WRP_CTE_POSIX_API_T wrp::cae::PosixApi *
+#define CLIO_CTE_POSIX_API (CTP_GET_GLOBAL_PTR_VAR(clio::cae::PosixApi, clio::cae::g_posix_api))
+#define CLIO_CTE_POSIX_API_T clio::cae::PosixApi *
 
-namespace wrp::cae {
+namespace clio::cae {
 /** Used for compatability with older kernel versions */
 int fxstat_to_fstat(int fd, struct stat *stbuf);
-}  // namespace wrp::cae
+}  // namespace clio::cae
 
-#endif  // WRP_CTE_ADAPTER_POSIX_H
+#endif  // CLIO_CTE_ADAPTER_POSIX_H

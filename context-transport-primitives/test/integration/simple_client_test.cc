@@ -31,15 +31,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "hermes_shm/lightbeam/lightbeam.h"
-#include "hermes_shm/util/timer.h"
+#include "clio_ctp/lightbeam/lightbeam.h"
+#include "clio_ctp/util/timer.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
 #include <string>
 #include <cstring>
 #include <cereal/types/string.hpp>
-#include "hermes_shm/lightbeam/thallium/client.h"
+#include "clio_ctp/lightbeam/thallium/client.h"
 
 void print_usage(const char* program_name) {
     std::cout << "Usage: " << program_name << " <ip_address> <protocol>" << std::endl;
@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
     
     // Create client using the selected backend
     if (protocol == "thallium") {
-        hshm::lbm::thallium::Client client;
+        ctp::lbm::thallium::Client client;
         std::cout << "Connecting to Thallium server..." << std::endl;
         client.Connect(url);
         std::string message = "Hello Thallium!";
@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
             std::cout << "❌ FAIL: Thallium round-trip failed" << std::endl;
         }
     } else {
-        hshm::lbm::Client client;
+        ctp::lbm::Client client;
         std::cout << "Connecting to ZMQ server..." << std::endl;
         client.Connect(url);
         // Add your ZMQ test logic here (existing logic)
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
         // Start timing the complete round-trip
         std::cout << "Starting round-trip test..." << std::endl;
         
-        hshm::Timer timer;
+        ctp::Timer timer;
         timer.Resume();
         
         // Send message (async)

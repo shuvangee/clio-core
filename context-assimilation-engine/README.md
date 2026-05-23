@@ -1,18 +1,18 @@
 # Context Assimilation Engine (CAE)
 
-A Chimaera module (ChiMod) for high-performance data ingestion into the IOWarp
+A Chimaera module (Module) for high-performance data ingestion into the IOWarp
 ecosystem. CAE assimilates data from external sources — local binary files,
 HDF5 datasets, and Globus endpoints — into the Context Transfer Engine (CTE)
 for distributed storage and retrieval.
 
 ## Overview
 
-CAE runs as a pool inside the Chimaera runtime alongside CTE. Clients submit
+CAE runs as a pool inside the Clio runtime alongside CTE. Clients submit
 OMNI YAML files to describe data transfers; CAE parses them and dispatches
 assimilation tasks to the appropriate backend (binary, HDF5, or Globus).
 
 ```
-External Source          CAE ChiMod              CTE ChiMod
+External Source          CAE Module              CTE Module
 (file, HDF5, Globus) --> ParseOmni task -------> Tag + Blob storage
 ```
 
@@ -37,23 +37,23 @@ cmake -DCMAKE_BUILD_TYPE=Release -DWRP_CORE_ENABLE_HDF5=ON ..
 
 ## Running
 
-### 1. Start the Chimaera runtime with CTE and CAE
+### 1. Start the Clio runtime with CTE and CAE
 
 ```bash
-export CHI_SERVER_CONF=/path/to/wrp_config.yaml
-chimaera runtime start
+export CLIO_X=/path/to/clio_config.yaml
+clio_run runtime start
 ```
 
 An example configuration deploying both CTE and CAE is provided in
-`config/wrp_config_example.yaml`:
+`config/clio_config_example.yaml`:
 
 ```yaml
 compose:
-  - mod_name: wrp_cte_core
+  - mod_name: clio_cte_core
     pool_name: cte_main
     pool_query: local
     pool_id: "512.0"
-  - mod_name: wrp_cae_core
+  - mod_name: clio_cae_core
     pool_name: cae_main
     pool_query: local
     pool_id: "400.0"
@@ -62,7 +62,7 @@ compose:
 ### 2. Submit an OMNI file
 
 ```bash
-wrp_cae_omni /path/to/my_transfers.yaml
+clio_cae /path/to/my_transfers.yaml
 ```
 
 ## OMNI File Format
@@ -109,10 +109,10 @@ transfers:
 
 ```
 config/      - Example runtime configuration files
-core/        - ChiMod implementation
+core/        - Module implementation
   include/   - Public headers (tasks, assimilation context, factory)
   src/        - Runtime and client implementation
-  util/       - wrp_cae_omni command-line tool
+  util/       - clio_cae command-line tool
 data/        - Sample datasets for testing (HDF5, CSV, Parquet)
 test/
   unit/      - Unit tests (binary, HDF5, range, error handling)
@@ -124,8 +124,8 @@ test/
 | Component | Pool ID | Module Name    |
 |-----------|---------|----------------|
 | Admin     | 1.0     | chimaera_admin |
-| CTE Core  | 512.0   | wrp_cte_core   |
-| CAE Core  | 400.0   | wrp_cae_core   |
+| CTE Core  | 512.0   | clio_cte_core   |
+| CAE Core  | 400.0   | clio_cae_core   |
 
 ## License
 

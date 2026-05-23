@@ -41,7 +41,7 @@
 #include <string>
 #include <unistd.h>
 
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 namespace coeus {
 
@@ -62,7 +62,7 @@ IowarpEngine::IowarpEngine(adios2::core::IO &io, const std::string &name,
       total_io_time_ms_(0.0) {
   HLOG(kDebug, "[IowarpEngine] Constructor entered, rank={}, name={}", rank_, name);
 
-  // At >=512 nodes (>=6144 ranks at 12 ppn) calling WRP_CTE_CLIENT_INIT
+  // At >=512 nodes (>=6144 ranks at 12 ppn) calling CLIO_CTE_CLIENT_INIT
   // simultaneously across all ranks overwhelms each daemon's local 9416
   // ROUTER — every per-rank ZMTP greeting times out and the SIM aborts
   // before step 1. Stagger init per local-rank within a node so the
@@ -78,7 +78,7 @@ IowarpEngine::IowarpEngine(adios2::core::IO &io, const std::string &name,
     int local_rank = rank_ % ppn;
     // Per-local-rank stagger step (μs); default 250 ms so 12 ranks
     // spread over 3s. Tunable via CHI_INIT_STAGGER_MS.
-    const char *stag_env = std::getenv("CHI_INIT_STAGGER_MS");
+    const char *stag_env = chi::env::GetCompat("INIT_STAGGER_MS");
     int stagger_ms = (stag_env && *stag_env) ? std::atoi(stag_env) : 250;
     if (stagger_ms < 0) stagger_ms = 0;
     if (local_rank > 0) {
@@ -87,7 +87,7 @@ IowarpEngine::IowarpEngine(adios2::core::IO &io, const std::string &name,
     }
   }
 
-  // Initialize CTE client - assumes Chimaera runtime is already running.
+  // Initialize CTE client - assumes CLIO Runtime runtime is already running.
   // Retry with jittered backoff: at >=512 nodes the local daemon is
   // busy serving cross-node SWIM probes (511+ peers) and may take many
   // seconds to drain its 9416 ROUTER accept queue; a few short retries
@@ -95,11 +95,11 @@ IowarpEngine::IowarpEngine(adios2::core::IO &io, const std::string &name,
   // Jitter desynchronizes 12 same-node ranks so they don't all retry
   // on the same second. Tunable via CHI_INIT_ATTEMPTS and
   // CHI_INIT_SLEEP_MS (sleep is mean; actual is uniform [0.5x, 1.5x]).
-  HLOG(kDebug, "[IowarpEngine] About to call WRP_CTE_CLIENT_INIT");
-  const char *att_env = std::getenv("CHI_INIT_ATTEMPTS");
+  HLOG(kDebug, "[IowarpEngine] About to call CLIO_CTE_CLIENT_INIT");
+  const char *att_env = chi::env::GetCompat("INIT_ATTEMPTS");
   int max_attempts = (att_env && *att_env) ? std::atoi(att_env) : 60;
   if (max_attempts < 1) max_attempts = 1;
-  const char *slp_env = std::getenv("CHI_INIT_SLEEP_MS");
+  const char *slp_env = chi::env::GetCompat("INIT_SLEEP_MS");
   int mean_sleep_ms = (slp_env && *slp_env) ? std::atoi(slp_env) : 3000;
   if (mean_sleep_ms < 1) mean_sleep_ms = 1;
   // Per-rank seed so each rank's jitter sequence differs.
@@ -108,12 +108,12 @@ IowarpEngine::IowarpEngine(adios2::core::IO &io, const std::string &name,
       static_cast<unsigned int>(::getpid());
   bool ok = false;
   for (int attempt = 0; attempt < max_attempts; ++attempt) {
-    if (wrp_cte::core::WRP_CTE_CLIENT_INIT("", chi::PoolQuery::Local())) {
+    if (clio::cte::core::CLIO_CTE_CLIENT_INIT("", chi::PoolQuery::Local())) {
       ok = true;
       break;
     }
     HLOG(kWarning,
-         "[IowarpEngine] WRP_CTE_CLIENT_INIT failed (rank={}, attempt={}/{}); retrying",
+         "[IowarpEngine] CLIO_CTE_CLIENT_INIT failed (rank={}, attempt={}/{}); retrying",
          rank_, attempt + 1, max_attempts);
     // uniform jitter in [0.5, 1.5] × mean
     int rnd = rand_r(&rng_state) % 1001;  // 0..1000
@@ -122,11 +122,11 @@ IowarpEngine::IowarpEngine(adios2::core::IO &io, const std::string &name,
   }
   if (!ok) {
     throw std::runtime_error(
-        "IowarpEngine: WRP_CTE_CLIENT_INIT failed after " +
+        "IowarpEngine: CLIO_CTE_CLIENT_INIT failed after " +
         std::to_string(max_attempts) +
         " attempts - is Chimaera runtime running?");
   }
-  HLOG(kDebug, "[IowarpEngine] WRP_CTE_CLIENT_INIT completed");
+  HLOG(kDebug, "[IowarpEngine] CLIO_CTE_CLIENT_INIT completed");
 
   // Start wall clock timer
   wall_clock_start_ = std::chrono::high_resolution_clock::now();
@@ -181,7 +181,7 @@ void IowarpEngine::Init_() {
   // Use the engine name as the tag name
   try {
     HLOG(kDebug, "[IowarpEngine] About to create Tag with name={}", m_Name);
-    current_tag_ = std::make_unique<wrp_cte::core::Tag>(m_Name);
+    current_tag_ = std::make_unique<clio::cte::core::Tag>(m_Name);
     HLOG(kDebug, "[IowarpEngine] Tag created successfully");
     open_ = true;
   } catch (const std::exception &e) {
@@ -372,9 +372,9 @@ void IowarpEngine::DoPutDeferred_(const adios2::core::Variable<T> &variable,
 
   // Put blob asynchronously
   try {
-    auto *ipc_manager = CHI_IPC;
+    auto *ipc_manager = CLIO_IPC;
     if (ipc_manager == nullptr) {
-      throw std::runtime_error("IowarpEngine::DoPutDeferred_: CHI_IPC is null");
+      throw std::runtime_error("IowarpEngine::DoPutDeferred_: CLIO_IPC is null");
     }
 
     // Allocate shared memory buffer and copy data
