@@ -42,8 +42,9 @@
 #include <unistd.h>
 #endif
 
-#include <fstream>
-#include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "clio_ctp/thread/thread_model/thread_model.h"
 #include "clio_ctp/util/formatter.h"
@@ -99,6 +100,18 @@ struct CpuTimes {
     return user + nice + system + irq + softirq + steal;
   }
   uint64_t Total() const { return TotalActive() + idle + iowait; }
+};
+
+/** Handle to a spawned child process */
+struct ProcessHandle {
+#ifdef _WIN32
+  HANDLE hProcess = nullptr;
+  HANDLE hThread = nullptr;
+  HANDLE hJob = nullptr;
+  DWORD pid = 0;
+#else
+  pid_t pid = -1;
+#endif
 };
 
 /** A unification of certain OS system calls */
@@ -199,6 +212,9 @@ class SystemInfo {
 
   CTP_DLL static void *MapSharedMemory(const File &fd, size_t size, i64 off);
 
+  CTP_DLL static void *MapMixedMemory(const File &fd, size_t private_size,
+                                       size_t shared_size, i64 shared_offset);
+
   CTP_DLL static void UnmapMemory(void *ptr, size_t size);
 
   CTP_DLL static void *AlignedAlloc(size_t alignment, size_t size);
@@ -227,6 +243,19 @@ class SystemInfo {
   CTP_DLL static void EnsureMemfdDir();
 
   CTP_DLL static bool IsProcessAlive(int pid);
+
+  CTP_DLL static ProcessHandle SpawnProcess(
+      const std::string &exe_path,
+      const std::vector<std::string> &args,
+      const std::vector<std::pair<std::string, std::string>> &env);
+
+  CTP_DLL static void KillProcess(ProcessHandle &proc);
+
+  CTP_DLL static int WaitProcess(ProcessHandle &proc);
+
+  CTP_DLL static std::string GetSelfExePath();
+
+  CTP_DLL static void SuppressErrorDialogs();
 
   CTP_DLL static std::string GetModuleDirectory();
 
