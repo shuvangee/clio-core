@@ -49,11 +49,11 @@
 #include <iostream>
 #include <string>
 
-#include <hermes_shm/util/logging.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/admin/admin_client.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
+#include <clio_ctp/util/logging.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
 
 static constexpr int kNumBlobs = 10;
 static constexpr chi::u64 kBlobSize = 4096;
@@ -70,12 +70,12 @@ int PutBlobs() {
   }
 
   // Create CTE client bound to pool 512.0
-  wrp_cte::core::Client cte_client(chi::PoolId(512, 0));
+  clio::cte::core::Client cte_client(chi::PoolId(512, 0));
 
   // Create or get tag
   auto tag_task = cte_client.AsyncGetOrCreateTag(kTagName);
   tag_task.Wait();
-  wrp_cte::core::TagId tag_id = tag_task->tag_id_;
+  clio::cte::core::TagId tag_id = tag_task->tag_id_;
   HLOG(kInfo, "Phase 1: Created tag '{}'", kTagName);
 
   // Put kNumBlobs blobs with distinct data patterns
@@ -83,7 +83,7 @@ int PutBlobs() {
     std::string blob_name = "restart_blob_" + std::to_string(i);
 
     // Allocate SHM buffer
-    hipc::FullPtr<char> buf = CHI_IPC->AllocateBuffer(kBlobSize);
+    ctp::ipc::FullPtr<char> buf = CLIO_IPC->AllocateBuffer(kBlobSize);
     if (buf.IsNull()) {
       HLOG(kError, "Phase 1: Failed to allocate SHM buffer for blob {}", i);
       return 1;
@@ -94,7 +94,7 @@ int PutBlobs() {
     memset(buf.ptr_, pattern, kBlobSize);
 
     // Convert to ShmPtr for API
-    hipc::ShmPtr<> shm_ptr = buf.shm_.template Cast<void>();
+    ctp::ipc::ShmPtr<> shm_ptr = buf.shm_.template Cast<void>();
 
     // Put blob
     auto put_task = cte_client.AsyncPutBlob(
@@ -137,7 +137,7 @@ int VerifyBlobs() {
 
   // Call RestartContainers via admin client
   HLOG(kInfo, "Phase 2: Calling RestartContainers...");
-  chimaera::admin::Client admin_client(chi::kAdminPoolId);
+  clio::run::admin::Client admin_client(chi::kAdminPoolId);
   auto restart_task = admin_client.AsyncRestartContainers(chi::PoolQuery::Local());
   restart_task.Wait();
 
@@ -158,7 +158,7 @@ int VerifyBlobs() {
   }
 
   // Verify pool was recreated by connecting a CTE client
-  wrp_cte::core::Client cte_client(chi::PoolId(512, 0));
+  clio::cte::core::Client cte_client(chi::PoolId(512, 0));
 
   // Verify we can create/get a tag on the restarted pool
   auto tag_task = cte_client.AsyncGetOrCreateTag(kTagName);
@@ -168,7 +168,7 @@ int VerifyBlobs() {
          tag_task->GetReturnCode());
     return 1;
   }
-  wrp_cte::core::TagId tag_id = tag_task->tag_id_;
+  clio::cte::core::TagId tag_id = tag_task->tag_id_;
   HLOG(kInfo, "Phase 2: Tag '{}' accessible on restarted pool", kTagName);
 
   // Verify targets were re-registered by listing them
@@ -183,13 +183,13 @@ int VerifyBlobs() {
     std::string blob_name = "restart_blob_" + std::to_string(i);
     char expected_pattern = static_cast<char>('A' + i);
 
-    hipc::FullPtr<char> buf = CHI_IPC->AllocateBuffer(kBlobSize);
+    ctp::ipc::FullPtr<char> buf = CLIO_IPC->AllocateBuffer(kBlobSize);
     if (buf.IsNull()) {
       ++failed;
       continue;
     }
     memset(buf.ptr_, 0, kBlobSize);
-    hipc::ShmPtr<> shm_ptr = buf.shm_.template Cast<void>();
+    ctp::ipc::ShmPtr<> shm_ptr = buf.shm_.template Cast<void>();
 
     auto get_task = cte_client.AsyncGetBlob(
         tag_id, blob_name, 0, kBlobSize, 0, shm_ptr);

@@ -1,0 +1,16 @@
+---
+# Chimaera runtime config for FUSE manual testing.
+#
+# NOTE: the CTE pool is no longer composed here. The manual test now mirrors
+# the jarvis pipeline shape:
+#   1. clio_run runtime start   (this file, no compose section)
+#   2. clio_run compose cte_compose.yaml   (the compose lives in a sibling file)
+#   3. clio_cte_fuse <mountpoint> -f
+#
+# Doing compose separately exercises the same admin-pool CreatePool path that
+# `clio_cte` jarvis package uses, so any cross-node propagation bug shows up
+# the same way in both flows.
+
+runtime:
+  num_threads: 4
+  queue_depth: 1024

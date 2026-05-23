@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WRP_CTE_ADAPTER_FILESYSTEM_FILESYSTEM_IO_CLIENT_H_
-#define WRP_CTE_ADAPTER_FILESYSTEM_FILESYSTEM_IO_CLIENT_H_
+#ifndef CLIO_CTE_ADAPTER_FILESYSTEM_FILESYSTEM_IO_CLIENT_H_
+#define CLIO_CTE_ADAPTER_FILESYSTEM_FILESYSTEM_IO_CLIENT_H_
 
 #include <mpi.h>
 
@@ -40,35 +40,35 @@
 #include <future>
 #include <limits>
 
-#include "wrp_cte/core/core_client.h"
-#include "wrp_cte/core/core_tasks.h"
+#include "clio_cte/core/core_client.h"
+#include "clio_cte/core/core_tasks.h"
 #include "adapter/adapter_types.h"
 #include "adapter/mapper/balanced_mapper.h"
-#include "hermes_shm/types/bitfield.h"
-#include "hermes_shm/thread/lock.h"
+#include "clio_ctp/types/bitfield.h"
+#include "clio_ctp/thread/lock.h"
 
 namespace stdfs = std::filesystem;
 
-namespace wrp::cae {
+namespace clio::cae {
 
 /** Put or get data directly from I/O client */
-#define WRP_CTE_IO_CLIENT_BYPASS BIT_OPT(uint32_t, 0)
-/** Only put or get data from a Hermes buffer; no fallback to I/O client */
-#define WRP_CTE_IO_CLIENT_NO_FALLBACK BIT_OPT(uint32_t, 1)
+#define CLIO_CTE_IO_CLIENT_BYPASS BIT_OPT(uint32_t, 0)
+/** Only put or get data from a Clio buffer; no fallback to I/O client */
+#define CLIO_CTE_IO_CLIENT_NO_FALLBACK BIT_OPT(uint32_t, 1)
 /** Whether to perform seek */
-#define WRP_CTE_FS_SEEK BIT_OPT(uint32_t, 2)
+#define CLIO_CTE_FS_SEEK BIT_OPT(uint32_t, 2)
 /** Whether to perform create */
-#define WRP_CTE_FS_CREATE BIT_OPT(uint32_t, 3)
+#define CLIO_CTE_FS_CREATE BIT_OPT(uint32_t, 3)
 /** Whether in append mode */
-#define WRP_CTE_FS_APPEND BIT_OPT(uint32_t, 4)
+#define CLIO_CTE_FS_APPEND BIT_OPT(uint32_t, 4)
 /** Whether to perform truncate */
-#define WRP_CTE_FS_TRUNC BIT_OPT(uint32_t, 5)
+#define CLIO_CTE_FS_TRUNC BIT_OPT(uint32_t, 5)
 /** Whether the file was found on-disk */
-#define WRP_CTE_FS_EXISTS BIT_OPT(uint32_t, 6)
+#define CLIO_CTE_FS_EXISTS BIT_OPT(uint32_t, 6)
 /** Whether the file supports reading */
-#define WRP_CTE_FS_READ BIT_OPT(uint32_t, 7)
+#define CLIO_CTE_FS_READ BIT_OPT(uint32_t, 7)
 /** Whether the file supports writing */
-#define WRP_CTE_FS_WRITE BIT_OPT(uint32_t, 8)
+#define CLIO_CTE_FS_WRITE BIT_OPT(uint32_t, 8)
 
 /** A structure to represent IO status */
 struct IoStatus {
@@ -102,7 +102,7 @@ struct IoStatus {
  * For now, nothing additional than the typical FsIoOptions.
  * */
 struct FsIoOptions {
-  hshm::bitfield32_t flags_;    /**< various I/O flags */
+  ctp::bitfield32_t flags_;    /**< various I/O flags */
   MPI_Datatype mpi_type_; /**< MPI data type */
   int mpi_count_;         /**< The number of types */
   int type_size_;         /**< The size of type */
@@ -117,19 +117,19 @@ struct FsIoOptions {
   }
 
   /** Enable seek for this I/O */
-  void SetSeek() { flags_.SetBits(WRP_CTE_FS_SEEK); }
+  void SetSeek() { flags_.SetBits(CLIO_CTE_FS_SEEK); }
 
   /** Disable seek for this I/O */
-  void UnsetSeek() { flags_.UnsetBits(WRP_CTE_FS_SEEK); }
+  void UnsetSeek() { flags_.UnsetBits(CLIO_CTE_FS_SEEK); }
 
   /** Whether or not to perform seek in FS adapter */
-  bool DoSeek() const { return flags_.Any(WRP_CTE_FS_SEEK); }
+  bool DoSeek() const { return flags_.Any(CLIO_CTE_FS_SEEK); }
 
   /** Marks the file as truncated */
-  void MarkTruncated() { flags_.SetBits(WRP_CTE_FS_TRUNC); }
+  void MarkTruncated() { flags_.SetBits(CLIO_CTE_FS_TRUNC); }
 
   /** Whether a file is marked truncated */
-  bool IsTruncated() const { return flags_.Any(WRP_CTE_FS_TRUNC); }
+  bool IsTruncated() const { return flags_.Any(CLIO_CTE_FS_TRUNC); }
 
   /** return IO options with \a mpi_type MPI data type */
   static FsIoOptions DataType(MPI_Datatype mpi_type, bool seek = true) {
@@ -142,16 +142,20 @@ struct FsIoOptions {
   }
 };
 
-/** The get task */
+/** The get task — holds a chi::Future returned by Client::AsyncGetBlob. */
 struct GetBlobAsyncTask {
-  hipc::FullPtr<wrp_cte::core::GetBlobTask> task_;
+  chi::Future<clio::cte::core::GetBlobTask> task_;
   char *orig_data_;
   size_t orig_size_;
 };
 
-/** A structure to represent Hermes request */
+/** A structure to represent an async CTE request.
+ *
+ * After the chi::Future-based core API switchover, both put and get
+ * sides hold chi::Future objects; the Future owns the underlying task
+ * and cleans up on destruction, so callers just need .Wait() to drain. */
 struct FsAsyncTask {
-  std::vector<hipc::FullPtr<wrp_cte::core::PutBlobTask>> put_tasks_;
+  std::vector<chi::Future<clio::cte::core::PutBlobTask>> put_tasks_;
   std::vector<GetBlobAsyncTask> get_tasks_;
   IoStatus io_status_;
   FsIoOptions opts_;
@@ -215,7 +219,7 @@ struct File {
 struct AdapterStat {
   std::string path_;         /**< The URL of this file */
   int flags_;                /**< open() flags for POSIX */
-  hshm::bitfield32_t hflags_;      /**< Flags used by FS adapter */
+  ctp::bitfield32_t hflags_;      /**< Flags used by FS adapter */
   mode_t st_mode_;           /**< protection */
   uid_t st_uid_;             /**< user ID of owner */
   gid_t st_gid_;             /**< group ID of owner */
@@ -236,9 +240,19 @@ struct AdapterStat {
   MPI_Comm comm_;  /**< Communicator for the file.*/
   bool atomicity_; /**< Consistency semantics for data-access */
 
-  wrp_cte::core::TagId tag_id_; /**< tag associated with the file */
+  clio::cte::core::TagId tag_id_; /**< tag associated with the file */
   /** Page size used for file */
   size_t page_size_;
+
+  /**
+   * Pending GetOrCreateTag future from an async Open. Populated when
+   * Filesystem::Open issues AsyncGetOrCreateTag and returns immediately
+   * without waiting. The first I/O op that needs tag_id_ waits on this
+   * future (via AwaitPendingOpen) and clears the flag.
+   */
+  chi::Future<clio::cte::core::GetOrCreateTagTask<clio::cte::core::CreateParams>>
+      pending_open_fut_;
+  bool open_pending_ = false;
 
   /** Default constructor */
   AdapterStat()
@@ -275,13 +289,13 @@ struct FsIoClientMetadata {
     hermes_fd_max_ = std::numeric_limits<int>::max();
   }
 
-  /** Allocate a Hermes FD */
+  /** Allocate a Clio FD */
   int AllocateFd() {
     int cur = hermes_fd_cur_.fetch_add(1);
     return cur;
   }
 
-  /** Release a Hermes FD */
+  /** Release a Clio FD */
   void ReleaseFd(int hermes_fd) {
     // TODO(llogan): recycle instead of ignore
     (void)hermes_fd;
@@ -333,9 +347,9 @@ public:
                         const std::string &path) = 0;
 
   /**
-   * Called after real open. Allocates the Hermes representation of
-   * identifying file information, such as a hermes file descriptor
-   * and hermes file handler. These are not the same as POSIX file
+   * Called after real open. Allocates the Clio representation of
+   * identifying file information, such as a clio file descriptor
+   * and clio file handler. These are not the same as POSIX file
    * descriptor and STDIO file handler.
    * */
   virtual void HermesOpen(File &f, const AdapterStat &stat,
@@ -361,16 +375,16 @@ public:
   virtual void UpdateIoStatus(const FsIoOptions &opts, IoStatus &status) = 0;
 };
 
-} // namespace wrp::cae
+} // namespace clio::cae
 
 namespace std {
 /** A structure to represent hash */
-template <> struct hash<::wrp::cae::File> {
+template <> struct hash<::clio::cae::File> {
   /** hash creator functor */
-  std::size_t operator()(const wrp::cae::File &key) const {
+  std::size_t operator()(const clio::cae::File &key) const {
     return key.hash();
   }
 };
 } // namespace std
 
-#endif // WRP_CTE_ADAPTER_FILESYSTEM_FILESYSTEM_IO_CLIENT_H_
+#endif // CLIO_CTE_ADAPTER_FILESYSTEM_FILESYSTEM_IO_CLIENT_H_

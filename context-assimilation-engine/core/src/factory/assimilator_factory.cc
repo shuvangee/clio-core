@@ -31,22 +31,22 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <wrp_cae/core/factory/assimilator_factory.h>
-#include <wrp_cae/core/factory/binary_file_assimilator.h>
-#ifdef WRP_CAE_ENABLE_HDF5
-#include <wrp_cae/core/factory/hdf5_file_assimilator.h>
+#include <clio_cae/core/factory/assimilator_factory.h>
+#include <clio_cae/core/factory/binary_file_assimilator.h>
+#ifdef CLIO_CAE_ENABLE_HDF5
+#include <clio_cae/core/factory/hdf5_file_assimilator.h>
 #endif
 #ifdef CAE_ENABLE_GLOBUS
-#include <wrp_cae/core/factory/globus_file_assimilator.h>
+#include <clio_cae/core/factory/globus_file_assimilator.h>
 #endif
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include <memory>
 
-namespace wrp_cae::core {
+namespace clio::cae::core {
 
 AssimilatorFactory::AssimilatorFactory(
-    std::shared_ptr<wrp_cte::core::Client> cte_client)
+    std::shared_ptr<clio::cte::core::Client> cte_client)
     : cte_client_(cte_client) {}
 
 std::unique_ptr<BaseAssimilator> AssimilatorFactory::Get(
@@ -79,7 +79,7 @@ std::unique_ptr<BaseAssimilator> AssimilatorFactory::Get(
     // For file protocol, return a BinaryFileAssimilator
     return std::make_unique<BinaryFileAssimilator>(cte_client_);
   } else if (protocol == "hdf5") {
-#ifdef WRP_CAE_ENABLE_HDF5
+#ifdef CLIO_CAE_ENABLE_HDF5
     HLOG(
         kInfo,
         "AssimilatorFactory: Creating Hdf5FileAssimilator for 'hdf5' protocol");
@@ -131,4 +131,4 @@ std::string AssimilatorFactory::GetUrlProtocol(const std::string& url) {
   return "";
 }
 
-}  // namespace wrp_cae::core
+}  // namespace clio::cae::core

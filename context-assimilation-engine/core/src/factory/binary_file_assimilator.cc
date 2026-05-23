@@ -31,30 +31,36 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 #ifndef _WIN32
 #include <sys/stat.h>
 #endif
-#include <wrp_cae/core/factory/binary_file_assimilator.h>
+#include <clio_cae/core/factory/binary_file_assimilator.h>
 
 #include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <vector>
 
-// Include wrp_cte headers after closing any wrp_cae namespace to avoid Method
+// Include clio_cte headers after closing any clio_cae namespace to avoid Method
 // namespace collision
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
 
-namespace wrp_cae::core {
+namespace clio::cae::core {
 
 BinaryFileAssimilator::BinaryFileAssimilator(
-    std::shared_ptr<wrp_cte::core::Client> cte_client)
+    std::shared_ptr<clio::cte::core::Client> cte_client)
     : cte_client_(cte_client) {}
 
 chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
                                                 int& error_code) {
+#ifdef __NVCOMPILER
+  thread_local chi::RunContext _fb_rctx;
+  chi::RunContext* _fp = chi::GetCurrentRunContextFromWorker();
+  chi::RunContext& rctx = _fp ? *_fp : _fb_rctx;
+#endif
+  CLIO_TASK_BODY_BEGIN
   HLOG(kDebug,
        "BinaryFileAssimilator::Schedule ENTRY: src='{}', dst='{}', "
        "range_off={}, range_size={}",
@@ -71,7 +77,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
          "'{}'",
          dst_protocol);
     error_code = -1;
-    co_return;
+    CLIO_CO_RETURN;
   }
 
   // Extract tag name from destination URL
@@ -82,19 +88,19 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
     HLOG(kError,
          "BinaryFileAssimilator: Invalid destination URL, no tag name found");
     error_code = -2;
-    co_return;
+    CLIO_CO_RETURN;
   }
 
   // Get or create the tag in CTE
   HLOG(kDebug, "BinaryFileAssimilator: Getting or creating tag '{}'", tag_name);
   auto tag_task = cte_client_->AsyncGetOrCreateTag(tag_name);
-  co_await tag_task;
-  wrp_cte::core::TagId tag_id = tag_task->tag_id_;
+  CLIO_CO_AWAIT(tag_task);
+  clio::cte::core::TagId tag_id = tag_task->tag_id_;
   if (tag_id.IsNull()) {
     HLOG(kError, "BinaryFileAssimilator: Failed to get or create tag '{}'",
          tag_name);
     error_code = -3;
-    co_return;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "BinaryFileAssimilator: Tag '{}' obtained/created successfully",
        tag_name);
@@ -108,7 +114,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
          "(depends_on: {})",
          ctx.depends_on);
     error_code = 0;
-    co_return;
+    CLIO_CO_RETURN;
   }
 
   // Extract source file path
@@ -119,7 +125,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
     HLOG(kError,
          "BinaryFileAssimilator: Invalid source URL, no file path found");
     error_code = -4;
-    co_return;
+    CLIO_CO_RETURN;
   }
 
   // Determine file size and chunk parameters
@@ -138,7 +144,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
       HLOG(kError, "BinaryFileAssimilator: Failed to get file size for '{}'",
            src_path);
       error_code = -5;
-      co_return;
+      CLIO_CO_RETURN;
     }
     HLOG(kDebug, "BinaryFileAssimilator: File size={} bytes", file_size);
     // Validate range
@@ -148,7 +154,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
            "{}, file_size: {})",
            chunk_offset, total_size, file_size);
       error_code = -6;
-      co_return;
+      CLIO_CO_RETURN;
     }
   } else {
     HLOG(kDebug, "BinaryFileAssimilator: Using full file mode");
@@ -158,7 +164,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
       HLOG(kError, "BinaryFileAssimilator: Failed to get file size for '{}'",
            src_path);
       error_code = -5;
-      co_return;
+      CLIO_CO_RETURN;
     }
     HLOG(kDebug, "BinaryFileAssimilator: File size={} bytes", file_size);
     chunk_offset = 0;
@@ -169,7 +175,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
   std::string description = "binary<size=" + std::to_string(total_size) +
                             ", offset=" + std::to_string(chunk_offset) + ">";
   size_t desc_size = description.size();
-  auto desc_buffer = CHI_IPC->AllocateBuffer(desc_size);
+  auto desc_buffer = CLIO_IPC->AllocateBuffer(desc_size);
   std::memcpy(desc_buffer.ptr_, description.c_str(), desc_size);
 
   HLOG(kDebug, "BinaryFileAssimilator: Storing description blob: '{}'",
@@ -177,8 +183,8 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
   auto desc_task =
       cte_client_->AsyncPutBlob(tag_id, "description", 0, desc_size,
                                 desc_buffer.shm_.template Cast<void>(), 1.0f,
-                                wrp_cte::core::Context(), 0);
-  co_await desc_task;
+                                clio::cte::core::Context(), 0);
+  CLIO_CO_AWAIT(desc_task);
 
   if (desc_task->return_code_ != 0) {
     HLOG(kError,
@@ -186,7 +192,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
          "return_code: {}",
          tag_name, desc_task->return_code_);
     error_code = -9;
-    co_return;
+    CLIO_CO_RETURN;
   }
   HLOG(kDebug, "BinaryFileAssimilator: Description blob stored successfully");
 
@@ -207,7 +213,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
   if (!file.is_open()) {
     HLOG(kError, "BinaryFileAssimilator: Failed to open file '{}'", src_path);
     error_code = -7;
-    co_return;
+    CLIO_CO_RETURN;
   }
 
   // Seek to the starting offset
@@ -218,14 +224,14 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
          "BinaryFileAssimilator: Failed to seek to offset {} in file '{}'",
          chunk_offset, src_path);
     error_code = -8;
-    co_return;
+    CLIO_CO_RETURN;
   }
 
   // Process chunks in batches
   HLOG(kDebug, "BinaryFileAssimilator: Starting chunk processing");
   size_t chunk_idx = 0;
   size_t bytes_processed = 0;
-  std::vector<chi::Future<wrp_cte::core::PutBlobTask>> active_tasks;
+  std::vector<chi::Future<clio::cte::core::PutBlobTask>> active_tasks;
 
   while (bytes_processed < total_size) {
     // Submit tasks up to the parallel limit
@@ -236,7 +242,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
           std::min(kMaxChunkSize, total_size - bytes_processed);
 
       // Allocate buffer in shared memory
-      auto buffer_ptr = CHI_IPC->AllocateBuffer(current_chunk_size);
+      auto buffer_ptr = CLIO_IPC->AllocateBuffer(current_chunk_size);
       char* buffer = buffer_ptr.ptr_;
 
       // Read chunk from file
@@ -272,9 +278,9 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
                "BinaryFileAssimilator: File position: {}, bytes_processed: {}, "
                "total_size: {}",
                file.tellg(), bytes_processed, total_size);
-          CHI_IPC->FreeBuffer(buffer_ptr);
+          CLIO_IPC->FreeBuffer(buffer_ptr);
           error_code = -9;
-          co_return;
+          CLIO_CO_RETURN;
         }
       }
 
@@ -298,7 +304,7 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
       auto task =
           cte_client_->AsyncPutBlob(tag_id, blob_name, 0, current_chunk_size,
                                     buffer_ptr.shm_.template Cast<void>(), 1.0f,
-                                    wrp_cte::core::Context(), 0);
+                                    clio::cte::core::Context(), 0);
 
       active_tasks.push_back(task);
 
@@ -310,19 +316,19 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
     if (!active_tasks.empty()) {
       // Wait for the first task to complete
       auto& first_task = active_tasks.front();
-      co_await first_task;
+      CLIO_CO_AWAIT(first_task);
 
       if (first_task->return_code_ != 0) {
         HLOG(kError, "BinaryFileAssimilator: PutBlob task failed with code {}",
              first_task->return_code_);
         // Free the buffer before deleting the task
-        CHI_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
+        CLIO_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
         error_code = -10;
-        co_return;
+        CLIO_CO_RETURN;
       }
 
       // Free the buffer before deleting the task
-      CHI_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
+      CLIO_IPC->FreeBuffer(first_task->blob_data_.template Cast<char>());
       active_tasks.erase(active_tasks.begin());
     }
   }
@@ -332,17 +338,17 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
        "BinaryFileAssimilator: Waiting for {} remaining tasks to complete",
        active_tasks.size());
   for (auto& task : active_tasks) {
-    co_await task;
+    CLIO_CO_AWAIT(task);
     if (task->return_code_ != 0) {
       HLOG(kError, "BinaryFileAssimilator: PutBlob task failed with code {}",
            task->return_code_);
       // Free the buffer before deleting the task
-      CHI_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
+      CLIO_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
       error_code = -10;
-      co_return;
+      CLIO_CO_RETURN;
     }
     // Free the buffer before deleting the task
-    CHI_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
+    CLIO_IPC->FreeBuffer(task->blob_data_.template Cast<char>());
   }
 
   file.close();
@@ -354,7 +360,8 @@ chi::TaskResume BinaryFileAssimilator::Schedule(const AssimilationCtx& ctx,
   HLOG(kDebug, "BinaryFileAssimilator::Schedule EXIT: Success");
 
   error_code = 0;
-  co_return;
+  CLIO_CO_RETURN;
+  CLIO_TASK_BODY_END
 }
 
 std::string BinaryFileAssimilator::GetUrlProtocol(const std::string& url) {
@@ -381,4 +388,4 @@ size_t BinaryFileAssimilator::GetFileSize(const std::string& file_path) {
   return static_cast<size_t>(st.st_size);
 }
 
-}  // namespace wrp_cae::core
+}  // namespace clio::cae::core

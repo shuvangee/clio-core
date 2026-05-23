@@ -35,11 +35,12 @@
  * Type implementations
  */
 
-#include "chimaera/types.h"
+#include "clio_runtime/types.h"
+#include "clio_runtime/worker.h"
 #include <sstream>
 #include <stdexcept>
 
-namespace chi {
+namespace clio::run {
 
 UniqueId UniqueId::FromString(const std::string& str) {
   // Parse format "major.minor"
@@ -61,4 +62,18 @@ std::string UniqueId::ToString() const {
   return std::to_string(major_) + "." + std::to_string(minor_);
 }
 
-}  // namespace chi
+LockOwnerId GetCurrentLockOwnerId() {
+  LockOwnerId id;
+  Worker *worker = CLIO_CUR_WORKER;
+  if (!worker) return id;
+  FullPtr<Task> task = worker->GetCurrentTask();
+  if (task.ptr_ == nullptr) return id;
+  id.worker_id_ = worker->GetId();
+  id.pid_ = task->task_id_.pid_;
+  id.tid_ = task->task_id_.tid_;
+  id.major_ = task->task_id_.major_;
+  id.node_id_ = task->task_id_.node_id_;
+  return id;
+}
+
+}  // namespace clio::run

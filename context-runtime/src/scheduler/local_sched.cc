@@ -32,23 +32,23 @@
  */
 
 // Copyright 2024 IOWarp contributors
-#include "chimaera/scheduler/local_sched.h"
+#include "clio_runtime/scheduler/local_sched.h"
 
 #include <functional>
 
-#include "chimaera/config_manager.h"
-#include "chimaera/ipc_manager.h"
-#include "chimaera/work_orchestrator.h"
-#include "chimaera/worker.h"
+#include "clio_runtime/config_manager.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/work_orchestrator.h"
+#include "clio_runtime/worker.h"
 
-namespace chi {
+namespace clio::run {
 
 void LocalScheduler::DivideWorkers(WorkOrchestrator *work_orch) {
   if (!work_orch) {
     return;
   }
 
-  ConfigManager *config = CHI_CONFIG_MANAGER;
+  ConfigManager *config = CLIO_CONFIG_MANAGER;
   if (!config) {
     HLOG(kError,
          "LocalScheduler::DivideWorkers: ConfigManager not available");
@@ -76,11 +76,14 @@ void LocalScheduler::DivideWorkers(WorkOrchestrator *work_orch) {
     }
   }
 
-  IpcManager *ipc = CHI_IPC;
+  IpcManager *ipc = CLIO_IPC;
   if (ipc) {
     ipc->SetNumSchedQueues(num_sched_workers);
     if (net_worker_) {
-      ipc->SetNetLane(net_worker_->GetLane());
+      // LocalScheduler keeps a single net worker — pass the same lane for
+      // both send and recv so EnqueueNetTask's priority-based dispatch
+      // still works.
+      ipc->SetNetLane(net_worker_->GetLane(), net_worker_->GetLane());
     }
   }
 
@@ -153,6 +156,14 @@ u32 LocalScheduler::RuntimeMapTask(Worker *worker, const Future<Task> &task,
     selected = scheduler_workers_[idx];
   }
 
+  // Net worker tasks → delegate to a scheduler worker to keep IPC responsive
+  if (selected == nullptr && net_worker_ != nullptr && worker == net_worker_ &&
+      !scheduler_workers_.empty()) {
+    u32 idx = next_sched_idx_.fetch_add(1, std::memory_order_relaxed) %
+              scheduler_workers_.size();
+    selected = scheduler_workers_[idx];
+  }
+
   // Fallback: stay on current worker
   if (selected == nullptr) {
     selected = worker;
@@ -189,13 +200,13 @@ void LocalScheduler::AdjustPolling(RunContext *run_ctx) {
 }
 
 u32 LocalScheduler::MapByPidTid(u32 num_lanes) {
-  auto *sys_info = HSHM_SYSTEM_INFO;
+  auto *sys_info = CTP_SYSTEM_INFO;
   pid_t pid = sys_info->pid_;
-  auto tid = HSHM_THREAD_MODEL->GetTid();
+  auto tid = CTP_THREAD_MODEL->GetTid();
 
   size_t combined_hash =
-      std::hash<pid_t>{}(pid) ^ (std::hash<hshm::u64>{}(tid.tid_) << 1);
+      std::hash<pid_t>{}(pid) ^ (std::hash<ctp::u64>{}(tid.tid_) << 1);
   return static_cast<u32>(combined_hash % num_lanes);
 }
 
-}  // namespace chi
+}  // namespace clio::run

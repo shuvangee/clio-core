@@ -38,9 +38,9 @@
 #include <adios2/engine/plugin/PluginEngineInterface.h>
 
 // Then include IOWarp headers
-#include <chimaera/chimaera.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
 
 namespace coeus {
 
@@ -127,12 +127,12 @@ class IowarpEngine : public adios2::plugin::PluginEngineInterface {
  private:
   /** Structure to hold deferred task and its buffer */
   struct DeferredTask {
-    chi::Future<wrp_cte::core::PutBlobTask> task;
-    hipc::FullPtr<char> buffer;
+    chi::Future<clio::cte::core::PutBlobTask> task;
+    ctp::ipc::FullPtr<char> buffer;
   };
 
   /** CTE Tag for this ADIOS file/session */
-  std::unique_ptr<wrp_cte::core::Tag> current_tag_;
+  std::unique_ptr<clio::cte::core::Tag> current_tag_;
 
   /** Current step counter */
   size_t current_step_;

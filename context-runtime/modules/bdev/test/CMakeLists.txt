@@ -7,24 +7,27 @@ set(BDEV_TEST_SOURCES
   test_bdev_chimod.cc
 )
 
+# GPU bdev tests (test_bdev_gpucache, test_bdev_gpu_kernels) removed
+# along with the GPU runtime concept.
+
 # Create bdev test executable
 add_executable(${BDEV_TEST_TARGET} ${BDEV_TEST_SOURCES})
 
 # Include directories for bdev tests
 target_include_directories(${BDEV_TEST_TARGET} PRIVATE
-  ${CHIMAERA_ROOT}/include
-  ${CHIMAERA_ROOT}/test  # For simple_test.h
-  ${CHIMAERA_ROOT}/modules/admin/include  # For admin tasks
-  ${CHIMAERA_ROOT}/modules/bdev/include   # For bdev tasks and client
+  ${CLIO_RUN_ROOT}/include
+  ${CLIO_RUN_ROOT}/test  # For simple_test.h
+  ${CLIO_RUN_ROOT}/modules/admin/include  # For admin tasks
+  ${CLIO_RUN_ROOT}/modules/bdev/include   # For bdev tasks and client
 )
 
 # Link against required libraries for bdev tests
 target_link_libraries(${BDEV_TEST_TARGET}
-  chimaera_admin_runtime          # Admin module runtime
-  chimaera_admin_client           # Admin module client
-  chimaera_bdev_runtime           # Bdev module runtime
-  chimaera_bdev_client            # Bdev module client
-  hshm::cxx                       # HermesShm library
+  clio_admin_runtime          # Admin module runtime
+  clio_admin_client           # Admin module client
+  clio_bdev_runtime           # Bdev module runtime
+  clio_bdev_client            # Bdev module client
+  ctp::cxx                       # ClioCtp library
   ${CMAKE_THREAD_LIBS_INIT}       # Threading support
 )
 
@@ -39,8 +42,10 @@ set_target_properties(${BDEV_TEST_TARGET} PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
+# GPU bdev test build rules removed.
+
 # Enable CTest integration if testing is enabled
-if(WRP_CORE_ENABLE_TESTS)
+if(CLIO_CORE_ENABLE_TESTS)
   # Platform-portable library search path for test environment
   if(WIN32)
     set(CHI_TEST_LIB_ENV "PATH=${CMAKE_BINARY_DIR}/bin\;$ENV{PATH}")
@@ -90,6 +95,18 @@ if(WRP_CORE_ENABLE_TESTS)
   set_tests_properties(cr_bdev_explicit_backend_ipc PROPERTIES
     TIMEOUT 180
     ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;${CHI_TEST_LIB_ENV};CHIMAERA_TEST_MODE=1;CHI_IPC_MODE=IPC"
+  )
+
+  # Set test properties
+  set_tests_properties(
+    cr_all_bdev_tests
+    cr_bdev_explicit_backend_shm
+    cr_bdev_explicit_backend_tcp
+    cr_bdev_explicit_backend_ipc
+    PROPERTIES
+      TIMEOUT 300
+      LABELS "msan_skip"
+      ENVIRONMENT "CHI_REPO_PATH=${CMAKE_BINARY_DIR}/bin;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHIMAERA_TEST_MODE=1"
   )
 endif()
 

@@ -5,10 +5,10 @@
 # Flow:
 #   Node 1 (primary):
 #     - Sets up SSH key pair (shared via workspace volume)
-#     - Initialises Jarvis and adds the jarvis_iowarp package repository
+#     - Initialises Jarvis and adds the jarvis_clio_core package repository
 #     - Runs: jarvis ppl run yaml cte_integration_test.yaml
 #       which starts the IOWarp runtime on both nodes (via pssh/SSH),
-#       deploys CTE pools (via chimaera compose on all nodes),
+#       deploys CTE pools (via clio_run compose on all nodes),
 #       and runs the PutGet benchmark.
 #   Node 2 (secondary):
 #     - Waits for node1's SSH public key, then starts sshd in foreground.
@@ -137,11 +137,18 @@ cleanup() {
 start_environment() {
     print_header "Starting 2-Node Jarvis Deployment Test Environment"
 
-    # Pass host UID/GID so container processes match host file ownership
-    export HOST_UID=$(id -u)
-    export HOST_GID=$(id -g)
-
     print_msg "$BLUE" "Starting containers..."
+    # Auto-detect Docker image: use nvidia image if binary requires CUDA
+    if [ -z "${IOWARP_DOCKER_IMAGE:-}" ]; then
+        CHIMAERA_BIN="/workspace/build/bin/chimaera"
+        [ ! -f "$CHIMAERA_BIN" ] && CHIMAERA_BIN="${IOWARP_CORE_ROOT:-/workspace}/build/bin/chimaera"
+        if [ -f "$CHIMAERA_BIN" ] && ldd "$CHIMAERA_BIN" 2>/dev/null | grep -q "libcudart"; then
+            export IOWARP_DOCKER_IMAGE="iowarp/deps-nvidia:latest"
+        else
+            export IOWARP_DOCKER_IMAGE="iowarp/deps-cpu:latest"
+        fi
+    fi
+
     docker compose up -d
 
     # Wait for containers to be ready with retry logic
@@ -271,7 +278,7 @@ main() {
         print_success "  - SSH established between node1 and node2"
         print_success "  - Jarvis pipeline 'cte_integration_test' ran via 'jarvis ppl run yaml'"
         print_success "  - IOWarp runtime started on both nodes (via pssh)"
-        print_success "  - CTE pools deployed via 'chimaera compose' (via pssh)"
+        print_success "  - CTE pools deployed via 'clio_run compose' (via pssh)"
         print_success "  - CTE PutGet benchmark completed successfully"
     else
         print_error "Jarvis deployment test failed with exit code: $exit_code"

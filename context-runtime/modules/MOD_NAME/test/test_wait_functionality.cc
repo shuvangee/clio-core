@@ -55,20 +55,20 @@
 
 using namespace std::chrono_literals;
 
-// Include Chimaera headers
-#include <chimaera/chimaera.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/task.h>
+// Include CLIO Runtime headers
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/task.h>
 
 // Include MOD_NAME client and tasks for WaitTest functionality
-#include <chimaera/MOD_NAME/MOD_NAME_client.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_client.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
 
 // Include admin client for pool management
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 namespace {
   // Test configuration constants
@@ -112,7 +112,7 @@ namespace {
      * Create MOD_NAME container for testing
      */
     bool createContainer(chi::PoolId pool_id) {
-      chimaera::MOD_NAME::Client client(pool_id);
+      clio::run::MOD_NAME::Client client(pool_id);
 
 
       try {
@@ -199,7 +199,7 @@ TEST_CASE("wait_test_basic_functionality", "[wait_test][basic]") {
   }
   
   SECTION("Basic WaitTest with depth 1") {
-    chimaera::MOD_NAME::Client client(kWaitTestPoolId);
+    clio::run::MOD_NAME::Client client(kWaitTestPoolId);
 
 
     chi::u32 test_id = fixture.generateTestId();
@@ -223,7 +223,7 @@ TEST_CASE("wait_test_basic_functionality", "[wait_test][basic]") {
   }
   
   SECTION("Basic WaitTest with depth 3") {
-    chimaera::MOD_NAME::Client client(kWaitTestPoolId);
+    clio::run::MOD_NAME::Client client(kWaitTestPoolId);
 
 
     chi::u32 test_id = fixture.generateTestId();
@@ -259,7 +259,7 @@ TEST_CASE("wait_test_recursive_functionality", "[wait_test][recursive]") {
   }
   
   SECTION("Recursive WaitTest with depth 5") {
-    chimaera::MOD_NAME::Client client(kWaitTestPoolId);
+    clio::run::MOD_NAME::Client client(kWaitTestPoolId);
 
 
     chi::u32 test_id = fixture.generateTestId();
@@ -283,7 +283,7 @@ TEST_CASE("wait_test_recursive_functionality", "[wait_test][recursive]") {
   }
   
   SECTION("Deep recursive WaitTest with depth 10") {
-    chimaera::MOD_NAME::Client client(kWaitTestPoolId);
+    clio::run::MOD_NAME::Client client(kWaitTestPoolId);
 
 
     chi::u32 test_id = fixture.generateTestId();
@@ -319,7 +319,7 @@ TEST_CASE("wait_test_async_functionality", "[wait_test][async]") {
   }
   
   SECTION("Async WaitTest with manual Wait() call") {
-    chimaera::MOD_NAME::Client client(kWaitTestPoolId);
+    clio::run::MOD_NAME::Client client(kWaitTestPoolId);
 
 
     chi::u32 test_id = fixture.generateTestId();
@@ -343,16 +343,16 @@ TEST_CASE("wait_test_async_functionality", "[wait_test][async]") {
          " completed in " + std::to_string(elapsed_time) + "ms");
 
     // Clean up
-    (void)CHI_IPC;
+    (void)CLIO_IPC;
   }
   
   SECTION("Multiple concurrent async WaitTest tasks") {
-    chimaera::MOD_NAME::Client client(kWaitTestPoolId);
+    clio::run::MOD_NAME::Client client(kWaitTestPoolId);
 
 
     const int num_tasks = 3;
     std::vector<chi::u32> depths = {2, 3, 4};
-    std::vector<chi::Future<chimaera::MOD_NAME::WaitTestTask>> tasks;
+    std::vector<chi::Future<clio::run::MOD_NAME::WaitTestTask>> tasks;
 
     auto start_time = std::chrono::steady_clock::now();
 
@@ -376,7 +376,7 @@ TEST_CASE("wait_test_async_functionality", "[wait_test][async]") {
          std::to_string(elapsed_time) + "ms");
 
     // Clean up all tasks
-    (void)CHI_IPC;
+    (void)CLIO_IPC;
     for (auto& task : tasks) {
       (void)task;
     }
@@ -395,7 +395,7 @@ TEST_CASE("wait_test_edge_cases", "[wait_test][edge_cases]") {
   }
   
   SECTION("WaitTest with depth 0") {
-    chimaera::MOD_NAME::Client client(kWaitTestPoolId);
+    clio::run::MOD_NAME::Client client(kWaitTestPoolId);
 
 
     chi::u32 test_id = fixture.generateTestId();
@@ -413,7 +413,7 @@ TEST_CASE("wait_test_edge_cases", "[wait_test][edge_cases]") {
   }
   
   SECTION("WaitTest with same test_id multiple times") {
-    chimaera::MOD_NAME::Client client(kWaitTestPoolId);
+    clio::run::MOD_NAME::Client client(kWaitTestPoolId);
 
 
     chi::u32 test_id = fixture.generateTestId();

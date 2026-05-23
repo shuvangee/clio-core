@@ -34,7 +34,7 @@
 #ifndef SIMPLE_MOD_CLIENT_H_
 #define SIMPLE_MOD_CLIENT_H_
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include "simple_mod_tasks.h"
 
@@ -62,10 +62,10 @@ class Client : public chi::ContainerClient {
    * @param pool_query Pool routing information
    * @return Future for the CreateTask
    */
-  chi::Future<CreateTask> AsyncCreate(const hipc::MemContext& mctx,
+  chi::Future<CreateTask> AsyncCreate(const ctp::ipc::MemContext& mctx,
                                        const chi::PoolQuery& pool_query) {
     (void)mctx;  // Memory context not needed for task creation
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     // Use admin pool for CreateTask as per CLAUDE.md requirements
     // Pass 'this' as client pointer for PostWait callback
@@ -83,10 +83,10 @@ class Client : public chi::ContainerClient {
    * @param pool_query Pool routing information
    * @return Future for the DestroyTask
    */
-  chi::Future<DestroyTask> AsyncDestroy(const hipc::MemContext& mctx,
+  chi::Future<DestroyTask> AsyncDestroy(const ctp::ipc::MemContext& mctx,
                                          const chi::PoolQuery& pool_query) {
     (void)mctx;  // Memory context not needed for task creation
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<DestroyTask>(chi::CreateTaskId(), pool_id_,
                                                   pool_query, pool_id_, 0);
@@ -100,10 +100,10 @@ class Client : public chi::ContainerClient {
    * @param pool_query Pool routing information
    * @return Future for the FlushTask
    */
-  chi::Future<FlushTask> AsyncFlush(const hipc::MemContext& mctx,
+  chi::Future<FlushTask> AsyncFlush(const ctp::ipc::MemContext& mctx,
                                      const chi::PoolQuery& pool_query) {
     (void)mctx;  // Memory context not needed for task creation
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
 
     auto task = ipc_manager->NewTask<FlushTask>(chi::CreateTaskId(), pool_id_,
                                                 pool_query);

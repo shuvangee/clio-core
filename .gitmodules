@@ -1,16 +1,4 @@
-[submodule "external/hindsight"]
-	path = external/hindsight
-	url = https://github.com/vectorize-io/hindsight.git
-[submodule "external/graphiti"]
-	path = external/graphiti
-	url = https://github.com/getzep/graphiti.git
-[submodule "context-transfer-engine/benchmark/memorybench"]
-	path = context-transfer-engine/benchmark/memorybench
-	url = https://github.com/iowarp/memorybench.git
 [submodule "docs"]
 	path = docs
 	url = https://github.com/iowarp/docs.git
 	branch = iowarp-dev
-[submodule "external/jarvis-cd"]
-	path = external/jarvis-cd
-	url = https://github.com/grc-iit/jarvis-cd.git

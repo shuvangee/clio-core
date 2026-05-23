@@ -7,6 +7,7 @@ cmake-build-*/
 /bench
 context-transfer-engine/compressor/test/results
 context-transfer-engine/compressor/results
+.claude/worktrees/
 
 # CMake generated files (only in build directories)
 # Build directories already ignored above, but add specific patterns for safety
@@ -135,6 +136,9 @@ CMakeUserPresents.json
 external/boost-*.tar.gz
 external/boost-*/
 external/boost/
+
+# Model weights (large binaries)
+models/
 
 # Submodules managed by .gitmodules
 #external/libzmq/

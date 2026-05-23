@@ -1,12 +1,17 @@
 # IOWarp Core - Release Variant
 # Standard release build using CMakePresets.json "release" preset
 #
-# Usage: rattler-build build --recipe recipe/ --variant-config variants/release.yaml
+# Usage: IOWARP_PRESET=release conda build installers/conda/ -c conda-forge
 
-preset: release
+preset:
+  - release
 
 # These are automatically derived from the preset
-cuda_enabled: "OFF"
-rocm_enabled: "OFF"
-mpi_enabled: "OFF"
-mpi_impl: nompi
+cuda_enabled:
+  - "OFF"
+rocm_enabled:
+  - "OFF"
+mpi_enabled:
+  - "OFF"
+mpi_impl:
+  - nompi

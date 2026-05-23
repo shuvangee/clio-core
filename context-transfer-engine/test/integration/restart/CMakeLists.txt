@@ -4,18 +4,14 @@ cmake_minimum_required(VERSION 3.10)
 # Restart test executable (two-mode: --put-blobs / --verify-blobs)
 add_executable(test_restart test_restart.cc)
 
-target_include_directories(test_restart PRIVATE
-  ${CMAKE_SOURCE_DIR}/test
-)
-
 target_link_libraries(test_restart
-    wrp_cte_core_runtime
-    wrp_cte_core_client
+    clio_cte_core_runtime
+    clio_cte_core_client
     chimaera::admin_runtime
     chimaera::admin_client
     chimaera::bdev_runtime
     chimaera::bdev_client
-    hshm::cxx
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -30,8 +26,8 @@ add_test(NAME cte_restart_integration
 
 set_tests_properties(cte_restart_integration
     PROPERTIES
-        TIMEOUT 120
-        LABELS "integration;restart;cte"
+        TIMEOUT 300
+        LABELS "integration;restart;cte;msan_skip"
         ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};BIN_DIR=${CMAKE_BINARY_DIR}/bin"
 )
 

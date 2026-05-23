@@ -32,7 +32,7 @@
  */
 
 /**
- * Comprehensive unit tests for Chimaera runtime system
+ * Comprehensive unit tests for CLIO Runtime runtime system
  *
  * Tests the complete flow: runtime startup → client init → task submission →
  * completion Uses simple custom test framework for testing.
@@ -46,19 +46,19 @@
 
 using namespace std::chrono_literals;
 
-// Include Chimaera headers
-#include <chimaera/chimaera.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+// Include CLIO Runtime headers
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 
 // Include MOD_NAME client and tasks for custom task testing
-#include <chimaera/MOD_NAME/MOD_NAME_client.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_client.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
 
 // Include admin client for pool management
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 namespace {
 // Test configuration constants
@@ -74,7 +74,7 @@ bool g_initialized = false;
 } // namespace
 
 /**
- * Test fixture for Chimaera runtime tests
+ * Test fixture for CLIO Runtime runtime tests
  * Handles setup and teardown of runtime and client components
  */
 class ChimaeraRuntimeFixture {
@@ -99,7 +99,7 @@ public:
    * @return true if task completed, false if timeout
    */
   template <typename TaskT>
-  bool waitForTaskCompletion(hipc::FullPtr<TaskT> task,
+  bool waitForTaskCompletion(ctp::ipc::FullPtr<TaskT> task,
                              chi::u32 timeout_ms = kTestTimeoutMs) {
     if (task.IsNull()) {
       return false;
@@ -117,7 +117,7 @@ public:
       }
 
       // Yield to allow other tasks to run
-      HSHM_THREAD_MODEL->Yield();
+      CTP_THREAD_MODEL->Yield();
     }
 
     return true; // Task completed
@@ -127,8 +127,8 @@ public:
    * Clean up runtime and client resources
    */
   void cleanup() {
-    // Note: Chimaera framework handles automatic cleanup through destructors
-    // when the Chimaera manager singleton is destroyed
+    // Note: CLIO Runtime framework handles automatic cleanup through destructors
+    // when the CLIO Runtime manager singleton is destroyed
     INFO("Test cleanup completed");
   }
 
@@ -138,17 +138,17 @@ public:
    */
   bool createModNamePool() {
     try {
-      // Admin client is automatically initialized via CHI_ADMIN singleton
+      // Admin client is automatically initialized via CLIO_ADMIN singleton
       chi::DomainQuery pool_query; // Default domain query
 
       // Create MOD_NAME pool parameters
-      chimaera::MOD_NAME::CreateParams params;
+      clio::run::MOD_NAME::CreateParams params;
       params.config_data_ = "test_config";
       params.worker_count_ = 2;
 
       // Create the MOD_NAME pool
       auto task =
-          admin_client.AsyncGetOrCreatePool<chimaera::MOD_NAME::CreateParams>(pool_query, kTestModNamePoolId, params);
+          admin_client.AsyncGetOrCreatePool<clio::run::MOD_NAME::CreateParams>(pool_query, kTestModNamePoolId, params);
 
       if (waitForTaskCompletion(task)) {
         INFO("MOD_NAME pool created successfully with ID: "
@@ -177,9 +177,9 @@ TEST_CASE("Chimaera Initialization", "[runtime][initialization]") {
     REQUIRE(g_initialized);
 
     // Verify runtime state
-    REQUIRE(CHI_CHIMAERA_MANAGER->IsInitialized());
-    REQUIRE(CHI_CHIMAERA_MANAGER->IsRuntime());
-    REQUIRE(CHI_CHIMAERA_MANAGER->IsClient());
+    REQUIRE(CLIO_CHIMAERA_MANAGER->IsInitialized());
+    REQUIRE(CLIO_CHIMAERA_MANAGER->IsRuntime());
+    REQUIRE(CLIO_CHIMAERA_MANAGER->IsClient());
   }
 
   SECTION("Multiple initializations should be safe") {
@@ -203,7 +203,7 @@ TEST_CASE("MOD_NAME Custom Task Execution", "[task][mod_name][custom]") {
     REQUIRE(fixture.createModNamePool());
 
     // Step 3: Initialize MOD_NAME client
-    chimaera::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
 
     // Step 4: Create the MOD_NAME container
     chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
@@ -246,7 +246,7 @@ TEST_CASE("MOD_NAME Async Task Execution", "[task][mod_name][async]") {
     REQUIRE(fixture.createModNamePool());
 
     // Initialize MOD_NAME client
-    chimaera::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
 
     // Create the MOD_NAME container
     chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
@@ -290,7 +290,7 @@ TEST_CASE("Error Handling Tests", "[error][edge_cases]") {
   SECTION("Task submission without runtime should fail gracefully") {
     (void)g_initialized; // Mark as used
     // Try to create a client without initializing runtime
-    chimaera::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
 
     // This should not crash, but may fail
     chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
@@ -310,7 +310,7 @@ TEST_CASE("Error Handling Tests", "[error][edge_cases]") {
 
     // Try to use an invalid pool ID
     constexpr chi::PoolId kInvalidPoolId = chi::PoolId(9999, 0);
-    chimaera::MOD_NAME::Client invalid_client(kInvalidPoolId);
+    clio::run::MOD_NAME::Client invalid_client(kInvalidPoolId);
 
     chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
     std::string pool_name = "test_invalid_pool";
@@ -328,7 +328,7 @@ TEST_CASE("Error Handling Tests", "[error][edge_cases]") {
     REQUIRE(g_initialized);
     REQUIRE(fixture.createModNamePool());
 
-    chimaera::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
     chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
     std::string pool_name = "test_mod_name_pool";
     auto create_task = mod_name_client.AsyncCreate(pool_query, pool_name, kTestModNamePoolId);
@@ -363,7 +363,7 @@ TEST_CASE("Concurrent Task Execution", "[concurrent][stress]") {
     REQUIRE(g_initialized);
     REQUIRE(fixture.createModNamePool());
 
-    chimaera::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
     chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
     std::string pool_name = "test_mod_name_pool";
     auto create_task = mod_name_client.AsyncCreate(pool_query, pool_name, kTestModNamePoolId);
@@ -375,7 +375,7 @@ TEST_CASE("Concurrent Task Execution", "[concurrent][stress]") {
 
     // Submit multiple concurrent tasks
     constexpr int kNumTasks = 5;
-    std::vector<hipc::FullPtr<chimaera::MOD_NAME::CustomTask>> tasks;
+    std::vector<ctp::ipc::FullPtr<clio::run::MOD_NAME::CustomTask>> tasks;
 
     for (int i = 0; i < kNumTasks; ++i) {
       std::string input_data = "concurrent_test_" + std::to_string(i);
@@ -412,7 +412,7 @@ TEST_CASE("Memory Management", "[memory][cleanup]") {
     REQUIRE(g_initialized);
     REQUIRE(fixture.createModNamePool());
 
-    chimaera::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
     chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
     std::string pool_name = "test_mod_name_pool";
     auto create_task = mod_name_client.AsyncCreate(pool_query, pool_name, kTestModNamePoolId);
@@ -450,7 +450,7 @@ TEST_CASE("Performance Tests", "[performance][timing]") {
     REQUIRE(g_initialized);
     REQUIRE(fixture.createModNamePool());
 
-    chimaera::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
+    clio::run::MOD_NAME::Client mod_name_client(kTestModNamePoolId);
     chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
     std::string pool_name = "test_mod_name_pool";
     auto create_task = mod_name_client.AsyncCreate(pool_query, pool_name, kTestModNamePoolId);

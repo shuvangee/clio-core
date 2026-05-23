@@ -1,0 +1,66 @@
+# 2-node IOR + CTE — comp-14 + comp-18 — isolates whether comp-18 is
+# the cause of repeated SWIM probe timeouts seen in 8-node runs.
+# Mirrors ior_cte_libfuse_sbatch.yaml, just smaller scale + nodelist pin.
+name: ior_cte_libfuse_2n_c18
+
+ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
+mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include eno1 --prtemca prte_if_include eno1 --prtemca prte_tmpdir_base /home/llogan/iowarp_prte_tmp'
+
+env:
+  TMPDIR: "/home/llogan/iowarp_prte_tmp"
+  CLIO_MEMFD_DIR: "/home/llogan/iowarp_chimaera_tmp_${HOSTNAME}"
+
+scheduler:
+  name: slurm
+  job_name: ior_2n_c18
+  nodes: 2
+  ntasks_per_node: 1
+  cpus_per_task: 32
+  partition: compute
+  time: "00:10:00"
+  nodelist: "ares-comp-14,ares-comp-18"
+  output: slurm-%j.out
+  error: slurm-%j.err
+  suffix: "-40g"
+  pre_cmds:
+    - 'source /etc/profile.d/lmod.sh 2>/dev/null || source /etc/profile.d/modules.sh'
+    - 'module load gcc/11.4.0/openmpi/5.0.5-x2kvx5l ior/3.3.0-fihmxeb'
+    - 'mkdir -p /home/llogan/iowarp_prte_tmp'
+
+pkgs:
+  - pkg_type: jarvis_clio_core.clio_runtime
+    pkg_name: runtime
+    num_threads: 4
+    client_data_segment_size: "2G"
+    port: 9413
+    ipc_mode: "shm"
+    log_level: "debug"
+    sleep: 4
+
+  - pkg_type: jarvis_clio_core.clio_cte
+    pkg_name: cte_core
+    devices:
+      - ["ram::cte_ram_tier1", "32GB", 1.0]
+    dpe_type: "max_bw"
+    neighborhood: 1
+    default_target_timeout_ms: 30000
+    poll_period_ms: 5000
+    pool_query: "local"
+
+  - pkg_type: jarvis_clio_core.clio_cte_libfuse
+    pkg_name: cte_fuse
+    mountpoint: ${HOME}/cte_libfuse_sbatch
+    sleep: 2
+    extra_fuse_args: "-f"
+
+  - pkg_type: builtin.ior
+    pkg_name: ior
+    api: posix
+    write: true
+    read: true
+    fpp: true
+    nprocs: 48
+    ppn: 24
+    xfer: 1m
+    block: 64m
+    out: ${HOME}/cte_libfuse_sbatch/ior_sbatch.bin

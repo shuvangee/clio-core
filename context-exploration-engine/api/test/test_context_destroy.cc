@@ -40,15 +40,15 @@
  * 3. Testing special characters in context names
  *
  * Environment Variables:
- * - INIT_CHIMAERA: If set to "1", initializes Chimaera runtime
+ * - INIT_CHIMAERA: If set to "1", initializes CLIO Runtime runtime
  */
 
-#include <wrp_cee/api/context_interface.h>
-#include <chimaera/chimaera.h>
+#include <clio_cee/api/context_interface.h>
+#include <clio_runtime/clio_runtime.h>
 #include <iostream>
 #include <cassert>
 #include <cstring>
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 /**
  * Test that context_destroy can handle empty context list
@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
   HLOG(kInfo, "========================================");
 
   try {
-    // Initialize Chimaera runtime if requested (for unit tests)
+    // Initialize CLIO Runtime runtime if requested (for unit tests)
     const char* init_chimaera = std::getenv("INIT_CHIMAERA");
     if (init_chimaera && std::strcmp(init_chimaera, "1") == 0) {
       HLOG(kInfo, "Initializing Chimaera (INIT_CHIMAERA=1)...");
@@ -119,8 +119,8 @@ int main(int argc, char** argv) {
       HLOG(kSuccess, "Chimaera initialized");
     }
 
-    // Verify Chimaera IPC is available
-    auto* ipc_manager = CHI_IPC;
+    // Verify CLIO Runtime IPC is available
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Chimaera IPC not initialized. Is the runtime running?");
       HLOG(kInfo, "HINT: Set INIT_CHIMAERA=1 to initialize runtime or start runtime externally");

@@ -2,12 +2,12 @@ cmake_minimum_required(VERSION 3.20)
 project(content_transfer_engine)
 
 # Set root directory for this component
-set(WRP_CTE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
+set(CLIO_CTE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Note: WRP_CTE_ENABLE_COMPRESS is defined in root CMakeLists.txt
-# It controls both compressor chimod building and HSHM compression support
+# Note: CLIO_CTE_ENABLE_COMPRESS is defined in root CMakeLists.txt
+# It controls both compressor chimod building and CTP compression support
 
-# Python bindings are controlled by WRP_CORE_ENABLE_PYTHON in root CMakeLists.txt
+# Python bindings are controlled by CLIO_CORE_ENABLE_PYTHON in root CMakeLists.txt
 # CTE_ENABLE_ASAN is set by root CMakeLists.txt
 
 # C++ standard, compile commands, RPATH, ASAN, and output directories are all set by root CMakeLists.txt
@@ -15,16 +15,16 @@ set(WRP_CTE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 # CTE_ENABLE_CMAKE_DOTENV is set by root CMakeLists.txt
 # DOTENV handling is done by root CMakeLists.txt
 
-# CMake modules and ChiMod utilities are now provided by IowarpCoreCommon.cmake
+# CMake modules and ChiMod utilities are now provided by ClioCoreCommon.cmake
 # All find_package calls are handled by root CMakeLists.txt
-# Targets chimaera::cxx, chimaera_admin_client, etc. are already available
+# Targets chimaera::cxx, clio_admin_client, etc. are already available
 
 # Python bindings configuration
-# nanobind is configured by root CMakeLists.txt when WRP_CORE_ENABLE_PYTHON=ON
+# nanobind is configured by root CMakeLists.txt when CLIO_CORE_ENABLE_PYTHON=ON
 # No local nanobind setup needed - use the root configuration
-if(WRP_CORE_ENABLE_PYTHON)
+if(CLIO_CORE_ENABLE_PYTHON)
   if(NOT COMMAND nanobind_add_module)
-    message(WARNING "WRP_CORE_ENABLE_PYTHON is ON but nanobind_add_module command not found. Python bindings may fail.")
+    message(WARNING "CLIO_CORE_ENABLE_PYTHON is ON but nanobind_add_module command not found. Python bindings may fail.")
   else()
     message(STATUS "Python bindings available - nanobind configured by root CMakeLists.txt")
   endif()
@@ -32,11 +32,20 @@ endif()
 
 message(STATUS "Found Chimaera framework - building full ChiMod implementation")
 
+# Ensure CUDA language is enabled in this directory scope so that chimod
+# subdirectories (core, compressor) can use add_cuda_library when
+# CLIO_CORE_ENABLE_CUDA is ON.  enable_language() is idempotent; the
+# architecture and flag variables set by wrp_core_enable_cuda() in
+# context-transport-primitives are already in the CMake cache.
+if(CLIO_CORE_ENABLE_CUDA)
+    enable_language(CUDA)
+endif()
+
 # Add the core ChiMod
 add_subdirectory(core)
 
 # Add the compressor ChiMod (optional - only if compression is enabled)
-if(WRP_CTE_ENABLE_COMPRESS)
+if(CLIO_CTE_ENABLE_COMPRESS)
     message(STATUS "CTE: Compression enabled - building compressor chimod")
     add_subdirectory(compressor)
 else()
@@ -49,13 +58,16 @@ endif()
 # Add adapters
 add_subdirectory(adapter)
 
+# Add UVM (GPU virtual memory manager) -- requires CUDA
+add_subdirectory(uvm)
+
 # Enable testing
 # CTest is included by root CMakeLists.txt
 include(CTest)
 
 # Add tests if enabled
-# Tests are controlled by WRP_CORE_ENABLE_TESTS in root CMakeLists.txt
-if(WRP_CORE_ENABLE_TESTS)
+# Tests are controlled by CLIO_CORE_ENABLE_TESTS in root CMakeLists.txt
+if(CLIO_CORE_ENABLE_TESTS)
   add_subdirectory(test)
   message(STATUS "CTE tests enabled - added test subdirectory")
 endif()
@@ -64,14 +76,14 @@ endif()
 add_subdirectory(wrapper)
 
 # Add benchmarks if enabled
-# Benchmarks are controlled by WRP_CORE_ENABLE_BENCHMARKS
-if(WRP_CORE_ENABLE_BENCHMARKS)
+# Benchmarks are controlled by CLIO_CORE_ENABLE_BENCHMARKS
+if(CLIO_CORE_ENABLE_BENCHMARKS)
   add_subdirectory(benchmark)
   message(STATUS "CTE benchmarks enabled - added benchmark subdirectory")
 endif()
 
 message(STATUS "CTE Core and Bdev ChiMods configured for compilation")
 
-if(WRP_CORE_ENABLE_JARVIS)
-    jarvis_repo_add(${WRP_CTE_ROOT}/test/jarvis_iowarp)
+if(CLIO_CORE_ENABLE_JARVIS)
+    jarvis_repo_add(${CLIO_CTE_ROOT}/test/jarvis_clio_core)
 endif()

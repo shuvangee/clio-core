@@ -1,0 +1,17 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: 50%
+        threshold: 5%
+
+ignore:
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/benchmark/**"
+  - "**/globus_file_assimilator.cc"
+  - "**/local_sched.cc"

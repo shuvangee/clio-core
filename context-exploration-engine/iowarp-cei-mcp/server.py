@@ -22,7 +22,7 @@ Runtime Management:
 - get_client_status: Get CTE client initialization status
 - get_cte_types: Get available CTE types and operations
 
-Note: This wraps the wrp_cte_core_ext Python bindings.
+Note: This wraps the clio_cte_core_ext Python bindings.
 """
 import sys
 import os
@@ -71,8 +71,8 @@ def _find_cte_bindings():
         if not search_path.exists():
             continue
         
-        # Look for wrp_cte_core_ext.so or wrp_cte_core_ext*.so
-        for pattern in ["wrp_cte_core_ext.so", "wrp_cte_core_ext*.so"]:
+        # Look for clio_cte_core_ext.so or clio_cte_core_ext*.so
+        for pattern in ["clio_cte_core_ext.so", "clio_cte_core_ext*.so"]:
             matches = list(search_path.glob(pattern))
             if matches:
                 # Add directory to Python path
@@ -87,13 +87,13 @@ _found_bindings = _find_cte_bindings()
 
 # Try to import CTE Python bindings
 try:
-    import wrp_cte_core_ext as cte
+    import clio_cte_core_ext as cte
     CTE_AVAILABLE = True
 except ImportError as e:
     if _found_bindings:
         print(f"Warning: Found bindings directory but still could not import: {e}", file=sys.stderr)
     else:
-        print(f"Warning: Could not import wrp_cte_core_ext: {e}", file=sys.stderr)
+        print(f"Warning: Could not import clio_cte_core_ext: {e}", file=sys.stderr)
         print("Note: CTE Python bindings must be built and available in Python path", file=sys.stderr)
         print(f"      Searched in: {[str(p) for p in _find_cte_bindings.__code__.co_consts if isinstance(p, str)][:5]}", file=sys.stderr)
         print(f"      Try: export PYTHONPATH=/workspace/build/bin:$PYTHONPATH", file=sys.stderr)
@@ -141,7 +141,7 @@ def _initialize_runtime() -> bool:
                 module_file = cte.__file__ if hasattr(cte, '__file__') else None
                 if module_file:
                     bin_dir = os.path.dirname(os.path.abspath(module_file))
-                    os.environ["CHI_REPO_PATH"] = bin_dir
+                    os.environ["CLIO_REPO_PATH"] = bin_dir
                     existing_ld_path = os.getenv("LD_LIBRARY_PATH", "")
                     if existing_ld_path:
                         os.environ["LD_LIBRARY_PATH"] = f"{bin_dir}:{existing_ld_path}"
@@ -151,9 +151,9 @@ def _initialize_runtime() -> bool:
                 pass  # May fail, continue anyway
             
             # Get config path
-            config_path = os.getenv("CHI_SERVER_CONF", "")
+            config_path = os.getenv("CLIO_SERVER_CONF", "")
             
-            # Step 1: Initialize Chimaera (unified init)
+            # Step 1: Initialize CLIO Runtime (unified init)
             chimaera_result = False
             if hasattr(cte, 'chimaera_init') and hasattr(cte, 'ChimaeraMode'):
                 try:
@@ -163,7 +163,7 @@ def _initialize_runtime() -> bool:
                 except Exception:
                     pass  # May fail in some environments
 
-            # Step 2: Initialize CTE subsystem (only if Chimaera succeeded)
+            # Step 2: Initialize CTE subsystem (only if CLIO Runtime succeeded)
             cte_result = False
             if chimaera_result and hasattr(cte, 'initialize_cte') and hasattr(cte, 'PoolQuery'):
                 try:
@@ -243,7 +243,7 @@ def get_client_status() -> str:
     if not CTE_AVAILABLE:
         return json.dumps({
             'available': False,
-            'error': 'CTE Python bindings (wrp_cte_core_ext) not available',
+            'error': 'CTE Python bindings (clio_cte_core_ext) not available',
             'message': 'CTE Python bindings must be built and available in Python path'
         }, indent=2)
     
@@ -282,7 +282,7 @@ def tag_query(tag_regex: str, max_tags: int = 0) -> str:
             'tags': [],
             'count': 0,
             'error': 'CTE Python bindings not available',
-            'message': 'CTE Python bindings (wrp_cte_core_ext) must be built and available'
+            'message': 'CTE Python bindings (clio_cte_core_ext) must be built and available'
         }, indent=2)
     
     if not _ensure_initialized():
@@ -354,7 +354,7 @@ def blob_query(tag_regex: str, blob_regex: str, max_blobs: int = 0) -> str:
             'blobs': [],
             'count': 0,
             'error': 'CTE Python bindings not available',
-            'message': 'CTE Python bindings (wrp_cte_core_ext) must be built and available'
+            'message': 'CTE Python bindings (clio_cte_core_ext) must be built and available'
         }, indent=2)
     
     if not _ensure_initialized():
@@ -425,7 +425,7 @@ def poll_telemetry_log(minimum_logical_time: int = 0) -> str:
             'entries': [],
             'count': 0,
             'error': 'CTE Python bindings not available',
-            'message': 'CTE Python bindings (wrp_cte_core_ext) must be built and available'
+            'message': 'CTE Python bindings (clio_cte_core_ext) must be built and available'
         }, indent=2)
     
     if not _ensure_initialized():
@@ -510,7 +510,7 @@ def reorganize_blob(tag_id_major: int, tag_id_minor: int, blob_name: str, new_sc
             'result_code': -1,
             'success': False,
             'error': 'CTE Python bindings not available',
-            'message': 'CTE Python bindings (wrp_cte_core_ext) must be built and available'
+            'message': 'CTE Python bindings (clio_cte_core_ext) must be built and available'
         }, indent=2)
     
     if not _ensure_initialized():
@@ -575,8 +575,8 @@ def initialize_cte_runtime() -> str:
     """Initialize the CTE runtime (Chimaera runtime, client, and CTE subsystem).
     
     This function follows the initialization pattern from test_bindings.py:
-    1. Setup environment paths (CHI_REPO_PATH, LD_LIBRARY_PATH)
-    2. Use CHI_SERVER_CONF if available, otherwise try empty config
+    1. Setup environment paths (CLIO_REPO_PATH, LD_LIBRARY_PATH)
+    2. Use CLIO_SERVER_CONF if available, otherwise try empty config
     3. Initialize Chimaera (chimaera_init with kClient mode, True) - wait 500ms
     4. Initialize CTE subsystem (initialize_cte with config_path)
     
@@ -587,7 +587,7 @@ def initialize_cte_runtime() -> str:
         return json.dumps({
             'success': False,
             'error': 'CTE Python bindings not available',
-            'message': 'CTE Python bindings (wrp_cte_core_ext) must be built and available'
+            'message': 'CTE Python bindings (clio_cte_core_ext) must be built and available'
         }, indent=2)
     
     global _runtime_initialized
@@ -634,20 +634,20 @@ def initialize_cte_runtime() -> str:
                 module_file = cte.__file__ if hasattr(cte, '__file__') else None
                 if module_file:
                     bin_dir = os.path.dirname(os.path.abspath(module_file))
-                    os.environ["CHI_REPO_PATH"] = bin_dir
+                    os.environ["CLIO_REPO_PATH"] = bin_dir
                     existing_ld_path = os.getenv("LD_LIBRARY_PATH", "")
                     if existing_ld_path:
                         os.environ["LD_LIBRARY_PATH"] = f"{bin_dir}:{existing_ld_path}"
                     else:
                         os.environ["LD_LIBRARY_PATH"] = bin_dir
-                    result['messages'].append(f'Set CHI_REPO_PATH={bin_dir}')
+                    result['messages'].append(f'Set CLIO_REPO_PATH={bin_dir}')
             except Exception as e:
                 result['messages'].append(f'Could not set environment paths: {str(e)}')
             log_progress(result) # Log after setting env paths
             
             # Step 0.5: Get or generate config path
-            # If CHI_SERVER_CONF is set, use it; otherwise try to generate a minimal config
-            config_path = os.getenv("CHI_SERVER_CONF", "")
+            # If CLIO_SERVER_CONF is set, use it; otherwise try to generate a minimal config
+            config_path = os.getenv("CLIO_SERVER_CONF", "")
             
             if not config_path:
                 # Try to generate a minimal config file (following test_bindings.py pattern)
@@ -708,20 +708,20 @@ def initialize_cte_runtime() -> str:
                         with open(config_path, 'w') as f:
                             yaml.dump(config, f)
                         
-                        os.environ['CHI_SERVER_CONF'] = config_path
+                        os.environ['CLIO_SERVER_CONF'] = config_path
                         result['messages'].append(f'Generated config file: {config_path} (port: {port})')
                     else:
                         result['messages'].append('Could not find available port for config generation')
                 except ImportError:
-                    result['messages'].append('PyYAML not available - cannot generate config (install pyyaml or set CHI_SERVER_CONF)')
+                    result['messages'].append('PyYAML not available - cannot generate config (install pyyaml or set CLIO_SERVER_CONF)')
                 except Exception as e:
                     result['messages'].append(f'Config generation failed: {type(e).__name__}: {str(e)}')
             else:
-                result['messages'].append(f'Using config from CHI_SERVER_CONF: {config_path}')
+                result['messages'].append(f'Using config from CLIO_SERVER_CONF: {config_path}')
             
             log_progress(result) # Log after getting/generating config path
             
-            # Step 1: Initialize Chimaera (unified init - following test_bindings.py pattern)
+            # Step 1: Initialize CLIO Runtime (unified init - following test_bindings.py pattern)
             # Note: This may fail if runtime is already running or config is missing
             if hasattr(cte, 'chimaera_init') and hasattr(cte, 'ChimaeraMode'):
                 try:
@@ -731,7 +731,7 @@ def initialize_cte_runtime() -> str:
                     result['runtime_init'] = bool(chimaera_result)
                     result['client_init'] = bool(chimaera_result)
                     if chimaera_result:
-                        # Give Chimaera time to initialize all components (500ms as per tests)
+                        # Give CLIO Runtime time to initialize all components (500ms as per tests)
                         time.sleep(0.5)
                         result['messages'].append('Chimaera initialized successfully')
                     else:
@@ -864,7 +864,7 @@ def initialize_cte_runtime() -> str:
         
         # Add helpful message if initialization failed
         if not result['success']:
-            result['note'] = 'CTE runtime initialization may require external setup. Options: 1) Set CHI_SERVER_CONF to a valid config file path, 2) Ensure PyYAML is installed for automatic config generation (pip install pyyaml), 3) Ensure Chimaera runtime is not already running on the same port, 4) Use external Chimaera runtime setup. Note: If initialization fails with process exit, the C++ code may have called FATAL - check logs or try external setup.'
+            result['note'] = 'CTE runtime initialization may require external setup. Options: 1) Set CLIO_SERVER_CONF to a valid config file path, 2) Ensure PyYAML is installed for automatic config generation (pip install pyyaml), 3) Ensure Chimaera runtime is not already running on the same port, 4) Use external Chimaera runtime setup. Note: If initialization fails with process exit, the C++ code may have called FATAL - check logs or try external setup.'
         log_progress(result) # Log before finally block
         
     except Exception as e:
@@ -909,7 +909,7 @@ def put_blob(tag_name: str, blob_name: str, data: str, offset: int = 0) -> str:
             'offset': offset,
             'success': False,
             'error': 'CTE Python bindings not available',
-            'message': 'CTE Python bindings (wrp_cte_core_ext) must be built and available'
+            'message': 'CTE Python bindings (clio_cte_core_ext) must be built and available'
         }, indent=2)
     
     if not _ensure_initialized():
@@ -1245,7 +1245,7 @@ def get_cte_types() -> str:
     
     if not CTE_AVAILABLE:
         result['error'] = 'CTE Python bindings not available'
-        result['message'] = 'CTE Python bindings (wrp_cte_core_ext) must be built and available'
+        result['message'] = 'CTE Python bindings (clio_cte_core_ext) must be built and available'
         return json.dumps(result, indent=2)
     
     try:

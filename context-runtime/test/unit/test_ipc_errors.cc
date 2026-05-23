@@ -42,8 +42,8 @@
 
 #include <cstdlib>
 
-#include "chimaera/chimaera.h"
-#include "chimaera/ipc_manager.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/ipc_manager.h"
 
 using namespace chi;
 
@@ -62,16 +62,76 @@ static bool InitializeRuntime() {
 }
 
 // ============================================================================
+// Connection Error Tests
+// ============================================================================
+
+// NOTE: This test is disabled because CHIMAERA_INIT has a static guard
+// that prevents multiple initializations in the same process. Once it
+// succeeds in any test, it will return true in all subsequent tests.
+// This test would need to run in a separate process to work correctly.
+/*
+TEST_CASE("IpcErrors - Client Connect Without Server", "[ipc][errors]") {
+  // Ensure no server is running by clearing any existing IPCs
+  // (This may fail if no IPCs exist, which is fine)
+
+  // Try to connect as client when NO server exists
+  setenv("CLIO_WITH_RUNTIME", "0", 1);
+
+  // This should timeout and fail gracefully (not crash)
+  bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
+  REQUIRE(!success);
+
+  // Verify IPC manager is not initialized
+  // Note: CLIO_IPC may be null or in uninitialized state
+  auto *ipc = CLIO_IPC;
+  if (ipc != nullptr) {
+    REQUIRE(!ipc->IsInitialized());
+  }
+}
+*/
+
+// NOTE: This test is disabled because it tries to call CHIMAERA_INIT
+// which can only be called once per process. It would need to run in
+// a separate process to work correctly.
+/*
+TEST_CASE("IpcErrors - Connection Timeout", "[ipc][errors]") {
+  // Start a server that will immediately exit (simulating crash)
+  pid_t server_pid = fork();
+  if (server_pid == 0) {
+    // Child: Start server then immediately exit
+    setenv("CLIO_WITH_RUNTIME", "1", 1);
+    CHIMAERA_INIT(ChimaeraMode::kServer, true);
+    exit(0);  // Exit immediately
+  }
+
+  // Wait for server to exit
+  int status;
+  waitpid(server_pid, &status, 0);
+
+  // Small delay
+  usleep(100000);
+
+  // Now try to connect - server is gone
+  setenv("CLIO_WITH_RUNTIME", "0", 1);
+  bool success = CHIMAERA_INIT(ChimaeraMode::kClient, false);
+
+  // May succeed or fail depending on timing and leftover shm
+  // The important thing is it doesn't crash
+}
+*/
+
+// ============================================================================
 // Memory Allocation Error Tests
 // ============================================================================
 
 TEST_CASE("IpcErrors - Huge Buffer Allocation", "[ipc][errors][memory]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
-  size_t huge_size = hshm::Unit<size_t>::Terabytes(100);
+  // Try to allocate impossibly large buffer
+  size_t huge_size = ctp::Unit<size_t>::Terabytes(100);
   auto buf = ipc->AllocateBuffer(huge_size);
   REQUIRE(buf.IsNull());
 }
@@ -79,7 +139,7 @@ TEST_CASE("IpcErrors - Huge Buffer Allocation", "[ipc][errors][memory]") {
 TEST_CASE("IpcErrors - Zero Size Allocation", "[ipc][errors][memory]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   auto buf = ipc->AllocateBuffer(0);
@@ -91,7 +151,7 @@ TEST_CASE("IpcErrors - Zero Size Allocation", "[ipc][errors][memory]") {
 TEST_CASE("IpcErrors - Invalid Buffer Free", "[ipc][errors][memory]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   FullPtr<char> null_buf;
@@ -105,7 +165,7 @@ TEST_CASE("IpcErrors - Invalid Buffer Free", "[ipc][errors][memory]") {
 TEST_CASE("IpcErrors - Invalid Node ID", "[ipc][errors][network]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   auto *host = ipc->GetHost(0xDEADBEEF);
@@ -118,7 +178,7 @@ TEST_CASE("IpcErrors - Invalid Node ID", "[ipc][errors][network]") {
 TEST_CASE("IpcErrors - Invalid IP Address", "[ipc][errors][network]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   auto *host = ipc->GetHostByIp("999.999.999.999");
@@ -135,7 +195,7 @@ TEST_CASE("IpcErrors - Network Client Creation Failure",
           "[ipc][errors][network]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   try {
@@ -153,12 +213,15 @@ TEST_CASE("IpcErrors - Network Client Creation Failure",
 TEST_CASE("IpcErrors - Network Queue Operations", "[ipc][errors][queue]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
+  // Try to pop from empty network queue across the latency/IO lanes
   Future<Task> future;
-  bool result = ipc->TryPopNetTask(NetQueuePriority::kSendIn, future);
-  REQUIRE(!result);
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendInLatency, future));
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendInIO, future));
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutLatency, future));
+  REQUIRE(!ipc->TryPopNetTask(NetQueuePriority::kSendOutIO, future));
 
   result = ipc->TryPopNetTask(NetQueuePriority::kSendOut, future);
   REQUIRE(!result);
@@ -171,10 +234,11 @@ TEST_CASE("IpcErrors - Network Queue Operations", "[ipc][errors][queue]") {
 TEST_CASE("IpcErrors - Invalid Allocator Registration", "[ipc][errors][shm]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
-  hipc::AllocatorId invalid_id(0xFFFF, 0xFFFF);
+  // Try to register with invalid allocator ID
+  ctp::ipc::AllocatorId invalid_id(0xFFFF, 0xFFFF);
   bool registered = ipc->RegisterMemory(invalid_id);
   (void)registered;
 }
@@ -183,7 +247,7 @@ TEST_CASE("IpcErrors - GetClientShmInfo Invalid Index",
           "[ipc][errors][shm]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   ClientShmInfo info = ipc->GetClientShmInfo(9999);
@@ -197,7 +261,7 @@ TEST_CASE("IpcErrors - GetClientShmInfo Invalid Index",
 TEST_CASE("IpcErrors - SetNumSchedQueues Edge Cases", "[ipc][errors][sched]") {
   REQUIRE(InitializeRuntime());
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   REQUIRE(ipc != nullptr);
 
   u32 original = ipc->GetNumSchedQueues();
@@ -207,6 +271,57 @@ TEST_CASE("IpcErrors - SetNumSchedQueues Edge Cases", "[ipc][errors][sched]") {
   ipc->SetNumSchedQueues(1000000);
   ipc->SetNumSchedQueues(original);
 }
+
+// ============================================================================
+// Multi-Process Error Tests
+// ============================================================================
+
+// NOTE: This test is disabled because it forks multiple processes that each
+// try to start a full runtime (workers, modules, servers). This is very heavy
+// and causes timeouts. It's better suited for integration tests.
+/*
+TEST_CASE("IpcErrors - Concurrent Init/Finalize", "[ipc][errors][multiproc]") {
+  // Test concurrent initialization attempts
+  const int num_procs = 3;
+  pid_t pids[num_procs];
+
+  for (int i = 0; i < num_procs; ++i) {
+    pids[i] = fork();
+    if (pids[i] == 0) {
+      // Child: Try to initialize
+      bool success = CHIMAERA_INIT(ChimaeraMode::kClient, true);
+
+      if (success) {
+        auto *ipc = CLIO_IPC;
+        if (ipc && ipc->IsInitialized()) {
+          // Do some operations
+          ipc->GetNodeId();
+          ipc->GetNumSchedQueues();
+
+          // Finalize using CLIO Runtime API
+          CLIO_CHIMAERA_MANAGER->ServerFinalize();
+        }
+        exit(0);
+      } else {
+        exit(1);
+      }
+    }
+  }
+
+  // Wait for all children
+  int success_count = 0;
+  for (int i = 0; i < num_procs; ++i) {
+    int status;
+    waitpid(pids[i], &status, 0);
+    if (WEXITSTATUS(status) == 0) {
+      success_count++;
+    }
+  }
+
+  // At least one should succeed, others may fail due to race
+  REQUIRE(success_count >= 1);
+}
+*/
 
 // ============================================================================
 // Global Cleanup - Finalize once at the end

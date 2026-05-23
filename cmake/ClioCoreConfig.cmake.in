@@ -1,0 +1,205 @@
+# IowarpCoreConfig.cmake.in
+# Config file for the IOWarp Core package
+
+@PACKAGE_INIT@
+
+# Version information
+set(IOWARP_CORE_VERSION_MAJOR @PROJECT_VERSION_MAJOR@)
+set(IOWARP_CORE_VERSION_MINOR @PROJECT_VERSION_MINOR@)
+set(IOWARP_CORE_VERSION_PATCH @PROJECT_VERSION_PATCH@)
+set(IOWARP_CORE_VERSION "@PROJECT_VERSION@")
+
+# Feature flags
+set(CLIO_CORE_ENABLE_MPI @CLIO_CORE_ENABLE_MPI@)
+set(CLIO_CORE_ENABLE_CUDA @CLIO_CORE_ENABLE_CUDA@)
+set(CLIO_CORE_ENABLE_ROCM @CLIO_CORE_ENABLE_ROCM@)
+set(CLIO_CORE_ENABLE_SYCL @CLIO_CORE_ENABLE_SYCL@)
+if(@CLIO_CORE_ENABLE_SYCL@)
+    set(CLIO_SYCL_COMPILER "@CLIO_SYCL_COMPILER@" CACHE STRING "SYCL compiler flavor (DPCPP|ACPP)")
+    set(SYCL_TARGET "@SYCL_TARGET@" CACHE STRING "SYCL target triple")
+    set(SYCL_DEVICE "@SYCL_DEVICE@" CACHE STRING "SYCL AOT device")
+    set(SYCL_CUDA_ARCH "@SYCL_CUDA_ARCH@" CACHE STRING "CUDA arch for nvptx64 SYCL target")
+endif()
+set(CLIO_CORE_ENABLE_OPENMP @CLIO_CORE_ENABLE_OPENMP@)
+set(CLIO_CORE_ENABLE_ZMQ @CLIO_CORE_ENABLE_ZMQ@)
+set(CLIO_CORE_ENABLE_LIBFABRIC @CLIO_CORE_ENABLE_LIBFABRIC@)
+set(CLIO_CORE_ENABLE_THALLIUM @CLIO_CORE_ENABLE_THALLIUM@)
+set(CLIO_CORE_ENABLE_CEREAL @CLIO_CORE_ENABLE_CEREAL@)
+set(CLIO_CORE_ENABLE_COMPRESS @CLIO_CORE_ENABLE_COMPRESS@)
+set(CLIO_CORE_ENABLE_ENCRYPT @CLIO_CORE_ENABLE_ENCRYPT@)
+set(CLIO_CORE_ENABLE_ELF @CLIO_CORE_ENABLE_ELF@)
+set(CLIO_CORE_ENABLE_DOXYGEN @CLIO_CORE_ENABLE_DOXYGEN@)
+set(CLIO_CORE_ENABLE_RPATH @CLIO_CORE_ENABLE_RPATH@)
+
+# Installation paths
+set(IOWARP_CORE_PREFIX @CMAKE_INSTALL_PREFIX@)
+set(IOWARP_CORE_LIB_DIR @CMAKE_INSTALL_PREFIX@/lib)
+set(IOWARP_CORE_INCLUDE_DIR @CMAKE_INSTALL_PREFIX@/include)
+set(IOWARP_CORE_BIN_DIR @CMAKE_INSTALL_PREFIX@/bin)
+
+# Include common utilities for external repos
+include("${CMAKE_CURRENT_LIST_DIR}/ClioCoreCommon.cmake")
+
+# Find required dependencies
+include(CMakeFindDependencyMacro)
+
+# Find common dependencies used by IOWarp Core components
+# These dependencies are OPTIONAL for external users because:
+# 1. IOWarp Core libraries are already built and contain the symbols
+# 2. External users don't need these packages unless they're building new ChiMods
+# 3. The headers that external users include don't expose Boost/cereal types in public APIs
+find_package(Boost QUIET COMPONENTS fiber context filesystem)
+find_package(cereal QUIET CONFIG)
+# msgpack-c provides the `msgpack-c-static` (or `msgpack-c`) imported target
+# referenced from ClioCtp's INTERFACE_LINK_LIBRARIES. Downstream projects
+# must have this target visible at find_package(iowarp-core) time, otherwise
+# the literal name "msgpack-c-static" leaks to the linker as -lmsgpack-c-static
+# and link fails. v6+ first, fall back to legacy v3.x.
+find_package(msgpack-c QUIET CONFIG)
+if(NOT msgpack-c_FOUND)
+    find_package(msgpack QUIET CONFIG)
+    # v3.x exports `msgpackc-static` / `msgpackc`; alias to v6+ names.
+    if(TARGET msgpackc-static AND NOT TARGET msgpack-c-static)
+        add_library(msgpack-c-static ALIAS msgpackc-static)
+    endif()
+    if(TARGET msgpackc AND NOT TARGET msgpack-c)
+        add_library(msgpack-c ALIAS msgpackc)
+    endif()
+endif()
+
+# Find HDF5 if CAE is enabled (required for CAE runtime)
+if(@CLIO_CORE_ENABLE_CAE@)
+    # Try CONFIG mode first (for HDF5 installed to non-standard cmake/ directory)
+    find_package(HDF5 COMPONENTS C QUIET CONFIG)
+    if(NOT HDF5_FOUND)
+        # Fallback to module mode (for system HDF5 installations)
+        find_package(HDF5 COMPONENTS C QUIET)
+    endif()
+    if(HDF5_FOUND)
+        # Ensure HDF5_LIBRARIES is set for both CONFIG and MODULE mode
+        if(NOT HDF5_LIBRARIES)
+            # CONFIG mode creates targets but may not set HDF5_LIBRARIES
+            # Prefer shared libraries over static for better compatibility
+            if(TARGET HDF5::HDF5)
+                set(HDF5_LIBRARIES HDF5::HDF5)
+            elseif(TARGET hdf5-shared)
+                set(HDF5_LIBRARIES hdf5-shared)
+            elseif(TARGET hdf5-static)
+                set(HDF5_LIBRARIES hdf5-static)
+            endif()
+        endif()
+    endif()
+endif()
+
+# Include ClioCtp (context-transport-primitives) export file directly
+# This provides all ctp::* modular targets
+include("${CMAKE_CURRENT_LIST_DIR}/../ClioCtp/ClioCtpCoreConfig.cmake")
+
+# Include CLIO Runtime export file directly. This provides the install-time
+# target name (`chimaera::cxx`, pinned for downstream compat) and the build
+# utilities. The canonical alias `clio::run::cxx` (and the pre-`::` waypoint
+# `clio_run::cxx`) are added below.  The install path follows
+# CLIO_RUN_PACKAGE_NAME (filesystem-safe form of the YAML namespace —
+# `clio::run` -> `clio_run`, legacy `chimaera` -> `chimaera`).
+include("${CMAKE_CURRENT_LIST_DIR}/../@CLIO_RUN_PACKAGE_NAME@/@CLIO_RUN_PACKAGE_NAME@_coreTargets.cmake")
+
+# Forward chimaera::cxx (install-time name) to the canonical clio::run::cxx
+# and the legacy waypoint clio_run::cxx so in-tree style links work after
+# find_package.  Guard against repeated find_package invocations.
+foreach(_legacy_runtime_ns IN ITEMS clio::run clio_run)
+    if(TARGET chimaera::cxx AND NOT TARGET ${_legacy_runtime_ns}::cxx)
+        add_library(${_legacy_runtime_ns}::cxx INTERFACE IMPORTED)
+        set_target_properties(${_legacy_runtime_ns}::cxx PROPERTIES
+            INTERFACE_LINK_LIBRARIES chimaera::cxx)
+    endif()
+endforeach()
+unset(_legacy_runtime_ns)
+
+# Include CLIO Runtime ChiMods that are always available.  The module
+# install paths are PINNED to `chimaera_<name>` (see ClioCoreCommon.cmake
+# add_clio_module_client/runtime lines ~982-986) even when the namespace
+# is `clio::run`, so external find_package(chimaera_admin) consumers like
+# coeus-adapter keep working.  Keep these references aligned with that pin.
+#
+# We pull in the per-module `<pkg>Config.cmake` (not just the bare
+# `<pkg>.cmake` targets file) so the alias-namespace forwarders generated
+# by ClioCoreCommon's `add_clio_module_*` (e.g. `clio::run::admin_client`
+# -> `chimaera::admin_client`, `clio_cte::core_client` ->
+# `clio::cte::core_client`) become visible after `find_package(iowarp-core)`.
+include("${CMAKE_CURRENT_LIST_DIR}/../chimaera_admin/chimaera_adminConfig.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../chimaera_bdev/chimaera_bdevConfig.cmake")
+
+# Feature-dependent ChiMods (only include if enabled at build time)
+set(_IOWARP_OPTIONAL_CHIMODS "")
+
+# Context Transfer Engine (CTE) - only if enabled
+if(@CLIO_CORE_ENABLE_CTE@)
+    include("${CMAKE_CURRENT_LIST_DIR}/../clio_cte_core/clio_cte_coreConfig.cmake")
+    list(APPEND _IOWARP_OPTIONAL_CHIMODS "clio_cte_core")
+endif()
+
+# Context Assimilation Engine (CAE) - only if enabled
+if(@CLIO_CORE_ENABLE_CAE@)
+    include("${CMAKE_CURRENT_LIST_DIR}/../clio_cae_core/clio_cae_coreConfig.cmake")
+    list(APPEND _IOWARP_OPTIONAL_CHIMODS "clio_cae_core")
+endif()
+
+# --- Backward-compat target-name aliases for the WRP_ -> CLIO_ rename ---
+# Downstream projects that still reference wrp_cte::* / wrp_cae::* get
+# INTERFACE IMPORTED targets that forward to the canonical clio_*::* names.
+# Skipped silently if the originals aren't loaded (CTE/CAE disabled at
+# build time) or if downstream code already created them. See rebranding.md.
+foreach(_compat_pair "clio_cte;wrp_cte" "clio_cae;wrp_cae")
+    list(GET _compat_pair 0 _new_ns)
+    list(GET _compat_pair 1 _legacy_ns)
+    foreach(_tgt IN ITEMS core_client core_runtime)
+        if(TARGET ${_new_ns}::${_tgt} AND NOT TARGET ${_legacy_ns}::${_tgt})
+            add_library(${_legacy_ns}::${_tgt} INTERFACE IMPORTED)
+            set_target_properties(${_legacy_ns}::${_tgt} PROPERTIES
+                INTERFACE_LINK_LIBRARIES ${_new_ns}::${_tgt})
+        endif()
+    endforeach()
+endforeach()
+unset(_compat_pair)
+unset(_new_ns)
+unset(_legacy_ns)
+unset(_tgt)
+
+# RPATH configuration (conditional based on build-time setting)
+if(@CLIO_CORE_ENABLE_RPATH@)
+    if(APPLE)
+        list(APPEND CMAKE_INSTALL_RPATH "@loader_path" "@loader_path/../lib")
+    elseif(UNIX)
+        list(APPEND CMAKE_INSTALL_RPATH "$ORIGIN" "$ORIGIN/../lib")
+    endif()
+endif()
+
+# Include the exported targets (if any core targets need to be exported)
+# This would be populated based on what the unified IOWarp Core exports
+
+message(STATUS "IOWarp Core found:")
+message(STATUS "  Version: ${IOWARP_CORE_VERSION}")
+message(STATUS "  Prefix: ${IOWARP_CORE_PREFIX}")
+message(STATUS "")
+message(STATUS "Core Components:")
+message(STATUS "  ClioCtp: Available (ctp::cxx, ctp::configure, ctp::serialize, etc.)")
+message(STATUS "  Chimaera Runtime: Available (chimaera::cxx)")
+message(STATUS "  IowarpCoreCommon: Available (ChiMod build utilities)")
+message(STATUS "")
+message(STATUS "Core ChiMods (Always Available):")
+message(STATUS "  Admin: Available (chimaera::admin_client, chimaera::admin_runtime)")
+message(STATUS "  Bdev: Available (chimaera::bdev_client, chimaera::bdev_runtime)")
+
+if(_IOWARP_OPTIONAL_CHIMODS)
+    message(STATUS "")
+    message(STATUS "Optional ChiMods (Build-time enabled):")
+    foreach(_chimod ${_IOWARP_OPTIONAL_CHIMODS})
+        if(_chimod STREQUAL "clio_cte_core")
+            message(STATUS "  CTE Core: Available (clio::cte::core_client, clio::cte::core_runtime)")
+        elseif(_chimod STREQUAL "clio_cae_core")
+            message(STATUS "  CAE Core: Available (clio::cae::core_client, clio::cae::core_runtime)")
+        endif()
+    endforeach()
+endif()
+
+check_required_components(iowarp-core)

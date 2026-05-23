@@ -31,17 +31,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WRP_CTE_ADAPTER_METADATA_MANAGER_H
-#define WRP_CTE_ADAPTER_METADATA_MANAGER_H
+#ifndef CLIO_CTE_ADAPTER_METADATA_MANAGER_H
+#define CLIO_CTE_ADAPTER_METADATA_MANAGER_H
 
 #include <cstdio>
 #include <unordered_map>
 
 #include "filesystem_io_client.h"
-#include "hermes_shm/thread/lock.h"
-#include "adapter/cae_config.h"
+#include "clio_ctp/thread/lock.h"
 
-namespace wrp::cae {
+namespace clio::cae {
+
+/**
+ * Hardcoded adapter page size. Defined here (instead of using
+ * kAdapterPageSize from filesystem.h) so this header stays free of the
+ * filesystem.h <-> filesystem_mdm.h include cycle.
+ */
+static constexpr size_t kMdmAdapterPageSize = 1024 * 1024;
+
 
 // MDM operation constants for lock priority
 const int kMDM_Create = 1;
@@ -59,7 +66,7 @@ private:
       path_to_hermes_file_; /**< Map to determine if path is buffered. */
   std::unordered_map<File, std::shared_ptr<AdapterStat>>
       hermes_file_to_stat_; /**< Map for metadata */
-  hshm::RwLock lock_;             /**< Lock to synchronize MD updates*/
+  ctp::RwLock lock_;             /**< Lock to synchronize MD updates*/
 
 public:
   std::unordered_map<uint64_t, FsAsyncTask *>
@@ -71,26 +78,21 @@ public:
 
   /** Get the current adapter mode */
   AdapterMode GetBaseAdapterMode() {
-    hshm::ScopedRwReadLock md_lock(lock_, 1);
+    ctp::ScopedRwReadLock md_lock(lock_, 1);
     return AdapterMode::kDefault;
   }
 
   /** Get the adapter mode for a particular file */
   AdapterMode GetAdapterMode(const std::string &path) {
     (void)path;
-    hshm::ScopedRwReadLock md_lock(lock_, 2);
+    ctp::ScopedRwReadLock md_lock(lock_, 2);
     return AdapterMode::kDefault;
   }
 
-  /** Get the adapter page size for a particular file */
+  /** Get the adapter page size for a particular file (uniform 1 MiB). */
   size_t GetAdapterPageSize(const std::string &path) {
     (void)path;
-    hshm::ScopedRwReadLock md_lock(lock_, 3);
-    auto *cae_config = WRP_CAE_CONF;
-    if (cae_config) {
-      return cae_config->GetAdapterPageSize();
-    }
-    return 4096; // Default fallback
+    return kMdmAdapterPageSize;
   }
 
   /**
@@ -103,7 +105,7 @@ public:
    */
   bool Create(const File &f, std::shared_ptr<AdapterStat> &stat) {
     HLOG(kDebug, "Create metadata for file handler");
-    hshm::ScopedRwWriteLock md_lock(lock_, kMDM_Create);
+    ctp::ScopedRwWriteLock md_lock(lock_, kMDM_Create);
     if (path_to_hermes_file_.find(stat->path_) == path_to_hermes_file_.end()) {
       path_to_hermes_file_.emplace(stat->path_, std::list<File>());
     }
@@ -121,7 +123,7 @@ public:
    */
   bool Update(const File &f, const AdapterStat &stat) {
     HLOG(kDebug, "Update metadata for file handler");
-    hshm::ScopedRwWriteLock md_lock(lock_, kMDM_Update);
+    ctp::ScopedRwWriteLock md_lock(lock_, kMDM_Update);
     auto iter = hermes_file_to_stat_.find(f);
     if (iter != hermes_file_to_stat_.end()) {
       *(*iter).second = stat;
@@ -139,7 +141,7 @@ public:
    */
   bool Delete(const std::string &path, const File &f) {
     HLOG(kDebug, "Delete metadata for file handler");
-    hshm::ScopedRwWriteLock md_lock(lock_, kMDM_Delete);
+    ctp::ScopedRwWriteLock md_lock(lock_, kMDM_Delete);
     auto iter = hermes_file_to_stat_.find(f);
     if (iter != hermes_file_to_stat_.end()) {
       hermes_file_to_stat_.erase(iter);
@@ -156,13 +158,13 @@ public:
   }
 
   /**
-   * Find the hermes file relating to a path.
+   * Find the clio file relating to a path.
    * @param path the path being checked
-   * @return The hermes file.
+   * @return The clio file.
    * */
   std::list<File> *Find(const std::string &path) {
     std::string canon_path = stdfs::absolute(path).string();
-    hshm::ScopedRwReadLock md_lock(lock_, kMDM_Find);
+    ctp::ScopedRwReadLock md_lock(lock_, kMDM_Find);
     auto iter = path_to_hermes_file_.find(canon_path);
     if (iter == path_to_hermes_file_.end())
       return nullptr;
@@ -177,7 +179,7 @@ public:
    *            The bool in pair indicated whether metadata entry exists.
    */
   std::shared_ptr<AdapterStat> Find(const File &f) {
-    hshm::ScopedRwReadLock md_lock(lock_, kMDM_Find2);
+    ctp::ScopedRwReadLock md_lock(lock_, kMDM_Find2);
     auto iter = hermes_file_to_stat_.find(f);
     if (iter == hermes_file_to_stat_.end())
       return nullptr;
@@ -189,7 +191,7 @@ public:
    * Add a request to the request map.
    * */
   void EmplaceTask(uint64_t id, FsAsyncTask *task) {
-    hshm::ScopedRwWriteLock md_lock(lock_, 0);
+    ctp::ScopedRwWriteLock md_lock(lock_, 0);
     request_map_.emplace(id, task);
   }
 
@@ -197,7 +199,7 @@ public:
    * Find a request in the request map.
    * */
   FsAsyncTask *FindTask(uint64_t id) {
-    hshm::ScopedRwReadLock md_lock(lock_, 0);
+    ctp::ScopedRwReadLock md_lock(lock_, 0);
     auto iter = request_map_.find(id);
     if (iter == request_map_.end()) {
       return nullptr;
@@ -210,7 +212,7 @@ public:
    * Delete a request in the request map.
    * */
   void DeleteTask(uint64_t id) {
-    hshm::ScopedRwWriteLock md_lock(lock_, 0);
+    ctp::ScopedRwWriteLock md_lock(lock_, 0);
     auto iter = request_map_.find(id);
     if (iter != request_map_.end()) {
       request_map_.erase(iter);
@@ -218,16 +220,16 @@ public:
   }
 };
 
-} // namespace wrp::cae
+} // namespace clio::cae
 
 // Global pointer-based singleton
-#include "hermes_shm/util/singleton.h"
+#include "clio_ctp/util/singleton.h"
 
-namespace wrp::cae {
-HSHM_DEFINE_GLOBAL_PTR_VAR_H(MetadataManager, g_fs_metadata_manager);
+namespace clio::cae {
+CTP_DEFINE_GLOBAL_PTR_VAR_H(MetadataManager, g_fs_metadata_manager);
 }
 
-#define WRP_CTE_FS_METADATA_MANAGER (HSHM_GET_GLOBAL_PTR_VAR(wrp::cae::MetadataManager, wrp::cae::g_fs_metadata_manager))
-#define WRP_CTE_FS_METADATA_MANAGER_T wrp::cae::MetadataManager *
+#define CLIO_CTE_FS_METADATA_MANAGER (CTP_GET_GLOBAL_PTR_VAR(clio::cae::MetadataManager, clio::cae::g_fs_metadata_manager))
+#define CLIO_CTE_FS_METADATA_MANAGER_T clio::cae::MetadataManager *
 
-#endif // WRP_CTE_ADAPTER_METADATA_MANAGER_H
+#endif // CLIO_CTE_ADAPTER_METADATA_MANAGER_H

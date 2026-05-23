@@ -15,36 +15,36 @@ fn main() {
         .flag("-Wno-sign-compare")
         .flag("-Wno-reorder")
         .flag("-Wno-pedantic")
-        // HSHM / chimaera defines (match CMake build)
-        .define("HSHM_COMPILER_GNU", "1")
-        .define("HSHM_COMPILER_MSVC", "0")
-        .define("HSHM_DEBUG_LOCK", "0")
-        .define("HSHM_DEFAULT_ALLOC_T", "hipc::ThreadLocalAllocator")
-        .define("HSHM_DEFAULT_THREAD_MODEL", "hshm::thread::Pthread")
-        .define("HSHM_DEFAULT_THREAD_MODEL_GPU", "hshm::thread::Cuda")
-        .define("HSHM_ENABLE_CEREAL", "1")
-        .define("HSHM_ENABLE_DLL_EXPORT", "1")
-        .define("HSHM_ENABLE_DOXYGEN", "0")
-        .define("HSHM_ENABLE_LIBFABRIC", "0")
-        .define("HSHM_ENABLE_LIGHTBEAM", "1")
-        .define("HSHM_ENABLE_OPENMP", "0")
-        .define("HSHM_ENABLE_PROCFS_SYSINFO", "1")
-        .define("HSHM_ENABLE_PTHREADS", "1")
-        .define("HSHM_ENABLE_THALLIUM", "0")
-        .define("HSHM_ENABLE_WINDOWS_SYSINFO", "0")
-        .define("HSHM_ENABLE_WINDOWS_THREADS", "0")
-        .define("HSHM_ENABLE_ZMQ", "1")
-        .define("HSHM_LOG_LEVEL", "0")
+        // CTP / chimaera defines (match CMake build)
+        .define("CTP_COMPILER_GNU", "1")
+        .define("CTP_COMPILER_MSVC", "0")
+        .define("CTP_DEBUG_LOCK", "0")
+        .define("CTP_DEFAULT_ALLOC_T", "ctp::ipc::ThreadLocalAllocator")
+        .define("CTP_DEFAULT_THREAD_MODEL", "ctp::thread::Pthread")
+        .define("CTP_DEFAULT_THREAD_MODEL_GPU", "ctp::thread::Cuda")
+        .define("CTP_ENABLE_CEREAL", "1")
+        .define("CTP_ENABLE_DLL_EXPORT", "1")
+        .define("CTP_ENABLE_DOXYGEN", "0")
+        .define("CTP_ENABLE_LIBFABRIC", "0")
+        .define("CTP_ENABLE_LIGHTBEAM", "1")
+        .define("CTP_ENABLE_OPENMP", "0")
+        .define("CTP_ENABLE_PROCFS_SYSINFO", "1")
+        .define("CTP_ENABLE_PTHREADS", "1")
+        .define("CTP_ENABLE_THALLIUM", "0")
+        .define("CTP_ENABLE_WINDOWS_SYSINFO", "0")
+        .define("CTP_ENABLE_WINDOWS_THREADS", "0")
+        .define("CTP_ENABLE_ZMQ", "1")
+        .define("CTP_LOG_LEVEL", "0")
         .compile("cte_shim");
 
     println!("cargo:rustc-link-search=native=/usr/local/lib");
     println!("cargo:rustc-link-search=native=/home/iowarp/miniconda3/lib");
 
     // Direct dependency
-    println!("cargo:rustc-link-lib=dylib=wrp_cte_core_client");
+    println!("cargo:rustc-link-lib=dylib=clio_cte_core_client");
     // Transitive deps (needed for test binary linking)
     println!("cargo:rustc-link-lib=dylib=chimaera_cxx");
-    println!("cargo:rustc-link-lib=dylib=hermes_shm_host");
+    println!("cargo:rustc-link-lib=dylib=clio_ctp_host");
     println!("cargo:rustc-link-lib=dylib=zmq");
 
     println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/local/lib");

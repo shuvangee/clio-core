@@ -31,9 +31,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <hermes_shm/lightbeam/event_manager.h>
-#include <hermes_shm/lightbeam/socket_transport.h>
-#include <hermes_shm/lightbeam/transport_factory_impl.h>
+#include <clio_ctp/lightbeam/event_manager.h>
+#include <clio_ctp/lightbeam/socket_transport.h>
+#include <clio_ctp/lightbeam/transport_factory_impl.h>
 
 #include <cassert>
 #include <chrono>
@@ -42,10 +42,11 @@
 #include <thread>
 #include <atomic>
 #ifndef _WIN32
+#include <signal.h>
 #include <unistd.h>
 #endif
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 // Custom metadata class for transport tests
 class TestMeta : public LbmMeta<> {
@@ -219,9 +220,13 @@ void TestMultipleEvents() {
   EventManager em;
 
   int pipe1[2] = {}, pipe2[2] = {}, pipe3[2] = {};
-  assert(pipe(pipe1) == 0);
-  assert(pipe(pipe2) == 0);
-  assert(pipe(pipe3) == 0);
+  int rc1 = pipe(pipe1);
+  int rc2 = pipe(pipe2);
+  int rc3 = pipe(pipe3);
+  assert(rc1 == 0);
+  assert(rc2 == 0);
+  assert(rc3 == 0);
+  (void)rc1; (void)rc2; (void)rc3;
 
   em.AddEvent(pipe1[0], kDefaultReadEvent);
   em.AddEvent(pipe2[0], kDefaultReadEvent);
@@ -269,7 +274,7 @@ void TestSocketTransportWithEM() {
   send_meta.request_id = 55;
   send_meta.operation = "em_test";
   Bulk bulk = client->Expose(
-      hipc::FullPtr<char>(const_cast<char*>(data)), size, BULK_XFER);
+      ctp::ipc::FullPtr<char>(const_cast<char*>(data)), size, BULK_XFER);
   send_meta.send.push_back(bulk);
   send_meta.send_bulks = 1;
 
@@ -310,8 +315,8 @@ void TestSocketTransportWithEM() {
   std::cout << "[SocketTransport With EventManager] Test passed!\n";
 }
 
-#ifdef HSHM_ENABLE_ZMQ
-#include <hermes_shm/lightbeam/zmq_transport.h>
+#if CTP_ENABLE_ZMQ
+#include <clio_ctp/lightbeam/zmq_transport.h>
 
 void TestZmqTransportWithEM() {
   std::cout << "\n==== Testing ZmqTransport With EventManager ====\n";
@@ -336,7 +341,7 @@ void TestZmqTransportWithEM() {
   send_meta.request_id = 66;
   send_meta.operation = "zmq_em";
   Bulk bulk = client->Expose(
-      hipc::FullPtr<char>(const_cast<char*>(data)), size, BULK_XFER);
+      ctp::ipc::FullPtr<char>(const_cast<char*>(data)), size, BULK_XFER);
   send_meta.send.push_back(bulk);
   send_meta.send_bulks = 1;
 
@@ -370,6 +375,7 @@ void TestZmqTransportWithEM() {
 
 int main() {
 #ifndef _WIN32
+  signal(SIGPIPE, SIG_IGN);  // Prevent SIGPIPE from terminating process
   TestConstruction();
   TestAddEventBasic();
   TestAddEventWithAction();
@@ -380,7 +386,7 @@ int main() {
 #endif
   TestSocketTransportWithEM();
 
-#ifdef HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
   TestZmqTransportWithEM();
 #else
   std::cout << "\n[Skipped] ZmqTransport With EventManager (ZMQ not enabled)\n";

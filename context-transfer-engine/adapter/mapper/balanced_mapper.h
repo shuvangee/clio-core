@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WRP_CTE_BALANCED_MAPPER_H
-#define WRP_CTE_BALANCED_MAPPER_H
+#ifndef CLIO_CTE_BALANCED_MAPPER_H
+#define CLIO_CTE_BALANCED_MAPPER_H
 
 #include <vector>
 
 #include "abstract_mapper.h"
 
-namespace wrp::cae {
+namespace clio::cae {
 /**
  * Implement balanced mapping
  */
@@ -65,6 +65,6 @@ class BalancedMapper : public AbstractMapper {
     }
   }
 };
-}  // namespace wrp::cae
+}  // namespace clio::cae
 
-#endif  // WRP_CTE_BALANCED_MAPPER_H
+#endif  // CLIO_CTE_BALANCED_MAPPER_H

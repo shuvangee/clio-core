@@ -15,7 +15,7 @@ function(add_cee_api_unit_test TEST_NAME TEST_SOURCE)
   # Link common dependencies
   target_link_libraries(${TEST_NAME}
     PRIVATE
-      wrp_cee_api
+      clio_cee_api
   )
 
   # Install test binary
@@ -46,13 +46,9 @@ add_cee_api_unit_test(test_context_destroy test_context_destroy.cc)
 
 # Comprehensive coverage test
 add_executable(test_context_comprehensive test_context_comprehensive.cc)
-target_include_directories(test_context_comprehensive
-  PRIVATE
-    ${CMAKE_SOURCE_DIR}/test  # For simple_test.h
-)
 target_link_libraries(test_context_comprehensive
   PRIVATE
-    wrp_cee_api
+    clio_cee_api
 )
 install(TARGETS test_context_comprehensive DESTINATION bin/tests)
 
@@ -81,14 +77,15 @@ set_tests_properties(
   CEE_Destroy_Multi CEE_Destroy_Partial CEE_Splice_Stub CEE_Integration
   PROPERTIES
     TIMEOUT 180
-    LABELS "cee;comprehensive;coverage"
-    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+    LABELS "cee;comprehensive;coverage;msan_skip"
+    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH};CHI_TEST_DATA_DIR=${CMAKE_BINARY_DIR}"
+    RESOURCE_LOCK "chimaera_runtime"
 )
 
 #------------------------------------------------------------------------------
 # Python Tests (if Python bindings are enabled)
 #------------------------------------------------------------------------------
-if(TARGET wrp_cee)
+if(TARGET clio_cee)
   # Copy Python test to build directory
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/test_context_interface.py
@@ -111,7 +108,7 @@ if(TARGET wrp_cee)
 
   # Install Python test
   install(FILES test_context_interface.py
-    DESTINATION share/wrp_cee/test
+    DESTINATION share/clio_cee/test
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
@@ -137,7 +134,7 @@ if(TARGET wrp_cee)
 
   # Install enhanced Python test
   install(FILES test_context_interface_enhanced.py
-    DESTINATION share/wrp_cee/test
+    DESTINATION share/clio_cee/test
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
@@ -162,7 +159,7 @@ if(TARGET wrp_cee)
   )
 
   install(FILES test_context_retrieve_roundtrip.py
-    DESTINATION share/wrp_cee/test
+    DESTINATION share/clio_cee/test
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
@@ -174,6 +171,8 @@ endif()
 #------------------------------------------------------------------------------
 # Test labels for selective execution
 #------------------------------------------------------------------------------
-set_tests_properties(test_context_bundle PROPERTIES LABELS "cee;api;bundle")
-set_tests_properties(test_context_query PROPERTIES LABELS "cee;api;query")
-set_tests_properties(test_context_destroy PROPERTIES LABELS "cee;api;destroy")
+# Skip under MSan: CEE tests use uninstrumented chimaera runtime (ZMQ, shared
+# memory, forked processes) that produce false-positive MSan reports.
+set_tests_properties(test_context_bundle PROPERTIES LABELS "cee;api;bundle;msan_skip")
+set_tests_properties(test_context_query PROPERTIES LABELS "cee;api;query;msan_skip")
+set_tests_properties(test_context_destroy PROPERTIES LABELS "cee;api;destroy;msan_skip")

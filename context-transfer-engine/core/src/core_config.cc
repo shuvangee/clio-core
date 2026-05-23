@@ -31,16 +31,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <wrp_cte/core/core_config.h>
+#include <clio_cte/core/core_config.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 #include <yaml-cpp/yaml.h>
 #include <fstream>
 #include <iostream>
 #include <cstdlib>
 #include <cctype>
 #include <cstdio>
-#include "hermes_shm/util/logging.h"
+#include "clio_ctp/util/logging.h"
 
-namespace wrp_cte::core {
+namespace clio::cte::core {
 
 // Config class implementation
 bool Config::LoadFromFile(const std::string &config_file_path) {
@@ -120,7 +121,7 @@ bool Config::LoadFromString(const std::string &yaml_string) {
 }
 
 bool Config::LoadFromEnvironment() {
-  std::string env_path = hshm::SystemInfo::Getenv(config_env_var_);
+  std::string env_path = ctp::SystemInfo::Getenv(config_env_var_);
   if (env_path.empty()) {
     HLOG(kInfo, "Config info: Environment variable {} not set, using default configuration", config_env_var_);
     return true; // Not an error, use defaults
@@ -287,6 +288,24 @@ bool Config::ParseYamlNode(const YAML::Node &node) {
     }
   }
 
+  // Parse GPU metadata cache configuration (optional)
+  if (node["gpu_metadata_cache"]) {
+    const YAML::Node &gmc = node["gpu_metadata_cache"];
+    if (gmc["enabled"]) {
+      gpu_metadata_cache_.enabled_ = gmc["enabled"].as<bool>();
+    }
+    if (gmc["capacity"]) {
+      std::string cap_str = gmc["capacity"].as<std::string>();
+      ParseSizeString(cap_str, gpu_metadata_cache_.capacity_bytes_);
+    }
+    if (gmc["max_blobs"]) {
+      gpu_metadata_cache_.max_blobs_ = gmc["max_blobs"].as<chi::u32>();
+    }
+    if (gmc["max_tags"]) {
+      gpu_metadata_cache_.max_tags_ = gmc["max_tags"].as<chi::u32>();
+    }
+  }
+
   // Parse environment variable configuration
   if (node["config_env_var"]) {
     config_env_var_ = node["config_env_var"].as<std::string>();
@@ -378,7 +397,7 @@ bool Config::ParsePerformanceConfig(const YAML::Node &node) {
 
   if (node["metadata_log_path"]) {
     std::string path = node["metadata_log_path"].as<std::string>();
-    performance_.metadata_log_path_ = hshm::ConfigParse::ExpandPath(path);
+    performance_.metadata_log_path_ = ctp::ConfigParse::ExpandPath(path);
   }
 
   if (node["flush_data_period_ms"]) {
@@ -431,7 +450,7 @@ bool Config::ParseStorageConfig(const YAML::Node &node) {
       return false;
     }
     std::string path = device_node["path"].as<std::string>();
-    device_config.path_ = hshm::ConfigParse::ExpandPath(path);
+    device_config.path_ = ctp::ConfigParse::ExpandPath(path);
     
     // Parse bdev_type (required)
     if (!device_node["bdev_type"]) {
@@ -441,8 +460,10 @@ bool Config::ParseStorageConfig(const YAML::Node &node) {
     device_config.bdev_type_ = device_node["bdev_type"].as<std::string>();
     
     // Validate bdev_type
-    if (device_config.bdev_type_ != "file" && device_config.bdev_type_ != "ram") {
-      HLOG(kError, "Config error: Invalid bdev_type '{}' (must be 'file' or 'ram')", device_config.bdev_type_);
+    if (device_config.bdev_type_ != "file" && device_config.bdev_type_ != "ram" &&
+        device_config.bdev_type_ != "hbm" && device_config.bdev_type_ != "pinned" &&
+        device_config.bdev_type_ != "noop") {
+      HLOG(kError, "Config error: Invalid bdev_type '{}' (must be 'file', 'ram', 'hbm', 'pinned', or 'noop')", device_config.bdev_type_);
       return false;
     }
     
@@ -479,8 +500,28 @@ bool Config::ParseStorageConfig(const YAML::Node &node) {
     }
     
     if (device_config.capacity_limit_ == 0) {
-      HLOG(kError, "Config error: Storage device capacity_limit must be greater than 0");
-      return false;
+      // Policy: a RAM device configured with capacity 0 ("0g") defaults
+      // to 80% of total system DRAM — identical to the bdev module's
+      // own behavior (clio::run::bdev::DefaultRamCapacityBytes), so "0g"
+      // means the same whether a bdev is created directly or via CTE.
+      // Other tiers (file/noop/...) have no DRAM-based default, so 0
+      // remains an error for them.
+      if (device_config.bdev_type_ == "ram") {
+        device_config.capacity_limit_ =
+            clio::run::bdev::DefaultRamCapacityBytes();
+        HLOG(kInfo,
+             "Storage device {}: capacity_limit 0/'0g' for ram tier -> "
+             "defaulting to {}% of system DRAM = {} bytes",
+             device_config.path_,
+             static_cast<int>(
+                 clio::run::bdev::kDefaultRamCapacityFraction * 100),
+             device_config.capacity_limit_);
+      } else {
+        HLOG(kError,
+             "Config error: Storage device capacity_limit must be greater "
+             "than 0 (only 'ram' tier supports 0 = 80% DRAM default)");
+        return false;
+      }
     }
     
     storage_.devices_.push_back(std::move(device_config));
@@ -603,4 +644,4 @@ std::string Config::FormatSizeBytes(chi::u64 size_bytes) const {
   }
 }
 
-}  // namespace wrp_cte::core
+}  // namespace clio::cte::core

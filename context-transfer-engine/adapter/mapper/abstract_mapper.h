@@ -31,12 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WRP_CTE_ABSTRACT_MAPPER_H
-#define WRP_CTE_ABSTRACT_MAPPER_H
+#ifndef CLIO_CTE_ABSTRACT_MAPPER_H
+#define CLIO_CTE_ABSTRACT_MAPPER_H
 
-#include "chimaera/chimaera.h"
+#include "clio_runtime/clio_runtime.h"
 
-namespace wrp::cae {
+namespace clio::cae {
 
 /**
  * Define different types of mappers supported by POSIX Adapter.
@@ -56,25 +56,27 @@ struct BlobPlacement {
   size_t blob_size_;  /**< Size after offset to read */
 
   /** create a BLOB name from index. */
-  static chi::string CreateBlobName(size_t page) {
-    chi::string buf(sizeof(page));
-    hipc::LocalSerialize srl(buf);
+  static std::string CreateBlobName(size_t page) {
+    std::string buf;
+    ctp::ipc::LocalSerialize<std::string> srl(buf);
     srl << page;
+    srl.Finalize();
     return buf;
   }
 
   /** create a BLOB name from index. */
-  chi::string CreateBlobName() const {
-    chi::string buf(sizeof(page_));
-    hipc::LocalSerialize srl(buf);
+  std::string CreateBlobName() const {
+    std::string buf;
+    ctp::ipc::LocalSerialize<std::string> srl(buf);
     srl << page_;
+    srl.Finalize();
     return buf;
   }
 
   /** decode \a blob_name BLOB name to index.  */
   template<typename StringT>
   void DecodeBlobName(const StringT &blob_name, size_t page_size) {
-    hipc::LocalDeserialize srl(blob_name);
+    ctp::ipc::LocalDeserialize srl(blob_name);
     srl >> page_;
     bucket_off_ = page_ * page_size;
     blob_off_ = 0;
@@ -92,7 +94,7 @@ class AbstractMapper {
   virtual ~AbstractMapper() = default;
 
   /**
-   * This method maps the current operation to Hermes data structures.
+   * This method maps the current operation to Clio data structures.
    *
    * @param off offset
    * @param size size
@@ -103,6 +105,6 @@ class AbstractMapper {
   virtual void map(size_t off, size_t size, size_t page_size,
                    BlobPlacements &ps) = 0;
 };
-}  // namespace wrp::cae
+}  // namespace clio::cae
 
-#endif  // WRP_CTE_ABSTRACT_MAPPER_H
+#endif  // CLIO_CTE_ABSTRACT_MAPPER_H

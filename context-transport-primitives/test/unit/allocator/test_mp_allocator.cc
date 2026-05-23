@@ -33,20 +33,20 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "allocator_test.h"
-#include "hermes_shm/memory/backend/posix_mmap.h"
-#include "hermes_shm/memory/allocator/mp_allocator.h"
+#include "clio_ctp/memory/backend/posix_mmap.h"
+#include "clio_ctp/memory/allocator/mp_allocator.h"
 
-using hshm::testing::AllocatorTest;
+using ctp::testing::AllocatorTest;
 
-TEST_CASE("MultiProcessAllocator - Allocate and Free Immediate", "[MultiProcessAllocator]") {
-  hipc::PosixMmap backend;
+TEST_CASE("ProducerConsumerAllocator - Allocate and Free Immediate", "[ProducerConsumerAllocator]") {
+  ctp::ipc::PosixMmap backend;
   size_t heap_size = 512 * 1024 * 1024;  // 512 MB heap
-  size_t alloc_size = sizeof(hipc::MultiProcessAllocator);
-  backend.shm_init(hipc::MemoryBackendId(0, 0), alloc_size + heap_size);
+  size_t alloc_size = sizeof(ctp::ipc::ProducerConsumerAllocator);
+  backend.shm_init(ctp::ipc::MemoryBackendId(0, 0), alloc_size + heap_size);
 
-  auto *alloc = backend.MakeAlloc<hipc::MultiProcessAllocator>();
+  auto *alloc = backend.MakeAlloc<ctp::ipc::ProducerConsumerAllocator>();
 
-  AllocatorTest<hipc::MultiProcessAllocator> tester(alloc);
+  AllocatorTest<ctp::ipc::ProducerConsumerAllocator> tester(alloc);
 
   SECTION("Small allocations (1KB)") {
     REQUIRE_NOTHROW(tester.TestAllocFreeImmediate(10000, 1024));
@@ -63,15 +63,15 @@ TEST_CASE("MultiProcessAllocator - Allocate and Free Immediate", "[MultiProcessA
   alloc->shm_detach();
 }
 
-TEST_CASE("MultiProcessAllocator - Batch Allocate and Free", "[MultiProcessAllocator]") {
-  hipc::PosixMmap backend;
+TEST_CASE("ProducerConsumerAllocator - Batch Allocate and Free", "[ProducerConsumerAllocator]") {
+  ctp::ipc::PosixMmap backend;
   size_t heap_size = 512 * 1024 * 1024;  // 512 MB heap
-  size_t alloc_size = sizeof(hipc::MultiProcessAllocator);
-  backend.shm_init(hipc::MemoryBackendId(0, 0), alloc_size + heap_size);
+  size_t alloc_size = sizeof(ctp::ipc::ProducerConsumerAllocator);
+  backend.shm_init(ctp::ipc::MemoryBackendId(0, 0), alloc_size + heap_size);
 
-  auto *alloc = backend.MakeAlloc<hipc::MultiProcessAllocator>();
+  auto *alloc = backend.MakeAlloc<ctp::ipc::ProducerConsumerAllocator>();
 
-  AllocatorTest<hipc::MultiProcessAllocator> tester(alloc);
+  AllocatorTest<ctp::ipc::ProducerConsumerAllocator> tester(alloc);
 
   SECTION("Small batches (10 allocations of 4KB)") {
     REQUIRE_NOTHROW(tester.TestAllocFreeBatch(1000, 10, 4096));
@@ -88,15 +88,15 @@ TEST_CASE("MultiProcessAllocator - Batch Allocate and Free", "[MultiProcessAlloc
   alloc->shm_detach();
 }
 
-TEST_CASE("MultiProcessAllocator - Random Allocation", "[MultiProcessAllocator]") {
-  hipc::PosixMmap backend;
+TEST_CASE("ProducerConsumerAllocator - Random Allocation", "[ProducerConsumerAllocator]") {
+  ctp::ipc::PosixMmap backend;
   size_t heap_size = 512 * 1024 * 1024;  // 512 MB heap
-  size_t alloc_size = sizeof(hipc::MultiProcessAllocator);
-  backend.shm_init(hipc::MemoryBackendId(0, 0), alloc_size + heap_size);
+  size_t alloc_size = sizeof(ctp::ipc::ProducerConsumerAllocator);
+  backend.shm_init(ctp::ipc::MemoryBackendId(0, 0), alloc_size + heap_size);
 
-  auto *alloc = backend.MakeAlloc<hipc::MultiProcessAllocator>();
+  auto *alloc = backend.MakeAlloc<ctp::ipc::ProducerConsumerAllocator>();
 
-  AllocatorTest<hipc::MultiProcessAllocator> tester(alloc);
+  AllocatorTest<ctp::ipc::ProducerConsumerAllocator> tester(alloc);
 
   SECTION("256 iterations of random allocations") {
     REQUIRE_NOTHROW(tester.TestRandomAllocation(256));
@@ -109,15 +109,15 @@ TEST_CASE("MultiProcessAllocator - Random Allocation", "[MultiProcessAllocator]"
   alloc->shm_detach();
 }
 
-TEST_CASE("MultiProcessAllocator - Multi-threaded Random", "[MultiProcessAllocator][multithread]") {
-  hipc::PosixMmap backend;
+TEST_CASE("ProducerConsumerAllocator - Multi-threaded Random", "[ProducerConsumerAllocator][multithread]") {
+  ctp::ipc::PosixMmap backend;
   size_t heap_size = 512 * 1024 * 1024;  // 512 MB heap
-  size_t alloc_size = sizeof(hipc::MultiProcessAllocator);
-  backend.shm_init(hipc::MemoryBackendId(0, 0), alloc_size + heap_size);
+  size_t alloc_size = sizeof(ctp::ipc::ProducerConsumerAllocator);
+  backend.shm_init(ctp::ipc::MemoryBackendId(0, 0), alloc_size + heap_size);
 
-  auto *alloc = backend.MakeAlloc<hipc::MultiProcessAllocator>();
+  auto *alloc = backend.MakeAlloc<ctp::ipc::ProducerConsumerAllocator>();
 
-  AllocatorTest<hipc::MultiProcessAllocator> tester(alloc);
+  AllocatorTest<ctp::ipc::ProducerConsumerAllocator> tester(alloc);
 
   SECTION("8 threads, 16 iterations each") {
     REQUIRE_NOTHROW(tester.TestMultiThreadedRandom(8, 16));

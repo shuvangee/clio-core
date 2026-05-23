@@ -32,18 +32,19 @@
  */
 
 /**
- * Main Chimaera initialization and global functions
+ * Main CLIO Runtime initialization and global functions
  */
 
-#include "chimaera/chimaera.h"
-#include "chimaera/container.h"
-#include "chimaera/work_orchestrator.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/work_orchestrator.h"
 #include <cstdlib>
 #include <cstring>
 
-namespace chi {
+namespace clio::run {
 
-bool CHIMAERA_INIT(ChimaeraMode mode, bool default_with_runtime, bool is_restart) {
+bool ClioInitImpl(ChimaeraMode mode, bool default_with_runtime,
+                  bool is_restart) {
   // Static guard to prevent double initialization
   static bool s_initialized = false;
   if (s_initialized) {
@@ -51,18 +52,20 @@ bool CHIMAERA_INIT(ChimaeraMode mode, bool default_with_runtime, bool is_restart
   }
 
   // Suppress OS error dialogs so tests don't block on popups
-  hshm::SystemInfo::SuppressErrorDialogs();
+  ctp::SystemInfo::SuppressErrorDialogs();
 
-  auto* chimaera_manager = CHI_CHIMAERA_MANAGER;
+  auto* chimaera_manager = CLIO_CHIMAERA_MANAGER;
   chimaera_manager->is_restart_ = is_restart;
 
   // Check environment variable CHI_WITH_RUNTIME
   // Use hshm::SystemInfo::Getenv for Windows compatibility (std::getenv
   // doesn't reflect changes made via SetEnvironmentVariable/Setenv)
   bool with_runtime = default_with_runtime;
-  std::string env_val = hshm::SystemInfo::Getenv("CHI_WITH_RUNTIME");
-  if (!env_val.empty()) {
-    with_runtime = (env_val == "1" || env_val == "true" || env_val == "TRUE");
+  const char* env_val = chi::env::GetCompat("WITH_RUNTIME");
+  if (env_val != nullptr) {
+    with_runtime = (std::strcmp(env_val, "1") == 0 ||
+                   std::strcmp(env_val, "true") == 0 ||
+                   std::strcmp(env_val, "TRUE") == 0);
   }
 
   // Determine what to initialize based on mode and with_runtime flag
@@ -94,7 +97,7 @@ bool CHIMAERA_INIT(ChimaeraMode mode, bool default_with_runtime, bool is_restart
   }
 
   // Register atexit handler so CHIMAERA_FINALIZE runs before static
-  // destructors.  The Chimaera singleton is heap-allocated (GetGlobalPtrVar)
+  // destructors.  The CLIO Runtime singleton is heap-allocated (GetGlobalPtrVar)
   // so its destructor is never called automatically.  Without this the ZMQ
   // DEALER socket stays open and zmq_ctx_destroy blocks forever at exit.
   std::atexit(CHIMAERA_FINALIZE);
@@ -110,7 +113,7 @@ void CHIMAERA_FINALIZE() {
     return;
   }
   s_finalized = true;
-  auto *mgr = CHI_CHIMAERA_MANAGER;
+  auto *mgr = CLIO_CHIMAERA_MANAGER;
   if (mgr) {
     // Server first: stop worker threads that may still be sending IPC
     mgr->ServerFinalize();
@@ -119,4 +122,4 @@ void CHIMAERA_FINALIZE() {
   }
 }
 
-}  // namespace chi
+}  // namespace clio::run

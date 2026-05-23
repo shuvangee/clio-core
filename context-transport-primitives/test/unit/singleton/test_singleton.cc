@@ -45,7 +45,7 @@ TEST_CASE("TestSingleton") {
   p2.SetSingleton(p2_val);
   REQUIRE(p1.GetSingleton() == p2_val);
   REQUIRE(p2.GetSingleton() == p2_val);
-  REQUIRE(hshm::Singleton<MyStruct>::GetInstance()->string_ == p2_val);
+  REQUIRE(ctp::Singleton<MyStruct>::GetInstance()->string_ == p2_val);
 }
 
 TEST_CASE("TestGlobalSingleton") {
@@ -57,5 +57,5 @@ TEST_CASE("TestGlobalSingleton") {
   p2.SetGlobalSingleton(p2_val);
   REQUIRE(p1.GetGlobalSingleton() == p2_val);
   REQUIRE(p2.GetGlobalSingleton() == p2_val);
-  REQUIRE(hshm::GlobalSingleton<MyStruct>::GetInstance()->string_ == p2_val);
+  REQUIRE(ctp::GlobalSingleton<MyStruct>::GetInstance()->string_ == p2_val);
 }

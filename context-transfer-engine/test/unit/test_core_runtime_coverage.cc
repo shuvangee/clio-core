@@ -39,15 +39,20 @@
  */
 
 #include "simple_test.h"
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/bdev/bdev_client.h>
-#include <chimaera/bdev/bdev_tasks.h>
-#include <hermes_shm/util/logging.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
+#include <clio_ctp/util/logging.h>
 
-using namespace wrp_cte::core;
+using namespace clio::cte::core;
+
+static std::string chi_test_data_dir() {
+  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
+  return (d && *d) ? d : ".";
+}
 
 /**
  * Test fixture for runtime coverage tests
@@ -64,29 +69,31 @@ public:
     if (!g_initialized) {
       INFO("=== Initializing Runtime Coverage Test Environment ===");
 
-      // Step 1: Initialize Chimaera runtime
+      // Step 1: Initialize CLIO Runtime runtime
       bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
       if (!success) {
         throw std::runtime_error("CHIMAERA_INIT failed");
       }
+      // Drain ZMQ background threads in main() before static dtors fire.
+      SimpleTest::g_test_finalize = chi::CHIMAERA_FINALIZE;
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
       // Step 2: Initialize CTE client subsystem (CRITICAL!)
-      success = wrp_cte::core::WRP_CTE_CLIENT_INIT();
+      success = clio::cte::core::CLIO_CTE_CLIENT_INIT();
       if (!success) {
-        throw std::runtime_error("WRP_CTE_CLIENT_INIT failed");
+        throw std::runtime_error("CLIO_CTE_CLIENT_INIT failed");
       }
 
       // Step 3: Set pool ID on global client
-      auto *cte_client = WRP_CTE_CLIENT;
-      cte_client->Init(wrp_cte::core::kCtePoolId);
+      auto *cte_client = CLIO_CTE_CLIENT;
+      cte_client->Init(clio::cte::core::kCtePoolId);
 
       // Step 4: Create CTE core pool
-      wrp_cte::core::CreateParams params;
+      clio::cte::core::CreateParams params;
       auto create_task = cte_client->AsyncCreate(
           chi::PoolQuery::Dynamic(),
-          wrp_cte::core::kCtePoolName,
-          wrp_cte::core::kCtePoolId,
+          clio::cte::core::kCtePoolName,
+          clio::cte::core::kCtePoolId,
           params);
       create_task.Wait();
 
@@ -98,7 +105,7 @@ public:
       g_initialized = true;
     }
 
-    test_storage_path_ = std::string(std::getenv("HOME")) + "/cte_runtime_test.dat";
+    test_storage_path_ = chi_test_data_dir() + "/cte_runtime_test.dat";
   }
 
   void SetupTarget() {
@@ -106,24 +113,24 @@ public:
       return;
     }
 
-    auto *cte_client = WRP_CTE_CLIENT;
+    auto *cte_client = CLIO_CTE_CLIENT;
 
     // Create bdev pool for storage
     chi::PoolId bdev_pool_id(900, 0);
     size_t target_size = 10 * 1024 * 1024;  // 10 MB
-    chimaera::bdev::Client bdev_client(bdev_pool_id);
+    clio::run::bdev::Client bdev_client(bdev_pool_id);
     auto bdev_create = bdev_client.AsyncCreate(
         chi::PoolQuery::Dynamic(),
         test_storage_path_,
         bdev_pool_id,
-        chimaera::bdev::BdevType::kFile,
+        clio::run::bdev::BdevType::kFile,
         target_size);
     bdev_create.Wait();
 
     // Register target with CTE
     auto reg_task = cte_client->AsyncRegisterTarget(
         test_storage_path_,
-        chimaera::bdev::BdevType::kFile,
+        clio::run::bdev::BdevType::kFile,
         target_size,
         chi::PoolQuery::Local(),
         bdev_pool_id);
@@ -158,7 +165,7 @@ TEST_CASE("Runtime - GetTargetInfo Success Path", "[runtime][target]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Test successful target info retrieval
   auto task = client->AsyncGetTargetInfo(fixture.test_storage_path_);
@@ -173,7 +180,7 @@ TEST_CASE("Runtime - GetTargetInfo NonExistent Target", "[runtime][target][error
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Test getting info for non-existent target (error path)
   auto task = client->AsyncGetTargetInfo("/nonexistent/target.dat");
@@ -191,26 +198,26 @@ TEST_CASE("Runtime - UnregisterTarget Success", "[runtime][target]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Register a temporary target
-  std::string temp_target = std::string(std::getenv("HOME")) + "/temp_unregister_test.dat";
+  std::string temp_target = chi_test_data_dir() + "/temp_unregister_test.dat";
 
   chi::PoolId temp_bdev_pool_id(901, 0);
   size_t temp_target_size = 5 * 1024 * 1024;
 
-  chimaera::bdev::Client temp_bdev_client(temp_bdev_pool_id);
+  clio::run::bdev::Client temp_bdev_client(temp_bdev_pool_id);
   auto bdev_create = temp_bdev_client.AsyncCreate(
       chi::PoolQuery::Dynamic(),
       temp_target,
       temp_bdev_pool_id,
-      chimaera::bdev::BdevType::kFile,
+      clio::run::bdev::BdevType::kFile,
       temp_target_size);
   bdev_create.Wait();
 
   auto reg_task = client->AsyncRegisterTarget(
       temp_target,
-      chimaera::bdev::BdevType::kFile,
+      clio::run::bdev::BdevType::kFile,
       temp_target_size,
       chi::PoolQuery::Local(),
       temp_bdev_pool_id);
@@ -229,7 +236,7 @@ TEST_CASE("Runtime - UnregisterTarget NonExistent", "[runtime][target][error]") 
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Try to unregister non-existent target (error path)
   auto unreg_task = client->AsyncUnregisterTarget("/nonexistent/target.dat");
@@ -247,7 +254,7 @@ TEST_CASE("Runtime - DelBlob Success Path", "[runtime][blob]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag and put blob
   auto tag_task = client->AsyncGetOrCreateTag("delblob_test_tag");
@@ -255,10 +262,10 @@ TEST_CASE("Runtime - DelBlob Success Path", "[runtime][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
-  hipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
+  auto *ipc = CLIO_IPC;
+  ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
-  hipc::ShmPtr<> shm_ref(shm_ptr.shm_);
+  ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
 
   auto put_task = client->AsyncPutBlob(
       tag_task->tag_id_, "blob_for_deletion", 0, data.size(), shm_ref, 1.0f);
@@ -279,7 +286,7 @@ TEST_CASE("Runtime - DelBlob NonExistent Blob", "[runtime][blob][error]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag
   auto tag_task = client->AsyncGetOrCreateTag("delblob_error_tag");
@@ -298,7 +305,7 @@ TEST_CASE("Runtime - DelBlob Empty Name", "[runtime][blob][error]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag
   auto tag_task = client->AsyncGetOrCreateTag("delblob_empty_tag");
@@ -321,7 +328,7 @@ TEST_CASE("Runtime - GetBlobScore Success", "[runtime][blob]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag and put blob with specific score
   auto tag_task = client->AsyncGetOrCreateTag("score_test_tag");
@@ -329,10 +336,10 @@ TEST_CASE("Runtime - GetBlobScore Success", "[runtime][blob]") {
   REQUIRE(tag_task->GetReturnCode() == 0);
 
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
-  auto *ipc = CHI_IPC;
-  hipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
+  auto *ipc = CLIO_IPC;
+  ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
-  hipc::ShmPtr<> shm_ref(shm_ptr.shm_);
+  ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
 
   float expected_score = 0.475f;
   auto put_task = client->AsyncPutBlob(
@@ -355,7 +362,7 @@ TEST_CASE("Runtime - GetBlobScore NonExistent Blob", "[runtime][blob][error]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag
   auto tag_task = client->AsyncGetOrCreateTag("score_error_tag");
@@ -374,7 +381,7 @@ TEST_CASE("Runtime - GetBlobScore Empty Name", "[runtime][blob][error]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag
   auto tag_task = client->AsyncGetOrCreateTag("score_empty_tag");
@@ -397,7 +404,7 @@ TEST_CASE("Runtime - GetBlobSize Success", "[runtime][blob]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag and put blob
   auto tag_task = client->AsyncGetOrCreateTag("blobsize_tag");
@@ -406,10 +413,10 @@ TEST_CASE("Runtime - GetBlobSize Success", "[runtime][blob]") {
 
   size_t expected_size = 2048;
   auto data = fixture.CreateTestData(expected_size);
-  auto *ipc = CHI_IPC;
-  hipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
+  auto *ipc = CLIO_IPC;
+  ctp::ipc::FullPtr<char> shm_ptr = ipc->AllocateBuffer(data.size());
   memcpy(shm_ptr.ptr_, data.data(), data.size());
-  hipc::ShmPtr<> shm_ref(shm_ptr.shm_);
+  ctp::ipc::ShmPtr<> shm_ref(shm_ptr.shm_);
 
   auto put_task = client->AsyncPutBlob(
       tag_task->tag_id_, "sized_blob", 0, data.size(), shm_ref, 1.0f);
@@ -431,7 +438,7 @@ TEST_CASE("Runtime - GetBlobSize NonExistent", "[runtime][blob][error]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag
   auto tag_task = client->AsyncGetOrCreateTag("size_error_tag");
@@ -454,21 +461,21 @@ TEST_CASE("Runtime - GetTagSize Success", "[runtime][tag]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag and put multiple blobs
   auto tag_task = client->AsyncGetOrCreateTag("tagsize_test");
   tag_task.Wait();
   REQUIRE(tag_task->GetReturnCode() == 0);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
 
   // Put first blob
   size_t size1 = 1024;
   auto data1 = fixture.CreateTestData(size1);
-  hipc::FullPtr<char> shm1 = ipc->AllocateBuffer(data1.size());
+  ctp::ipc::FullPtr<char> shm1 = ipc->AllocateBuffer(data1.size());
   memcpy(shm1.ptr_, data1.data(), data1.size());
-  hipc::ShmPtr<> ref1(shm1.shm_);
+  ctp::ipc::ShmPtr<> ref1(shm1.shm_);
 
   auto put1 = client->AsyncPutBlob(tag_task->tag_id_, "blob1", 0, size1, ref1, 1.0f);
   put1.Wait();
@@ -478,9 +485,9 @@ TEST_CASE("Runtime - GetTagSize Success", "[runtime][tag]") {
   // Put second blob
   size_t size2 = 512;
   auto data2 = fixture.CreateTestData(size2);
-  hipc::FullPtr<char> shm2 = ipc->AllocateBuffer(data2.size());
+  ctp::ipc::FullPtr<char> shm2 = ipc->AllocateBuffer(data2.size());
   memcpy(shm2.ptr_, data2.data(), data2.size());
-  hipc::ShmPtr<> ref2(shm2.shm_);
+  ctp::ipc::ShmPtr<> ref2(shm2.shm_);
 
   auto put2 = client->AsyncPutBlob(tag_task->tag_id_, "blob2", 0, size2, ref2, 1.0f);
   put2.Wait();
@@ -503,7 +510,7 @@ TEST_CASE("Runtime - DelTag by Name Success", "[runtime][tag]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag
   std::string tag_name = "tag_to_delete";
@@ -522,7 +529,7 @@ TEST_CASE("Runtime - DelTag by ID Success", "[runtime][tag]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag
   auto create_task = client->AsyncGetOrCreateTag("tag_to_delete_by_id");
@@ -546,22 +553,22 @@ TEST_CASE("Runtime - GetContainedBlobs Success", "[runtime][blob]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create tag and add multiple blobs
   auto tag_task = client->AsyncGetOrCreateTag("contained_blobs_tag");
   tag_task.Wait();
   REQUIRE(tag_task->GetReturnCode() == 0);
 
-  auto *ipc = CHI_IPC;
+  auto *ipc = CLIO_IPC;
   auto data = fixture.CreateTestData(fixture.kTestDataSize);
 
   // Add 3 blobs
   for (int i = 0; i < 3; ++i) {
     std::string blob_name = "blob_" + std::to_string(i);
-    hipc::FullPtr<char> shm = ipc->AllocateBuffer(data.size());
+    ctp::ipc::FullPtr<char> shm = ipc->AllocateBuffer(data.size());
     memcpy(shm.ptr_, data.data(), data.size());
-    hipc::ShmPtr<> ref(shm.shm_);
+    ctp::ipc::ShmPtr<> ref(shm.shm_);
 
     auto put = client->AsyncPutBlob(tag_task->tag_id_, blob_name, 0, data.size(), ref, 1.0f);
     put.Wait();
@@ -581,7 +588,7 @@ TEST_CASE("Runtime - GetContainedBlobs Empty Tag", "[runtime][blob]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   // Create empty tag
   auto tag_task = client->AsyncGetOrCreateTag("empty_tag");
@@ -605,7 +612,7 @@ TEST_CASE("Runtime - ListTargets Success", "[runtime][target]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   auto list_task = client->AsyncListTargets();
   list_task.Wait();
@@ -623,7 +630,7 @@ TEST_CASE("Runtime - StatTargets Success", "[runtime][target]") {
   RuntimeCoverageFixture fixture;
   fixture.SetupTarget();
 
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
 
   auto stat_task = client->AsyncStatTargets();
   stat_task.Wait();

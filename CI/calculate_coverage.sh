@@ -142,6 +142,18 @@ fi
 COVERAGE_EXCLUDE_LABELS="integration|restart|functional|query|stress|docker"
 COVERAGE_EXCLUDE_NAMES="cr_bdev_|cr_mpi_|cr_per_process_shm_stress"
 
+# Detect lcov version for RC option compatibility.
+# lcov 1.x uses 'lcov_branch_coverage' and 'geninfo_unexecuted_blocks';
+# lcov 2.x renamed them and treats unknown keys as fatal errors.
+LCOV_MAJOR=$(lcov --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1 | cut -d. -f1)
+LCOV_MAJOR=${LCOV_MAJOR:-1}
+if [ "${LCOV_MAJOR}" -ge 2 ] 2>/dev/null; then
+    LCOV_RC_OPTS=(--rc branch_coverage=0)
+else
+    LCOV_RC_OPTS=(--rc lcov_branch_coverage=0 --rc geninfo_unexecuted_blocks=1)
+fi
+print_info "Detected lcov version: ${LCOV_MAJOR}.x (using ${LCOV_RC_OPTS[*]})"
+
 ################################################################################
 # Step 1: Clean build directory (if requested)
 ################################################################################
@@ -166,13 +178,28 @@ if [ "$DO_BUILD" = true ]; then
         print_info "Using conda prefix: $CONDA_PREFIX"
     fi
 
+    # Ensure build dependencies are available in conda env (coverage does a
+    # fresh from-source build which needs development headers / cmake configs)
+    if [ -n "$CONDA_PREFIX" ]; then
+        print_info "Installing build dependencies into conda env..."
+        conda install -y -c conda-forge \
+            cmake make pkg-config cereal yaml-cpp zeromq \
+            msgpack-c hdf5 catch2 libaio liburing 2>&1 | tail -3
+    fi
+
     print_info "Configuring build with coverage enabled..."
+    # CMake variables are CLIO_*; the legacy WRP_* names were silently
+    # ignored (no_op overrides) after the rebrand, so the debug preset's
+    # CLIO_CTE_ENABLE_COMPRESS=ON default leaked through and broke the
+    # pkg_check_modules(liblz4 REQUIRED) call when lz4 wasn't in the
+    # conda env.
     cmake --preset=debug \
-        -DWRP_CORE_ENABLE_COVERAGE=ON \
-        -DWRP_CORE_ENABLE_DOCKER_CI=OFF \
-        -DWRP_CTE_ENABLE_ADIOS2_ADAPTER=OFF \
-        -DWRP_CTE_ENABLE_COMPRESS=OFF \
-        -DWRP_CORE_ENABLE_GRAY_SCOTT=OFF
+        -DCLIO_CORE_ENABLE_COVERAGE=ON \
+        -DCLIO_CORE_ENABLE_CONDA=ON \
+        -DCLIO_CORE_ENABLE_DOCKER_CI=OFF \
+        -DCLIO_CTE_ENABLE_ADIOS2_ADAPTER=OFF \
+        -DCLIO_CTE_ENABLE_COMPRESS=OFF \
+        -DCLIO_CORE_ENABLE_GRAY_SCOTT=OFF
 
     print_info "Building project..."
     NUM_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
@@ -344,15 +371,27 @@ cd "${BUILD_DIR}"
 
 print_info "Capturing final coverage data with lcov..."
 
-# Use geninfo directly with comprehensive error ignoring for all components at once
-# This approach gives more accurate results than capturing from root directory
+# lcov 2.x is stricter about errors than 1.x. Build a comprehensive
+# --ignore-errors list so that stale .gcda files, missing sources, or
+# version mismatches do not abort the capture.
+if [ "${LCOV_MAJOR}" -ge 2 ] 2>/dev/null; then
+    LCOV_IGNORE_OPTS=(--ignore-errors source,graph,mismatch,empty,unused,negative,count,inconsistent)
+else
+    LCOV_IGNORE_OPTS=(--ignore-errors source,graph)
+fi
+
 lcov --capture \
      --directory . \
      --output-file coverage_combined.info \
-     --rc lcov_branch_coverage=0 \
-     --rc geninfo_unexecuted_blocks=1 \
-     --ignore-errors graph,mismatch,negative,inconsistent,unused,empty,gcov,source \
-     2>&1 | grep -E "Found [0-9]+ data files|Finished" || true
+     "${LCOV_RC_OPTS[@]}" \
+     "${LCOV_IGNORE_OPTS[@]}" \
+     2>&1 | tee /tmp/lcov_capture.log | grep -E "Found [0-9]+ data files|Finished|Reading" || true
+
+if [ ! -f coverage_combined.info ] || [ ! -s coverage_combined.info ]; then
+    print_error "Failed to generate coverage data"
+    print_info "lcov capture log (last 20 lines):"
+    tail -20 /tmp/lcov_capture.log 2>/dev/null || true
+fi
 
 if [ ! -f coverage_combined.info ] || [ ! -s coverage_combined.info ]; then
     print_error "Failed to generate coverage data"
@@ -380,7 +419,7 @@ lcov --remove coverage_all.info \
      '*/catch2/*' \
      '*/nanobind/*' \
      --output-file coverage_filtered.info \
-     --ignore-errors mismatch,negative,unused \
+     "${LCOV_IGNORE_OPTS[@]}" \
      2>&1 | grep -E "Removed|Summary|lines|functions" | tail -5 || true
 
 if [ ! -f coverage_filtered.info ] || [ ! -s coverage_filtered.info ]; then
@@ -399,7 +438,6 @@ print_header "Step 6: Generating HTML Coverage Report"
 print_info "Generating HTML report..."
 genhtml coverage_filtered.info \
         --output-directory coverage_report \
-        --ignore-errors mismatch,negative \
         --title "IOWarp Core Coverage Report" \
         --legend \
         2>&1 | grep -E "Overall|Processing|Writing" | tail -10 || true
@@ -425,36 +463,36 @@ print_info "Extracting component coverage..."
 
 # CTP is mostly header-only, so include both src/ and include/
 lcov --extract coverage_filtered.info \
-     '/workspace/context-transport-primitives/src/*' \
-     '/workspace/context-transport-primitives/include/*' \
+     "${REPO_ROOT}/context-transport-primitives/src/*" \
+     "${REPO_ROOT}/context-transport-primitives/include/*" \
      --output-file "${TMP_DIR}/ctp.info" \
-     --ignore-errors mismatch,negative,unused >/dev/null 2>&1 || true
+     >/dev/null 2>&1 || true
 
 lcov --extract coverage_filtered.info \
-     '/workspace/context-runtime/src/*' \
-     '/workspace/context-runtime/include/*' \
-     '/workspace/context-runtime/modules/*/src/*' \
-     '/workspace/context-runtime/modules/*/include/*' \
+     "${REPO_ROOT}/context-runtime/src/*" \
+     "${REPO_ROOT}/context-runtime/include/*" \
+     "${REPO_ROOT}/context-runtime/modules/*/src/*" \
+     "${REPO_ROOT}/context-runtime/modules/*/include/*" \
      --output-file "${TMP_DIR}/runtime.info" \
-     --ignore-errors mismatch,negative,unused >/dev/null 2>&1 || true
+     >/dev/null 2>&1 || true
 
 lcov --extract coverage_filtered.info \
-     '/workspace/context-transfer-engine/core/src/*' \
-     '/workspace/context-transfer-engine/core/include/*' \
+     "${REPO_ROOT}/context-transfer-engine/core/src/*" \
+     "${REPO_ROOT}/context-transfer-engine/core/include/*" \
      --output-file "${TMP_DIR}/cte.info" \
-     --ignore-errors mismatch,negative,unused >/dev/null 2>&1 || true
+     >/dev/null 2>&1 || true
 
 lcov --extract coverage_filtered.info \
-     '/workspace/context-assimilation-engine/core/src/*' \
-     '/workspace/context-assimilation-engine/core/include/*' \
+     "${REPO_ROOT}/context-assimilation-engine/core/src/*" \
+     "${REPO_ROOT}/context-assimilation-engine/core/include/*" \
      --output-file "${TMP_DIR}/cae.info" \
-     --ignore-errors mismatch,negative,unused >/dev/null 2>&1 || true
+     >/dev/null 2>&1 || true
 
 lcov --extract coverage_filtered.info \
-     '/workspace/context-exploration-engine/api/src/*' \
-     '/workspace/context-exploration-engine/api/include/*' \
+     "${REPO_ROOT}/context-exploration-engine/api/src/*" \
+     "${REPO_ROOT}/context-exploration-engine/api/include/*" \
      --output-file "${TMP_DIR}/cee.info" \
-     --ignore-errors mismatch,negative,unused >/dev/null 2>&1 || true
+     >/dev/null 2>&1 || true
 
 ################################################################################
 # Step 9: Generate summary report
@@ -474,7 +512,7 @@ EOFSUM
 
 echo "" >> "${BUILD_DIR}/COVERAGE_SUMMARY.txt"
 echo "=== Overall Coverage ===" >> "${BUILD_DIR}/COVERAGE_SUMMARY.txt"
-lcov --summary coverage_filtered.info --ignore-errors mismatch,negative 2>&1 | \
+lcov --summary coverage_filtered.info 2>&1 | \
     grep -E "lines|functions" >> "${BUILD_DIR}/COVERAGE_SUMMARY.txt"
 
 echo "" >> "${BUILD_DIR}/COVERAGE_SUMMARY.txt"
@@ -483,7 +521,7 @@ echo "=== Component Coverage ===" >> "${BUILD_DIR}/COVERAGE_SUMMARY.txt"
 for COMPONENT in ctp runtime cte cae cee; do
     case $COMPONENT in
         ctp)
-            NAME="Context Transport Primitives (HSHM)"
+            NAME="Context Transport Primitives (CTP)"
             ;;
         runtime)
             NAME="Context Runtime (Chimaera)"
@@ -502,7 +540,7 @@ for COMPONENT in ctp runtime cte cae cee; do
     if [ -f "${TMP_DIR}/${COMPONENT}.info" ] && [ -s "${TMP_DIR}/${COMPONENT}.info" ]; then
         echo "" >> "${BUILD_DIR}/COVERAGE_SUMMARY.txt"
         echo "${NAME}:" >> "${BUILD_DIR}/COVERAGE_SUMMARY.txt"
-        lcov --summary "${TMP_DIR}/${COMPONENT}.info" --ignore-errors mismatch,negative 2>&1 | \
+        lcov --summary "${TMP_DIR}/${COMPONENT}.info" 2>&1 | \
             grep -E "lines|functions" | sed 's/^/  /' >> "${BUILD_DIR}/COVERAGE_SUMMARY.txt"
     fi
 done

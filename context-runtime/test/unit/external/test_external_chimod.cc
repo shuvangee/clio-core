@@ -1,11 +1,11 @@
 #include <iostream>
-#include <hermes_shm/util/logging.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/admin/admin_client.h>
+#include <clio_ctp/util/logging.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/admin/admin_client.h>
 
 /**
  * Simple external ChiMod test that verifies:
- * 1. Chimaera can be found and initialized as a client
+ * 1. CLIO Runtime can be found and initialized as a client
  * 2. Admin ChiMod client can be created
  * 3. Basic functionality works through the installed packages
  */
@@ -13,7 +13,7 @@ int main() {
   HIPRINT("Testing external ChiMod integration...");
 
   try {
-    // Initialize Chimaera client
+    // Initialize CLIO Runtime client
     if (!chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true)) {
       HLOG(kError, "Failed to initialize Chimaera client");
       return 1;
@@ -21,7 +21,7 @@ int main() {
     HIPRINT("Chimaera client initialized successfully");
 
     // Create admin client
-    chimaera::admin::Client admin_client(chi::kAdminPoolId);
+    clio::run::admin::Client admin_client(chi::kAdminPoolId);
     HIPRINT("Admin client created successfully");
 
     // Test that we can call basic methods (without actually creating containers)

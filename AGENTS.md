@@ -1,7 +1,7 @@
 # IOWarp Core - Unified Development Guide
 
 This repository contains the unified IOWarp Core framework, integrating multiple components:
-- **context-transport-primitives** (formerly cte-hermes-shm): Core transport and shared memory primitives
+- **context-transport-primitives** (formerly context-transport-primitives): Core transport and shared memory primitives
 - **runtime**: IOWarp runtime system
 - **context-transfer-engine**: Context transfer engine
 - **context-assimilation-engine**: Context assimilation engine
@@ -22,9 +22,9 @@ We use rpaths for libraries. This stuff does not get overriden by LD_LIBRARY_PAT
 
 ## Chimods
 
-When building chimods, make sure to edit chimaera_mod.yaml and chimaera_repo.yaml.
+When building chimods, make sure to edit clio_mod.yaml and clio_repo.yaml.
 
-If you add new methods to a chimod, please edit chimaera_mod.yaml and use the chimaera repo refresh binary to autogenerate the relevant autogen files.
+If you add new methods to a chimod, please edit clio_mod.yaml and use the clio_run repo refresh binary to autogenerate the relevant autogen files.
 
 
 ## ⚠️ CRITICAL BUILD RULE ⚠️
@@ -52,26 +52,85 @@ If you add new methods to a chimod, please edit chimaera_mod.yaml and use the ch
 2. Remove ALL CMakeFiles, CMakeCache.txt, cmake_install.cmake, Makefile from source tree
 3. Rebuild properly from `/workspace/build`
 
+## GPU Producer-Only Model
+
+The GPU side of CLIO Runtime is a **pure task producer** — kernels do not allocate
+tasks, FutureShm, or data buffers. All allocations happen on the host before
+kernel launch into client-owned device-memory backends that are registered
+with the runtime via `admin::RegisterMemoryTask`. Inside a kernel the only
+operation `chi::gpu::IpcManager` exposes is `Send` — pack a pre-allocated
+task and push it onto the per-device gpu2cpu_queue.
+
+### Lifecycle (host)
+1. Runtime init: `gpu::IpcManager::ServerInitGpuQueues` enumerates GPUs and
+   allocates one pinned-host gpu2cpu_queue per device. The CPU GPU worker
+   polls every queue.
+2. Client backend allocation:
+   ```cpp
+   char *base = nullptr;
+   auto alloc_id = ipc->AllocateAndRegisterGpuBackend(
+       gpu_id, chi::gpu::IpcManager::MemKind::kPinnedHost, bytes, &base);
+   ```
+   Available kinds: `kPinnedHost` (pinned host, fastest), `kManagedUvm`
+   (CUDA managed / SYCL shared), `kDeviceMem` (device-only; worker copies
+   POD bytes via cudaMemcpy on each pop). First-cut implementation only
+   wires `kPinnedHost` end-to-end; the others register correctly but the
+   worker pop path logs a warning for `kDeviceMem`.
+3. Pre-construct task + FutureShm pairs in the registered backend with
+   placement new. Tasks are POD with identical layout on CPU and GPU.
+
+### Lifecycle (kernel)
+```cpp
+__global__ void MyKernel(IpcManagerGpuInfo info,
+                         ctp::ipc::FullPtr<MyTaskT> task) {
+  CHIMAERA_GPU_INIT(info, /*ipc_ptr=*/nullptr);
+  if (threadIdx.x == 0) {
+    // Mutate POD task fields. No NewTask, no AllocateBuffer.
+    task->some_input_ = ...;
+    auto fut = CLIO_IPC->Send(task);
+    fut.Wait();
+    // Read result fields back from the same POD task.
+  }
+}
+```
+SYCL kernels get a kernel-scope IpcManager pointer; CUDA/ROCm kernels use
+the per-block `__shared__` IpcManager via `GetBlockIpcManager()`. The
+single `CHIMAERA_GPU_INIT(gpu_info, ipc_ptr)` macro covers both backends.
+
+### Worker pop path
+The CPU GPU worker (`Worker::ProcessNewTaskGpu`) pops a `gpu::Future<Task>`
+off `gpu2cpu_queue`, resolves both the task ShmPtr and the FutureShm
+ShmPtr via `gpu::IpcManager::FindClientBackend`, dispatches the chimod
+method on the local CPU runtime, and signals `FUTURE_COMPLETE` on the
+device-side gpu::FutureShm so the kernel poll-loop unblocks.
+
+### Forbidden on the GPU
+- `CLIO_IPC->NewTask(...)`, `CLIO_IPC->NewObj(...)`, `CLIO_IPC->AllocateBuffer(...)`
+  — these are host-only.
+- `PoolQuery::ToLocalGpu(...)`, `PoolQuery::LocalGpuBcast()` — both removed.
+  Use `PoolQuery::ToLocalCpu()` exclusively for kernel→runtime submission.
+- `IpcCpu2Gpu`, `IpcGpu2Gpu` — both deleted with the GPU runtime concept.
+
 ## Code Style
 
 Keeep code simple. Do not allow functions to be more than 100 lines of code. Make helper functions logically.
 
 Use the Google C++ style guide for C++.
 
-You should store the pointer returned by the singleton GetInstance method. Avoid dereferencing GetInstance method directly using either -> or *. E.g., do not do ``hshm::Singleton<T>::GetInstance()->var_``. You should do ``auto *x = hshm::Singleton<T>::GetInstance(); x->var_;``.
+You should store the pointer returned by the singleton GetInstance method. Avoid dereferencing GetInstance method directly using either -> or *. E.g., do not do ``ctp::Singleton<T>::GetInstance()->var_``. You should do ``auto *x = ctp::Singleton<T>::GetInstance(); x->var_;``.
 
 Whenever you build a new function, always create a docstring for it. It should document what the parameters mean and the point of the function. It should be something easily parsed by doxygen.
 
 ### GPU Compiler Macro Rule
 
-**NEVER** use raw GPU compiler-detection macros (`__CUDACC__`, `__HIPCC__`, `__HIP__`, `__CUDA_ARCH__`, `__HIP_DEVICE_COMPILE__`) anywhere except `context-transport-primitives/include/hermes_shm/constants/macros.h`. We do not want code paths to compile just because a GPU compiler is being used — we need the explicit CMake build flags (`HSHM_ENABLE_CUDA`, `HSHM_ENABLE_ROCM`) to be set as well.
+**NEVER** use raw GPU compiler-detection macros (`__CUDACC__`, `__HIPCC__`, `__HIP__`, `__CUDA_ARCH__`, `__HIP_DEVICE_COMPILE__`) anywhere except `context-transport-primitives/include/clio_ctp/constants/macros.h`. We do not want code paths to compile just because a GPU compiler is being used — we need the explicit CMake build flags (`CTP_ENABLE_CUDA`, `CTP_ENABLE_ROCM`) to be set as well.
 
 **Use these macros instead:**
-- `HSHM_IS_GPU` — true when compiling device code (replaces `__CUDA_ARCH__` / `__HIP_DEVICE_COMPILE__`)
-- `HSHM_IS_HOST` — true when compiling host code
-- `HSHM_IS_GPU_COMPILER` — true when compiled by nvcc or hipcc AND the build flag is set (replaces `__CUDACC__` / `__HIPCC__`)
-- `HSHM_IS_CUDA_COMPILER` — CUDA-specific compiler check (replaces `HSHM_ENABLE_CUDA && __CUDACC__`)
-- `HSHM_IS_ROCM_COMPILER` — ROCm-specific compiler check (replaces `HSHM_ENABLE_ROCM && __HIPCC__`)
+- `CTP_IS_GPU` — true when compiling device code (replaces `__CUDA_ARCH__` / `__HIP_DEVICE_COMPILE__`)
+- `CTP_IS_HOST` — true when compiling host code
+- `CTP_IS_GPU_COMPILER` — true when compiled by nvcc or hipcc AND the build flag is set (replaces `__CUDACC__` / `__HIPCC__`)
+- `CTP_IS_CUDA_COMPILER` — CUDA-specific compiler check (replaces `CTP_ENABLE_CUDA && __CUDACC__`)
+- `CTP_IS_ROCM_COMPILER` — ROCm-specific compiler check (replaces `CTP_ENABLE_ROCM && __HIPCC__`)
 
 ## File Headers
 
@@ -142,13 +201,13 @@ All timing prints MUST include units of measurement in milliseconds (ms). Always
 
 ### Automatic IPC Cleanup on RuntimeInit
 
-When Chimaera RuntimeInit is called (via `IpcManager::ServerInit()`), it automatically cleans up leftover shared memory segments from previous runs or crashed processes by calling `IpcManager::ClearUserIpcs()`.
+When CLIO Runtime RuntimeInit is called (via `IpcManager::ServerInit()`), it automatically cleans up leftover shared memory segments from previous runs or crashed processes by calling `IpcManager::ClearUserIpcs()`.
 
 **ClearUserIpcs() Behavior:**
 - Scans the per-user chimaera directory (`SystemInfo::GetMemfdDir()`, i.e. `/tmp/chimaera_$USER/`)
 - Removes all memfd symlinks and IPC socket files from that directory
 - Silently ignores permission errors (EACCES, EPERM) to support multi-user systems
-- Other users' active Chimaera processes are not affected
+- Other users' active CLIO Runtime processes are not affected
 - Logs successfully removed segments at kDebug level
 - Returns the count of segments removed
 
@@ -157,11 +216,11 @@ This ensures a clean state for each runtime initialization without requiring man
 ### IPC Path Convention
 
 **CRITICAL**: Never hardcode `/tmp/chimaera_*` paths in IpcManager or elsewhere. Always use the `SystemInfo` helpers:
-- `hshm::SystemInfo::GetMemfdDir()` — returns `/tmp/chimaera_$USER`
-- `hshm::SystemInfo::GetMemfdPath(name)` — returns `/tmp/chimaera_$USER/<name>` (strips leading `/`)
-- `hshm::SystemInfo::EnsureMemfdDir()` — creates the directory if it doesn't exist
+- `ctp::SystemInfo::GetMemfdDir()` — returns `/tmp/chimaera_$USER`
+- `ctp::SystemInfo::GetMemfdPath(name)` — returns `/tmp/chimaera_$USER/<name>` (strips leading `/`)
+- `ctp::SystemInfo::EnsureMemfdDir()` — creates the directory if it doesn't exist
 
-For IPC Unix domain socket paths, use: `hshm::SystemInfo::GetMemfdPath("chimaera_" + std::to_string(port) + ".ipc")`
+For IPC Unix domain socket paths, use: `ctp::SystemInfo::GetMemfdPath("chimaera_" + std::to_string(port) + ".ipc")`
 
 ## Workflow
 
@@ -202,10 +261,10 @@ NEVER DO MOCK CODE OR STUB CODE UNLESS SPECIFICALLY STATED OTHERWISE. ALWAYS IMP
 
 ### Component Build Options
 The unified IOWarp Core build system provides options to enable/disable components:
-- `WRP_CORE_ENABLE_RUNTIME`: Enable runtime component (default: ON)
-- `WRP_CORE_ENABLE_CTE`: Enable context-transfer-engine component (default: ON)
-- `WRP_CORE_ENABLE_CAE`: Enable context-assimilation-engine component (default: ON)
-- `WRP_CORE_ENABLE_CEE`: Enable context-exploration-engine component (default: ON)
+- `CLIO_CORE_ENABLE_RUNTIME`: Enable runtime component (default: ON)
+- `CLIO_CORE_ENABLE_CTE`: Enable context-transfer-engine component (default: ON)
+- `CLIO_CORE_ENABLE_CAE`: Enable context-assimilation-engine component (default: ON)
+- `CLIO_CORE_ENABLE_CEE`: Enable context-exploration-engine component (default: ON)
 
 Example:
 ```bash
@@ -216,45 +275,44 @@ cmake --preset=debug -DWRP_CORE_ENABLE_CTE=ON -DWRP_CORE_ENABLE_CAE=OFF
 - Always use the debug CMakePreset when compiling code in this repo
 - Never hardcode paths in CMakeLists.txt files
 - Use find_package() for all dependencies
-- Follow ChiMod build patterns from MODULE_DEVELOPMENT_GUIDE.md
+- Follow Module build patterns from MODULE_DEVELOPMENT_GUIDE.md
 - All compilation warnings have been resolved as of the current state
 
 ### RPATH Configuration
 The build system uses **relative RPATHs** (`$ORIGIN`) for portable, relocatable binaries (enabled by default):
-- **Enable/Disable**: Controlled by `WRP_CORE_ENABLE_RPATH` option (default: ON)
+- **Enable/Disable**: Controlled by `CLIO_CORE_ENABLE_RPATH` option (default: ON)
 - **Linux**: Uses `$ORIGIN` and `$ORIGIN/../lib` so libraries and binaries find siblings at runtime
 - **macOS**: Uses `@loader_path` and `@loader_path/../lib` (equivalent to `$ORIGIN`)
 - Works for all deployment targets: system installs, pip wheels, conda packages, and relocatable builds
 - **Disable RPATH**: Set `-DWRP_CORE_ENABLE_RPATH=OFF` if you prefer using `LD_LIBRARY_PATH`
 
-### HSHM Usage
+### CTP Usage
 
-Always use HSHM_MCTX macro unless we are writing GPU code, which necessitates a specific mctx to be created.
+Always use CTP_MCTX macro unless we are writing GPU code, which necessitates a specific mctx to be created.
 
-### ChiMod Build Patterns
+### Module Build Patterns
 
-This project follows the Chimaera MODULE_DEVELOPMENT_GUIDE.md patterns for proper ChiMod development:
+This project follows the CLIO Runtime MODULE_DEVELOPMENT_GUIDE.md patterns for proper Module development:
 
-**Required Packages for ChiMod Development:**
+**Required Packages for Module Development:**
 ```cmake
-# Core Chimaera framework (includes ChimaeraCommon.cmake functions)
-find_package(chimaera REQUIRED)              # Core library (chimaera::cxx)
-find_package(chimaera_admin REQUIRED)        # Admin ChiMod (required for most ChiMods)
+# Core Clio framework (includes ChimaeraCommon.cmake functions)
+find_package(chimaera REQUIRED)              # Core library (clio::run::cxx)
+find_package(clio_admin REQUIRED)        # Admin Module (required for most Modules)
 ```
 
-**ChiMod Creation Pattern:**
+**Module Creation Pattern:**
 ```cmake
-# Use modern ChiMod build functions instead of manual add_library
-add_chimod_runtime(
-  CHIMOD_NAME core
+# Use modern Module build functions instead of manual add_library
+# Module name and namespace come from clio_mod.yaml in the source dir.
+add_clio_module_runtime(
   SOURCES
     src/core_runtime.cc
     src/core_config.cc
     src/autogen/core_lib_exec.cc
 )
 
-add_chimod_client(
-  CHIMOD_NAME core
+add_clio_module_client(
   SOURCES
     src/core_client.cc
     src/content_transfer_engine.cc
@@ -262,9 +320,10 @@ add_chimod_client(
 ```
 
 **Target Naming:**
-- **Actual Targets**: `${NAMESPACE}_${CHIMOD_NAME}_runtime`, `${NAMESPACE}_${CHIMOD_NAME}_client`
-- **CMake Aliases**: `${NAMESPACE}::${CHIMOD_NAME}_runtime`, `${NAMESPACE}::${CHIMOD_NAME}_client` (recommended)
-- **Package Names**: `${NAMESPACE}_${CHIMOD_NAME}` (for external find_package)
+- **Actual Targets**: `${PACKAGE_NAME}_${MODULE_NAME}_runtime`, `${PACKAGE_NAME}_${MODULE_NAME}_client` (or `${LIB_NAME}_runtime`/`_client` if `LIB_NAME` is passed to override — used e.g. by the bdev module which installs as `clio_bdev_*`).  `PACKAGE_NAME` is the filesystem-safe form of `NAMESPACE` (e.g. `clio::run` -> `clio_run`).
+- **CMake Aliases**: `${NAMESPACE}::${MODULE_NAME}_runtime`, `${NAMESPACE}::${MODULE_NAME}_client` (recommended — e.g. `clio::run::admin_client`, `clio::cte::core_client`)
+- **Legacy Aliases**: For chimaera-renamed modules (admin / bdev / MOD_NAME, now under `clio::run::`), the install layout still exposes `chimaera::<module>_<x>` aliases so external consumers (e.g. coeus-adapter) keep working.  The pre-`::` waypoint spellings (`clio_run::`, `clio_cte::`, `clio_cae::`) also resolve as forwarders.
+- **Package Names**: `${PACKAGE_NAME}_${MODULE_NAME}` for clio::cte / clio::cae; pinned to `chimaera_${MODULE_NAME}` for clio::run-namespace modules to keep `find_package(chimaera_admin/_bdev/_MOD_NAME)` backward compat.
 
 ## Worker Method Return Types
 
@@ -282,7 +341,7 @@ The following PoolManager methods are coroutines that return `TaskResume`:
 - `DestroyPool()` - Destroys a pool (coroutine for consistency)
 
 **Why Coroutines:**
-These methods are coroutines to properly handle nested pool creation. When a ChiMod's Create method (e.g., CTE Create) needs to create sub-pools (e.g., bdev for storage), it uses `co_await`. The coroutine chain allows proper suspension and resumption:
+These methods are coroutines to properly handle nested pool creation. When a Module's Create method (e.g., CTE Create) needs to create sub-pools (e.g., bdev for storage), it uses `co_await`. The coroutine chain allows proper suspension and resumption:
 1. Admin's `GetOrCreatePool` co_awaits `PoolManager::CreatePool`
 2. `PoolManager::CreatePool` co_awaits `container->Run()` (the Create method)
 3. The Create method can co_await nested pool creations (e.g., bdev Create)
@@ -350,7 +409,7 @@ void Task::Yield(double block_time_us = 0.0);
 
 Use the `WorkQueue` typedef for worker queue types:
 ```cpp
-using WorkQueue = chi::ipc::mpsc_ring_buffer<hipc::TypedPointer<TaskLane>>;
+using WorkQueue = chi::ipc::mpsc_ring_buffer<ctp::ipc::TypedPointer<TaskLane>>;
 ```
 
 This simplifies code readability and maintenance for worker queue operations.
@@ -358,12 +417,12 @@ This simplifies code readability and maintenance for worker queue operations.
 **TaskLane Typedef:**
 The `TaskLane` typedef is defined globally in the `chi` namespace:
 ```cpp
-using TaskLane = chi::ipc::multi_mpsc_ring_buffer<hipc::TypedPointer<Task>, TaskQueueHeader>::queue_t;
+using TaskLane = chi::ipc::multi_mpsc_ring_buffer<ctp::ipc::TypedPointer<Task>, TaskQueueHeader>::queue_t;
 ```
 
 Use `TaskLane*` for all lane pointers in RunContext and other interfaces. Avoid `void*` and explicit type casts.
 
-## ChiMod Client Requirements
+## Module Client Requirements
 
 ### PoolQuery Recommendations for Create Operations
 
@@ -381,11 +440,11 @@ Use `TaskLane*` for all lane pointers in RunContext and other interfaces. Avoid 
 ```cpp
 // Recommended: Use Dynamic() for automatic caching
 admin_client.Create(mctx, chi::PoolQuery::Dynamic(), "admin");
-bdev_client.Create(mctx, chi::PoolQuery::Dynamic(), file_path, chimaera::bdev::BdevType::kFile);
+bdev_client.Create(mctx, chi::PoolQuery::Dynamic(), file_path, clio_run::bdev::BdevType::kFile);
 ```
 
 ### CreateTask Pool Assignment
-CreateTask operations in all ChiMod clients MUST use `chi::kAdminPoolId` instead of the client's `pool_id_`. This is because CreateTask is actually a GetOrCreatePoolTask that must be processed by the admin ChiMod to create or find the target pool.
+CreateTask operations in all Module clients MUST use `chi::kAdminPoolId` instead of the client's `pool_id_`. This is because CreateTask is actually a GetOrCreatePoolTask that must be processed by the admin Module to create or find the target pool.
 
 **Correct Usage:**
 ```cpp
@@ -411,183 +470,196 @@ This mapping allows DirectHash to correctly route tasks:
 2. Container ID maps to physical node ID via the address table
 3. Task completer reflects the physical node ID where it executed
 
-### ChiMod Name Parameter
-ChiMod clients MUST use `CreateParams::chimod_lib_name` instead of hardcoded module names in CreateTask operations.
+### Module Name Parameter
+Module clients MUST use `CreateParams::chimod_lib_name` instead of hardcoded module names in CreateTask operations.
 
 ### Pool Name Requirements
-All ChiMod Create functions MUST require a user-provided `pool_name` parameter. Never auto-generate pool names using `pool_id_` during Create operations, as `pool_id_` is not set until after Create completes.
+All Module Create functions MUST require a user-provided `pool_name` parameter. Never auto-generate pool names using `pool_id_` during Create operations, as `pool_id_` is not set until after Create completes.
 
 **Admin Pool Name Requirement:**
 The admin pool name MUST always be "admin". Multiple admin pools are NOT supported.
 
-## ChiMod Linking Requirements
+## Module Linking Requirements
 
 ### Target Naming and Aliases
-ChiMod libraries use consistent underscore-based naming:
+Module libraries use consistent underscore-based naming:
 
 **Target Names:**
-- Runtime: `${NAMESPACE}_${CHIMOD_NAME}_runtime` (e.g., `chimaera_admin_runtime`)
-- Client: `${NAMESPACE}_${CHIMOD_NAME}_client` (e.g., `chimaera_admin_client`)
+- Runtime: `${NAMESPACE}_${MODULE_NAME}_runtime` (e.g., `clio_admin_runtime`)
+- Client: `${NAMESPACE}_${MODULE_NAME}_client` (e.g., `clio_admin_client`)
 
 **CMake Aliases:**
-- Runtime: `${NAMESPACE}::${CHIMOD_NAME}_runtime` (e.g., `chimaera::admin_runtime`)
-- Client: `${NAMESPACE}::${CHIMOD_NAME}_client` (e.g., `chimaera::admin_client`)
+- Runtime: `${NAMESPACE}::${MODULE_NAME}_runtime` (e.g., `clio::run::admin_runtime`)
+- Client: `${NAMESPACE}::${MODULE_NAME}_client` (e.g., `clio::run::admin_client`)
 
 **Package Names:**
-- Format: `${NAMESPACE}_${CHIMOD_NAME}` (e.g., `chimaera_admin`)
-- Used with `find_package(chimaera_admin REQUIRED)`
-- Core package: `chimaera` (provides `chimaera::cxx`)
+- Format: `${NAMESPACE}_${MODULE_NAME}` (e.g., `chimaera_admin`)
+- Used with `find_package(clio_admin REQUIRED)`
+- Core package: `chimaera` (provides `clio::run::cxx`)
 
 ### Automatic Dependency Linking
-ChiMod libraries automatically handle common dependencies:
+Module libraries automatically handle common dependencies:
 
 **Automatic Dependencies for Runtime Code:**
-- `rt` library: Automatically linked to all ChiMod runtime targets for POSIX real-time library support (async I/O)
-- Admin ChiMod: Automatically linked to all non-admin ChiMod runtime and client targets
-- Admin includes: Automatically added to include directories for non-admin ChiMods
+- `rt` library: Automatically linked to all Module runtime targets for POSIX real-time library support (async I/O)
+- Admin Module: Automatically linked to all non-admin Module runtime and client targets
+- Admin includes: Automatically added to include directories for non-admin Modules
 
 **For External Applications:**
 
-Use the unified `find_package(iowarp-core)` which automatically includes all components and ChiMods:
+Use the unified `find_package(clio-core)` which automatically includes all components and Modules:
 
 ```cmake
 # Single find_package call includes everything
-find_package(iowarp-core REQUIRED)
+find_package(clio-core REQUIRED)
 # This automatically provides:
 #   Core Components:
-#     - All hshm::* modular targets (hshm::cxx, hshm::configure, hshm::serialize, etc.)
-#     - chimaera::cxx (core runtime library)
-#     - ChiMod build utilities (add_chimod_client, add_chimod_runtime, etc.)
+#     - All ctp::* modular targets (ctp::cxx, ctp::configure, ctp::serialize, etc.)
+#     - clio::run::cxx (core runtime library)
+#     - Module build utilities (add_clio_module_client, add_clio_module_runtime, etc.)
 #
-#   Core ChiMods (Always Available):
-#     - chimaera::admin_client, chimaera::admin_runtime
-#     - chimaera::bdev_client, chimaera::bdev_runtime
+#   Core Modules (Always Available):
+#     - clio::run::admin_client, clio::run::admin_runtime
+#     - clio::run::bdev_client, clio::run::bdev_runtime
 #
-#   Optional ChiMods (if enabled at build time):
-#     - wrp_cte::core_client, wrp_cte::core_runtime (if WRP_CORE_ENABLE_CTE=ON)
-#     - wrp_cae::core_client, wrp_cae::core_runtime (if WRP_CORE_ENABLE_CAE=ON)
+#   Optional Modules (if enabled at build time):
+#     - clio_cte::core_client, clio_cte::core_runtime (if CLIO_CORE_ENABLE_CTE=ON)
+#     - clio_cae::core_client, clio_cae::core_runtime (if CLIO_CORE_ENABLE_CAE=ON)
 
-# Then link to the ChiMod libraries you need
+# Then link to the Module libraries you need
 target_link_libraries(your_target
-  chimaera::admin_client     # Admin ChiMod (always available)
-  chimaera::bdev_client      # Block device ChiMod (always available)
-  wrp_cte::core_client       # CTE ChiMod (if enabled)
-  wrp_cae::core_client       # CAE ChiMod (if enabled)
+  clio::run::admin_client     # Admin Module (always available)
+  clio::run::bdev_client      # Block device Module (always available)
+  clio_cte::core_client       # CTE Module (if enabled)
+  clio_cae::core_client       # CAE Module (if enabled)
 )
-# Dependencies are automatically included by ChiMod libraries
-# No need to manually link hshm::cxx or chimaera::cxx
+# Dependencies are automatically included by Module libraries
+# No need to manually link ctp::cxx or clio::run::cxx
 ```
 
 **Alternative (Manual):**
 If you need finer control, you can still find packages individually:
 ```cmake
-find_package(HermesShm REQUIRED)        # Provides hshm::* targets
-find_package(chimaera REQUIRED)         # Provides chimaera::cxx
-find_package(chimaera_admin REQUIRED)   # Provides admin ChiMod
-find_package(chimaera_bdev REQUIRED)    # Provides bdev ChiMod
-find_package(wrp_cte_core REQUIRED)     # Provides CTE ChiMod (if enabled)
-find_package(wrp_cae_core REQUIRED)     # Provides CAE ChiMod (if enabled)
+find_package(ClioCtp REQUIRED)        # Provides ctp::* targets
+find_package(chimaera REQUIRED)         # Provides clio::run::cxx
+find_package(clio_admin REQUIRED)   # Provides admin Module
+find_package(chimaera_bdev REQUIRED)    # Provides bdev Module (library now: clio_bdev_*)
+find_package(clio_cte_core REQUIRED)     # Provides CTE Module (if enabled)
+find_package(clio_cae_core REQUIRED)     # Provides CAE Module (if enabled)
 ```
 
-### HSHM Modular Dependency Targets
+### CTP Modular Dependency Targets
 
-HSHM (HermesShm/context-transport-primitives) provides modular INTERFACE library targets for optional dependencies. Each target includes only the specific dependency it represents, along with the associated compile definitions.
+CTP (ClioCtp/context-transport-primitives) provides modular INTERFACE library targets for optional dependencies. Each target includes only the specific dependency it represents, along with the associated compile definitions.
 
 **Available Modular Targets:**
 
-- **`hshm::cxx`** - Core HSHM library
+- **`ctp::cxx`** - Core CTP library
   - Provides: Basic shared memory and data structures
   - Links to: `configure`, `thread_all`
-  - Always required by all HSHM users
+  - Always required by all CTP users
 
-- **`hshm::configure`** - Configuration parsing (yaml-cpp)
+- **`ctp::configure`** - Configuration parsing (yaml-cpp)
   - Provides: YAML configuration file parsing
   - Use instead of linking to yaml-cpp directly
   - Compile definitions: None (yaml-cpp is always enabled)
 
-- **`hshm::serialize`** - Serialization (cereal)
+- **`ctp::serialize`** - Serialization (cereal)
   - Provides: Object serialization/deserialization
   - Use instead of linking to cereal directly
-  - Compile definitions: `HSHM_ENABLE_CEREAL`
+  - Compile definitions: `CTP_ENABLE_CEREAL`
 
-- **`hshm::interceptor`** - ELF interception
+- **`ctp::interceptor`** - ELF interception
   - Provides: Dynamic library interception support
   - Required for: Adapter real API functionality
-  - Compile definitions: `HSHM_ENABLE_ELF`
+  - Compile definitions: `CTP_ENABLE_ELF`
 
-- **`hshm::lightbeam`** - Network transport (ZeroMQ, libfabric, Thallium)
+- **`ctp::lightbeam`** - Network transport (ZeroMQ, libfabric, Thallium)
   - Provides: High-performance network communication
-  - Used by: Chimaera runtime for distributed operations
-  - Compile definitions: `HSHM_ENABLE_ZMQ`, `HSHM_ENABLE_LIBFABRIC`, `HSHM_ENABLE_THALLIUM`
+  - Used by: Clio runtime for distributed operations
+  - Compile definitions: `CTP_ENABLE_ZMQ`, `CTP_ENABLE_LIBFABRIC`, `CTP_ENABLE_THALLIUM`
 
-- **`hshm::thread_all`** - Threading support
+- **`ctp::thread_all`** - Threading support
   - Provides: pthread, OpenMP support
   - Includes: Thread model definitions
-  - Compile definitions: `HSHM_ENABLE_OPENMP`, `HSHM_ENABLE_PTHREADS`, `HSHM_ENABLE_WINDOWS_THREADS`, `HSHM_DEFAULT_THREAD_MODEL`, `HSHM_DEFAULT_THREAD_MODEL_GPU`
+  - Compile definitions: `CTP_ENABLE_OPENMP`, `CTP_ENABLE_PTHREADS`, `CTP_ENABLE_WINDOWS_THREADS`, `CTP_DEFAULT_THREAD_MODEL`, `CTP_DEFAULT_THREAD_MODEL_GPU`
 
-- **`hshm::mpi`** - MPI support
+- **`ctp::mpi`** - MPI support
   - Provides: Message Passing Interface
   - Use only where MPI is actually needed
-  - Compile definitions: `HSHM_ENABLE_MPI`
+  - Compile definitions: `CTP_ENABLE_MPI`
 
-- **`hshm::compress`** - Compression libraries
+- **`ctp::compress`** - Compression libraries
   - Provides: Data compression support
-  - Compile definitions: `HSHM_ENABLE_COMPRESS`
+  - Compile definitions: `CTP_ENABLE_COMPRESS`
 
-- **`hshm::encrypt`** - Encryption libraries
+- **`ctp::encrypt`** - Encryption libraries
   - Provides: Data encryption support
-  - Compile definitions: `HSHM_ENABLE_ENCRYPT`
+  - Compile definitions: `CTP_ENABLE_ENCRYPT`
 
-- **`hshm::cuda_cxx`** - CUDA GPU support
-  - Provides: CUDA-enabled HSHM library for GPU code
+- **`ctp::cuda_cxx`** - CUDA GPU support
+  - Provides: CUDA-enabled CTP library for GPU code
   - Use for: CUDA kernel code and GPU device functions
-  - Compile definitions: `HSHM_ENABLE_CUDA=1`, `HSHM_ENABLE_ROCM=0`
-  - Note: Only available when `HSHM_ENABLE_CUDA=ON` at build time
+  - Compile definitions: `CTP_ENABLE_CUDA=1`, `CTP_ENABLE_ROCM=0`
+  - Note: Only available when `CTP_ENABLE_CUDA=ON` at build time
 
-- **`hshm::rocm_cxx`** - ROCm GPU support
-  - Provides: ROCm-enabled HSHM library for GPU code
+- **`ctp::rocm_cxx`** - ROCm GPU support
+  - Provides: ROCm-enabled CTP library for GPU code
   - Use for: HIP kernel code and GPU device functions
-  - Compile definitions: `HSHM_ENABLE_ROCM=1`, `HSHM_ENABLE_CUDA=0`
-  - Note: Only available when `HSHM_ENABLE_ROCM=ON` at build time
+  - Compile definitions: `CTP_ENABLE_ROCM=1`, `CTP_ENABLE_CUDA=0`
+  - Note: Only available when `CTP_ENABLE_ROCM=ON` at build time
+
+- **`ctp::nixl`** - NIXL (NVIDIA Inference Xfer Library) transport
+  - Provides: NIXL-backed data movement (DRAM→FILE via POSIX, DRAM→DRAM via memcpy)
+  - Use for: High-performance CPU→storage transfers and future GPU→storage (GDS)
+  - Compile definitions: `CTP_ENABLE_NIXL=1`
+  - Build option: `CLIO_CORE_ENABLE_NIXL=ON`
+  - Note: Requires NIXL installed at `/usr/local` (built with POSIX backend)
+
+- **`ctp::nvshmem`** - NVSHMEM GPU-to-GPU communication
+  - Provides: NVSHMEM compile definitions for GPU peer-to-peer communication
+  - Compile definitions: `CTP_ENABLE_NVSHMEM=1`
+  - Build option: `CLIO_CORE_ENABLE_NVSHMEM=ON`
+  - Note: Requires NVSHMEM from NVIDIA developer portal
 
 **Linking Guidelines:**
 
-1. **Never link to yaml-cpp directly** - Use `hshm::configure` instead (except within hshm::configure itself)
-2. **Never link to cereal directly** - Use `hshm::serialize` instead
+1. **Never link to yaml-cpp directly** - Use `ctp::configure` instead (except within ctp::configure itself)
+2. **Never link to cereal directly** - Use `ctp::serialize` instead
 3. **Be selective** - Only link to the modular targets you actually need
-4. **ChiMod clients** - Should only link to `hshm::cxx` (automatically included)
-5. **ChiMod runtimes** - May link to additional modular targets as needed
+4. **Module clients** - Should only link to `ctp::cxx` (automatically included)
+5. **Module runtimes** - May link to additional modular targets as needed
 6. **Tests** - Link only to the specific modular targets they test
-7. **GPU code** - Use `hshm::cuda_cxx` or `hshm::rocm_cxx` for GPU kernel code; use `hshm::cxx` for host code
+7. **GPU code** - Use `ctp::cuda_cxx` or `ctp::rocm_cxx` for GPU kernel code; use `ctp::cxx` for host code
 
 **Example Usage:**
 ```cmake
 # External application needing configuration and serialization
 target_link_libraries(my_app
-  wrp_cte::core_client      # Provides hshm::cxx automatically
-  hshm::configure           # For YAML config parsing
-  hshm::serialize           # For object serialization
+  clio_cte::core_client      # Provides ctp::cxx automatically
+  ctp::configure           # For YAML config parsing
+  ctp::serialize           # For object serialization
 )
 
 # Adapter needing ELF interception
 target_link_libraries(my_adapter
-  hshm::cxx
-  hshm::interceptor         # For real API functionality
+  ctp::cxx
+  ctp::interceptor         # For real API functionality
 )
 
 # Test needing MPI
 target_link_libraries(my_test
-  hshm::cxx
-  hshm::mpi                 # Only link MPI where needed
+  ctp::cxx
+  ctp::mpi                 # Only link MPI where needed
 )
 
 # GPU application using CUDA
 target_link_libraries(my_cuda_kernel
-  hshm::cuda_cxx            # For GPU kernel code
+  ctp::cuda_cxx            # For GPU kernel code
 )
 ```
 
-## ChiMod Runtime Code Standards
+## Module Runtime Code Standards
 
 ### Autogenerated Code Duplication
 Runtime code (`*_runtime.cc` files) should **NEVER** duplicate autogenerated code methods. The following methods are automatically generated and must not be manually implemented in runtime source files:
@@ -604,10 +676,10 @@ Runtime code (`*_runtime.cc` files) should **NEVER** duplicate autogenerated cod
 
 ### CoMutex and CoRwLock
 
-The chimaera runtime provides two simplified coroutine-aware synchronization primitives for runtime code:
+The clio_run runtime provides two simplified coroutine-aware synchronization primitives for runtime code:
 
 **CoMutex (Coroutine Mutex)**
-- **Header**: `chimaera/comutex.h`
+- **Header**: `clio_runtime/comutex.h`
 - **Purpose**: Simplified mutex that uses Yield for blocking
 - Uses a single `std::atomic<bool>` for lock state
 - Tasks that cannot acquire the lock call `Yield()` to be placed in the blocked queue
@@ -615,11 +687,13 @@ The chimaera runtime provides two simplified coroutine-aware synchronization pri
 - No complex data structures (no vectors, maps, or lists)
 
 **CoRwLock (Coroutine Reader-Writer Lock)**
-- **Header**: `chimaera/corwlock.h`
+- **Header**: `clio_runtime/corwlock.h`
 - **Purpose**: Simplified reader-writer lock that uses Yield for blocking
 - Uses `std::atomic<int>` for reader count and `std::atomic<bool>` for writer state
 - Supports multiple concurrent readers or a single writer
 - Tasks that cannot acquire the lock call `Yield()` to be placed in the blocked queue
+
+**CRITICAL**: Do NOT add any print, log, or HLOG statements in lock acquire or release paths (Lock, Unlock, ReadLock, ReadUnlock, WriteLock, WriteUnlock). Logging in lock paths causes severe performance degradation and can introduce deadlocks when the logging system itself acquires locks.
 
 ### Task Wait Functionality
 
@@ -673,16 +747,16 @@ create_task->Wait();
 ASSERT_EQ(create_task->GetReturnCode(), 0) << "Create task failed with return code: " << create_task->GetReturnCode();
 ```
 
-This requirement applies to ALL ChiMod Create operations in unit tests including admin, bdev, and any custom ChiMods.
+This requirement applies to ALL Module Create operations in unit tests including admin, bdev, and any custom Modules.
 
 ### Test Framework Requirements
 
-**CRITICAL**: Unit tests that initialize the Chimaera runtime MUST use the `simple_test.h` framework. **DO NOT use Catch2** with Chimaera runtime initialization.
+**CRITICAL**: Unit tests that initialize the Clio runtime MUST use the `simple_test.h` framework. **DO NOT use Catch2** with Clio runtime initialization.
 
 **Catch2 Incompatibility:**
-- Catch2's test framework causes segmentation faults when used with Chimaera runtime initialization
+- Catch2's test framework causes segmentation faults when used with Clio runtime initialization
 - This issue was confirmed by copying working test code from `test_bdev_chimod.cc` (which uses simple_test.h) to a Catch2-based test - the identical code segfaulted with Catch2 but worked with simple_test.h
-- Root cause: Catch2's test runner infrastructure conflicts with Chimaera's runtime initialization
+- Root cause: Catch2's test runner infrastructure conflicts with CLIO Runtime's runtime initialization
 
 **Required Test Framework:**
 - Use `#include "../../../context-runtime/test/simple_test.h"` instead of Catch2
@@ -702,28 +776,28 @@ TEST_CASE("My Test", "[mytag]") {
 SIMPLE_TEST_MAIN()
 ```
 
-### Chimaera Initialization in Unit Tests
+### CLIO Runtime Initialization in Unit Tests
 
-**CRITICAL**: All unit tests MUST use the unified `CHIMAERA_INIT()` function. Do NOT use deprecated initialization functions or direct calls to `CHIMAERA_RUNTIME_INIT()` or `CHIMAERA_CLIENT_INIT()`.
+**CRITICAL**: All unit tests MUST use the unified `CLIO_RUNTIME_INIT()` macro (the umbrella entry point). Do NOT call any private/legacy init functions directly.
 
 **Required Pattern for All Unit Tests:**
 ```cpp
 // At the beginning of your test or test fixture setup
-bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
+bool success = CLIO_RUNTIME_INIT(chi::ChimaeraMode::kClient, true);
 REQUIRE(success);
 
 // Optional: Wait for initialization to complete
 std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
 // Verify core managers are available
-REQUIRE(CHI_IPC != nullptr);
-REQUIRE(CHI_IPC->IsInitialized());
+REQUIRE(CLIO_IPC != nullptr);
+REQUIRE(CLIO_IPC->IsInitialized());
 ```
 
 **Initialization Parameters:**
 - **Mode**: Always use `chi::ChimaeraMode::kClient` for unit tests
 - **default_with_runtime**: Always use `true` for unit tests (starts runtime automatically)
-- **Environment Variable**: `CHI_WITH_RUNTIME` is handled automatically by `CHIMAERA_INIT()`
+- **Environment Variable**: `CLIO_X` is handled automatically by `CLIO_RUNTIME_INIT()`
   - If set to `1`: Runtime will be started
   - If set to `0`: Only client initialization (useful for external runtime scenarios)
   - If not set: Uses the `default_with_runtime` parameter value
@@ -732,24 +806,22 @@ REQUIRE(CHI_IPC->IsInitialized());
 - `initializeBoth()` - Remove from all test fixtures
 - `initializeRuntime()` - Remove from all test fixtures
 - `initializeClient()` - Remove from all test fixtures
-- `chi::CHIMAERA_RUNTIME_INIT()` - Do not call directly in tests
-- `chi::CHIMAERA_CLIENT_INIT()` - Do not call directly in tests
 
 **Example Test Fixture:**
 ```cpp
 class MyTestFixture {
 public:
   MyTestFixture() {
-    // Initialize Chimaera with client mode and runtime
-    bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
+    // Initialize CLIO Runtime with client mode and runtime
+    bool success = CLIO_RUNTIME_INIT(chi::ChimaeraMode::kClient, true);
     REQUIRE(success);
 
     // Give runtime time to initialize
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Verify initialization
-    REQUIRE(CHI_IPC != nullptr);
-    REQUIRE(CHI_POOL_MANAGER != nullptr);
+    REQUIRE(CLIO_IPC != nullptr);
+    REQUIRE(CLIO_POOL_MANAGER != nullptr);
   }
 
   ~MyTestFixture() {
@@ -800,15 +872,15 @@ docker-compose down
 Configure via environment variables in docker-compose.yml:
 ```yaml
 environment:
-  - CHI_SCHED_WORKERS=8
-  - CHI_MAIN_SEGMENT_SIZE=1G
-  - CHI_CLIENT_DATA_SEGMENT_SIZE=512M
-  - CHI_RUNTIME_DATA_SEGMENT_SIZE=512M
-  - CHI_PORT=9413              # Override RPC port (default: 9413)
-  - CHI_SERVER_ADDR=127.0.0.1 # Override server address for clients
-  - CHI_IPC_MODE=TCP          # SHM, TCP (default), or IPC
-  - CHI_LOG_LEVEL=info
-  - CHI_SHM_SIZE=2147483648
+  - CLIO_SCHED_WORKERS=8
+  - CLIO_MAIN_SEGMENT_SIZE=1G
+  - CLIO_CLIENT_DATA_SEGMENT_SIZE=512M
+  - CLIO_RUNTIME_DATA_SEGMENT_SIZE=512M
+  - CLIO_PORT=9413              # Override RPC port (default: 9413)
+  - CLIO_SERVER_ADDR=127.0.0.1 # Override server address for clients
+  - CLIO_X=TCP          # SHM, TCP (default), or IPC
+  - CLIO_LOG_LEVEL=info
+  - CLIO_SHM_SIZE=2147483648
 ```
 
 ### Critical Requirements
@@ -832,19 +904,19 @@ Mount in docker-compose.yml:
 volumes:
   - ./hostfile:/etc/iowarp/hostfile:ro
 environment:
-  - CHI_HOSTFILE=/etc/iowarp/hostfile
+  - CLIO_HOSTFILE=/etc/iowarp/hostfile
 ```
 
 ## IPC Transport Modes
 
-Chimaera clients communicate with the runtime server using one of three IPC transport modes, controlled by the `CHI_IPC_MODE` environment variable. This variable is read during `IpcManager::ClientInit()`.
+CLIO Runtime clients communicate with the runtime server using one of three IPC transport modes, controlled by the `CLIO_X` environment variable. This variable is read during `IpcManager::ClientInit()`.
 
 **Values:**
 
 | Value | Mode | Description |
 |-------|------|-------------|
 | `SHM` / `shm` | Shared Memory | Client attaches to the server's shared memory queues and pushes tasks directly. Lowest latency, requires same-machine access to the server's shared memory segment. |
-| `TCP` / `tcp` | TCP (ZeroMQ) | Client sends serialized tasks over TCP via lightbeam PUSH/PULL sockets. Works across machines. **This is the default when `CHI_IPC_MODE` is unset.** |
+| `TCP` / `tcp` | TCP (ZeroMQ) | Client sends serialized tasks over TCP via lightbeam PUSH/PULL sockets. Works across machines. **This is the default when `CLIO_X` is unset.** |
 | `IPC` / `ipc` | Unix Domain Socket (ZeroMQ) | Client sends serialized tasks over a Unix domain socket via lightbeam PUSH/PULL. Same-machine only, avoids TCP overhead. |
 
 **Bulk data handling:**
@@ -854,13 +926,13 @@ Chimaera clients communicate with the runtime server using one of three IPC tran
 **Example:**
 ```bash
 # Use shared memory transport (same machine, lowest latency)
-export CHI_IPC_MODE=SHM
+export CLIO_X=SHM
 
 # Use TCP transport (default, works across machines)
-export CHI_IPC_MODE=TCP
+export CLIO_X=TCP
 
 # Use Unix domain socket transport (same machine, no TCP overhead)
-export CHI_IPC_MODE=IPC
+export CLIO_X=IPC
 ```
 
 ## Python Wheel Distribution
@@ -880,9 +952,9 @@ python -m build --wheel
 ```
 
 **What Gets Bundled:**
-- All IOWarp libraries (libchimaera_cxx.so, libhermes_shm_host.so, ChiMod libraries)
+- All IOWarp libraries (libchimaera_cxx.so, libclio_ctp_host.so, Module libraries)
 - Dependencies from install.sh (Boost, HDF5, ZeroMQ, yaml-cpp, etc.)
-- Command-line tools (wrp_cte, wrp_cae_omni, chimaera, etc.)
+- Command-line tools (clio_cte, clio_cae, chimaera, etc.)
 - Headers and CMake configuration files
 - Conda dependencies (if building in a Conda environment)
 
@@ -924,9 +996,9 @@ This documentation covers:
 A standalone external integration test is available at: `context-transfer-engine/test/unit/external/`
 
 This test demonstrates MODULE_DEVELOPMENT_GUIDE.md compliant patterns:
-- Modern find_package() usage for ChiMod discovery
+- Modern find_package() usage for Module discovery
 - Proper target linking with namespace::module_type aliases
-- Automatic dependency resolution through ChiMod targets
+- Automatic dependency resolution through Module targets
 - External application CMake configuration
 
 ## Cleanup Commands
@@ -973,11 +1045,11 @@ find . -name "Testing" -type d -exec rm -rf {} + 2>/dev/null || true
 echo "CMake cleanup completed!"
 ```
 
-## ChiMod Development
+## Module Development
 
-When creating or modifying ChiMods (Chimaera modules), refer to the comprehensive module development guide:
+When creating or modifying Modules (CLIO Runtime modules), refer to the comprehensive module development guide:
 
-**📖 See [context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md](context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md) for complete ChiMod development documentation**
+**📖 See [context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md](context-transport-primitives/docs/MODULE_DEVELOPMENT_GUIDE.md) for complete Module development documentation**
 
 This guide covers:
 - Module structure and architecture
@@ -987,5 +1059,5 @@ This guide covers:
 - Configuration and code generation
 - Synchronization primitives
 - Execution modes and dynamic scheduling
-- External ChiMod development
+- External Module development
 - Best practices and common pitfalls

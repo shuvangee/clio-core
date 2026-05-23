@@ -32,13 +32,13 @@
  */
 
 #include "../../../context-runtime/test/simple_test.h"
-#include "hermes_shm/data_structures/ipc/vector.h"
-#include "hermes_shm/memory/backend/malloc_backend.h"
-#include "hermes_shm/memory/allocator/arena_allocator.h"
+#include "clio_ctp/data_structures/ipc/vector.h"
+#include "clio_ctp/memory/backend/malloc_backend.h"
+#include "clio_ctp/memory/allocator/arena_allocator.h"
 #include <string>
 #include <vector>
 
-using namespace hshm::ipc;
+using namespace ctp::ipc;
 
 /**
  * Helper function to create an ArenaAllocator for testing
@@ -773,7 +773,8 @@ TEST_CASE("Vector: copy assignment self", "[vector]") {
 
   vector<int, ArenaAllocator<false>> vec(alloc, {10, 20, 30});
 
-  vec = vec; // Self-assignment
+  auto &self = vec;
+  vec = self; // Self-assignment
 
   REQUIRE(vec.size() == 3);
   REQUIRE(vec[0] == 10);

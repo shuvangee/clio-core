@@ -42,15 +42,15 @@
  * - External namespace usage (external_test vs chimaera)  
  * - Custom ChiMod development patterns
  * - Proper CMake find_package and linking
- * - add_chimod_client and add_chimod_runtime functionality
+ * - add_clio_module_client and add_clio_module_runtime functionality
  */
 
 #include <iostream>
 #include <memory>
-#include <hermes_shm/util/logging.h>
-#include <chimaera/chimaera.h>
-#include <chimaera/simple_mod/simple_mod_client.h>
-#include <chimaera/admin/admin_client.h>
+#include <clio_ctp/util/logging.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/simple_mod/simple_mod_client.h>
+#include <clio_runtime/admin/admin_client.h>
 
 namespace {
 constexpr chi::PoolId kExternalTestPoolId = chi::PoolId(7001, 0);
@@ -61,7 +61,7 @@ int main() {
   HIPRINT("Testing external_test::simple_mod with custom namespace and CMake linking.");
 
   try {
-    // Step 1: Initialize Chimaera client
+    // Step 1: Initialize CLIO Runtime client
     HLOG(kInfo, "\n1. Initializing Chimaera client...");
     bool client_init_success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
 
@@ -75,7 +75,7 @@ int main() {
 
     // Step 2: Create admin client (required for pool management)
     HLOG(kInfo, "\n2. Creating admin client...");
-    chimaera::admin::Client admin_client(chi::kAdminPoolId);
+    clio::run::admin::Client admin_client(chi::kAdminPoolId);
     HLOG(kInfo, "Admin client created with pool ID: {}", chi::kAdminPoolId);
 
     // Step 3: Create simple_mod client (from external_test namespace)
@@ -121,11 +121,11 @@ int main() {
   HIPRINT("\n=== Key External ChiMod Features Demonstrated ===");
   HIPRINT("Custom namespace (external_test vs chimaera)");
   HIPRINT("External chimaera_repo.yaml configuration");
-  HIPRINT("add_chimod_client()/add_chimod_runtime() CMake functions");
+  HIPRINT("add_clio_module_client()/add_clio_module_runtime() CMake functions");
   HIPRINT("install_chimod() CMake function usage");
-  HIPRINT("find_package(chimaera::core) linking");
+  HIPRINT("find_package(chimaera) linking");
   HIPRINT("External module directory structure");
-  HIPRINT("CHI_TASK_CC macro with external library name");
+  HIPRINT("CLIO_TASK_CC macro with external library name");
 
   HIPRINT("\nNOTE: This test demonstrates successful external ChiMod development patterns.");
   HIPRINT("For full functionality, run chimaera runtime start in another terminal.");

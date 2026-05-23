@@ -31,17 +31,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <chimaera/chimaera.h>
-#include <wrp_cte/core/content_transfer_engine.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_config.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/core/content_transfer_engine.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_config.h>
 #include <string>
 
 // Define global pointer variable in source file (outside namespace)
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(wrp_cte::core::ContentTransferEngine,
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(clio::cte::core::ContentTransferEngine,
                               g_cte_manager);
 
-namespace wrp_cte::core {
+namespace clio::cte::core {
 
 bool ContentTransferEngine::ClientInit(const chi::PoolQuery &pool_query) {
   // Check for race conditions - if already initialized or initializing
@@ -51,7 +51,7 @@ bool ContentTransferEngine::ClientInit(const chi::PoolQuery &pool_query) {
   if (is_initializing_) {
     return true;
   }
-  auto *chimaera_manager = CHI_CHIMAERA_MANAGER;
+  auto *chimaera_manager = CLIO_CHIMAERA_MANAGER;
   if (chimaera_manager->IsInitializing()) {
     return true;
   }
@@ -59,22 +59,22 @@ bool ContentTransferEngine::ClientInit(const chi::PoolQuery &pool_query) {
   // Set initializing flag
   is_initializing_ = true;
 
-  // Initialize Chimaera client
+  // Initialize CLIO Runtime client
   if (!chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, false)) {
     is_initializing_ = false;
     return false;
   }
 
   // Initialize CTE core client
-  auto *cte_client = WRP_CTE_CLIENT;
+  auto *cte_client = CLIO_CTE_CLIENT;
 
   // Create CreateParams without config - configuration is now provided via chimaera compose
   CreateParams params;
 
   // Create CTE Core container using constants from core_tasks.h and specified pool_query
   auto create_task = cte_client->AsyncCreate(pool_query,
-                                              wrp_cte::core::kCtePoolName,
-                                              wrp_cte::core::kCtePoolId,
+                                              clio::cte::core::kCtePoolName,
+                                              clio::cte::core::kCtePoolId,
                                               params);
   create_task.Wait();
 
@@ -82,7 +82,7 @@ bool ContentTransferEngine::ClientInit(const chi::PoolQuery &pool_query) {
   chi::u32 return_code = create_task->GetReturnCode();
   if (return_code != 0) {
     HLOG(kError, "CTE ClientInit: Failed to create CTE pool '{}' with return code: {}",
-          wrp_cte::core::kCtePoolName, return_code);
+          clio::cte::core::kCtePoolName, return_code);
     is_initializing_ = false;
     return false;
   }
@@ -103,7 +103,7 @@ std::vector<std::string> ContentTransferEngine::TagQuery(
     const std::string &tag_re,
     chi::u32 max_tags,
     const chi::PoolQuery &pool_query) {
-  auto *cte_client = WRP_CTE_CLIENT;
+  auto *cte_client = CLIO_CTE_CLIENT;
   auto task = cte_client->AsyncTagQuery(tag_re, max_tags, pool_query);
   task.Wait();
 
@@ -116,7 +116,7 @@ std::vector<std::pair<std::string, std::string>> ContentTransferEngine::BlobQuer
     const std::string &blob_re,
     chi::u32 max_blobs,
     const chi::PoolQuery &pool_query) {
-  auto *cte_client = WRP_CTE_CLIENT;
+  auto *cte_client = CLIO_CTE_CLIENT;
   auto task = cte_client->AsyncBlobQuery(tag_re, blob_re, max_blobs, pool_query);
   task.Wait();
 
@@ -128,4 +128,4 @@ std::vector<std::pair<std::string, std::string>> ContentTransferEngine::BlobQuer
   return results;
 }
 
-} // namespace wrp_cte::core
+} // namespace clio::cte::core

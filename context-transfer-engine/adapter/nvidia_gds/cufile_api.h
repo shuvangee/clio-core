@@ -39,14 +39,14 @@
  * Copyright by the Illinois Institute of Technology.                        *
  * All rights reserved.                                                      *
  *                                                                           *
- * This file is part of Hermes. The full Hermes copyright notice, including  *
+ * This file is part of Clio. The full Clio copyright notice, including  *
  * terms governing use, modification, and redistribution, is contained in    *
  * the COPYING file, which can be found at the top directory. If you do not  *
  * have access to the file, you may request a copy from help@hdfgroup.org.   *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef WRP_CTE_ADAPTER_STDIO_H
-#define WRP_CTE_ADAPTER_STDIO_H
+#ifndef CLIO_CTE_ADAPTER_STDIO_H
+#define CLIO_CTE_ADAPTER_STDIO_H
 
 #include <cufile.h>
 #include <dlfcn.h>
@@ -56,9 +56,9 @@
 #include <iostream>
 #include <string>
 
-#include "hermes_shm/util/logging.h"
-#include "hermes_shm/util/real_api.h"
-#include "hermes_shm/util/singleton.h"
+#include "clio_ctp/util/logging.h"
+#include "clio_ctp/util/real_api.h"
+#include "clio_ctp/util/singleton.h"
 
 extern "C" {
 typedef CUfileError_t (*cuFileHandleRegister_t)(CUfileHandle_t *,
@@ -87,9 +87,9 @@ typedef CUfileError_t (*cuFileBatchIOCancel_t)(CUfileBatchHandle_t);
 typedef void (*cuFileBatchIODestroy_t)(CUfileBatchHandle_t);
 }
 
-namespace wrp::cae {
+namespace clio::cae {
 
-using hshm::RealApi;
+using ctp::RealApi;
 
 /** CuFileApi class */
 class CuFileApi : public RealApi {
@@ -153,15 +153,15 @@ class CuFileApi : public RealApi {
   }
 };
 
-}  // namespace wrp::cae
+}  // namespace clio::cae
 
-#include "hermes_shm/util/singleton.h"
+#include "clio_ctp/util/singleton.h"
 
 // Singleton macros
-#define WRP_CTE_CUFILE_API \
-  hshm::Singleton<::wrp::cae::CuFileApi>::GetInstance()
-#define WRP_CTE_STDIO_API \
-  hshm::Singleton<::wrp::cae::StdioApi>::GetInstance()
-#define WRP_CTE_STDIO_API_T wrp::cae::StdioApi *
+#define CLIO_CTE_CUFILE_API \
+  ctp::Singleton<::clio::cae::CuFileApi>::GetInstance()
+#define CLIO_CTE_STDIO_API \
+  ctp::Singleton<::clio::cae::StdioApi>::GetInstance()
+#define CLIO_CTE_STDIO_API_T clio::cae::StdioApi *
 
-#endif  // WRP_CTE_ADAPTER_STDIO_H
+#endif  // CLIO_CTE_ADAPTER_STDIO_H

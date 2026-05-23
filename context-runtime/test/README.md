@@ -1,12 +1,12 @@
 # Chimaera Unit Tests
 
-This directory contains comprehensive unit tests for the Chimaera runtime system using the Catch2 testing framework.
+This directory contains comprehensive unit tests for the Clio runtime system using the Catch2 testing framework.
 
 ## Overview
 
 The unit tests demonstrate and verify the complete Chimaera workflow:
 
-1. **Runtime Startup** - Initialize Chimaera runtime components
+1. **Runtime Startup** - Initialize Clio runtime components
 2. **Client Initialization** - Connect client to the runtime
 3. **Task Submission** - Create and submit MOD_NAME custom tasks
 4. **Task Completion** - Wait for task completion and verify results
@@ -151,7 +151,7 @@ TEST_CASE("Custom Task Test", "[task][custom]") {
     REQUIRE(fixture.createModNamePool());
     
     // Create client
-    chimaera::MOD_NAME::Client client(kTestModNamePoolId);
+    clio::run::MOD_NAME::Client client(kTestModNamePoolId);
     chi::DomainQuery pool_query;
     client.Create(pool_query);
     
@@ -193,7 +193,7 @@ constexpr chi::PoolId kTestModNamePoolId = 100; // Test pool ID
 ### Common Issues
 
 1. **Tests timeout** - Increase `kTestTimeoutMs` or check Chimaera initialization
-2. **Pool creation fails** - Verify admin ChiMod is available and working
+2. **Pool creation fails** - Verify admin Module is available and working
 3. **Task submission fails** - Check IPC manager initialization and pool existence
 
 ### Debug Mode
@@ -216,11 +216,11 @@ Each test case runs independently. The fixture ensures:
 ## Dependencies
 
 The tests require:
-- **Catch2** - Testing framework (included with HSHM)
+- **Catch2** - Testing framework (included with CTP)
 - **Chimaera Core** - Main runtime library
-- **Admin ChiMod** - For pool management
-- **MOD_NAME ChiMod** - For custom task testing
-- **HSHM** - Shared memory and threading support
+- **Admin Module** - For pool management
+- **MOD_NAME Module** - For custom task testing
+- **CTP** - Shared memory and threading support
 
 ## Contributing
 

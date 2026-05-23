@@ -33,33 +33,33 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "hermes_shm/data_structures/ipc/ring_buffer.h"
-#include "hermes_shm/data_structures/ipc/vector.h"
-#include "hermes_shm/data_structures/priv/string.h"
-#include "hermes_shm/memory/allocator/arena_allocator.h"
-#include "hermes_shm/memory/allocator/buddy_allocator.h"
-#include "hermes_shm/memory/backend/gpu_shm_mmap.h"
-#include "hermes_shm/util/gpu_api.h"
-#include "hermes_shm/data_structures/serialization/local_serialize.h"
+#include "clio_ctp/data_structures/ipc/ring_buffer.h"
+#include "clio_ctp/data_structures/ipc/vector.h"
+#include "clio_ctp/data_structures/priv/string.h"
+#include "clio_ctp/memory/allocator/arena_allocator.h"
+#include "clio_ctp/memory/allocator/buddy_allocator.h"
+#include "clio_ctp/memory/backend/gpu_shm_mmap.h"
+#include "clio_ctp/util/gpu_api.h"
+#include "clio_ctp/data_structures/serialization/local_serialize.h"
 
-using hshm::ipc::ArenaAllocator;
-using hshm::ipc::GpuShmMmap;
-using hshm::ipc::MemoryBackendId;
-using hshm::ipc::mpsc_ring_buffer;
+using ctp::ipc::ArenaAllocator;
+using ctp::ipc::GpuShmMmap;
+using ctp::ipc::MemoryBackendId;
+using ctp::ipc::mpsc_ring_buffer;
 
 /**
  * Simple POD struct for testing struct transfer through ring buffer
  * from GPU to CPU.
  */
 struct TestTransferStruct {
-  hshm::u64 id_;
+  ctp::u64 id_;
   char data_[64];
 
-  HSHM_INLINE_CROSS_FUN TestTransferStruct() : id_(0) {
+  CTP_INLINE_CROSS_FUN TestTransferStruct() : id_(0) {
     memset(data_, 0, sizeof(data_));
   }
 
-  HSHM_INLINE_CROSS_FUN TestTransferStruct(hshm::u64 id) : id_(id) {
+  CTP_INLINE_CROSS_FUN TestTransferStruct(ctp::u64 id) : id_(id) {
     memset(data_, 9, sizeof(data_));
   }
 };
@@ -69,7 +69,7 @@ struct TestTransferStruct {
  */
 template <typename AllocT>
 struct StringStruct {
-  hshm::priv::string<AllocT> str_;
+  ctp::priv::string<AllocT> str_;
   float value_;
 
   /**
@@ -126,7 +126,7 @@ template <typename AllocT>
 __global__ void PushStructsKernel(
     mpsc_ring_buffer<TestTransferStruct, AllocT> *ring, size_t count) {
   for (size_t i = 0; i < count; ++i) {
-    TestTransferStruct s(static_cast<hshm::u64>(i));
+    TestTransferStruct s(static_cast<ctp::u64>(i));
     ring->Emplace(s);
   }
 }
@@ -135,7 +135,7 @@ __global__ void PushStructsKernel(
  * GPU kernel to serialize data into a vector
  * This demonstrates the serialization pattern that would be used with StringStruct
  *
- * Note: Fully constructing StringStruct with hshm::priv::string on GPU causes memory
+ * Note: Fully constructing StringStruct with ctp::priv::string on GPU causes memory
  * allocation issues, so we demonstrate the serialization format directly.
  * In a real use case, the StringStruct would be constructed on CPU and passed to GPU,
  * or GPU-specific string types would be used.
@@ -146,7 +146,7 @@ __global__ void PushStructsKernel(
  */
 template <typename AllocT>
 __global__ void SerializeStringStructKernel(AllocT *alloc,
-                                            hipc::vector<char, AllocT> *vec) {
+                                            ctp::ipc::vector<char, AllocT> *vec) {
   // Demonstrate manual serialization of StringStruct format:
   // The format would be: [string_length][string_data][float_value]
 
@@ -205,7 +205,7 @@ TEST_CASE("GpuShmMmap", "[gpu][backend]") {
     // Step 2: Create an allocator on that backend (on the host)
     // Since GpuShmMmap provides unified memory, we can create the allocator on
     // the host
-    using AllocT = hipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -271,12 +271,12 @@ TEST_CASE("GpuShmMmap", "[gpu][backend]") {
     REQUIRE(init_success);
 
     // Step 2: Create a BuddyAllocator on the backend
-    using AllocT = hipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
-    // Step 3: Allocate a hipc::vector<char> from allocator
-    using CharVector = hipc::vector<char, AllocT>;
+    // Step 3: Allocate a ctp::ipc::vector<char> from allocator
+    using CharVector = ctp::ipc::vector<char, AllocT>;
     CharVector *vec_ptr = alloc_ptr->NewObj<CharVector>(alloc_ptr).ptr_;
     REQUIRE(vec_ptr != nullptr);
 
@@ -331,7 +331,7 @@ TEST_CASE("GpuShmMmap", "[gpu][backend]") {
     REQUIRE(init_success);
 
     // Create allocator on backend
-    using AllocT = hipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -350,7 +350,7 @@ TEST_CASE("GpuShmMmap", "[gpu][backend]") {
       TestTransferStruct value;
       bool popped = ring_ptr->Pop(value);
       REQUIRE(popped);
-      REQUIRE(value.id_ == static_cast<hshm::u64>(i));
+      REQUIRE(value.id_ == static_cast<ctp::u64>(i));
       for (size_t j = 0; j < 64; ++j) {
         REQUIRE(value.data_[j] == 9);
       }
@@ -366,7 +366,7 @@ TEST_CASE("GpuShmMmap", "[gpu][backend]") {
         backend.shm_init(backend_id, kBackendSize, kUrl + "_async_rb", kGpuId);
     REQUIRE(init_success);
 
-    using AllocT = hipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT *alloc_ptr = backend.MakeAlloc<AllocT>();
     REQUIRE(alloc_ptr != nullptr);
 
@@ -385,7 +385,7 @@ TEST_CASE("GpuShmMmap", "[gpu][backend]") {
       if (!ring_ptr->Pop(value)) {
         continue;  // Not ready yet, keep polling
       }
-      REQUIRE(value.id_ == static_cast<hshm::u64>(popped_count));
+      REQUIRE(value.id_ == static_cast<ctp::u64>(popped_count));
       for (size_t j = 0; j < 64; ++j) {
         REQUIRE(value.data_[j] == 9);
       }

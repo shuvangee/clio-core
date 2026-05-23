@@ -34,7 +34,7 @@
 #include <utility>
 
 #include "basic_test.h"
-#include "hermes_shm/encrypt/encrypt.h"
+#include "clio_ctp/encrypt/encrypt.h"
 
 template <typename CryptoT>
 void CryptoTest() {
@@ -50,4 +50,4 @@ void CryptoTest() {
   REQUIRE(data == decoded);
 }
 
-TEST_CASE("TestAES") { CryptoTest<hshm::AES>(); }
+TEST_CASE("TestAES") { CryptoTest<ctp::AES>(); }

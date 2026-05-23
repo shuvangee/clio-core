@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <wrp_cte/core/core_dpe.h>
+#include <clio_cte/core/core_dpe.h>
 #include <algorithm>
 #include <iostream>
 #include <chrono>
-#include "hermes_shm/util/logging.h"
+#include "clio_ctp/util/logging.h"
 
-namespace wrp_cte::core {
+namespace clio::cte::core {
 
 // Static member definition for round-robin counter
 std::atomic<chi::u32> RoundRobinDpe::round_robin_counter_(0);
@@ -198,7 +198,7 @@ std::vector<TargetInfo> MaxBwDpe::SelectTargets(const std::vector<TargetInfo>& t
   }
 
   // Sort targets by performance metrics (bandwidth or latency)
-  auto perf_comparator = [data_size, this](const TargetInfo& a, const TargetInfo& b) {
+  auto perf_comparator = [data_size](const TargetInfo& a, const TargetInfo& b) {
     if (data_size >= kLatencyThreshold) {
       // Sort by write bandwidth (descending)
       return a.perf_metrics_.write_bandwidth_mbps_ > b.perf_metrics_.write_bandwidth_mbps_;
@@ -241,7 +241,7 @@ std::vector<TargetInfo> MaxBwDpe::SelectTargets(const std::vector<TargetInfo>& t
   // (when falling back to higher tiers, prefer lower-performing ones first)
   std::sort(high_score_targets.begin(), high_score_targets.end(),
             [&perf_comparator](const TargetInfo& a, const TargetInfo& b) {
-              return !perf_comparator(a, b);  // Reverse the comparison
+              return perf_comparator(b, a);  // Reverse by swapping arguments
             });
 
   // Build result: low_score targets first (preferred), then high_score (fallback)
@@ -278,4 +278,4 @@ std::unique_ptr<DataPlacementEngine> DpeFactory::CreateDpe(const std::string& dp
   return CreateDpe(StringToDpeType(dpe_str));
 }
 
-} // namespace wrp_cte::core
+} // namespace clio::cte::core

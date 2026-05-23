@@ -49,16 +49,16 @@
 #include <thread>
 #include <vector>
 
-#include <chimaera/chimaera.h>
-#include <chimaera/pool_query.h>
-#include <chimaera/singletons.h>
-#include <chimaera/types.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/pool_query.h>
+#include <clio_runtime/singletons.h>
+#include <clio_runtime/types.h>
 
-#include <chimaera/MOD_NAME/MOD_NAME_client.h>
-#include <chimaera/MOD_NAME/MOD_NAME_tasks.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_client.h>
+#include <clio_runtime/MOD_NAME/MOD_NAME_tasks.h>
 
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/admin/admin_tasks.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/admin/admin_tasks.h>
 
 using namespace std::chrono_literals;
 
@@ -87,10 +87,10 @@ class MigrateTestFixture {
         g_initialized = true;
         SimpleTest::g_test_finalize = chi::CHIMAERA_FINALIZE;
         std::this_thread::sleep_for(500ms);
-        REQUIRE(CHI_CHIMAERA_MANAGER != nullptr);
-        REQUIRE(CHI_IPC != nullptr);
-        REQUIRE(CHI_POOL_MANAGER != nullptr);
-        REQUIRE(CHI_IPC->IsInitialized());
+        REQUIRE(CLIO_CHIMAERA_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC != nullptr);
+        REQUIRE(CLIO_POOL_MANAGER != nullptr);
+        REQUIRE(CLIO_IPC->IsInitialized());
         INFO("Chimaera initialization successful");
       } else {
         FAIL("Failed to initialize Chimaera");
@@ -103,7 +103,7 @@ class MigrateTestFixture {
   bool createModNamePool() {
     try {
       chi::PoolQuery pool_query = chi::PoolQuery::Dynamic();
-      chimaera::MOD_NAME::Client mod_name_client(test_pool_id_);
+      clio::run::MOD_NAME::Client mod_name_client(test_pool_id_);
       std::string pool_name = "test_migrate_pool";
       auto create_task =
           mod_name_client.AsyncCreate(pool_query, pool_name, test_pool_id_);
@@ -132,7 +132,7 @@ TEST_CASE("Migrate container and verify task re-routing",
     REQUIRE(g_initialized);
     REQUIRE(fixture.createModNamePool());
 
-    chimaera::MOD_NAME::Client mod_name_client(fixture.getTestPoolId());
+    clio::run::MOD_NAME::Client mod_name_client(fixture.getTestPoolId());
     chi::PoolQuery create_query = chi::PoolQuery::Dynamic();
     std::string pool_name = "test_migrate_pool";
     auto create_task = mod_name_client.AsyncCreate(
@@ -156,7 +156,7 @@ TEST_CASE("Migrate container and verify task re-routing",
     // Node IDs are 1-indexed in the hostfile (node 0 -> node_id 1, etc.)
     // Container 0 is on node_id 1 (first node), migrate to node_id 2 (second)
     INFO("Step 2: Migrating container 0 from node 1 to node 2");
-    auto *admin_client = CHI_ADMIN;
+    auto *admin_client = CLIO_ADMIN;
     REQUIRE(admin_client != nullptr);
 
     std::vector<chi::MigrateInfo> migrations;
@@ -192,7 +192,7 @@ TEST_CASE("Migrate container during broadcast event",
     REQUIRE(g_initialized);
     REQUIRE(fixture.createModNamePool());
 
-    chimaera::MOD_NAME::Client mod_name_client(fixture.getTestPoolId());
+    clio::run::MOD_NAME::Client mod_name_client(fixture.getTestPoolId());
     chi::PoolQuery create_query = chi::PoolQuery::Dynamic();
     std::string pool_name = "test_migrate_broadcast_pool";
     auto create_task = mod_name_client.AsyncCreate(
@@ -214,7 +214,7 @@ TEST_CASE("Migrate container during broadcast event",
 
     // Step 2: Migrate container 0 from node 1 to node 2
     INFO("Step 2: Migrating container 0 from node 1 to node 2");
-    auto *admin_client = CHI_ADMIN;
+    auto *admin_client = CLIO_ADMIN;
     REQUIRE(admin_client != nullptr);
 
     std::vector<chi::MigrateInfo> migrations;

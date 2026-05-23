@@ -35,19 +35,19 @@
  * Module manager implementation with dynamic ChiMod loading
  */
 
-#include "chimaera/module_manager.h"
+#include "clio_runtime/module_manager.h"
 
 #include <climits>
 
 #include <cstring>
 #include <filesystem>
 
-#include "chimaera/container.h"
+#include "clio_runtime/container.h"
 
 // Global pointer variable definition for Module manager singleton
-HSHM_DEFINE_GLOBAL_PTR_VAR_CC(chi::ModuleManager, g_module_manager);
+CTP_DEFINE_GLOBAL_PTR_VAR_CC(chi::ModuleManager, g_module_manager);
 
-namespace chi {
+namespace clio::run {
 
 // Helper function to get a symbol address for dladdr
 // This avoids issues with member function pointer casts
@@ -55,7 +55,7 @@ static void *GetSymbolForDlAddr() {
   return reinterpret_cast<void *>(&GetSymbolForDlAddr);
 }
 
-// Constructor and destructor removed - handled by HSHM singleton pattern
+// Constructor and destructor removed - handled by CTP singleton pattern
 
 bool ModuleManager::ServerInit() {
   if (is_initialized_) {
@@ -145,7 +145,27 @@ bool ModuleManager::LoadChiMod(const std::string &lib_path) {
 
 ChiModInfo *ModuleManager::GetChiMod(const std::string &chimod_name) {
   auto it = chimods_.find(chimod_name);
-  return (it != chimods_.end()) ? it->second.get() : nullptr;
+  if (it != chimods_.end()) {
+    return it->second.get();
+  }
+  // Backward-compat alias table: when a module is renamed, list the legacy
+  // name here so older YAML configs (compose entries, persistent pool
+  // metadata in the WAL) keep loading the module under the old `mod_name`.
+  // The table is checked only on cache miss, so the rename does not slow
+  // down the hot path. See docs/deprecation-notes.md for the public list.
+  static const std::pair<const char *, const char *> kAliases[] = {
+      {"chimaera_bdev", "clio_bdev"},   // renamed 2026
+      {"chimaera_admin", "clio_admin"}, // renamed 2026
+  };
+  for (const auto &alias : kAliases) {
+    if (chimod_name == alias.first) {
+      it = chimods_.find(alias.second);
+      if (it != chimods_.end()) {
+        return it->second.get();
+      }
+    }
+  }
+  return nullptr;
 }
 
 Container *ModuleManager::CreateContainer(const std::string &chimod_name,
@@ -212,8 +232,8 @@ std::vector<std::string> ModuleManager::GetScanDirectories() const {
   }
 
   // Get CHI_REPO_PATH
-  std::string chi_repo_path = hshm::SystemInfo::Getenv("CHI_REPO_PATH");
-  if (!chi_repo_path.empty()) {
+  const char *chi_repo_path = chi::env::GetCompat("REPO_PATH");
+  if (chi_repo_path) {
     std::string path_str(chi_repo_path);
     // Split by platform path separator
     char delimiter = hshm::SystemInfo::GetPathListSeparator();
@@ -273,11 +293,11 @@ bool ModuleManager::IsSharedLibrary(const std::string &file_path) const {
 
 bool ModuleManager::HasModuleNamingConvention(
     const std::string &file_path) const {
-  // ChiMod libraries must contain "_runtime" in their name
-  return file_path.find("_runtime") != std::string::npos;
+  // ChiMod libraries must end with "_runtime.so" (not "_runtime_gpu.so")
+  return file_path.find("_runtime.so") != std::string::npos;
 }
 
-bool ModuleManager::ValidateChiMod(hshm::SharedLibrary &lib) const {
+bool ModuleManager::ValidateChiMod(ctp::SharedLibrary &lib) const {
   // Check for required ChiMod functions
   void *alloc_func = lib.GetSymbol("alloc_chimod");
   void *new_func = lib.GetSymbol("new_chimod");
@@ -288,4 +308,4 @@ bool ModuleManager::ValidateChiMod(hshm::SharedLibrary &lib) const {
           name_func != nullptr && destroy_func != nullptr);
 }
 
-}  // namespace chi
+}  // namespace clio::run

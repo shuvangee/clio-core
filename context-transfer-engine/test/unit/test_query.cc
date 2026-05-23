@@ -45,7 +45,7 @@
  * 4. Empty result sets and edge cases
  *
  * Following CLAUDE.md requirements:
- * - Use simple_test.h framework (NOT Catch2 - Catch2 causes segfaults with Chimaera runtime)
+ * - Use simple_test.h framework (NOT Catch2 - Catch2 causes segfaults with CLIO Runtime runtime)
  * - Use proper runtime initialization
  * - Use chi::kAdminPoolId for CreateTask operations
  * - Use semantic names for QueueIds and priorities
@@ -68,16 +68,21 @@
 
  using namespace std::chrono_literals;
 
- // Chimaera core includes
- #include <chimaera/admin/admin_tasks.h>
- #include <chimaera/bdev/bdev_client.h>
- #include <chimaera/bdev/bdev_tasks.h>
- #include <chimaera/chimaera.h>
- #include <wrp_cte/core/core_client.h>
- #include <wrp_cte/core/core_runtime.h>
- #include <wrp_cte/core/core_tasks.h>
+ // CLIO Runtime core includes
+ #include <clio_runtime/admin/admin_tasks.h>
+ #include <clio_runtime/bdev/bdev_client.h>
+ #include <clio_runtime/bdev/bdev_tasks.h>
+ #include <clio_runtime/clio_runtime.h>
+ #include <clio_cte/core/core_client.h>
+ #include <clio_cte/core/core_runtime.h>
+ #include <clio_cte/core/core_tasks.h>
 
  namespace fs = std::filesystem;
+
+static std::string chi_test_data_dir() {
+  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
+  return (d && *d) ? d : ".";
+}
 
  // Global state tracking for initialization (following pattern from other tests)
  namespace {
@@ -105,8 +110,8 @@
    static constexpr size_t kTestBlobSize = 4096; // 4KB test blobs
 
    // CTE Core pool configuration - use constants from core_tasks.h
-   static inline const chi::PoolId& kCTECorePoolId = wrp_cte::core::kCtePoolId;
-   static inline const char* kCTECorePoolName = wrp_cte::core::kCtePoolName;
+   static inline const chi::PoolId& kCTECorePoolId = clio::cte::core::kCtePoolId;
+   static inline const char* kCTECorePoolName = clio::cte::core::kCtePoolName;
 
    std::string test_storage_path_;
 
@@ -120,7 +125,7 @@
    /**
     * Helper: Async TagQuery
     */
-   static std::vector<std::string> TagQueryAsync(wrp_cte::core::Client* client,
+   static std::vector<std::string> TagQueryAsync(clio::cte::core::Client* client,
                                                   const std::string& tag_pattern,
                                                   chi::u32 flags,
                                                   const chi::PoolQuery& pool_query) {
@@ -133,7 +138,7 @@
     * Helper: Async BlobQuery
     */
    static std::vector<std::pair<std::string, std::string>> BlobQueryAsync(
-       wrp_cte::core::Client* client,
+       clio::cte::core::Client* client,
        const std::string& tag_pattern,
        const std::string& blob_pattern,
        chi::u32 flags,
@@ -152,12 +157,12 @@
 
    CTEQueryTestFixture() {
      // Initialize test storage path in home directory
-     std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+     std::string home_dir = ctp::SystemInfo::Getenv("HOME");
      if (home_dir.empty()) {
        throw std::runtime_error("HOME environment variable is not set");
      }
 
-     test_storage_path_ = home_dir + "/cte_query_test.dat";
+     test_storage_path_ = chi_test_data_dir() + "/cte_query_test.dat";
 
      // Clean up any existing test file (use error_code to avoid throwing on
      // Windows where the file may be locked by bdev)
@@ -166,7 +171,7 @@
        fs::remove(test_storage_path_, ec);
      }
 
-     // Initialize Chimaera and CTE client once per test suite
+     // Initialize CLIO Runtime and CTE client once per test suite
      if (!g_initialized) {
        bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
        if (!success) {
@@ -176,7 +181,7 @@
        // Wait for runtime to be fully ready
        std::this_thread::sleep_for(500ms);
 
-       success = wrp_cte::core::WRP_CTE_CLIENT_INIT();
+       success = clio::cte::core::CLIO_CTE_CLIENT_INIT();
        if (!success) {
          throw std::runtime_error("Failed to initialize CTE client");
        }
@@ -205,13 +210,13 @@
     * Setup test data: create tags and blobs for query testing
     */
    void setupTestData() {
-     auto *cte_client = WRP_CTE_CLIENT;
+     auto *cte_client = CLIO_CTE_CLIENT;
 
      // Create test storage target using bdev client
      chi::PoolId bdev_pool_id(200, 0);  // Custom pool ID for bdev
-     chimaera::bdev::Client bdev_client(bdev_pool_id);
+     clio::run::bdev::Client bdev_client(bdev_pool_id);
      auto create_task = bdev_client.AsyncCreate(chi::PoolQuery::Dynamic(), test_storage_path_,
-                                                 bdev_pool_id, chimaera::bdev::BdevType::kFile);
+                                                 bdev_pool_id, clio::run::bdev::BdevType::kFile);
      create_task.Wait();
 
      // Wait for storage target creation
@@ -219,7 +224,7 @@
 
      // Register the storage target with CTE
      auto reg_task = cte_client->AsyncRegisterTarget(test_storage_path_,
-                                                      chimaera::bdev::BdevType::kFile,
+                                                      clio::run::bdev::BdevType::kFile,
                                                       kTestTargetSize, chi::PoolQuery::Local(), bdev_pool_id);
      reg_task.Wait();
      std::this_thread::sleep_for(100ms);
@@ -252,7 +257,7 @@
      test_tags_.push_back(tag_name);
 
      // Use Tag wrapper class for easier blob creation
-     wrp_cte::core::Tag tag(tag_name);
+     clio::cte::core::Tag tag(tag_name);
 
      // Create test data buffer
      std::vector<char> test_data(kTestBlobSize, 'X');
@@ -273,10 +278,10 @@
   * Test TagQuery with exact match pattern
   */
  TEST_CASE("TagQuery - Exact Match", "[query][tagquery][exact]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
 
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::TagQueryAsync(cte_client, "user_data", 0, chi::PoolQuery::Broadcast());
 
    INFO("Query returned " << results.size() << " tags");
@@ -296,12 +301,12 @@
   * Test TagQuery with wildcard pattern
   */
  TEST_CASE("TagQuery - Wildcard Pattern", "[query][tagquery][wildcard]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing TagQuery with wildcard pattern");
 
    // Query for all tags starting with "user_"
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::TagQueryAsync(cte_client, "user_.*", 0, chi::PoolQuery::Broadcast());
 
    INFO("Query returned " << results.size() << " tags");
@@ -327,12 +332,12 @@
   * Test TagQuery with alternation pattern
   */
  TEST_CASE("TagQuery - Alternation Pattern", "[query][tagquery][alternation]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing TagQuery with alternation pattern");
 
    // Query for tags matching either "system_config" or "system_cache"
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::TagQueryAsync(cte_client, "system_(config|cache)", 0, chi::PoolQuery::Broadcast());
 
    INFO("Query returned " << results.size() << " tags");
@@ -358,12 +363,12 @@
   * Test TagQuery with match-all pattern
   */
  TEST_CASE("TagQuery - Match All Pattern", "[query][tagquery][matchall]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing TagQuery with match-all pattern");
 
    // Query for all tags
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::TagQueryAsync(cte_client, ".*", 0, chi::PoolQuery::Broadcast());
 
    INFO("Query returned " << results.size() << " tags");
@@ -389,12 +394,12 @@
   * Test TagQuery with no matches
   */
  TEST_CASE("TagQuery - No Matches", "[query][tagquery][nomatch]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing TagQuery with pattern that matches nothing");
 
    // Query for non-existent tag pattern
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::TagQueryAsync(cte_client, "nonexistent_tag_pattern_xyz", 0, chi::PoolQuery::Broadcast());
 
    INFO("Query returned " << results.size() << " tags");
@@ -405,12 +410,12 @@
   * Test BlobQuery with exact tag and blob match
   */
  TEST_CASE("BlobQuery - Exact Match", "[query][blobquery][exact]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with exact match patterns");
 
    // Query for specific blob in specific tag
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::BlobQueryAsync(cte_client, "user_data", "blob_001\\.dat", 0, chi::PoolQuery::Broadcast());
 
    INFO("Query returned " << results.size() << " blob pairs");
@@ -431,12 +436,12 @@
   * Test BlobQuery with wildcard patterns
   */
  TEST_CASE("BlobQuery - Wildcard Patterns", "[query][blobquery][wildcard]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with wildcard patterns");
 
    // Query for all .dat blobs in user_data tag
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::BlobQueryAsync(cte_client, "user_data", "blob_.*\\.dat", 0, chi::PoolQuery::Broadcast());
 
    INFO("Total blobs matched: " << results.size());
@@ -458,12 +463,12 @@
   * Test BlobQuery with multiple tag matches
   */
  TEST_CASE("BlobQuery - Multiple Tags", "[query][blobquery][multitag]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with multiple tag matches");
 
    // Query for all .txt files in any "user_" tag
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::BlobQueryAsync(cte_client, "user_.*", "file_.*\\.txt", 0, chi::PoolQuery::Broadcast());
 
    INFO("Total blobs matched: " << results.size());
@@ -483,12 +488,12 @@
   * Test BlobQuery with match-all patterns
   */
  TEST_CASE("BlobQuery - Match All", "[query][blobquery][matchall]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with match-all patterns");
 
    // Query for all blobs in all tags
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::BlobQueryAsync(cte_client, ".*", ".*", 0, chi::PoolQuery::Broadcast());
 
    INFO("Total blobs matched: " << results.size());
@@ -499,12 +504,12 @@
   * Test BlobQuery with no blob matches
   */
  TEST_CASE("BlobQuery - No Blob Matches", "[query][blobquery][noblob]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with blob pattern that matches nothing");
 
    // Query for non-existent blob pattern in existing tag
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::BlobQueryAsync(cte_client, "user_data", "nonexistent_blob_xyz", 0, chi::PoolQuery::Broadcast());
 
    INFO("Total blobs matched: " << results.size());
@@ -515,12 +520,12 @@
   * Test BlobQuery with no tag matches
   */
  TEST_CASE("BlobQuery - No Tag Matches", "[query][blobquery][notag]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing BlobQuery with tag pattern that matches nothing");
 
    // Query for non-existent tag pattern
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
    auto results = CTEQueryTestFixture::BlobQueryAsync(cte_client, "nonexistent_tag_xyz", ".*", 0, chi::PoolQuery::Broadcast());
 
    INFO("Query returned " << results.size() << " blob pairs");
@@ -531,11 +536,11 @@
   * Test Query API with Local pool query
   */
  TEST_CASE("Query - Local Pool Query", "[query][poolquery][local]") {
-   auto *fixture = hshm::Singleton<CTEQueryTestFixture>::GetInstance();
+   auto *fixture = ctp::Singleton<CTEQueryTestFixture>::GetInstance();
   (void)fixture; // Suppress unused variable warning
    INFO("Testing query APIs with Local pool query");
 
-   auto *cte_client = WRP_CTE_CLIENT;
+   auto *cte_client = CLIO_CTE_CLIENT;
 
    // TagQuery with Local should work but only return local results
    auto tag_results = CTEQueryTestFixture::TagQueryAsync(cte_client, "user_.*", 0, chi::PoolQuery::Local());

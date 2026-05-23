@@ -1,6 +1,6 @@
-# CAE ChiMod Unit Tests
+# CAE Module Unit Tests
 
-This directory contains unit tests for the Content Assimilation Engine (CAE) ChiMod.
+This directory contains unit tests for the Content Assimilation Engine (CAE) Module.
 
 ## Test Organization
 
@@ -9,7 +9,7 @@ This directory contains unit tests for the Content Assimilation Engine (CAE) Chi
 ```
 chimods/test/unit/
 ├── README.md                      # This file
-├── wrp_config.yaml                # Shared CTE configuration for all tests
+├── clio_config.yaml                # Shared CTE configuration for all tests
 └── binary_assim/                  # Binary assimilation test suite
     ├── test_binary_assim.cc       # C++ test executable
     ├── binary_assim_omni.yaml     # OMNI config file
@@ -28,8 +28,8 @@ Before running tests, ensure:
    ```
 
 2. **Ensure runtime components are available:**
-   - `chi_runtime` (Chimaera runtime)
-   - `wrp_cte_daemon` (Content Transfer Engine daemon)
+   - `chi_runtime` (Clio runtime)
+   - `clio_cte_daemon` (Content Transfer Engine daemon)
    - Test executables in `build/bin/`
 
 ## Running Tests
@@ -63,7 +63,7 @@ Binary Assimilation ParseOmni Test
 ========================================
 
 [STEP 1] Checking prerequisites...
-[STEP 2] Starting Chimaera runtime...
+[STEP 2] Starting Clio runtime...
 [STEP 3] Starting CTE daemon...
 [STEP 4] Running test executable...
 [STEP 5] Analyzing results...
@@ -140,7 +140,7 @@ TEST SUITE PASSED
 └────────┬────────┘
          │
          ├─► Start chi_runtime
-         ├─► Start wrp_cte_daemon (with wrp_config.yaml)
+         ├─► Start clio_cte_daemon (with clio_config.yaml)
          │
          ▼
 ┌─────────────────────────┐
@@ -160,7 +160,7 @@ TEST SUITE PASSED
 1. **constants.h**
    - Defines `kCaePoolId` constant for consistent pool identification
 
-2. **wrp_config.yaml**
+2. **clio_config.yaml**
    - RAM-only CTE configuration
    - Single-node setup
    - 16GB capacity limit
@@ -174,7 +174,7 @@ TEST SUITE PASSED
 
 4. **run_test.sh**
    - Environment setup and teardown
-   - Process management (chi_runtime, wrp_cte_daemon)
+   - Process management (chi_runtime, clio_cte_daemon)
    - Output analysis and validation
    - Color-coded results
 
@@ -194,7 +194,7 @@ export CHIMAERA_LOG_LEVEL=debug
 cat /tmp/chimaera_runtime.log
 
 # CTE logs
-cat /tmp/wrp_cte_daemon.log
+cat /tmp/clio_cte_daemon.log
 ```
 
 ### Manual test run (without script):
@@ -202,13 +202,13 @@ cat /tmp/wrp_cte_daemon.log
 ```bash
 # Start services manually
 chi_runtime &
-wrp_cte_daemon /workspace/chimods/test/unit/wrp_config.yaml &
+clio_cte_daemon /workspace/chimods/test/unit/clio_config.yaml &
 
 # Run test
 /workspace/build/bin/test_binary_assim
 
 # Cleanup
-killall chi_runtime wrp_cte_daemon
+killall chi_runtime clio_cte_daemon
 rm -f /dev/shm/chimaera_*
 ```
 
@@ -233,8 +233,8 @@ To add a new test:
    )
    target_link_libraries(test_my_feature
      PRIVATE
-       wrp_cae_core_client
-       chimaera::cxx
+       clio_cae_core_client
+       clio::run::cxx
    )
    install(TARGETS test_my_feature DESTINATION bin)
    ```

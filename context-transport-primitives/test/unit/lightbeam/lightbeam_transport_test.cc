@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <hermes_shm/lightbeam/zmq_transport.h>
+#include <clio_ctp/lightbeam/zmq_transport.h>
 
 #include <cassert>
 #include <chrono>
@@ -39,10 +39,10 @@
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 void TestZeroMQ() {
-#ifdef HSHM_ENABLE_ZMQ
+#if CTP_ENABLE_ZMQ
   std::cout << "\n==== Testing ZeroMQ ====\n";
 
   std::string addr = "127.0.0.1";
@@ -60,7 +60,7 @@ void TestZeroMQ() {
   // Client creates metadata and sends
   LbmMeta<> send_meta;
   Bulk send_bulk = client->Expose(
-      hipc::FullPtr<char>(const_cast<char*>(magic.data())),
+      ctp::ipc::FullPtr<char>(const_cast<char*>(magic.data())),
       magic.size(), BULK_XFER);
   send_meta.send.push_back(send_bulk);
 

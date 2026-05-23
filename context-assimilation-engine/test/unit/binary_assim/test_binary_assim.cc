@@ -48,7 +48,7 @@
  * - Tests chunking behavior for files > 1MB
  *
  * Environment Variables:
- * - INIT_CHIMAERA: If set to "1", initializes Chimaera runtime
+ * - INIT_CHIMAERA: If set to "1", initializes CLIO Runtime runtime
  * - TEST_FILE_SIZE: Override default 256MB test file size (in MB)
  */
 
@@ -58,20 +58,20 @@
 #include <cstdlib>
 #include <cstring>
 
-// Chimaera and CAE headers
-#include <chimaera/chimaera.h>
-#include <wrp_cae/core/core_client.h>
-#include <wrp_cae/core/constants.h>
-#include <wrp_cae/core/factory/assimilation_ctx.h>
+// CLIO Runtime and CAE headers
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cae/core/core_client.h>
+#include <clio_cae/core/constants.h>
+#include <clio_cae/core/factory/assimilation_ctx.h>
 
 // CTE headers
-#include <wrp_cte/core/core_client.h>
+#include <clio_cte/core/core_client.h>
 
 // YAML parsing
 #include <yaml-cpp/yaml.h>
 
 // Logging
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 // Test configuration
 constexpr size_t kDefaultFileSizeMB = 256;
@@ -129,7 +129,7 @@ bool GenerateTestFile(const std::string& file_path, size_t size_bytes) {
  *       range_off: <offset> (optional, default: 0)
  *       range_size: <size> (optional, default: 0 for full file)
  */
-std::vector<wrp_cae::core::AssimilationCtx> LoadOmni(const std::string& omni_path) {
+std::vector<clio::cae::core::AssimilationCtx> LoadOmni(const std::string& omni_path) {
   HLOG(kInfo, "Loading OMNI file: {}", omni_path);
 
   YAML::Node config;
@@ -149,7 +149,7 @@ std::vector<wrp_cae::core::AssimilationCtx> LoadOmni(const std::string& omni_pat
     throw std::runtime_error("OMNI 'transfers' must be a sequence/array");
   }
 
-  std::vector<wrp_cae::core::AssimilationCtx> contexts;
+  std::vector<clio::cae::core::AssimilationCtx> contexts;
   contexts.reserve(transfers.size());
 
   // Parse each transfer entry
@@ -167,7 +167,7 @@ std::vector<wrp_cae::core::AssimilationCtx> LoadOmni(const std::string& omni_pat
       throw std::runtime_error("Transfer " + std::to_string(i + 1) + " missing required 'format' field");
     }
 
-    wrp_cae::core::AssimilationCtx ctx;
+    clio::cae::core::AssimilationCtx ctx;
     ctx.src = transfer["src"].as<std::string>();
     ctx.dst = transfer["dst"].as<std::string>();
     ctx.format = transfer["format"].as<std::string>();
@@ -215,7 +215,7 @@ int main(int argc, char* argv[]) {
   int exit_code = 0;
 
   try {
-    // Initialize Chimaera runtime (CHI_WITH_RUNTIME controls behavior)
+    // Initialize CLIO Runtime runtime (CHI_WITH_RUNTIME controls behavior)
     HLOG(kInfo, "Initializing Chimaera...");
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
     if (!success) {
@@ -224,8 +224,8 @@ int main(int argc, char* argv[]) {
     }
     HLOG(kSuccess, "Chimaera initialized successfully");
 
-    // Verify Chimaera IPC is available
-    auto* ipc_manager = CHI_IPC;
+    // Verify CLIO Runtime IPC is available
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Chimaera IPC not initialized");
       return 1;
@@ -248,23 +248,23 @@ int main(int argc, char* argv[]) {
 
     // Step 2: Connect to CTE
     HLOG(kInfo, "[STEP 2] Connecting to CTE...");
-    wrp_cte::core::WRP_CTE_CLIENT_INIT();
+    clio::cte::core::CLIO_CTE_CLIENT_INIT();
     HLOG(kSuccess, "CTE client initialized");
 
     // Step 2.5: Initialize CAE client
     HLOG(kInfo, "[STEP 2.5] Initializing CAE client...");
-    WRP_CAE_CLIENT_INIT();
+    CLIO_CAE_CLIENT_INIT();
     HLOG(kSuccess, "CAE client initialized");
 
     // Step 3: Create CAE pool
     HLOG(kInfo, "[STEP 3] Creating CAE pool...");
-    wrp_cae::core::Client cae_client;
-    wrp_cae::core::CreateParams params;
+    clio::cae::core::Client cae_client;
+    clio::cae::core::CreateParams params;
 
     auto create_task = cae_client.AsyncCreate(
         chi::PoolQuery::Local(),
         "test_cae_pool",
-        wrp_cae::core::kCaePoolId,
+        clio::cae::core::kCaePoolId,
         params);
     create_task.Wait();
 
@@ -276,7 +276,7 @@ int main(int argc, char* argv[]) {
     const auto last_sep = source_path.find_last_of("/\\");
     const std::string omni_file = source_path.substr(0, last_sep) + "/binary_assim_omni.yaml";
 
-    std::vector<wrp_cae::core::AssimilationCtx> contexts;
+    std::vector<clio::cae::core::AssimilationCtx> contexts;
     try {
       contexts = LoadOmni(omni_file);
     } catch (const std::exception& e) {
@@ -312,12 +312,12 @@ int main(int argc, char* argv[]) {
     HLOG(kInfo, "[STEP 8] Verifying data in CTE...");
 
     // Get CTE client
-    auto cte_client = WRP_CTE_CLIENT;
+    auto cte_client = CLIO_CTE_CLIENT;
 
     // Check if tag exists
     auto tag_task = cte_client->AsyncGetOrCreateTag(kTestTagName);
     tag_task.Wait();
-    wrp_cte::core::TagId tag_id = tag_task->tag_id_;
+    clio::cte::core::TagId tag_id = tag_task->tag_id_;
     if (tag_id.IsNull()) {
       HLOG(kError, "Tag not found in CTE: {}", kTestTagName);
       exit_code = 1;

@@ -32,11 +32,11 @@
  */
 
 /**
- * Unit tests for CHI_IPC->AllocateBuffer functionality
+ * Unit tests for CLIO_IPC->AllocateBuffer functionality
  * Tests the IPC manager's buffer allocation for shared memory operations
  */
 
-#include <chimaera/chimaera.h>
+#include <clio_runtime/clio_runtime.h>
 
 #include <cstring>
 #include <memory>
@@ -53,17 +53,17 @@ bool initialize_chimaera() {
 }
 }  // namespace
 
-TEST_CASE("CHI_IPC AllocateBuffer basic functionality",
+TEST_CASE("CLIO_IPC AllocateBuffer basic functionality",
           "[ipc][allocate_buffer][basic]") {
-  // Initialize Chimaera client for testing
+  // Initialize CLIO Runtime client for testing
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Allocate char buffer") {
     size_t buffer_size = 1024;
-    hipc::FullPtr<char> buffer_ptr =
+    ctp::ipc::FullPtr<char> buffer_ptr =
         ipc_manager->AllocateBuffer(buffer_size);
 
     REQUIRE_FALSE(buffer_ptr.IsNull());
@@ -81,14 +81,14 @@ TEST_CASE("CHI_IPC AllocateBuffer basic functionality",
 
   SECTION("Allocate typed buffer") {
     size_t buffer_size = 512;
-    hipc::FullPtr<char> char_buffer =
+    ctp::ipc::FullPtr<char> char_buffer =
         ipc_manager->AllocateBuffer(buffer_size);
 
     REQUIRE_FALSE(char_buffer.IsNull());
     REQUIRE(char_buffer.ptr_ != nullptr);
 
     // Test typed buffer access
-    const char* test_string = "CHI_IPC AllocateBuffer test";
+    const char* test_string = "CLIO_IPC AllocateBuffer test";
     size_t test_len = strlen(test_string);
     REQUIRE(test_len < buffer_size);
 
@@ -100,7 +100,7 @@ TEST_CASE("CHI_IPC AllocateBuffer basic functionality",
 
   SECTION("Allocate integer buffer") {
     size_t num_ints = 100 * sizeof(int);  // Allocate bytes, not int count
-    hipc::FullPtr<char> buffer = ipc_manager->AllocateBuffer(num_ints);
+    ctp::ipc::FullPtr<char> buffer = ipc_manager->AllocateBuffer(num_ints);
 
     REQUIRE_FALSE(buffer.IsNull());
     REQUIRE(buffer.ptr_ != nullptr);
@@ -120,25 +120,25 @@ TEST_CASE("CHI_IPC AllocateBuffer basic functionality",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer return type verification",
+TEST_CASE("CLIO_IPC AllocateBuffer return type verification",
           "[ipc][allocate_buffer][types]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
-  SECTION("Return type is FullPtr<char>, not hipc::ShmPtr<>") {
+  SECTION("Return type is FullPtr<char>, not ctp::ipc::ShmPtr<>") {
     // Compile-time type checking - now always returns FullPtr<char>
     auto buffer1 = ipc_manager->AllocateBuffer(1024);
-    static_assert(std::is_same_v<decltype(buffer1), hipc::FullPtr<char>>,
+    static_assert(std::is_same_v<decltype(buffer1), ctp::ipc::FullPtr<char>>,
                   "AllocateBuffer should return FullPtr<char>");
 
     auto buffer2 = ipc_manager->AllocateBuffer(512);
-    static_assert(std::is_same_v<decltype(buffer2), hipc::FullPtr<char>>,
+    static_assert(std::is_same_v<decltype(buffer2), ctp::ipc::FullPtr<char>>,
                   "AllocateBuffer should return FullPtr<char>");
 
     auto buffer3 = ipc_manager->AllocateBuffer(256);
-    static_assert(std::is_same_v<decltype(buffer3), hipc::FullPtr<char>>,
+    static_assert(std::is_same_v<decltype(buffer3), ctp::ipc::FullPtr<char>>,
                   "AllocateBuffer should return FullPtr<char>");
 
     // Runtime verification
@@ -148,18 +148,18 @@ TEST_CASE("CHI_IPC AllocateBuffer return type verification",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer size variations",
+TEST_CASE("CLIO_IPC AllocateBuffer size variations",
           "[ipc][allocate_buffer][sizes]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Various buffer sizes") {
     std::vector<size_t> test_sizes = {2, 64, 512, 1024, 4096, 16384};
 
     for (size_t size : test_sizes) {
-      hipc::FullPtr<char> buffer =
+      ctp::ipc::FullPtr<char> buffer =
           ipc_manager->AllocateBuffer(size);
 
       REQUIRE_FALSE(buffer.IsNull());
@@ -177,7 +177,7 @@ TEST_CASE("CHI_IPC AllocateBuffer size variations",
   SECTION("Zero size allocation") {
     // Test edge case - zero size should either return null or valid empty
     // buffer
-    hipc::FullPtr<char> buffer = ipc_manager->AllocateBuffer(0);
+    ctp::ipc::FullPtr<char> buffer = ipc_manager->AllocateBuffer(0);
 
     // Either null (allocation failed) or valid but zero-sized
     // Both behaviors are acceptable for zero-size allocations
@@ -186,17 +186,17 @@ TEST_CASE("CHI_IPC AllocateBuffer size variations",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer multiple allocations",
+TEST_CASE("CLIO_IPC AllocateBuffer multiple allocations",
           "[ipc][allocate_buffer][multiple]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Multiple simultaneous allocations") {
     const size_t num_buffers = 10;
     const size_t buffer_size = 1024;
-    std::vector<hipc::FullPtr<char>> buffers;
+    std::vector<ctp::ipc::FullPtr<char>> buffers;
 
     // Allocate multiple buffers
     for (size_t i = 0; i < num_buffers; ++i) {
@@ -227,14 +227,14 @@ TEST_CASE("CHI_IPC AllocateBuffer multiple allocations",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer client vs runtime behavior",
+TEST_CASE("CLIO_IPC AllocateBuffer client vs runtime behavior",
           "[ipc][allocate_buffer][client_runtime]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
-  auto* chimaera_manager = CHI_CHIMAERA_MANAGER;
+  auto* chimaera_manager = CLIO_CHIMAERA_MANAGER;
   REQUIRE(chimaera_manager != nullptr);
 
   SECTION("Colocated client mode allocation") {
@@ -243,7 +243,7 @@ TEST_CASE("CHI_IPC AllocateBuffer client vs runtime behavior",
     REQUIRE(chimaera_manager->IsRuntime());  // Colocated mode has runtime
     REQUIRE(chimaera_manager->IsClient());   // And client
 
-    hipc::FullPtr<char> buffer = ipc_manager->AllocateBuffer(100);
+    ctp::ipc::FullPtr<char> buffer = ipc_manager->AllocateBuffer(100);
     REQUIRE_FALSE(buffer.IsNull());
     REQUIRE(buffer.ptr_ != nullptr);
 
@@ -256,11 +256,11 @@ TEST_CASE("CHI_IPC AllocateBuffer client vs runtime behavior",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer memory alignment",
+TEST_CASE("CLIO_IPC AllocateBuffer memory alignment",
           "[ipc][allocate_buffer][alignment]") {
   REQUIRE(initialize_chimaera());
 
-  auto* ipc_manager = CHI_IPC;
+  auto* ipc_manager = CLIO_IPC;
   REQUIRE(ipc_manager != nullptr);
 
   SECTION("Pointer alignment for different types") {
@@ -290,7 +290,7 @@ TEST_CASE("CHI_IPC AllocateBuffer memory alignment",
   }
 }
 
-TEST_CASE("CHI_IPC AllocateBuffer documentation examples",
+TEST_CASE("CLIO_IPC AllocateBuffer documentation examples",
           "[ipc][allocate_buffer][documentation]") {
   REQUIRE(initialize_chimaera());
 
@@ -298,13 +298,13 @@ TEST_CASE("CHI_IPC AllocateBuffer documentation examples",
     // Test the exact examples from the documentation
 
     // Get the IPC manager singleton
-    auto* ipc_manager = CHI_IPC;
+    auto* ipc_manager = CLIO_IPC;
     REQUIRE(ipc_manager != nullptr);
 
     // Allocate a buffer in shared memory (returns FullPtr<T>, not
-    // hipc::ShmPtr<>)
+    // ctp::ipc::ShmPtr<>)
     size_t buffer_size = 1024;
-    hipc::FullPtr<char> buffer_ptr =
+    ctp::ipc::FullPtr<char> buffer_ptr =
         ipc_manager->AllocateBuffer(buffer_size);
 
     REQUIRE_FALSE(buffer_ptr.IsNull());
@@ -322,7 +322,7 @@ TEST_CASE("CHI_IPC AllocateBuffer documentation examples",
     REQUIRE(strcmp(static_cast<const char*>(buffer_data), source_data) == 0);
 
     // Alternative: Allocate typed buffer
-    hipc::FullPtr<char> char_buffer =
+    ctp::ipc::FullPtr<char> char_buffer =
         ipc_manager->AllocateBuffer(buffer_size);
     REQUIRE_FALSE(char_buffer.IsNull());
 

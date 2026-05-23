@@ -21,10 +21,10 @@ enable_testing()
 # yaml-cpp is already found by root CMakeLists.txt
 
 # Conditionally find HDF5 if enabled
-if(WRP_CAE_ENABLE_HDF5)
+if(CLIO_CAE_ENABLE_HDF5)
   # HDF5 is already found by root CMakeLists.txt
   if(NOT HDF5_FOUND)
-    message(WARNING "WRP_CAE_ENABLE_HDF5 is ON but HDF5 not found. HDF5 tests will be disabled.")
+    message(WARNING "CLIO_CAE_ENABLE_HDF5 is ON but HDF5 not found. HDF5 tests will be disabled.")
     set(HDF5_ENABLED FALSE)
   else()
     set(HDF5_ENABLED TRUE)
@@ -57,10 +57,10 @@ function(add_cae_unit_test TEST_NAME TEST_SOURCE)
   # Link common dependencies
   target_link_libraries(${TEST_NAME}
     PRIVATE
-      wrp_cae_core_client
-      wrp_cte_core_client
+      clio_cae_core_client
+      clio_cte_core_client
       chimaera::cxx
-      hshm::configure
+      ctp::configure
       ${ARG_EXTRA_LIBS}
   )
 
@@ -79,7 +79,7 @@ function(add_cae_unit_test TEST_NAME TEST_SOURCE)
 
   # Set test environment variables
   set_tests_properties(${TEST_NAME} PROPERTIES
-    ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/wrp_config.yaml;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+    ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/clio_config.yaml;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
     TIMEOUT 300  # 5 minute timeout
   )
 endfunction()
@@ -100,7 +100,7 @@ add_cae_unit_test(cae_binary_assim
 # Install test configuration
 install(FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/binary_assim/binary_assim_omni.yaml
-  DESTINATION share/wrp_cae/test/binary_assim
+  DESTINATION share/clio_cae/test/binary_assim
 )
 
 #------------------------------------------------------------------------------
@@ -117,7 +117,7 @@ add_cae_unit_test(cae_range_assim
 
 # Set smaller file size for range test to speed up CI
 set_tests_properties(cae_range_assim PROPERTIES
-  ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/wrp_config.yaml;TEST_FILE_SIZE=10;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"  # 10MB instead of default
+  ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/clio_config.yaml;TEST_FILE_SIZE=10;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"  # 10MB instead of default
 )
 
 #------------------------------------------------------------------------------
@@ -151,16 +151,16 @@ add_executable(test_cae_comprehensive
 target_include_directories(test_cae_comprehensive
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/test  # For simple_test.h
+
 )
 
 target_link_libraries(test_cae_comprehensive
   PRIVATE
-    wrp_cae_core_client
-    wrp_cte_core_client
+    clio_cae_core_client
+    clio_cte_core_client
     chimaera::admin_runtime
     chimaera::bdev_runtime
-    hshm::cxx
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -197,7 +197,7 @@ set_tests_properties(
   CAE_HDF5Format CAE_UnknownFormat
   PROPERTIES
     TIMEOUT 120
-    LABELS "coverage;comprehensive"
+    LABELS "coverage;comprehensive;msan_skip"
     ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
 )
 
@@ -209,7 +209,7 @@ set_tests_properties(
 # - Tests dataset discovery and transfer
 # - Validates metadata and tensor information
 # - Tests hierarchical group structures
-# Note: Requires WRP_CORE_ENABLE_HDF5=ON
+# Note: Requires CLIO_CORE_ENABLE_HDF5=ON
 #------------------------------------------------------------------------------
 if(HDF5_ENABLED)
   add_cae_unit_test(cae_hdf5_assim
@@ -219,7 +219,7 @@ if(HDF5_ENABLED)
   )
 
   # Set test labels
-  set_tests_properties(cae_hdf5_assim PROPERTIES LABELS "format;hdf5")
+  set_tests_properties(cae_hdf5_assim PROPERTIES LABELS "format;hdf5;msan_skip")
 endif()
 
 #------------------------------------------------------------------------------
@@ -235,9 +235,69 @@ endif()
 #------------------------------------------------------------------------------
 
 # Create test labels for selective execution
-set_tests_properties(cae_binary_assim PROPERTIES LABELS "core;basic")
-set_tests_properties(cae_range_assim PROPERTIES LABELS "core;advanced")
-set_tests_properties(cae_error_handling PROPERTIES LABELS "core;validation")
+# Skip under MSan: CAE tests use uninstrumented HDF5/yaml-cpp/ZMQ deps and
+# the chimaera runtime which involves shared memory and forked processes.
+set_tests_properties(cae_binary_assim PROPERTIES LABELS "core;basic;msan_skip")
+set_tests_properties(cae_range_assim PROPERTIES LABELS "core;advanced;msan_skip")
+set_tests_properties(cae_error_handling PROPERTIES LABELS "core;validation;msan_skip")
+
+#------------------------------------------------------------------------------
+# Test 6: ExportData Tests
+#------------------------------------------------------------------------------
+# Tests the ExportData feature (inverse of assimilation):
+# - ExportDataTask struct: default ctor, emplace ctor, Copy, Aggregate,
+#   SerializeIn, SerializeOut
+# - Runtime paths: empty tag, binary success/roundtrip, binary bad path,
+#   HDF5 success (if enabled) or HDF5-not-compiled, HDF5 bad path
+# - Autogen core_lib_exec.cc kExportData cases exercised via AsyncExportData
+#
+# NOTE: All ExportData tests are consolidated into two CTest targets (task and
+# runtime) to avoid starting the CLIO Runtime runtime multiple times on the same
+# port (which causes TIME_WAIT failures for subsequent processes).
+#------------------------------------------------------------------------------
+add_executable(test_export_data
+  ${CMAKE_CURRENT_SOURCE_DIR}/test_export_data.cc
+)
+
+target_include_directories(test_export_data
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+
+)
+
+target_link_libraries(test_export_data
+  PRIVATE
+    clio_cae_core_client
+    clio_cte_core_client
+    chimaera::cxx
+    ctp::configure
+    ${CMAKE_THREAD_LIBS_INIT}
+)
+
+if(HDF5_ENABLED)
+  target_compile_definitions(test_export_data PRIVATE CLIO_CAE_ENABLE_HDF5)
+  target_link_libraries(test_export_data PRIVATE ${HDF5_LIBRARIES})
+  target_include_directories(test_export_data PRIVATE ${HDF5_INCLUDE_DIRS})
+endif()
+
+install(TARGETS test_export_data DESTINATION bin)
+
+# Register as two CTest targets: task struct tests and runtime integration tests.
+# Each target runs all its test cases in a single process (one runtime startup),
+# avoiding port 9413 TIME_WAIT conflicts that arise from repeated restarts.
+add_test(NAME CAE_ExportData_Task
+  COMMAND test_export_data "[cae][export][task]")
+add_test(NAME CAE_ExportData_Runtime
+  COMMAND test_export_data "[cae][export][runtime]")
+
+set_tests_properties(
+  CAE_ExportData_Task
+  CAE_ExportData_Runtime
+  PROPERTIES
+    TIMEOUT 300
+    LABELS "coverage;export;msan_skip"
+    ENVIRONMENT "CHI_WITH_RUNTIME=1;CHI_SERVER_CONF=${CMAKE_CURRENT_SOURCE_DIR}/clio_config.yaml;LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/bin:$ENV{LD_LIBRARY_PATH}"
+)
 
 #------------------------------------------------------------------------------
 # Test Summary Target
@@ -266,10 +326,13 @@ message(STATUS "CAE Unit Tests Configuration:")
 message(STATUS "  Binary Assimilation Test: ENABLED")
 message(STATUS "  Range Transfer Test:      ENABLED")
 message(STATUS "  Error Handling Test:      ENABLED")
+message(STATUS "  ExportData Tests:         ENABLED")
 if(HDF5_ENABLED)
   message(STATUS "  HDF5 Format Test:         ENABLED")
+  message(STATUS "  ExportData HDF5 Tests:    ENABLED")
 else()
   message(STATUS "  HDF5 Format Test:         DISABLED (set -DWRP_CORE_ENABLE_HDF5=ON to enable)")
+  message(STATUS "  ExportData HDF5 Tests:    ENABLED (tests not-compiled path)")
 endif()
 message(STATUS "")
 message(STATUS "Run tests with:")

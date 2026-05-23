@@ -36,11 +36,11 @@
  * Contains SaveTaskArchive and LoadTaskArchive bulk() method implementations
  */
 
-#include "chimaera/task_archives.h"
-#include "chimaera/ipc_manager.h"
-#include "hermes_shm/util/logging.h"
+#include "clio_runtime/task_archives.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_ctp/util/logging.h"
 
-namespace chi {
+namespace clio::run {
 
 /**
  * SaveTaskArchive bulk transfer implementation
@@ -49,9 +49,9 @@ namespace chi {
  * @param size Size of the data in bytes
  * @param flags Transfer flags (BULK_XFER or BULK_EXPOSE)
  */
-void SaveTaskArchive::bulk(hipc::ShmPtr<> ptr, size_t size, uint32_t flags) {
-  hipc::FullPtr<char> full_ptr = CHI_IPC->ToFullPtr(ptr).template Cast<char>();
-  hshm::lbm::Bulk bulk;
+void SaveTaskArchive::bulk(ctp::ipc::ShmPtr<> ptr, size_t size, uint32_t flags) {
+  ctp::ipc::FullPtr<char> full_ptr = CLIO_IPC->ToFullPtr(ptr).template Cast<char>();
+  ctp::lbm::Bulk bulk;
   bulk.data = full_ptr;
   bulk.size = size;
   bulk.flags.bits_ = flags;
@@ -76,27 +76,76 @@ void SaveTaskArchive::bulk(hipc::ShmPtr<> ptr, size_t size, uint32_t flags) {
  * @param size Size of the data in bytes
  * @param flags Transfer flags (BULK_XFER or BULK_EXPOSE)
  */
-void LoadTaskArchive::bulk(hipc::ShmPtr<> &ptr, size_t size, uint32_t flags) {
+void LoadTaskArchive::bulk(ctp::ipc::ShmPtr<> &ptr, size_t size, uint32_t flags) {
   if (msg_type_ == MsgType::kSerializeIn) {
     // SerializeIn mode (input) - Get pointer from recv vector at current index
     // The task itself doesn't have a valid pointer during deserialization,
     // so we look into the recv vector and use the FullPtr at the current index
     if (current_bulk_index_ < recv.size()) {
       if (!recv[current_bulk_index_].data.shm_.IsNull()) {
-        // Valid ShmPtr: either SHM transport (data in shared memory) or
-        // ZMQ/socket transport (data received into buffer)
-        ptr = recv[current_bulk_index_].data.shm_.template Cast<void>();
+        if (recv[current_bulk_index_].desc != nullptr) {
+          // ZMQ zero-copy recv: the data currently lives in a
+          // libzmq-owned zmq_msg_t buffer (RecvBulks stored its handle
+          // in Bulk::desc). Pointing the task directly at it leaks that
+          // zmq_msg_t on every inbound BULK_XFER: FreeBuffer cannot free
+          // libzmq memory (so the TASK_DATA_OWNER destructor path can't
+          // reclaim it — see admin_runtime.cc RecvIn), and the only
+          // ClearRecvHandles call sites are the client *response* path,
+          // never this server inbound path. Instead, copy into an owned
+          // CHI buffer so the existing daemon_allocated_bulk_count_ /
+          // TASK_DATA_OWNER machinery frees it safely; the caller then
+          // frees the now-unreferenced zmq_msg_t via ClearRecvHandles
+          // immediately after AllocLoadTask. One extra 1 MiB memcpy on
+          // the TCP path (which already memcpys); SHM path (desc==null)
+          // stays zero-copy and untouched.
+          ctp::ipc::FullPtr<char> buf = CLIO_IPC->AllocateBuffer(size);
+          char *src = recv[current_bulk_index_].data.ptr_;
+          if (buf.ptr_ && src) {
+            memcpy(buf.ptr_, src, size);
+          }
+          ptr = buf.shm_.template Cast<void>();
+          recv[current_bulk_index_].data = buf;
+          ++daemon_allocated_bulk_count_;
+        } else if (recv[current_bulk_index_].data.shm_.alloc_id_ ==
+                       ctp::ipc::AllocatorId(UINT32_MAX - 1,
+                                              UINT32_MAX - 1)) {
+          // SocketTransport (IPC/TCP-socket) recv: the buffer was
+          // std::malloc'd in SocketTransport::RecvBulks and tagged with
+          // the (UINT32_MAX-1, UINT32_MAX-1) sentinel. ClearRecvHandles
+          // will std::free it immediately after AllocLoadTask returns —
+          // pointing the task straight at recv[i].data leaves a dangling
+          // ptr that the worker later memcpy()s in e.g.
+          // bdev::Runtime::WriteToRam (ASan: heap-use-after-free). Mirror
+          // the ZMQ path: copy into a CTP buffer the task owns via
+          // TASK_DATA_OWNER, leaving recv[i].data alone so
+          // ClearRecvHandles still frees the malloc'd buffer.
+          ctp::ipc::FullPtr<char> buf = CLIO_IPC->AllocateBuffer(size);
+          char *src = recv[current_bulk_index_].data.ptr_;
+          if (buf.ptr_ && src) {
+            memcpy(buf.ptr_, src, size);
+          }
+          ptr = buf.shm_.template Cast<void>();
+          ++daemon_allocated_bulk_count_;
+        } else {
+          // Valid ShmPtr, no zmq handle: SHM transport (data already in
+          // shared memory) — keep zero-copy.
+          ptr = recv[current_bulk_index_].data.shm_.template Cast<void>();
+        }
       } else {
         // Null ShmPtr: BULK_EXPOSE via ZMQ/socket where no data was sent.
         // Allocate a buffer for the receiver to fill (e.g., ReadTask).
-        hipc::FullPtr<char> buf = CHI_IPC->AllocateBuffer(size);
+        // This buffer is owned by the daemon and must be freed when the
+        // task is deleted (see daemon_allocated_bulk_count_ usage in
+        // admin_runtime.cc RecvIn / SendOut).
+        ctp::ipc::FullPtr<char> buf = CLIO_IPC->AllocateBuffer(size);
         ptr = buf.shm_.template Cast<void>();
         recv[current_bulk_index_].data = buf;
+        ++daemon_allocated_bulk_count_;
       }
       current_bulk_index_++;
     } else {
       // Error: not enough bulk transfers in recv vector
-      ptr = hipc::ShmPtr<>::GetNull();
+      ptr = ctp::ipc::ShmPtr<>::GetNull();
       HLOG(kError, "[LoadTaskArchive::bulk] SerializeIn - recv vector empty or exhausted");
     }
   } else if (msg_type_ == MsgType::kSerializeOut) {
@@ -110,7 +159,7 @@ void LoadTaskArchive::bulk(hipc::ShmPtr<> &ptr, size_t size, uint32_t flags) {
         // Note: MallocAllocator uses null alloc_id_, so check IsNull() on
         // the ShmPtr (which checks offset) rather than alloc_id_.
         if (!ptr.IsNull()) {
-          hipc::FullPtr<char> dst = CHI_IPC->ToFullPtr(ptr).template Cast<char>();
+          ctp::ipc::FullPtr<char> dst = CLIO_IPC->ToFullPtr(ptr).template Cast<char>();
           char *src = recv[current_bulk_index_].data.ptr_;
           size_t copy_size = recv[current_bulk_index_].size;
           if (dst.ptr_ && src) {
@@ -124,8 +173,8 @@ void LoadTaskArchive::bulk(hipc::ShmPtr<> &ptr, size_t size, uint32_t flags) {
       current_bulk_index_++;
     } else if (lbm_transport_) {
       // Pre-receive: expose task's buffer for RecvBulks (existing RecvOut pattern)
-      hipc::FullPtr<char> buffer = CHI_IPC->ToFullPtr(ptr).template Cast<char>();
-      hshm::lbm::Bulk bulk = lbm_transport_->Expose(buffer, size, flags);
+      ctp::ipc::FullPtr<char> buffer = CLIO_IPC->ToFullPtr(ptr).template Cast<char>();
+      ctp::lbm::Bulk bulk = lbm_transport_->Expose(buffer, size, flags);
       recv.push_back(bulk);
       if (flags & BULK_XFER) {
         recv_bulks++;
@@ -135,4 +184,4 @@ void LoadTaskArchive::bulk(hipc::ShmPtr<> &ptr, size_t size, uint32_t flags) {
   // kHeartbeat has no bulk transfers
 }
 
-} // namespace chi
+}  // namespace clio::run

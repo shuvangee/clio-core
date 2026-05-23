@@ -36,10 +36,10 @@
 #include <cstdlib>
 #include <memory>
 
-#include <chimaera/chimaera.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
-#include <chimaera/bdev/bdev_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
+#include <clio_runtime/bdev/bdev_tasks.h>
 
 namespace fs = std::filesystem;
 
@@ -71,13 +71,13 @@ public:
   static constexpr chi::QueueId kCTETestQueueId = chi::QueueId(1);
   static constexpr chi::u64 kTestTargetSize = 10 * 1024 * 1024;  // 10MB
   
-  std::unique_ptr<wrp_cte::core::Client> core_client_;
+  std::unique_ptr<clio::cte::core::Client> core_client_;
   std::string test_storage_path_;
   chi::PoolId core_pool_id_;
   
   CTECoreTestFixture() {
     // Setup test storage path in home directory
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
     REQUIRE(!home_dir.empty());
     test_storage_path_ = home_dir + "/cte_unit_test.dat";
     
@@ -92,7 +92,7 @@ public:
     core_pool_id_ = chi::PoolId(42, 0);  // Using fixed ID for testing (major=42, minor=0)
     
     // Create CTE core client
-    core_client_ = std::make_unique<wrp_cte::core::Client>(core_pool_id_);
+    core_client_ = std::make_unique<clio::cte::core::Client>(core_pool_id_);
   }
   
   ~CTECoreTestFixture() {
@@ -137,7 +137,7 @@ public:
  */
 TEST_CASE("Create CTE Core Pool", "[cte][core][pool]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Basic pool creation test") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Basic pool creation test") {
     // Verify client is properly initialized
     REQUIRE(fixture->core_client_ != nullptr);
     
@@ -150,10 +150,10 @@ TEST_CASE("Create CTE Core Pool", "[cte][core][pool]") {
   
   SECTION("CreateParams validation") {
     // Test default CreateParams structure
-    wrp_cte::core::CreateParams default_params;
-    REQUIRE(std::string(wrp_cte::core::CreateParams::chimod_lib_name) == "wrp_cte_core");
+    clio::cte::core::CreateParams default_params;
+    REQUIRE(std::string(clio::cte::core::CreateParams::chimod_lib_name) == "clio_cte_core");
 
-    INFO("ChiMod library name: " << wrp_cte::core::CreateParams::chimod_lib_name);
+    INFO("ChiMod library name: " << clio::cte::core::CreateParams::chimod_lib_name);
   }
   
   SECTION("Pool query validation") {
@@ -177,15 +177,15 @@ TEST_CASE("Create CTE Core Pool", "[cte][core][pool]") {
  */
 TEST_CASE("Register Target", "[cte][core][target]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("File-based target configuration") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("File-based target configuration") {
     const std::string target_name = "cte_test_target";
-    const chimaera::bdev::BdevType bdev_type = chimaera::bdev::BdevType::kFile;
+    const clio::run::bdev::BdevType bdev_type = clio::run::bdev::BdevType::kFile;
     
     // Validate target configuration parameters
     REQUIRE(!target_name.empty());
     REQUIRE(!fixture->test_storage_path_.empty());
     REQUIRE(CTECoreTestFixture::kTestTargetSize > 0);
-    REQUIRE(bdev_type == chimaera::bdev::BdevType::kFile);
+    REQUIRE(bdev_type == clio::run::bdev::BdevType::kFile);
     
     INFO("Target configuration validated:");
     INFO("  Name: " << target_name);
@@ -234,7 +234,7 @@ TEST_CASE("Register Target", "[cte][core][target]") {
  */
 TEST_CASE("PutBlob Operations", "[cte][core][putblob]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("PutBlob parameter validation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("PutBlob parameter validation") {
     // Test valid blob parameters - Updated for new pattern
     const std::string valid_blob_name = "test_blob_001";
     const chi::u32 valid_blob_id = 0;  // Use null ID for PutBlob
@@ -331,7 +331,7 @@ TEST_CASE("PutBlob Operations", "[cte][core][putblob]") {
  */
 TEST_CASE("GetBlob Operations", "[cte][core][getblob]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("GetBlob parameter validation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("GetBlob parameter validation") {
     // Test valid retrieval parameters - Updated for new pattern
     const chi::u32 valid_tag_id = 100;
     const std::string valid_blob_name = "";  // Empty name for GetBlob
@@ -445,7 +445,7 @@ TEST_CASE("GetBlob Operations", "[cte][core][getblob]") {
  */
 TEST_CASE("CTE Core Integration Workflow", "[cte][core][integration]") {
 
-  auto *fixture = hshm::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Complete workflow simulation") {
+  auto *fixture = ctp::Singleton<CTECoreTestFixture>::GetInstance();  SECTION("Complete workflow simulation") {
     INFO("=== CTE Core Integration Workflow Test ===");
     
     // Step 1: Pool initialization (already done in fixture)

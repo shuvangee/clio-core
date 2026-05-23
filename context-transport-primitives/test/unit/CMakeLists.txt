@@ -1,4 +1,4 @@
-project(hermes_shm)
+project(clio_ctp)
 
 # Find Catch2 testing framework
 find_package(Catch2 3 REQUIRED)
@@ -17,21 +17,21 @@ add_subdirectory(thread)
 # add_subdirectory(singleton)
 # add_subdirectory(solvers)
 
-if(NOT HSHM_COMPILER_MSVC)
+if(NOT CLIO_CTP_COMPILER_MSVC)
     add_subdirectory(interceptor)
 endif()
 
-if(WRP_CTE_ENABLE_COMPRESS)
+if(CLIO_CTE_ENABLE_COMPRESS)
     add_subdirectory(compress)
 endif()
 
-if(WRP_CORE_ENABLE_ENCRYPT)
+if(CLIO_CORE_ENABLE_ENCRYPT)
     add_subdirectory(encrypt)
 endif()
 
 add_subdirectory(io)
 
-if(WRP_CORE_ENABLE_CUDA OR WRP_CORE_ENABLE_ROCM)
+if(CLIO_CORE_ENABLE_CUDA OR CLIO_CORE_ENABLE_ROCM OR CLIO_CORE_ENABLE_SYCL)
     add_subdirectory(gpu)
 endif()
 

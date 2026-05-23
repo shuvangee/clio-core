@@ -44,7 +44,7 @@
  * - Tests offset + size combinations
  *
  * Environment Variables:
- * - INIT_CHIMAERA: If set to "1", initializes Chimaera runtime
+ * - INIT_CHIMAERA: If set to "1", initializes CLIO Runtime runtime
  */
 
 #include <iostream>
@@ -52,17 +52,17 @@
 #include <cstdlib>
 #include <cstring>
 
-// Chimaera and CAE headers
-#include <chimaera/chimaera.h>
-#include <wrp_cae/core/core_client.h>
-#include <wrp_cae/core/constants.h>
-#include <wrp_cae/core/factory/assimilation_ctx.h>
+// CLIO Runtime and CAE headers
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cae/core/core_client.h>
+#include <clio_cae/core/constants.h>
+#include <clio_cae/core/factory/assimilation_ctx.h>
 
 // CTE headers
-#include <wrp_cte/core/core_client.h>
+#include <clio_cte/core/core_client.h>
 
 // Logging
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 // Test configuration
 constexpr size_t kTestFileSizeMB = 10;  // 10MB for range testing
@@ -99,7 +99,7 @@ bool GenerateTestFile(const std::string& file_path, size_t size_bytes) {
 /**
  * Test a specific range
  */
-bool TestRange(wrp_cae::core::Client& cae_client,
+bool TestRange(clio::cae::core::Client& cae_client,
                const std::string& test_name,
                size_t range_off,
                size_t range_size) {
@@ -110,7 +110,7 @@ bool TestRange(wrp_cae::core::Client& cae_client,
   std::string tag_name = kTestTagPrefix + test_name;
 
   // Create AssimilationCtx
-  wrp_cae::core::AssimilationCtx ctx;
+  clio::cae::core::AssimilationCtx ctx;
   ctx.src = "file::" + kTestFileName;
   ctx.dst = "iowarp::" + tag_name;
   ctx.format = "binary";
@@ -119,7 +119,7 @@ bool TestRange(wrp_cae::core::Client& cae_client,
   ctx.range_size = range_size;
 
   // Call ParseOmni with vector containing single context
-  std::vector<wrp_cae::core::AssimilationCtx> contexts = {ctx};
+  std::vector<clio::cae::core::AssimilationCtx> contexts = {ctx};
   auto parse_task = cae_client.AsyncParseOmni(contexts);
   parse_task.Wait();
   chi::u32 result_code = parse_task->GetReturnCode();
@@ -155,7 +155,7 @@ int main(int argc, char* argv[]) {
   int tests_total = 0;
 
   try {
-    // Initialize Chimaera runtime (CHI_WITH_RUNTIME controls behavior)
+    // Initialize CLIO Runtime runtime (CHI_WITH_RUNTIME controls behavior)
     HLOG(kInfo, "Initializing Chimaera...");
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
     if (!success) {
@@ -164,8 +164,8 @@ int main(int argc, char* argv[]) {
     }
     HLOG(kSuccess, "Chimaera initialized successfully");
 
-    // Verify Chimaera IPC
-    auto* ipc_manager = CHI_IPC;
+    // Verify CLIO Runtime IPC
+    auto* ipc_manager = CLIO_IPC;
     if (!ipc_manager) {
       HLOG(kError, "Chimaera IPC not initialized");
       return 1;
@@ -181,21 +181,21 @@ int main(int argc, char* argv[]) {
 
     // Connect to CTE
     HLOG(kInfo, "[SETUP] Connecting to CTE...");
-    wrp_cte::core::WRP_CTE_CLIENT_INIT();
+    clio::cte::core::CLIO_CTE_CLIENT_INIT();
 
     // Initialize CAE client
     HLOG(kInfo, "[SETUP] Initializing CAE client...");
-    WRP_CAE_CLIENT_INIT();
+    CLIO_CAE_CLIENT_INIT();
 
     // Create CAE pool
     HLOG(kInfo, "[SETUP] Creating CAE pool...");
-    wrp_cae::core::Client cae_client;
-    wrp_cae::core::CreateParams params;
+    clio::cae::core::Client cae_client;
+    clio::cae::core::CreateParams params;
 
     auto create_task = cae_client.AsyncCreate(
         chi::PoolQuery::Local(),
         "test_cae_range_pool",
-        wrp_cae::core::kCaePoolId,
+        clio::cae::core::kCaePoolId,
         params);
     create_task.Wait();
 

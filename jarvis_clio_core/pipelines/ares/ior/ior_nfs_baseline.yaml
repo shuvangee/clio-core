@@ -1,0 +1,56 @@
+# IOR baseline against the cluster's NFS home.
+#
+# Matched topology to ior_cte_libfuse_sbatch.yaml so the numbers line up
+# apples-to-apples: 8 nodes, 24 PPN, 1 MiB xfer, 64 MiB block, fpp. The
+# only differences are:
+#   - no chimaera daemon / no CTE pool / no FUSE mount
+#   - output path is on NFS (`$HOME`) instead of the FUSE mount
+#   - mpi_cmd / OOB / PRTE settings preserved verbatim so the spawn graph
+#     uses the same network as the iowarp run for the control plane
+#
+# Usage:
+#   jarvis ppl submit ${IOWARP}/jarvis_clio_core/pipelines/ares/ior_nfs_baseline.yaml
+
+name: ior_nfs_baseline
+
+ssh_cmd: "env -u LD_LIBRARY_PATH ssh"
+
+# Match the iowarp run's NIC choice: data plane on 40 GbE (enp47s0np0),
+# OOB / PRTE on eno1.
+mpi_cmd: 'mpiexec --mca btl_tcp_if_include enp47s0np0 --mca oob_tcp_if_include eno1 --prtemca prte_if_include eno1 --prtemca prte_tmpdir_base /home/llogan/iowarp_prte_tmp'
+
+env:
+  TMPDIR: "/home/llogan/iowarp_prte_tmp"
+
+scheduler:
+  name: slurm
+  job_name: ior_nfs_baseline
+  nodes: 8
+  ntasks_per_node: 1
+  cpus_per_task: 32
+  partition: compute
+  time: "00:15:00"
+  exclude: "ares-comp-10,ares-comp-11"
+  output: slurm-%j.out
+  error: slurm-%j.err
+  # Match the iowarp run's hostfile suffix so MPI ranks talk to each
+  # other over 40 GbE just like chimaera does there.
+  suffix: "-40g"
+  pre_cmds:
+    - 'source /etc/profile.d/lmod.sh 2>/dev/null || source /etc/profile.d/modules.sh'
+    - 'module load gcc/11.4.0/openmpi/5.0.5-x2kvx5l ior/3.3.0-fihmxeb'
+    - 'mkdir -p /home/llogan/iowarp_prte_tmp /home/llogan/ior_nfs_baseline'
+
+pkgs:
+  - pkg_type: builtin.ior
+    pkg_name: ior
+    api: posix
+    write: true
+    read: true
+    fpp: true
+    nprocs: 192
+    ppn: 24
+    xfer: 1m
+    block: 64m
+    # /home/llogan is NFS-mounted on every compute node.
+    out: /home/llogan/ior_nfs_baseline/ior_nfs.bin

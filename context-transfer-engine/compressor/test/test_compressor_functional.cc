@@ -52,14 +52,14 @@
 #include <vector>
 #include <random>
 
-#include <chimaera/chimaera.h>
-#include <wrp_cte/compressor/compressor_client.h>
-#include <wrp_cte/compressor/compressor_tasks.h>
-#include <wrp_cte/compressor/compressor_runtime.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/compressor/compressor_client.h>
+#include <clio_cte/compressor/compressor_tasks.h>
+#include <clio_cte/compressor/compressor_runtime.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
 
-using namespace wrp_cte::compressor;
+using namespace clio::cte::compressor;
 
 namespace {
 
@@ -118,10 +118,10 @@ std::vector<char> GenerateTestData(size_t size, const std::string& pattern) {
 }
 
 /**
- * Initialize Chimaera runtime for compressor tests
+ * Initialize CLIO Runtime runtime for compressor tests
  */
 void InitializeChimaera() {
-  // Initialize Chimaera runtime in client mode with runtime
+  // Initialize CLIO Runtime runtime in client mode with runtime
   bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
   if (!success) {
     throw std::runtime_error("Failed to initialize Chimaera runtime");
@@ -129,7 +129,7 @@ void InitializeChimaera() {
 }
 
 /**
- * Cleanup Chimaera runtime
+ * Cleanup CLIO Runtime runtime
  */
 void CleanupChimaera() {
   // Client finalize handled by CHI_CLIENT destructor
@@ -140,9 +140,9 @@ void CleanupChimaera() {
  */
 chi::PoolId CreateCorePool() {
   chi::PoolId core_pool_id = chi::PoolId(1, 1);
-  wrp_cte::core::Client core_client;
+  clio::cte::core::Client core_client;
 
-  wrp_cte::core::CreateParams core_params;
+  clio::cte::core::CreateParams core_params;
   auto create_task = core_client.AsyncCreate(
       chi::PoolQuery::Local(),
       "test_core_pool",
@@ -160,7 +160,7 @@ chi::PoolId CreateCompressorPool() {
   chi::PoolId compressor_pool_id = chi::PoolId(2, 1);
   Client compressor_client;
 
-  auto create_task = compressor_client.AsyncCreate(
+  auto create_task = compressor_client.AsyncCreateCompressor(
       chi::PoolQuery::Local(),
       "test_compressor_pool",
       compressor_pool_id);
@@ -175,9 +175,9 @@ chi::PoolId CreateCompressorPool() {
 struct CTETestFixture {
   chi::PoolId core_pool_id_;
   chi::PoolId compressor_pool_id_;
-  wrp_cte::core::Client core_client_;
+  clio::cte::core::Client core_client_;
   Client compressor_client_;
-  wrp_cte::core::TagId tag_id_;
+  clio::cte::core::TagId tag_id_;
 
   CTETestFixture() {
     InitializeChimaera();
@@ -199,8 +199,8 @@ struct CTETestFixture {
   /**
    * Allocate shared memory and copy data to it
    */
-  hipc::FullPtr<char> AllocateAndCopyData(const std::vector<char>& data) {
-    auto shm_buffer = CHI_IPC->AllocateBuffer(data.size());
+  ctp::ipc::FullPtr<char> AllocateAndCopyData(const std::vector<char>& data) {
+    auto shm_buffer = CLIO_IPC->AllocateBuffer(data.size());
     if (!shm_buffer.IsNull()) {
       std::memcpy(shm_buffer.ptr_, data.data(), data.size());
     }
@@ -210,7 +210,7 @@ struct CTETestFixture {
   /**
    * Read data from shared memory
    */
-  std::vector<char> ReadFromSharedMemory(hipc::FullPtr<char>& buffer, size_t size) {
+  std::vector<char> ReadFromSharedMemory(ctp::ipc::FullPtr<char>& buffer, size_t size) {
     std::vector<char> data(size);
     if (!buffer.IsNull()) {
       std::memcpy(data.data(), buffer.ptr_, size);
@@ -234,7 +234,7 @@ TEST_CASE("Basic Compress and Store", "[compressor][functional][basic]") {
   auto shm_buffer = fixture.AllocateAndCopyData(test_data);
   REQUIRE(!shm_buffer.IsNull());
 
-  hipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
+  ctp::ipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
 
   Context context;
   context.compress_lib_ = CompLib::LZ4;
@@ -258,7 +258,7 @@ TEST_CASE("Basic Compress and Store", "[compressor][functional][basic]") {
   INFO("Compression completed successfully");
 
   // Cleanup
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
 }
 
 /**
@@ -274,7 +274,7 @@ TEST_CASE("Decompress and Retrieve", "[compressor][functional][basic]") {
   auto put_buffer = fixture.AllocateAndCopyData(original_data);
   REQUIRE(!put_buffer.IsNull());
 
-  hipc::ShmPtr<> put_blob_data = put_buffer.shm_.template Cast<void>();
+  ctp::ipc::ShmPtr<> put_blob_data = put_buffer.shm_.template Cast<void>();
 
   Context context;
   context.compress_lib_ = CompLib::LZ4;
@@ -294,15 +294,15 @@ TEST_CASE("Decompress and Retrieve", "[compressor][functional][basic]") {
   compress_task.Wait();
   REQUIRE(compress_task->return_code_ == 0);
 
-  CHI_IPC->FreeBuffer(put_buffer);
+  CLIO_IPC->FreeBuffer(put_buffer);
 
   // Now retrieve and decompress
-  auto get_buffer = CHI_IPC->AllocateBuffer(original_data.size());
+  auto get_buffer = CLIO_IPC->AllocateBuffer(original_data.size());
   REQUIRE(!get_buffer.IsNull());
 
-  hipc::ShmPtr<> get_blob_data = get_buffer.shm_.template Cast<void>();
+  ctp::ipc::ShmPtr<> get_blob_data = get_buffer.shm_.template Cast<void>();
 
-  auto decompress_task = fixture.compressor_client_.AsyncDecompress(
+  auto decompress_task = fixture.compressor_client_.AsyncDecompressExplicit(
       chi::PoolQuery::Local(),
       fixture.tag_id_,
       "test_blob_roundtrip",
@@ -321,7 +321,7 @@ TEST_CASE("Decompress and Retrieve", "[compressor][functional][basic]") {
   REQUIRE(std::memcmp(original_data.data(), retrieved_data.data(), original_data.size()) == 0);
 
   INFO("Round-trip compression/decompression verified");
-  CHI_IPC->FreeBuffer(get_buffer);
+  CLIO_IPC->FreeBuffer(get_buffer);
 }
 
 /**
@@ -336,7 +336,7 @@ TEST_CASE("Dynamic Schedule Compression", "[compressor][functional][dynamic]") {
   auto shm_buffer = fixture.AllocateAndCopyData(test_data);
   REQUIRE(!shm_buffer.IsNull());
 
-  hipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
+  ctp::ipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
 
   Context context;
   context.dynamic_compress_ = 0;  // Enable dynamic compression selection
@@ -359,7 +359,7 @@ TEST_CASE("Dynamic Schedule Compression", "[compressor][functional][dynamic]") {
   INFO("DynamicSchedule selected compression library: " << task->context_.compress_lib_);
   INFO("Tier score: " << task->tier_score_);
 
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
 }
 
 /**
@@ -382,7 +382,7 @@ TEST_CASE("Multiple Compression Libraries", "[compressor][functional][libraries]
       auto shm_buffer = fixture.AllocateAndCopyData(test_data);
       REQUIRE(!shm_buffer.IsNull());
 
-      hipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
+      ctp::ipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
 
       Context context;
       context.compress_lib_ = lib_id;
@@ -405,7 +405,7 @@ TEST_CASE("Multiple Compression Libraries", "[compressor][functional][libraries]
       REQUIRE(task->return_code_ == 0);
       INFO(lib_name << " compression completed successfully");
 
-      CHI_IPC->FreeBuffer(shm_buffer);
+      CLIO_IPC->FreeBuffer(shm_buffer);
     }
   }
 }
@@ -422,7 +422,7 @@ TEST_CASE("No Compression Passthrough", "[compressor][functional][passthrough]")
   auto shm_buffer = fixture.AllocateAndCopyData(test_data);
   REQUIRE(!shm_buffer.IsNull());
 
-  hipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
+  ctp::ipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
 
   Context context;
   context.compress_lib_ = 0;  // No compression
@@ -443,7 +443,7 @@ TEST_CASE("No Compression Passthrough", "[compressor][functional][passthrough]")
   REQUIRE(task->return_code_ == 0);
   INFO("Passthrough (no compression) completed successfully");
 
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
 }
 
 /**
@@ -464,7 +464,7 @@ TEST_CASE("Error Handling - Invalid Parameters", "[compressor][functional][error
         "test_blob_null",
         0,
         test_data.size(),
-        hipc::ShmPtr<>::GetNull(),  // Null data
+        ctp::ipc::ShmPtr<>::GetNull(),  // Null data
         0.5f,
         context,
         0,
@@ -480,7 +480,7 @@ TEST_CASE("Error Handling - Invalid Parameters", "[compressor][functional][error
     auto shm_buffer = fixture.AllocateAndCopyData(test_data);
     REQUIRE(!shm_buffer.IsNull());
 
-    hipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
+    ctp::ipc::ShmPtr<> blob_data = shm_buffer.shm_.template Cast<void>();
 
     Context context;
     context.compress_lib_ = CompLib::LZ4;
@@ -502,7 +502,7 @@ TEST_CASE("Error Handling - Invalid Parameters", "[compressor][functional][error
     REQUIRE(task->return_code_ != 0);
     INFO("Correctly handled zero size");
 
-    CHI_IPC->FreeBuffer(shm_buffer);
+    CLIO_IPC->FreeBuffer(shm_buffer);
   }
 }
 

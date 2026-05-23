@@ -90,11 +90,11 @@ check_prerequisites() {
     fi
     print_success "hostfile found"
 
-    if [ ! -f "wrp_config.yaml" ]; then
-        print_error "wrp_config.yaml not found"
+    if [ ! -f "clio_config.yaml" ]; then
+        print_error "clio_config.yaml not found"
         exit 1
     fi
-    print_success "wrp_config.yaml found"
+    print_success "clio_config.yaml found"
 }
 
 # Function to clean up previous runs
@@ -119,6 +119,17 @@ start_environment() {
     export HOST_GID=$(id -g)
 
     print_msg "$BLUE" "Starting containers..."
+    # Auto-detect Docker image: use nvidia image if binary requires CUDA
+    if [ -z "${IOWARP_DOCKER_IMAGE:-}" ]; then
+        CHIMAERA_BIN="/workspace/build/bin/chimaera"
+        [ ! -f "$CHIMAERA_BIN" ] && CHIMAERA_BIN="${IOWARP_CORE_ROOT:-/workspace}/build/bin/chimaera"
+        if [ -f "$CHIMAERA_BIN" ] && ldd "$CHIMAERA_BIN" 2>/dev/null | grep -q "libcudart"; then
+            export IOWARP_DOCKER_IMAGE="iowarp/deps-nvidia:latest"
+        else
+            export IOWARP_DOCKER_IMAGE="iowarp/deps-cpu:latest"
+        fi
+    fi
+
     docker compose up -d
 
     # Wait for containers to be ready with retry logic

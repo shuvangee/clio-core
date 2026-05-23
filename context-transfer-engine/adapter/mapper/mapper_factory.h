@@ -31,14 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WRP_CTE_ADAPTER_FACTORY_H
-#define WRP_CTE_ADAPTER_FACTORY_H
+#ifndef CLIO_CTE_ADAPTER_FACTORY_H
+#define CLIO_CTE_ADAPTER_FACTORY_H
 
 #include "abstract_mapper.h"
 #include "balanced_mapper.h"
-#include "hermes_shm/util/singleton.h"
+#include "clio_ctp/util/singleton.h"
 
-namespace wrp::cae {
+namespace clio::cae {
 /**
  A class to represent mapper factory pattern
 */
@@ -53,7 +53,7 @@ class MapperFactory {
   static AbstractMapper* Get(const MapperType& type) {
     switch (type) {
       case MapperType::kBalancedMapper: {
-        return hshm::Singleton<BalancedMapper>::GetInstance();
+        return ctp::Singleton<BalancedMapper>::GetInstance();
       }
       default: {
         // TODO(llogan): @error_handling Mapper not implemented
@@ -62,5 +62,5 @@ class MapperFactory {
     return NULL;
   }
 };
-}  // namespace wrp::cae
-#endif  // WRP_CTE_ADAPTER_FACTORY_H
+}  // namespace clio::cae
+#endif  // CLIO_CTE_ADAPTER_FACTORY_H

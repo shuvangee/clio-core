@@ -1,0 +1,69 @@
+# WfCommons Srasearch (30 GiB) + CTE POSIX adapter (bare-metal).
+#
+# Stack mirrors ior_posix_baremetal.yaml:
+#   clio_runtime (shm IPC) -> clio_cte (25 GiB RAM bdev) -> wfbench tasks
+#   are LD_PRELOAD'd with libclio_cte_posix.so, and run_wfbench.py
+#   rewrites every task I/O path to a "clio::"-prefixed form so the
+#   POSIX adapter intercepts it.
+#
+# I/O-active settings:
+#   cpu_work:   1   (MUST be >0; wfbench gates io_alternate on
+#                    cpu-benchmark progress; cpu_work=0 silently
+#                    disables ALL reads/writes)
+#   percent_cpu: 1.0 (10 cpu threads, 0 mem threads — avoids
+#                     stress-ng which is not installed on this host;
+#                     io_alternate gets cpu_percent updates from
+#                     cpu-benchmark and runs the workflow I/O)
+#   drop_page_cache: true  (fsync + posix_fadvise(DONTNEED) after each
+#                     read/write so NFS comparisons aren't biased by
+#                     the kernel page cache — CTE has no equivalent
+#                     client-side cache, so this puts both stacks on
+#                     equal footing)
+#
+# nprocs/ppn=24 is nominal on the wfcommons pkg (the driver is a
+# single Python process; task fanout comes from the DAG width and
+# BashTranslator's bash `&`+`wait`).
+#
+# Per-recipe num_tasks set to each recipe's base-graph minimum so the
+# 30 GiB total footprint is distributed across the fewest files
+# possible, maximising per-file size. WfCommons refuses to generate
+# DAGs smaller than the base graph.
+#
+# Recipe:         srasearch (WfChef-based synthetic workflow)
+# num_tasks:      24 (recipe minimum)
+# Data footprint: 30 GiB total (~1280 MB per file estimate)
+# CTE bdev:       ram::cte_ram, 32 GiB (fits 30 GiB peak with 2 GiB headroom)
+# Run:            jarvis ppl load yaml <this file> && jarvis ppl run
+
+name: wfcommons_srasearch_clio_30gb
+
+install_manager: default
+
+pkgs:
+  - pkg_type: jarvis_clio_core.clio_runtime
+    pkg_name: cte_runtime
+    ipc_mode: shm
+
+  - pkg_type: jarvis_clio_core.clio_cte
+    pkg_name: cte
+    devices:
+      - ["ram::cte_ram", "32G", 1.0]
+
+  - pkg_type: builtin.wfcommons
+    pkg_name: wfcommons
+    recipe: srasearch
+    num_tasks: 24
+    cpu_work: 1
+    percent_cpu: 1.0
+    drop_page_cache: true
+    data_footprint: "30G"
+    nprocs: 24
+    ppn: 24
+    out: $HOME/jarvis-runs/wfcommons_srasearch_clio_30gb
+    clio_prefix: true
+    interceptors: [cte_posix]
+
+interceptors:
+  - pkg_type: jarvis_clio_core.clio_adapters
+    pkg_name: cte_posix
+    posix: true

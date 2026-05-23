@@ -1,11 +1,17 @@
 # IOWarp Core - CUDA Variant
-# CUDA-enabled debug build using CMakePresets.json "cuda-debug" preset
+# CUDA-enabled build using CMakePresets.json "cuda-release" preset
+# (producer-only GPU; preset renamed from "cuda-debug" in the GPU2CPU refactor)
 #
-# Usage: rattler-build build --recipe recipe/ --variant-config variants/cuda.yaml
+# Usage: IOWARP_PRESET=cuda-release conda build installers/conda/ -c conda-forge
 
-preset: cuda-debug
+preset:
+  - cuda-release
 
-cuda_enabled: "ON"
-rocm_enabled: "OFF"
-mpi_enabled: "OFF"
-mpi_impl: nompi
+cuda_enabled:
+  - "ON"
+rocm_enabled:
+  - "OFF"
+mpi_enabled:
+  - "OFF"
+mpi_impl:
+  - nompi

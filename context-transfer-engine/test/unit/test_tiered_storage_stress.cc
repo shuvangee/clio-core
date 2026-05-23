@@ -41,10 +41,9 @@
  * - ReorganizeBlob all data to score 0.0 (tests capacity handling)
  */
 
-#include <algorithm>
-#include <chimaera/chimaera.h>
-#include <wrp_cte/core/core_client.h>
-#include <wrp_cte/core/core_tasks.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_cte/core/core_client.h>
+#include <clio_cte/core/core_tasks.h>
 
 #include <chrono>
 #include <cstdio>
@@ -59,6 +58,11 @@
 #include "simple_test.h"
 
 namespace fs = std::filesystem;
+
+static std::string chi_test_data_dir() {
+  const char *d = chi::env::GetCompat("TEST_DATA_DIR");
+  return (d && *d) ? d : ".";
+}
 
 // Test constants
 static constexpr chi::u64 kDramCapacity = 64 * 1024 * 1024;   // 64MB
@@ -83,10 +87,10 @@ class TieredStorageStressFixture {
     INFO("=== Initializing Tiered Storage Stress Test ===");
 
     // Setup paths
-    std::string home_dir = hshm::SystemInfo::Getenv("HOME");
+    std::string home_dir = ctp::SystemInfo::Getenv("HOME");
     REQUIRE(!home_dir.empty());
-    config_path_ = home_dir + "/tiered_stress_config.yaml";
-    file_storage_path_ = home_dir + "/tiered_stress_storage.bin";
+    config_path_ = chi_test_data_dir() + "/tiered_stress_config.yaml";
+    file_storage_path_ = chi_test_data_dir() + "/tiered_stress_storage.bin";
 
     // Clean up existing files
     Cleanup();
@@ -95,16 +99,18 @@ class TieredStorageStressFixture {
     CreateConfigFile();
 
     // Set environment variable for runtime config
-    hshm::SystemInfo::Setenv("WRP_RUNTIME_CONF", config_path_, 1);
+    // CHI_SERVER_CONF is checked first, so set it to override any existing value
+    setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
+    setenv("CLIO_SERVER_CONF", config_path_.c_str(), 1);
 
-    // Initialize Chimaera runtime
+    // Initialize CLIO Runtime runtime
     bool success = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
     REQUIRE(success);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Initialize CTE client
-    success = wrp_cte::core::WRP_CTE_CLIENT_INIT();
+    success = clio::cte::core::CLIO_CTE_CLIENT_INIT();
     REQUIRE(success);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -151,8 +157,8 @@ runtime:
   max_sleep: 50000
 
 compose:
-  - mod_name: wrp_cte_core
-    pool_name: wrp_cte
+  - mod_name: clio_cte_core
+    pool_name: clio_cte
     pool_query: local
     pool_id: 512.0
 
@@ -217,20 +223,20 @@ TEST_CASE("TieredStorage - Put 128MB with 64MB DRAM", "[tiered][stress][put]") {
   REQUIRE(g_fixture != nullptr);
   REQUIRE(g_fixture->initialized_);
 
-  auto* cte_client = WRP_CTE_CLIENT;
+  auto* cte_client = CLIO_CTE_CLIENT;
   REQUIRE(cte_client != nullptr);
 
   // Create a tag for our test blobs
   std::string tag_name = "stress_test_tag";
-  wrp_cte::core::Tag tag(tag_name);
+  clio::cte::core::Tag tag(tag_name);
 
   INFO("Putting " << kNumBlobs << " blobs (" << (kTotalDataSize / (1024 * 1024))
                   << " MB total) with only 64MB DRAM available");
 
   // Allocate shared memory buffer (reuse for all blobs)
-  auto shm_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto shm_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!shm_buffer.IsNull());
-  hipc::ShmPtr<> shm_ptr = shm_buffer.shm_.template Cast<void>();
+  ctp::ipc::ShmPtr<> shm_ptr = shm_buffer.shm_.template Cast<void>();
 
   int success_count = 0;
   int failure_count = 0;
@@ -258,7 +264,7 @@ TEST_CASE("TieredStorage - Put 128MB with 64MB DRAM", "[tiered][stress][put]") {
     }
   }
 
-  CHI_IPC->FreeBuffer(shm_buffer);
+  CLIO_IPC->FreeBuffer(shm_buffer);
 
   INFO("Put results: " << success_count << " succeeded, " << failure_count
                        << " failed");
@@ -279,13 +285,13 @@ TEST_CASE("TieredStorage - ReorganizeBlob to score 0",
   REQUIRE(g_fixture != nullptr);
   REQUIRE(g_fixture->initialized_);
 
-  auto* cte_client = WRP_CTE_CLIENT;
+  auto* cte_client = CLIO_CTE_CLIENT;
   REQUIRE(cte_client != nullptr);
 
   // Get the tag we created in the previous test
   std::string tag_name = "stress_test_tag";
-  wrp_cte::core::Tag tag(tag_name);
-  wrp_cte::core::TagId tag_id = tag.GetTagId();
+  clio::cte::core::Tag tag(tag_name);
+  clio::cte::core::TagId tag_id = tag.GetTagId();
 
   INFO("Reorganizing all " << kNumBlobs << " blobs to score 0.0 (DRAM tier)");
   INFO("Note: Only 64MB DRAM available for 128MB of data");
@@ -331,12 +337,12 @@ TEST_CASE("TieredStorage - Verify data integrity",
 
   // Get the tag
   std::string tag_name = "stress_test_tag";
-  wrp_cte::core::Tag tag(tag_name);
+  clio::cte::core::Tag tag(tag_name);
 
   INFO("Verifying data integrity for all " << kNumBlobs << " blobs");
 
   // Allocate buffer for reading
-  auto read_buffer = CHI_IPC->AllocateBuffer(kBlobSize);
+  auto read_buffer = CLIO_IPC->AllocateBuffer(kBlobSize);
   REQUIRE(!read_buffer.IsNull());
 
   int verified_count = 0;
@@ -360,7 +366,7 @@ TEST_CASE("TieredStorage - Verify data integrity",
     }
   }
 
-  CHI_IPC->FreeBuffer(read_buffer);
+  CLIO_IPC->FreeBuffer(read_buffer);
 
   INFO("Integrity results: " << verified_count << " verified, " << corrupted_count
                              << " corrupted");
@@ -378,12 +384,12 @@ TEST_CASE("TieredStorage - Cleanup", "[tiered][stress][cleanup]") {
   REQUIRE(g_fixture != nullptr);
   REQUIRE(g_fixture->initialized_);
 
-  auto* cte_client = WRP_CTE_CLIENT;
+  auto* cte_client = CLIO_CTE_CLIENT;
   REQUIRE(cte_client != nullptr);
 
   std::string tag_name = "stress_test_tag";
-  wrp_cte::core::Tag tag(tag_name);
-  wrp_cte::core::TagId tag_id = tag.GetTagId();
+  clio::cte::core::Tag tag(tag_name);
+  clio::cte::core::TagId tag_id = tag.GetTagId();
 
   INFO("Cleaning up all blobs");
 

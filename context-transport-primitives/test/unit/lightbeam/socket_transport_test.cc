@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <hermes_shm/lightbeam/socket_transport.h>
-#include <hermes_shm/lightbeam/transport_factory_impl.h>
+#include <clio_ctp/lightbeam/socket_transport.h>
+#include <clio_ctp/lightbeam/transport_factory_impl.h>
 
 #include <cassert>
 #include <chrono>
@@ -41,7 +41,7 @@
 #include <thread>
 #include <vector>
 
-using namespace hshm::lbm;
+using namespace ctp::lbm;
 
 // Custom metadata class that inherits from LbmMeta
 class TestMeta : public LbmMeta<> {
@@ -76,9 +76,9 @@ void TestBasicTcpTransfer() {
   send_meta.request_id = 42;
   send_meta.operation = "test_op";
 
-  Bulk bulk1 = client->Expose(hipc::FullPtr<char>(const_cast<char*>(data1)),
+  Bulk bulk1 = client->Expose(ctp::ipc::FullPtr<char>(const_cast<char*>(data1)),
                               size1, BULK_XFER);
-  Bulk bulk2 = client->Expose(hipc::FullPtr<char>(const_cast<char*>(data2)),
+  Bulk bulk2 = client->Expose(ctp::ipc::FullPtr<char>(const_cast<char*>(data2)),
                               size2, BULK_XFER);
 
   send_meta.send.push_back(bulk1);
@@ -124,6 +124,7 @@ void TestBasicTcpTransfer() {
   assert(received1 == data1);
   assert(received2 == data2);
 
+  server->ClearRecvHandles(recv_meta);
   std::cout << "[Socket TCP Basic] Test passed!\n";
 }
 
@@ -142,7 +143,7 @@ void TestMultipleBulks() {
   LbmMeta<> send_meta;
   for (const auto& chunk : data_chunks) {
     Bulk bulk = client->Expose(
-        hipc::FullPtr<char>(const_cast<char*>(chunk.data())),
+        ctp::ipc::FullPtr<char>(const_cast<char*>(chunk.data())),
         chunk.size(), BULK_XFER);
     send_meta.send.push_back(bulk);
     send_meta.send_bulks++;
@@ -176,6 +177,7 @@ void TestMultipleBulks() {
     assert(received == data_chunks[i]);
   }
 
+  server->ClearRecvHandles(recv_meta);
   std::cout << "[Socket Multiple Bulks] Test passed!\n";
 }
 
@@ -194,7 +196,7 @@ void TestUnixDomainSocket() {
   send_meta.request_id = 99;
   send_meta.operation = "ipc_test";
 
-  Bulk bulk = client->Expose(hipc::FullPtr<char>(const_cast<char*>(data)),
+  Bulk bulk = client->Expose(ctp::ipc::FullPtr<char>(const_cast<char*>(data)),
                              size, BULK_XFER);
   send_meta.send.push_back(bulk);
   send_meta.send_bulks = 1;
@@ -227,6 +229,7 @@ void TestUnixDomainSocket() {
   std::cout << "Received: " << received << "\n";
   assert(received == data);
 
+  server->ClearRecvHandles(recv_meta);
   std::cout << "[Socket IPC] Test passed!\n";
 }
 

@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WRP_CTE_SYNTHETIC_DATA_GENERATOR_H_
-#define WRP_CTE_SYNTHETIC_DATA_GENERATOR_H_
+#ifndef CLIO_CTE_SYNTHETIC_DATA_GENERATOR_H_
+#define CLIO_CTE_SYNTHETIC_DATA_GENERATOR_H_
 
 #include <vector>
 #include <string>
@@ -42,7 +42,7 @@
 #include <map>
 #include <sstream>
 
-namespace wrp_cte {
+namespace clio::cte {
 
 /**
  * Data pattern types for synthetic workload generation
@@ -632,6 +632,6 @@ class SyntheticDataGenerator {
   }
 };
 
-}  // namespace wrp_cte
+}  // namespace clio_cte
 
-#endif  // WRP_CTE_SYNTHETIC_DATA_GENERATOR_H_
+#endif  // CLIO_CTE_SYNTHETIC_DATA_GENERATOR_H_

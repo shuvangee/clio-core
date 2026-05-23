@@ -33,17 +33,17 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "hermes_shm/data_structures/ipc/ring_buffer.h"
-#include "hermes_shm/memory/allocator/arena_allocator.h"
-#include "hermes_shm/memory/allocator/buddy_allocator.h"
-#include "hermes_shm/memory/backend/gpu_malloc.h"
-#include "hermes_shm/util/gpu_api.h"
+#include "clio_ctp/data_structures/ipc/ring_buffer.h"
+#include "clio_ctp/memory/allocator/arena_allocator.h"
+#include "clio_ctp/memory/allocator/buddy_allocator.h"
+#include "clio_ctp/memory/backend/gpu_malloc.h"
+#include "clio_ctp/util/gpu_api.h"
 
-using hshm::ipc::ArenaAllocator;
-using hshm::ipc::GpuMalloc;
-using hshm::ipc::MemoryBackend;
-using hshm::ipc::MemoryBackendId;
-using hshm::ipc::mpsc_ring_buffer;
+using ctp::ipc::ArenaAllocator;
+using ctp::ipc::GpuMalloc;
+using ctp::ipc::MemoryBackend;
+using ctp::ipc::MemoryBackendId;
+using ctp::ipc::mpsc_ring_buffer;
 
 /**
  * GPU kernel to create and initialize an allocator
@@ -148,7 +148,7 @@ TEST_CASE("GpuMalloc", "[gpu][backend]") {
     REQUIRE(init_success);
 
     // Step 2: Create an allocator on that backend (using GPU kernel)
-    using AllocT = hipc::BuddyAllocator;
+    using AllocT = ctp::ipc::BuddyAllocator;
     AllocT **alloc_result_dev;
     cudaMalloc(&alloc_result_dev, sizeof(AllocT *));
 

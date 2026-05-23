@@ -35,12 +35,12 @@
  * Unit tests for Compose feature
  */
 
-#include <chimaera/chimaera.h>
-#include <chimaera/config_manager.h>
-#include <chimaera/admin/admin_client.h>
-#include <chimaera/bdev/bdev_client.h>
+#include <clio_runtime/clio_runtime.h>
+#include <clio_runtime/config_manager.h>
+#include <clio_runtime/admin/admin_client.h>
+#include <clio_runtime/bdev/bdev_client.h>
 #include <fstream>
-#include <hermes_shm/util/logging.h>
+#include <clio_ctp/util/logging.h>
 
 #include "simple_test.h"
 
@@ -59,7 +59,7 @@ std::string CreateComposeConfig() {
     config_file << "  port: 9413\n";
     config_file << "\n";
     config_file << "compose:\n";
-    config_file << "- mod_name: chimaera_bdev\n";
+    config_file << "- mod_name: clio_bdev\n";
     config_file << "  pool_name: /tmp/test_bdev.dat\n";
     config_file << "  pool_query: dynamic\n";
     config_file << "  pool_id: 200.0\n";
@@ -118,7 +118,7 @@ TEST_CASE("Parse compose configuration", "[compose]") {
   std::string config_path = CreateComposeConfig();
 
   // Load configuration
-  auto* config_manager = CHI_CONFIG_MANAGER;
+  auto* config_manager = CLIO_CONFIG_MANAGER;
   REQUIRE(config_manager != nullptr);
 
   REQUIRE(config_manager->LoadYaml(config_path));
@@ -130,10 +130,10 @@ TEST_CASE("Parse compose configuration", "[compose]") {
   // (there may be more from server initialization)
   REQUIRE(compose_config.pools_.size() >= 1);
 
-  // Find our test pool configuration (chimaera_bdev with pool_name /tmp/test_bdev.dat)
+  // Find our test pool configuration (clio_bdev with pool_name /tmp/test_bdev.dat)
   bool found_test_pool = false;
   for (const auto& pool_config : compose_config.pools_) {
-    if (pool_config.mod_name_ == "chimaera_bdev" &&
+    if (pool_config.mod_name_ == "clio_bdev" &&
         pool_config.pool_name_ == "/tmp/test_bdev.dat") {
       // Verify pool configuration
       REQUIRE(pool_config.pool_id_.major_ == 200);
@@ -156,13 +156,13 @@ TEST_CASE("Admin client Compose method", "[compose]") {
   std::string config_path = CreateComposeConfig();
 
   // Load configuration
-  auto* config_manager = CHI_CONFIG_MANAGER;
+  auto* config_manager = CLIO_CONFIG_MANAGER;
   REQUIRE(config_manager != nullptr);
 
   REQUIRE(config_manager->LoadYaml(config_path));
 
   // Get admin client
-  auto* admin_client = CHI_ADMIN;
+  auto* admin_client = CLIO_ADMIN;
   REQUIRE(admin_client != nullptr);
 
   // Get compose config
@@ -179,12 +179,12 @@ TEST_CASE("Admin client Compose method", "[compose]") {
 
   // Verify pool was created by checking if we can access it
   chi::PoolId bdev_pool_id(200, 0);
-  chimaera::bdev::Client bdev_client(bdev_pool_id);
+  clio::run::bdev::Client bdev_client(bdev_pool_id);
 
   // Try to allocate blocks to verify the pool exists and is functional
   auto alloc_task = bdev_client.AsyncAllocateBlocks(chi::PoolQuery::Local(), 1024);
   alloc_task.Wait();
-  std::vector<chimaera::bdev::Block> blocks;
+  std::vector<clio::run::bdev::Block> blocks;
   for (size_t i = 0; i < alloc_task->blocks_.size(); ++i) {
     blocks.push_back(alloc_task->blocks_[i]);
   }

@@ -31,19 +31,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WRP_CTE_ADAPTER_MPIIO_H
-#define WRP_CTE_ADAPTER_MPIIO_H
+#ifndef CLIO_CTE_ADAPTER_MPIIO_H
+#define CLIO_CTE_ADAPTER_MPIIO_H
 #include <dlfcn.h>
 #include <mpi.h>
 
 #include <iostream>
 #include <string>
 
-#include "hermes_shm/util/logging.h"
-#ifdef WRP_CTE_MPICH
+#include "clio_ctp/util/logging.h"
+#ifdef CLIO_CTE_MPICH
 #include <mpio.h>
 #endif
-#include "hermes_shm/util/real_api.h"
+#include "clio_ctp/util/real_api.h"
 
 #ifndef MPI_MODE_TRUNCATE
 #define MPI_MODE_TRUNCATE 0
@@ -114,9 +114,9 @@ typedef int (*MPI_File_iwrite_shared_t)(MPI_File fh, const void* buf, int count,
 typedef int (*MPI_File_sync_t)(MPI_File fh);
 }
 
-namespace wrp::cae {
+namespace clio::cae {
 
-using hshm::RealApi;
+using ctp::RealApi;
 
 /** Pointers to the real mpiio API */
 class MpiioApi : public RealApi {
@@ -252,13 +252,13 @@ class MpiioApi : public RealApi {
     REQUIRE_API(MPI_File_sync)
   }
 };
-}  // namespace wrp::cae
+}  // namespace clio::cae
 
-#include "hermes_shm/util/singleton.h"
+#include "clio_ctp/util/singleton.h"
 
 /** Simplify access to the stateless MpiioFs Singleton */
-#define WRP_CTE_MPIIO_API \
-  hshm::Singleton<::wrp::cae::MpiioApi>::GetInstance()
-#define WRP_CTE_MPIIO_API_T wrp::cae::MpiioApi*
+#define CLIO_CTE_MPIIO_API \
+  ctp::Singleton<::clio::cae::MpiioApi>::GetInstance()
+#define CLIO_CTE_MPIIO_API_T clio::cae::MpiioApi*
 
-#endif  // WRP_CTE_ADAPTER_MPIIO_H
+#endif  // CLIO_CTE_ADAPTER_MPIIO_H

@@ -1,5 +1,5 @@
-#include <chimaera/bdev/bdev_client.h>
-#include <wrp_cte/core/content_transfer_engine.h>
+#include <clio_runtime/bdev/bdev_client.h>
+#include <clio_cte/core/content_transfer_engine.h>
 
 // cxx-generated header: defines CteTagId shared struct
 #include "wrp-cte-rs/src/lib.rs.h"
@@ -10,7 +10,7 @@ bool cte_init(rust::Str config_path) {
   std::string path(config_path.data(), config_path.size());
   bool ok = chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true);
   if (!ok) return false;
-  return wrp_cte::core::WRP_CTE_CLIENT_INIT(path);
+  return clio::cte::core::CLIO_CTE_CLIENT_INIT(path);
 }
 
 std::unique_ptr<CteTag> tag_new(rust::Str tag_name) {
@@ -19,7 +19,7 @@ std::unique_ptr<CteTag> tag_new(rust::Str tag_name) {
 }
 
 std::unique_ptr<CteTag> tag_from_id(uint32_t major, uint32_t minor) {
-  wrp_cte::core::TagId tid(major, minor);
+  clio::cte::core::TagId tid(major, minor);
   return std::make_unique<CteTag>(tid);
 }
 
@@ -72,15 +72,15 @@ bool client_register_target(rust::Str target_path, uint64_t size) {
   std::string path(target_path.data(), target_path.size());
   // Create a bdev pool for this target
   chi::PoolId bdev_pool_id(800, 0);
-  chimaera::bdev::Client bdev_client(bdev_pool_id);
+  clio::run::bdev::Client bdev_client(bdev_pool_id);
   auto create_task = bdev_client.AsyncCreate(
       chi::PoolQuery::Dynamic(), path, bdev_pool_id,
-      chimaera::bdev::BdevType::kFile);
+      clio::run::bdev::BdevType::kFile);
   create_task.Wait();
   // Register with CTE
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
   auto reg_task = client->AsyncRegisterTarget(
-      path, chimaera::bdev::BdevType::kFile, size,
+      path, clio::run::bdev::BdevType::kFile, size,
       chi::PoolQuery::Local(), bdev_pool_id);
   reg_task.Wait();
   return true;
@@ -88,7 +88,7 @@ bool client_register_target(rust::Str target_path, uint64_t size) {
 
 bool client_del_tag(rust::Str name) {
   std::string tag_name(name.data(), name.size());
-  auto *client = WRP_CTE_CLIENT;
+  auto *client = CLIO_CTE_CLIENT;
   auto task = client->AsyncDelTag(tag_name);
   task.Wait();
   return true;

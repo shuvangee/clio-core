@@ -9,8 +9,8 @@ add_executable(test_distribution_classifier_exec
   test_distribution_classifier.cc
 )
 target_link_libraries(test_distribution_classifier_exec
-  wrp_cte::compressor_runtime
-  hshm::compress
+  clio::cte::compressor_runtime
+  ctp::compress
   Catch2::Catch2WithMain
 )
 add_test(NAME test_distribution_classifier COMMAND test_distribution_classifier_exec)
@@ -20,8 +20,8 @@ add_executable(test_linreg_table_predictor_exec
   test_linreg_table_predictor.cc
 )
 target_link_libraries(test_linreg_table_predictor_exec
-  wrp_cte::compressor_runtime
-  hshm::compress
+  clio::cte::compressor_runtime
+  ctp::compress
   Catch2::Catch2WithMain
 )
 add_test(NAME test_linreg_table_predictor COMMAND test_linreg_table_predictor_exec)
@@ -31,8 +31,8 @@ add_executable(test_qtable_predictor_exec
   test_qtable_predictor.cc
 )
 target_link_libraries(test_qtable_predictor_exec
-  wrp_cte::compressor_runtime
-  hshm::compress
+  clio::cte::compressor_runtime
+  ctp::compress
   Catch2::Catch2WithMain
 )
 add_test(NAME test_qtable_predictor COMMAND test_qtable_predictor_exec)
@@ -49,23 +49,19 @@ add_executable(test_compressor_functional
   test_compressor_functional.cc
 )
 
-# Include simple_test.h framework
-target_include_directories(test_compressor_functional PRIVATE
-  ${CMAKE_SOURCE_DIR}/test  # For unified simple_test.h
-)
 
 # Link against compressor runtime and dependencies
 target_link_libraries(test_compressor_functional
-  wrp_cte::compressor_runtime
-  wrp_cte::compressor_client
-  wrp_cte::core_runtime         # For Context type
-  wrp_cte::core_client          # For core client if needed
-  chimaera::admin_runtime       # For Chimaera runtime
+  clio::cte::compressor_runtime
+  clio::cte::compressor_client
+  clio::cte::core_runtime         # For Context type
+  clio::cte::core_client          # For core client if needed
+  chimaera::admin_runtime       # For CLIO Runtime
   chimaera::admin_client        # For admin client
   chimaera::bdev_runtime        # For bdev runtime
   chimaera::bdev_client         # For bdev client
-  hshm::compress                # For compression libraries
-  hshm::cxx                     # For HermesShm library
+  ctp::compress                # For compression libraries
+  ctp::cxx                     # For ClioCtp library
   ${CMAKE_THREAD_LIBS_INIT}     # Threading support
 )
 
@@ -113,31 +109,120 @@ install(TARGETS test_compressor_functional
 )
 
 #------------------------------------------------------------------------------
+# Transparent Compression Integration Test
+#------------------------------------------------------------------------------
+
+add_executable(test_transparent_compress
+  test_transparent_compress.cc
+)
+
+target_link_libraries(test_transparent_compress
+  clio::cte::compressor_runtime
+  clio::cte::compressor_client
+  clio::cte::core_runtime
+  clio::cte::core_client
+  chimaera::admin_runtime
+  chimaera::admin_client
+  chimaera::bdev_runtime
+  chimaera::bdev_client
+  ctp::compress
+  ctp::cxx
+  ${CMAKE_THREAD_LIBS_INIT}
+)
+
+# Copy compose config next to binary
+add_custom_command(TARGET test_transparent_compress POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_transparent_compress_config.yaml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_transparent_compress_config.yaml
+)
+
+add_test(NAME compressor_transparent_putblob
+    COMMAND test_transparent_compress "Transparent PutBlob")
+
+add_test(NAME compressor_transparent_getblob
+    COMMAND test_transparent_compress "Transparent GetBlob")
+
+set_tests_properties(
+    compressor_transparent_putblob
+    compressor_transparent_getblob
+    PROPERTIES
+        TIMEOUT 120
+        LABELS "compressor;transparent;integration;msan_skip"
+        RESOURCE_LOCK "chimaera_runtime"
+)
+
+install(TARGETS test_transparent_compress RUNTIME DESTINATION bin)
+
+#------------------------------------------------------------------------------
+# ADIOS2-style Transparent Compression Test (direct CTE client API, no Tag)
+#------------------------------------------------------------------------------
+
+add_executable(test_adios2_transparent_compress
+  test_adios2_transparent_compress.cc
+)
+
+target_link_libraries(test_adios2_transparent_compress
+  clio::cte::compressor_runtime
+  clio::cte::compressor_client
+  clio::cte::core_runtime
+  clio::cte::core_client
+  chimaera::admin_runtime
+  chimaera::admin_client
+  chimaera::bdev_runtime
+  chimaera::bdev_client
+  ctp::compress
+  ctp::cxx
+  ${CMAKE_THREAD_LIBS_INIT}
+)
+
+add_test(NAME adios2_transparent_compress_put
+    COMMAND test_adios2_transparent_compress "ADIOS2 transparent compress - PutBlob")
+
+add_test(NAME adios2_transparent_compress_get
+    COMMAND test_adios2_transparent_compress "ADIOS2 transparent compress - GetBlob")
+
+add_test(NAME adios2_transparent_compress_multistep
+    COMMAND test_adios2_transparent_compress "ADIOS2 transparent compress - multi-step")
+
+set_tests_properties(
+    adios2_transparent_compress_put
+    adios2_transparent_compress_get
+    adios2_transparent_compress_multistep
+    PROPERTIES
+        TIMEOUT 120
+        LABELS "compressor;adios2;transparent;integration;msan_skip"
+        RESOURCE_LOCK "chimaera_runtime"
+)
+
+install(TARGETS test_adios2_transparent_compress RUNTIME DESTINATION bin)
+
+#------------------------------------------------------------------------------
 # CTE Compression Benchmark
 #------------------------------------------------------------------------------
 
-# Create wrp_cte_compress_bench executable
-add_executable(wrp_cte_compress_bench
-    wrp_cte_compress_bench.cc
+# Create clio_cte_compress_bench executable
+add_executable(clio_cte_compress_bench
+    clio_cte_compress_bench.cc
 )
 
 # Add compression compile definition
-target_compile_definitions(wrp_cte_compress_bench PRIVATE WRP_CORE_ENABLE_COMPRESS)
+target_compile_definitions(clio_cte_compress_bench PRIVATE CLIO_CORE_ENABLE_COMPRESS)
 
 # Link required libraries
-target_link_libraries(wrp_cte_compress_bench
-    wrp_cte::core_client          # CTE core client library
-    wrp_cte::core_runtime         # CTE core runtime (for compression context)
-    chimaera::cxx                 # Core Chimaera library
-    hshm::compress                # Compression library
+target_link_libraries(clio_cte_compress_bench
+    clio::cte::core_client          # CTE core client library
+    clio::cte::core_runtime         # CTE core runtime (for compression context)
+    chimaera::cxx                 # Core CLIO Runtime library
+    ctp::compress                # Compression library
     ${CMAKE_THREAD_LIBS_INIT}     # Threading support (for pthread_setaffinity_np)
 )
 
 # Set C++ standard
-target_compile_features(wrp_cte_compress_bench PRIVATE cxx_std_17)
+target_compile_features(clio_cte_compress_bench PRIVATE cxx_std_17)
 
 # Install the compression benchmark executable
-install(TARGETS wrp_cte_compress_bench
+install(TARGETS clio_cte_compress_bench
     RUNTIME DESTINATION bin
 )
 
@@ -150,8 +235,8 @@ add_executable(test_compression_contention_exec
     test_compression_contention.cc
 )
 target_link_libraries(test_compression_contention_exec
-    hshm::compress
-    hshm::cxx
+    ctp::compress
+    ctp::cxx
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_compile_features(test_compression_contention_exec PRIVATE cxx_std_17)
@@ -177,9 +262,9 @@ target_include_directories(test_compression_benchmark_exec PRIVATE
     ${CMAKE_SOURCE_DIR}/context-transport-primitives/test/unit  # For basic_test.h
 )
 target_link_libraries(test_compression_benchmark_exec
-    wrp_cte::compressor_runtime
-    hshm::compress
-    hshm::cxx
+    clio::cte::compressor_runtime
+    ctp::compress
+    ctp::cxx
     Catch2::Catch2WithMain
     ${CMAKE_THREAD_LIBS_INIT}
 )
@@ -223,12 +308,12 @@ if(MPI_FOUND)
     )
 
     target_link_libraries(synthetic_workload_exec
-        wrp_cte::compressor_client
-        wrp_cte::core_client
-        wrp_cte::core_runtime
+        clio::cte::compressor_client
+        clio::cte::core_client
+        clio::cte::core_runtime
         chimaera::cxx
-        hshm::compress
-        hshm::cxx
+        ctp::compress
+        ctp::cxx
         ${MPI_CXX_LIBRARIES}
         ${CMAKE_THREAD_LIBS_INIT}
     )

@@ -32,12 +32,12 @@
  */
 
 #include "../../../context-runtime/test/simple_test.h"
-#include "hermes_shm/data_structures/ipc/multi_ring_buffer.h"
-#include "hermes_shm/memory/backend/malloc_backend.h"
-#include "hermes_shm/memory/allocator/arena_allocator.h"
+#include "clio_ctp/data_structures/ipc/multi_ring_buffer.h"
+#include "clio_ctp/memory/backend/malloc_backend.h"
+#include "clio_ctp/memory/allocator/arena_allocator.h"
 #include <string>
 
-using namespace hshm::ipc;
+using namespace ctp::ipc;
 
 /**
  * Helper function to create an ArenaAllocator for testing

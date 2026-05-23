@@ -42,8 +42,9 @@ target_include_directories(iowarp_engine PUBLIC
 )
 
 target_link_libraries(iowarp_engine PUBLIC
-  wrp_cte::core_client
+  clio::cte::core_client
   adios2::adios2
+  curl
 )
 
 # Add MPI support if available
@@ -61,8 +62,8 @@ install(
   TARGETS
   iowarp_engine
   EXPORT
-  ${WRP_CTE_EXPORTED_TARGETS}
-  LIBRARY DESTINATION ${WRP_CTE_INSTALL_LIB_DIR}
-  ARCHIVE DESTINATION ${WRP_CTE_INSTALL_LIB_DIR}
-  RUNTIME DESTINATION ${WRP_CTE_INSTALL_BIN_DIR}
+  ${CLIO_CTE_EXPORTED_TARGETS}
+  LIBRARY DESTINATION ${CLIO_CTE_INSTALL_LIB_DIR}
+  ARCHIVE DESTINATION ${CLIO_CTE_INSTALL_LIB_DIR}
+  RUNTIME DESTINATION ${CLIO_CTE_INSTALL_BIN_DIR}
 )

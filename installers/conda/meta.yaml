@@ -1,0 +1,75 @@
+{# Conda package version.  Originally driven by an environ.get(PKG_VERSION,
+   '1.0.0') jinja, mirroring the pip wheel.  conda-build 26.x sandboxed
+   the jinja `environ` so neither the PKG_VERSION env var nor the
+   default fallback resolves anymore — `version` evaluates to the
+   literal string "None" and the resulting "iowarp-core-None-..." pkg
+   name then fails libmamba's _test_env solve.  Hardcode until conda-
+   build exposes a working environ-bridge again; the CMake-side source
+   of truth is in /CMakeLists.txt project(iowarp-core VERSION X.Y.Z),
+   keep this number in sync when bumping. #}
+{% set version = "1.5.8" %}
+{% set preset = environ.get('IOWARP_PRESET', 'release') %}
+
+package:
+  name: iowarp-core
+  version: {{ version }}
+
+source:
+  path: ../..
+
+build:
+  number: 0
+  string: {{ preset.replace('-', '_') }}_h{{ PKG_HASH }}
+  script_env:
+    - IOWARP_PRESET
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}
+    - cmake >=3.20
+    - make
+    - pkg-config
+  host:
+    - python
+    - zeromq
+    - yaml-cpp
+    - cereal
+    - msgpack-c
+    - hdf5
+    - catch2
+    - libaio      # [linux]
+    - liburing    # [linux]
+  run:
+    - python
+    - zeromq
+    - yaml-cpp
+    - cereal
+    - msgpack-c
+    - hdf5
+    - catch2
+    - libaio      # [linux]
+    - liburing    # [linux]
+    - pyyaml
+    - msgpack-python
+    - flask
+
+test:
+  commands:
+    - test -f $PREFIX/lib/libchimaera_cxx.so    # [linux]
+    - test -f $PREFIX/lib/libchimaera_cxx.dylib  # [osx]
+
+about:
+  home: https://www.iowarp.ai
+  license: BSD-3-Clause
+  license_file: LICENSE
+  summary: IOWarp Context Management Platform - AI-accelerated scientific workflow orchestration
+  description: |
+    IOWarp Core provides a unified framework for context-aware data management
+    in scientific workflows, including the Context Transfer Engine (CTE),
+    Context Assimilation Engine (CAE), and Context Exploration Engine (CEE).
+  dev_url: https://github.com/iowarp/clio-core
+  doc_url: https://docs.iowarp.ai
+
+extra:
+  recipe-maintainers:
+    - lukemartinlogan

@@ -15,7 +15,7 @@ services:
     volumes:
       - ./chimaera.yaml:/etc/iowarp/chimaera.yaml:ro
     environment:
-      - CHI_SERVER_CONF=/etc/iowarp/chimaera.yaml
+      - CLIO_SERVER_CONF=/etc/iowarp/chimaera.yaml
     ports:
       - "9413:9413"
     mem_limit: 8g

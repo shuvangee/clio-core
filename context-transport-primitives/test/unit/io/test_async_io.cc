@@ -32,7 +32,7 @@
  */
 
 #include "basic_test.h"
-#include "hermes_shm/io/async_io_factory.h"
+#include "clio_ctp/io/async_io_factory.h"
 
 #include <fcntl.h>
 #ifdef _WIN32
@@ -89,8 +89,8 @@ static void AlignedFree(void *ptr) {
  * Helper: run a write-then-read round trip using aligned buffers (O_DIRECT path).
  * Returns true if the data read back matches what was written.
  */
-static bool RunAlignedWriteReadTest(hshm::AsyncIoBackend backend) {
-  auto aio = hshm::AsyncIoFactory::Get(kIoDepth, backend);
+static bool RunAlignedWriteReadTest(ctp::AsyncIoBackend backend) {
+  auto aio = ctp::AsyncIoFactory::Get(kIoDepth, backend);
   if (!aio) {
     return false;  // Backend not available on this platform
   }
@@ -113,10 +113,10 @@ static bool RunAlignedWriteReadTest(hshm::AsyncIoBackend backend) {
 
   // Write
   auto token = aio->Write(write_buf, kBlockSize, 0);
-  REQUIRE(token != hshm::kInvalidIoToken);
+  REQUIRE(token != ctp::kInvalidIoToken);
 
   // Poll for write completion
-  hshm::IoResult result;
+  ctp::IoResult result;
   int attempts = 0;
   while (!aio->IsComplete(token, result)) {
     ++attempts;
@@ -127,7 +127,7 @@ static bool RunAlignedWriteReadTest(hshm::AsyncIoBackend backend) {
 
   // Read back
   token = aio->Read(read_buf, kBlockSize, 0);
-  REQUIRE(token != hshm::kInvalidIoToken);
+  REQUIRE(token != ctp::kInvalidIoToken);
 
   attempts = 0;
   while (!aio->IsComplete(token, result)) {
@@ -153,8 +153,8 @@ static bool RunAlignedWriteReadTest(hshm::AsyncIoBackend backend) {
  * Helper: run a write-then-read round trip using unaligned buffers (regular fd path).
  * Returns true if the data read back matches what was written.
  */
-static bool RunUnalignedWriteReadTest(hshm::AsyncIoBackend backend) {
-  auto aio = hshm::AsyncIoFactory::Get(kIoDepth, backend);
+static bool RunUnalignedWriteReadTest(ctp::AsyncIoBackend backend) {
+  auto aio = ctp::AsyncIoFactory::Get(kIoDepth, backend);
   if (!aio) {
     return false;
   }
@@ -178,9 +178,9 @@ static bool RunUnalignedWriteReadTest(hshm::AsyncIoBackend backend) {
 
   // Write
   auto token = aio->Write(write_buf, kUnalignedSize, 0);
-  REQUIRE(token != hshm::kInvalidIoToken);
+  REQUIRE(token != ctp::kInvalidIoToken);
 
-  hshm::IoResult result;
+  ctp::IoResult result;
   int attempts = 0;
   while (!aio->IsComplete(token, result)) {
     ++attempts;
@@ -190,7 +190,7 @@ static bool RunUnalignedWriteReadTest(hshm::AsyncIoBackend backend) {
 
   // Read back
   token = aio->Read(read_buf, kUnalignedSize, 0);
-  REQUIRE(token != hshm::kInvalidIoToken);
+  REQUIRE(token != ctp::kInvalidIoToken);
 
   attempts = 0;
   while (!aio->IsComplete(token, result)) {
@@ -211,59 +211,71 @@ static bool RunUnalignedWriteReadTest(hshm::AsyncIoBackend backend) {
 
 TEST_CASE("TestAsyncIO") {
   PAGE_DIVIDE("Default") {
-    bool ok = RunAlignedWriteReadTest(hshm::AsyncIoBackend::kDefault);
+    bool ok = RunAlignedWriteReadTest(ctp::AsyncIoBackend::kDefault);
     REQUIRE(ok);
   }
 
   PAGE_DIVIDE("DefaultUnaligned") {
-    bool ok = RunUnalignedWriteReadTest(hshm::AsyncIoBackend::kDefault);
+    bool ok = RunUnalignedWriteReadTest(ctp::AsyncIoBackend::kDefault);
     REQUIRE(ok);
   }
 
-#if HSHM_ENABLE_LIBAIO
+#if CTP_ENABLE_LIBAIO
   PAGE_DIVIDE("LinuxAio") {
-    bool ok = RunAlignedWriteReadTest(hshm::AsyncIoBackend::kLinuxAio);
+    bool ok = RunAlignedWriteReadTest(ctp::AsyncIoBackend::kLinuxAio);
     REQUIRE(ok);
   }
 
   PAGE_DIVIDE("LinuxAioUnaligned") {
-    bool ok = RunUnalignedWriteReadTest(hshm::AsyncIoBackend::kLinuxAio);
+    bool ok = RunUnalignedWriteReadTest(ctp::AsyncIoBackend::kLinuxAio);
     REQUIRE(ok);
   }
 #endif
 
-#if HSHM_ENABLE_IO_URING
+#if CTP_ENABLE_IO_URING
   PAGE_DIVIDE("IoUring") {
-    bool ok = RunAlignedWriteReadTest(hshm::AsyncIoBackend::kIoUring);
+    bool ok = RunAlignedWriteReadTest(ctp::AsyncIoBackend::kIoUring);
     REQUIRE(ok);
   }
 
   PAGE_DIVIDE("IoUringUnaligned") {
-    bool ok = RunUnalignedWriteReadTest(hshm::AsyncIoBackend::kIoUring);
+    bool ok = RunUnalignedWriteReadTest(ctp::AsyncIoBackend::kIoUring);
     REQUIRE(ok);
   }
 #endif
 
 #if !defined(_WIN32)
   PAGE_DIVIDE("PosixAio") {
-    bool ok = RunAlignedWriteReadTest(hshm::AsyncIoBackend::kPosixAio);
+    bool ok = RunAlignedWriteReadTest(ctp::AsyncIoBackend::kPosixAio);
     REQUIRE(ok);
   }
 
   PAGE_DIVIDE("PosixAioUnaligned") {
-    bool ok = RunUnalignedWriteReadTest(hshm::AsyncIoBackend::kPosixAio);
+    bool ok = RunUnalignedWriteReadTest(ctp::AsyncIoBackend::kPosixAio);
     REQUIRE(ok);
   }
 #endif
 
 #ifdef _WIN32
   PAGE_DIVIDE("Iocp") {
-    bool ok = RunAlignedWriteReadTest(hshm::AsyncIoBackend::kIocp);
+    bool ok = RunAlignedWriteReadTest(ctp::AsyncIoBackend::kIocp);
     REQUIRE(ok);
   }
 
   PAGE_DIVIDE("IocpUnaligned") {
-    bool ok = RunUnalignedWriteReadTest(hshm::AsyncIoBackend::kIocp);
+    bool ok = RunUnalignedWriteReadTest(ctp::AsyncIoBackend::kIocp);
+    REQUIRE(ok);
+  }
+#endif
+
+#if CTP_ENABLE_NIXL
+  PAGE_DIVIDE("Nixl") {
+    bool ok = RunAlignedWriteReadTest(ctp::AsyncIoBackend::kNixl);
+    REQUIRE(ok);
+  }
+
+  PAGE_DIVIDE("NixlUnaligned") {
+    bool ok = RunUnalignedWriteReadTest(ctp::AsyncIoBackend::kNixl);
     REQUIRE(ok);
   }
 #endif

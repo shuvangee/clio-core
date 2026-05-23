@@ -38,25 +38,34 @@
  * Coroutines are managed via std::coroutine_handle stored in RunContext.
  */
 
-#include "chimaera/worker.h"
+#include "clio_runtime/worker.h"
 
+#ifndef _WIN32
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
+
+#ifndef __NVCOMPILER
 #include <coroutine>
+#endif
 #include <cstdlib>
 #include <iostream>
 #include <unordered_set>
 
 // Include task_queue.h before other chimaera headers to ensure proper
 // resolution
-#include "chimaera/admin/admin_client.h"
-#include "chimaera/container.h"
-#include "chimaera/ipc_manager.h"
-#include "chimaera/pool_manager.h"
-#include "chimaera/singletons.h"
-#include "chimaera/task.h"
-#include "chimaera/task_archives.h"
-#include "chimaera/work_orchestrator.h"
+#include "clio_runtime/admin/admin_client.h"
+#include "clio_runtime/container.h"
+#include "clio_runtime/device_memcpy.h"
+#include "clio_runtime/ipc_manager.h"
+#include "clio_runtime/pool_manager.h"
+#include "clio_runtime/singletons.h"
+#include "clio_runtime/task.h"
+#include "clio_runtime/task_archives.h"
+#include "clio_runtime/local_task_archives.h"
+#include "clio_runtime/work_orchestrator.h"
 
-namespace chi {
+namespace clio::run {
 
 // Stack detection is now handled by WorkOrchestrator during initialization
 
@@ -64,12 +73,13 @@ Worker::Worker(u32 worker_id)
     : worker_id_(worker_id),
       is_running_(false),
       is_initialized_(false),
+      load_(0),
       did_work_(false),
       task_did_work_(false),
       current_run_context_(nullptr),
       assigned_lane_(nullptr),
       event_queue_(nullptr),
-      last_long_queue_check_(0),
+      num_tasks_processed_(0),
       iteration_count_(0),
       idle_iterations_(0),
       current_sleep_us_(0),
@@ -101,21 +111,21 @@ bool Worker::Init() {
   // runtime data). Stores Future<Task> objects to avoid stale RunContext*
   // pointers.
   event_queue_ =
-      HSHM_MALLOC
-          ->template NewObj<hshm::ipc::mpsc_ring_buffer<
-              Future<Task, CHI_MAIN_ALLOC_T>, hshm::ipc::MallocAllocator>>(
-              HSHM_MALLOC, EVENT_QUEUE_DEPTH)
+      CTP_MALLOC
+          ->template NewObj<ctp::ipc::mpsc_ring_buffer<
+              Future<Task, CLIO_QUEUE_ALLOC_T>, ctp::ipc::MallocAllocator>>(
+              CTP_MALLOC, EVENT_QUEUE_DEPTH)
           .ptr_;
 
   // Get scheduler from IpcManager (IpcManager is the single owner)
-  scheduler_ = CHI_IPC->GetScheduler();
+  scheduler_ = CLIO_IPC->GetScheduler();
   HLOG(kDebug, "Worker {}: Using scheduler from IpcManager", worker_id_);
 
   // Create SHM lightbeam transports for worker-side transport
-  shm_send_transport_ = hshm::lbm::TransportFactory::Get(
-      "", hshm::lbm::TransportType::kShm, hshm::lbm::TransportMode::kClient);
-  shm_recv_transport_ = hshm::lbm::TransportFactory::Get(
-      "", hshm::lbm::TransportType::kShm, hshm::lbm::TransportMode::kServer);
+  shm_send_transport_ = ctp::lbm::TransportFactory::Get(
+      "", ctp::lbm::TransportType::kShm, ctp::lbm::TransportMode::kClient);
+  shm_recv_transport_ = ctp::lbm::TransportFactory::Get(
+      "", ctp::lbm::TransportType::kShm, ctp::lbm::TransportMode::kServer);
 
   is_initialized_ = true;
   return true;
@@ -161,14 +171,13 @@ WorkerStats Worker::GetWorkerStats() const {
   stats.suspend_period_us_ =
       (suspend_period < 0) ? 0 : static_cast<u32>(suspend_period);
 
-  // Note: num_tasks_processed_ would require adding a counter to the worker
-  // For now, set to 0 - can be added later if needed
-  stats.num_tasks_processed_ = 0;
+  stats.num_tasks_processed_ = num_tasks_processed_;
+  stats.load_ = load_;
 
   return stats;
 }
 
-hshm::lbm::EventManager &Worker::GetEventManager() { return event_manager_; }
+ctp::lbm::EventManager &Worker::GetEventManager() { return event_manager_; }
 
 void Worker::Finalize() {
   if (!is_initialized_) {
@@ -190,6 +199,13 @@ void Worker::Finalize() {
     }
   }
 
+  // Clean up all periodic queues
+  for (u32 i = 0; i < NUM_PERIODIC_QUEUES; ++i) {
+    while (!periodic_queues_[i].empty()) {
+      periodic_queues_[i].pop();
+    }
+  }
+
   // Clean up retry queue
   while (!retry_queue_.empty()) {
     retry_queue_.pop();
@@ -205,8 +221,6 @@ void Worker::Run() {
   if (!is_initialized_) {
     return;
   }
-  HLOG(kInfo, "Worker {}: Running", worker_id_);
-
   // Set current worker once for the entire thread duration
   SetAsCurrentWorker();
   is_running_ = true;
@@ -217,8 +231,6 @@ void Worker::Run() {
     assigned_lane_->SetTid(tid);
   }
   event_manager_.AddSignalEvent(nullptr);
-  HLOG(kInfo, "Worker {}: EventManager signal event added, tid={}", worker_id_,
-       tid);
 
   // Main worker loop - process tasks from assigned lane
   while (is_running_) {
@@ -230,12 +242,8 @@ void Worker::Run() {
       u32 count = ProcessNewTasks(assigned_lane_);
       if (count > 0) did_work_ = true;
     }
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
-    for (auto *gpu_lane : gpu_lanes_) {
-      u32 count = ProcessNewTasks(gpu_lane);
-      if (count > 0) did_work_ = true;
-    }
-#endif
+    u32 gpu_count = ProcessNewTasksGpu();
+    if (gpu_count > 0) did_work_ = true;
 
     // Check blocked queue for completed tasks at end of each iteration
     ContinueBlockedTasks(false);
@@ -272,50 +280,199 @@ void Worker::SetLane(TaskLane *lane) {
 
 TaskLane *Worker::GetLane() const { return assigned_lane_; }
 
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
-void Worker::SetGpuLanes(const std::vector<TaskLane *> &lanes) {
+void Worker::SetGpuLanes(const std::vector<GpuTaskLane *> &lanes) {
   gpu_lanes_ = lanes;
 }
 
-const std::vector<TaskLane *> &Worker::GetGpuLanes() const {
+const std::vector<GpuTaskLane *> &Worker::GetGpuLanes() const {
   return gpu_lanes_;
 }
-#endif
 
-hipc::FullPtr<Task> Worker::GetOrCopyTaskFromFuture(Future<Task> &future,
+u32 Worker::ProcessNewTasksGpu() {
+  u32 total = 0;
+  for (auto *gpu_lane : gpu_lanes_) {
+    if (ProcessNewTaskGpu(gpu_lane)) {
+      ++total;
+    }
+  }
+  return total;
+}
+
+bool Worker::ProcessNewTaskGpu(GpuTaskLane *gpu_lane) {
+  // Producer-only gpu2cpu pop path.
+  //
+  // The kernel pre-allocated a Task+FutureShm pair in a registered
+  // GPU client backend (kPinnedHost, kManagedUvm, or kDeviceMem) and
+  // pushed a gpu::Future<Task> carrying ShmPtrs (with the raw device-
+  // accessible address stashed in `off_`) for both the task and its
+  // co-located gpu::FutureShm.
+  //
+  // For kPinnedHost / kManagedUvm the worker dereferences both raw
+  // addresses directly: the CPU and GPU share visibility. For
+  // kDeviceMem the worker D2H-copies the POD bytes (gpu::FutureShm and
+  // the Task struct) into per-thread host scratch and runs the chimod
+  // on those copies; RuntimeSend H2D-copies the mutated Task POD back
+  // to the original device address before signaling FUTURE_COMPLETE.
+  // The chi::FutureShm carries the original device pointers
+  // (gpu_task_device_ptr_ / gpu_fshm_device_ptr_) plus task size so
+  // RuntimeSend can issue the writeback memcpys.
+  gpu::Future<Task> gpu_future;
+  if (!gpu_lane->Pop(gpu_future)) {
+    return false;
+  }
+  HLOG(kDebug, "Worker {}: ProcessNewTaskGpu: popped task from gpu2cpu queue",
+       worker_id_);
+
+  SetCurrentRunContext(nullptr);
+
+  ctp::ipc::ShmPtr<gpu::FutureShm> gpu_fshm_shmptr = gpu_future.GetFutureShmPtr();
+  ctp::ipc::ShmPtr<Task> task_shmptr = gpu_future.GetTaskPtr().shm_;
+  if (gpu_fshm_shmptr.IsNull() || task_shmptr.IsNull()) {
+    HLOG(kError, "Worker {}: ProcessNewTaskGpu: null ShmPtr in queue entry",
+         worker_id_);
+    return true;
+  }
+
+  void *gpu_fshm_raw = reinterpret_cast<void *>(
+      gpu_fshm_shmptr.off_.load());
+  void *gpu_task_raw = reinterpret_cast<void *>(task_shmptr.off_.load());
+  if (!gpu_fshm_raw || !gpu_task_raw) {
+    HLOG(kError, "Worker {}: ProcessNewTaskGpu: null off_ in queue entry",
+         worker_id_);
+    return true;
+  }
+
+  // Detect whether the FutureShm / Task structs sit in pure device
+  // memory (host cannot dereference them). g_is_device_pointer is
+  // installed by ServerInitGpuQueues; absent on host-only builds.
+  auto is_device_ptr = chi::g_is_device_pointer.load(
+      std::memory_order_acquire);
+  bool fshm_on_device =
+      is_device_ptr && is_device_ptr(gpu_fshm_raw);
+  bool task_on_device =
+      is_device_ptr && is_device_ptr(gpu_task_raw);
+
+  // Pull gpu::FutureShm contents into a local copy (D2H if needed).
+  // task_size_ tells us how many bytes the Task POD occupies.
+  alignas(8) char fshm_buf[sizeof(gpu::FutureShm)];
+  if (fshm_on_device) {
+    chi::DeviceAwareMemcpy(fshm_buf, gpu_fshm_raw,
+                           sizeof(gpu::FutureShm));
+  } else {
+    std::memcpy(fshm_buf, gpu_fshm_raw, sizeof(gpu::FutureShm));
+  }
+  auto &fshm_copy = *reinterpret_cast<gpu::FutureShm *>(fshm_buf);
+  u32 task_pod_size = fshm_copy.task_size_;
+  if (task_pod_size == 0) {
+    HLOG(kError,
+         "Worker {}: ProcessNewTaskGpu: gpu::FutureShm.task_size_=0 — "
+         "kernel did not call Reset(sizeof(TaskT)) before Send",
+         worker_id_);
+    return true;
+  }
+
+  // Per-thread scratch for the host-resident task copy. Sized to fit
+  // any reasonable POD task (PutBlobTask is ~480 bytes today).
+  static constexpr size_t kTaskScratchBytes = 4096;
+  alignas(64) thread_local char task_scratch[kTaskScratchBytes];
+  if (task_pod_size > kTaskScratchBytes) {
+    HLOG(kError,
+         "Worker {}: ProcessNewTaskGpu: task_pod_size {} exceeds "
+         "scratch capacity {}",
+         worker_id_, task_pod_size, kTaskScratchBytes);
+    return true;
+  }
+  Task *task_raw = nullptr;
+  if (task_on_device) {
+    chi::DeviceAwareMemcpy(task_scratch, gpu_task_raw, task_pod_size);
+    task_raw = reinterpret_cast<Task *>(task_scratch);
+  } else {
+    task_raw = static_cast<Task *>(gpu_task_raw);
+  }
+
+  PoolId pool_id = task_raw->pool_id_;
+  u32 method_id = task_raw->method_;
+
+  ctp::ipc::FullPtr<Task> task_full_ptr(task_raw);
+
+  Future<Task> future = CLIO_IPC->MakePointerFuture(task_full_ptr);
+  if (future.GetFutureShmPtr().IsNull()) {
+    HLOG(kError,
+         "Worker {}: ProcessNewTaskGpu: MakePointerFuture failed "
+         "(pool={}, method={})",
+         worker_id_, pool_id, method_id);
+    if (!fshm_on_device) {
+      static_cast<gpu::FutureShm *>(gpu_fshm_raw)
+          ->flags_.SetBitsSystem(gpu::FutureShm::FUTURE_COMPLETE);
+    }
+    return true;
+  }
+
+  auto chi_fshm = future.GetFutureShm();
+  chi_fshm->pool_id_ = pool_id;
+  chi_fshm->method_id_ = method_id;
+  chi_fshm->origin_ = FutureShm::FUTURE_CLIENT_GPU2CPU;
+  // Stash original device-side pointers + size so RuntimeSend can
+  // H2D-copy the mutated POD back and signal FUTURE_COMPLETE on the
+  // device-side gpu::FutureShm (cudaMemcpy when in kDeviceMem).
+  chi_fshm->gpu_fshm_device_ptr_ =
+      reinterpret_cast<uintptr_t>(gpu_fshm_raw);
+  chi_fshm->gpu_task_device_ptr_ =
+      task_on_device ? reinterpret_cast<uintptr_t>(gpu_task_raw) : 0;
+  chi_fshm->gpu_task_size_ = task_pod_size;
+
+  auto *pool_manager = CLIO_POOL_MANAGER;
+  Container *container = pool_manager->GetStaticContainer(pool_id);
+  if (!container) {
+    HLOG(kError,
+         "Worker {}: ProcessNewTaskGpu: Container not found "
+         "(pool={}, method={})",
+         worker_id_, pool_id, method_id);
+    chi_fshm->flags_.SetBits(1 | FutureShm::FUTURE_COMPLETE);
+    if (!fshm_on_device) {
+      static_cast<gpu::FutureShm *>(gpu_fshm_raw)
+          ->flags_.SetBitsSystem(gpu::FutureShm::FUTURE_COMPLETE);
+    } else {
+      // Best-effort: still flip the device flag via cudaMemcpy.
+      u32 v = gpu::FutureShm::FUTURE_COMPLETE;
+      chi::DeviceAwareMemcpy(
+          &static_cast<gpu::FutureShm *>(gpu_fshm_raw)->flags_.bits_.x,
+          &v, sizeof(u32));
+    }
+    return true;
+  }
+
+  // Fix up SSO/SVO `data_` pointers in the host-resident task copy if
+  // we D2H-copied it. The chimod's container override dispatches by
+  // method id to the per-task FixupAfterCopy(). Skip when the task
+  // never moved (kPinnedHost / kManagedUvm path).
+  if (task_on_device) {
+    container->FixupAfterCopy(method_id, task_full_ptr);
+  }
+
+  if (!task_full_ptr->task_flags_.Any(TASK_RUN_CTX_EXISTS)) {
+    CLIO_IPC->BeginTask(future, container, assigned_lane_);
+  } else {
+    RunContext *run_ctx = task_full_ptr->GetRunCtx();
+    if (run_ctx) {
+      run_ctx->worker_id_ = worker_id_;
+      run_ctx->lane_ = assigned_lane_;
+      run_ctx->event_queue_ = event_queue_;
+    }
+  }
+
+  RouteResult route_result = CLIO_IPC->RouteTask(future, /*force_enqueue=*/true);
+  HLOG(kDebug, "Worker {}: ProcessNewTaskGpu: RouteTask returned {} "
+       "pool={} method={}",
+       worker_id_, (int)route_result, pool_id, method_id);
+  return true;
+}
+
+ctp::ipc::FullPtr<Task> Worker::GetOrCopyTaskFromFuture(Future<Task> &future,
                                                     Container *container,
                                                     u32 method_id) {
-  auto future_shm = future.GetFutureShm();
-  FullPtr<Task> task_full_ptr = future.GetTaskPtr();
-
-  // Check FUTURE_COPY_FROM_CLIENT flag to determine if task needs to be loaded
-  if (future_shm->flags_.Any(FutureShm::FUTURE_COPY_FROM_CLIENT) &&
-      !future_shm->flags_.Any(FutureShm::FUTURE_WAS_COPIED)) {
-    // CLIENT PATH: Load task from serialized data in FutureShm copy_space
-    // Only copy if not already copied (FUTURE_WAS_COPIED not set)
-
-    // Build SHM context for transfer
-    hshm::lbm::LbmContext ctx;
-    ctx.copy_space = future_shm->copy_space;
-    ctx.shm_info_ = &future_shm->input_;
-
-    // Receive via SHM transport (blocking - spins until client sends)
-    LoadTaskArchive archive;
-    auto info = shm_recv_transport_->Recv(archive, ctx);
-    (void)info;
-
-    // Allocate and deserialize task
-    task_full_ptr = container->AllocLoadTask(method_id, archive);
-
-    // Update the Future's task pointer
-    future.GetTaskPtr() = task_full_ptr;
-
-    // Mark as copied to prevent re-copying if task migrates between workers
-    future_shm->flags_.SetBits(FutureShm::FUTURE_WAS_COPIED);
-  }
-  // RUNTIME PATH or ALREADY COPIED: Task pointer is already set in future
-
-  return task_full_ptr;
+  return CLIO_IPC->RecvRuntime(future, container, method_id,
+                              shm_recv_transport_.get());
 }
 
 u32 Worker::ProcessNewTasks(TaskLane *lane) {
@@ -344,6 +501,7 @@ bool Worker::ProcessNewTask(TaskLane *lane) {
     return false;
   }
 
+
   SetCurrentRunContext(nullptr);
 
   // Get FutureShm (allocator is pre-registered by Admin::RegisterMemory)
@@ -357,9 +515,11 @@ bool Worker::ProcessNewTask(TaskLane *lane) {
   // Get pool_id and method_id from FutureShm
   PoolId pool_id = future_shm->pool_id_;
   u32 method_id = future_shm->method_id_;
+  HLOG(kDebug, "Worker {}: ProcessNewTask popped pool={} method={}",
+       worker_id_, pool_id, method_id);
 
   // Get static container for task deserialization (stateless operation)
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   Container *container = pool_manager->GetStaticContainer(pool_id);
 
   if (!container) {
@@ -387,12 +547,12 @@ bool Worker::ProcessNewTask(TaskLane *lane) {
 
   // Allocate RunContext before routing (skip if already created)
   if (!task_full_ptr->task_flags_.Any(TASK_RUN_CTX_EXISTS)) {
-    CHI_IPC->BeginTask(future, container, lane);
+    CLIO_IPC->BeginTask(future, container, lane);
   } else {
     // Task was re-enqueued from another worker (e.g., by RouteLocal).
     // Update worker-specific RunContext fields to match this worker,
     // so subtask completion events go to the correct event queue.
-    RunContext *run_ctx = task_full_ptr->run_ctx_.get();
+    RunContext *run_ctx = task_full_ptr->GetRunCtx();
     if (run_ctx) {
       run_ctx->worker_id_ = worker_id_;
       run_ctx->lane_ = lane;
@@ -401,16 +561,16 @@ bool Worker::ProcessNewTask(TaskLane *lane) {
   }
 
   // Route task using consolidated routing function
-  if (CHI_IPC->RouteTask(future)) {
-    // Routing successful, execute the task
-#if HSHM_IS_HOST
-    RunContext *run_ctx = task_full_ptr->run_ctx_.get();
+  // RouteTask handles Retry/Dne internally via AddToRetryQueue
+  RouteResult route_result = CLIO_IPC->RouteTask(future);
+  if (route_result == RouteResult::ExecHere) {
+#if CTP_IS_HOST
+    // Re-fetch task pointer from future in case RouteTask changed it
+    RunContext *run_ctx = task_full_ptr->GetRunCtx();
     bool is_started = task_full_ptr->task_flags_.Any(TASK_STARTED);
     ExecTask(task_full_ptr, run_ctx, is_started);
 #endif
   }
-  // Note: RouteTask returning false doesn't always indicate an error
-  // Real errors are handled within RouteTask itself
 
   return true;
 }
@@ -450,12 +610,10 @@ double Worker::GetSuspendPeriod() const {
 }
 
 void Worker::SuspendMe() {
-#if HSHM_ENABLE_CUDA || HSHM_ENABLE_ROCM
   // GPU workers must never sleep — they need to poll GPU lanes continuously
   if (!gpu_lanes_.empty()) {
     return;
   }
-#endif
 
   // No work was done in this iteration - increment idle counter
   idle_iterations_++;
@@ -466,12 +624,12 @@ void Worker::SuspendMe() {
   }
 
   // Get configuration parameters
-  auto *config = CHI_CONFIG_MANAGER;
+  auto *config = CLIO_CONFIG_MANAGER;
   u32 first_busy_wait = config->GetFirstBusyWait();
   u32 max_sleep = config->GetMaxSleep();
 
   // Calculate actual elapsed idle time
-  hshm::Timepoint current_time;
+  ctp::Timepoint current_time;
   current_time.Now();
   double elapsed_idle_us = idle_start_.GetUsecFromStart(current_time);
 
@@ -488,9 +646,23 @@ void Worker::SuspendMe() {
       return;
     }
 
-    // Mark worker as inactive (blocked in epoll_wait)
+    // Last-chance recheck: any producer push that landed before we got
+    // here is already visible to a plain Empty() load. Producers now
+    // unconditionally send SIGUSR1 (see IpcManager::AwakenWorker), so we
+    // don't need the active_ park-flag handshake — any push that lands
+    // AFTER this recheck will signal us out of epoll_pwait2 regardless.
+    // The handshake previously here tripped a lost-wakeup race at scale
+    // (4n 256m, multi-tier bdev) where active_=true at the producer's
+    // load suppressed the signal while the worker was already past its
+    // post-store recheck and committed to epoll_pwait2.
     if (assigned_lane_) {
-      assigned_lane_->SetActive(false);
+      bool work_pending = !assigned_lane_->Empty();
+      if (!work_pending && event_queue_) {
+        work_pending = !event_queue_->Empty();
+      }
+      if (work_pending) {
+        return;
+      }
     }
 
     // Calculate timeout from periodic tasks
@@ -548,12 +720,12 @@ TaskLane *Worker::GetCurrentLane() const {
 }
 
 void Worker::SetAsCurrentWorker() {
-  HSHM_THREAD_MODEL->SetTls(chi_cur_worker_key_,
+  CTP_THREAD_MODEL->SetTls(chi_cur_worker_key_,
                             static_cast<class Worker *>(this));
 }
 
 void Worker::ClearCurrentWorker() {
-  HSHM_THREAD_MODEL->SetTls(chi_cur_worker_key_,
+  CTP_THREAD_MODEL->SetTls(chi_cur_worker_key_,
                             static_cast<class Worker *>(nullptr));
 }
 
@@ -576,12 +748,13 @@ void Worker::StartCoroutine(const FullPtr<Task> &task_ptr,
     return;
   }
 
-  // Call the container's Run function which returns a TaskResume coroutine
+  // Call the container's Run function which returns a TaskResume coroutine/fiber
   try {
     TaskResume task_resume =
         container->Run(task_ptr->method_, task_ptr, *run_ctx);
 
-    // Store the coroutine handle in RunContext for later resumption
+#ifndef __NVCOMPILER
+    // Standard C++20 coroutine path
     auto handle = task_resume.release();
     run_ctx->coro_handle_ = handle;
 
@@ -603,19 +776,42 @@ void Worker::StartCoroutine(const FullPtr<Task> &task_ptr,
         run_ctx->coro_handle_ = nullptr;
       }
     }
+#else // __NVCOMPILER - ucontext_t fiber path
+    auto fhandle = task_resume.release();
+    run_ctx->coro_handle_ = fhandle;
+
+    if (fhandle) {
+      // Resume the fiber to run until first suspension point or completion
+      run_ctx->coro_handle_.resume();
+
+      // Check if fiber completed
+      if (run_ctx->coro_handle_.done()) {
+        run_ctx->coro_handle_.destroy();
+        run_ctx->coro_handle_ = chi::detail::FiberHandle{};
+      }
+    }
+#endif // __NVCOMPILER
   } catch (const std::exception &e) {
     HLOG(kError, "Task execution failed: {}", e.what());
-    // Clean up coroutine handle on exception
+    // Clean up handle on exception
     if (run_ctx->coro_handle_) {
       run_ctx->coro_handle_.destroy();
+#ifndef __NVCOMPILER
       run_ctx->coro_handle_ = nullptr;
+#else
+      run_ctx->coro_handle_ = chi::detail::FiberHandle{};
+#endif
     }
   } catch (...) {
     HLOG(kError, "Task execution failed with unknown exception");
-    // Clean up coroutine handle on exception
+    // Clean up handle on exception
     if (run_ctx->coro_handle_) {
       run_ctx->coro_handle_.destroy();
+#ifndef __NVCOMPILER
       run_ctx->coro_handle_ = nullptr;
+#else
+      run_ctx->coro_handle_ = chi::detail::FiberHandle{};
+#endif
     }
   }
 }
@@ -637,29 +833,41 @@ void Worker::ResumeCoroutine(const FullPtr<Task> &task_ptr,
     return;
   }
 
-  // Resume the coroutine - it will run until next co_await or co_return
+  // Resume the coroutine/fiber - it will run until next suspension or completion
   try {
     run_ctx->coro_handle_.resume();
 
-    // Check if coroutine completed after resumption
+    // Check if coroutine/fiber completed after resumption
     if (run_ctx->coro_handle_.done()) {
-      // Coroutine completed - clean up
+      // Completed - clean up
       run_ctx->coro_handle_.destroy();
+#ifndef __NVCOMPILER
       run_ctx->coro_handle_ = nullptr;
+#else
+      run_ctx->coro_handle_ = chi::detail::FiberHandle{};
+#endif
     }
   } catch (const std::exception &e) {
     HLOG(kError, "Task resume failed: {}", e.what());
-    // Clean up coroutine handle on exception
+    // Clean up handle on exception
     if (run_ctx->coro_handle_) {
       run_ctx->coro_handle_.destroy();
+#ifndef __NVCOMPILER
       run_ctx->coro_handle_ = nullptr;
+#else
+      run_ctx->coro_handle_ = chi::detail::FiberHandle{};
+#endif
     }
   } catch (...) {
     HLOG(kError, "Task resume failed with unknown exception");
-    // Clean up coroutine handle on exception
+    // Clean up handle on exception
     if (run_ctx->coro_handle_) {
       run_ctx->coro_handle_.destroy();
+#ifndef __NVCOMPILER
       run_ctx->coro_handle_ = nullptr;
+#else
+      run_ctx->coro_handle_ = chi::detail::FiberHandle{};
+#endif
     }
   }
 }
@@ -674,11 +882,11 @@ void Worker::ExecTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
 
   // Check if task is null or run context is null
   if (task_ptr.IsNull() || !run_ctx) {
-    return;  // Consider null tasks as completed
+    return;
   }
 
   // Resolve the container fresh each time (may change during migration)
-  auto *pool_manager = CHI_POOL_MANAGER;
+  auto *pool_manager = CLIO_POOL_MANAGER;
   bool is_plugged = false;
   ContainerId container_id = task_ptr->pool_query_.GetContainerId();
   Container *exec_container =
@@ -687,13 +895,31 @@ void Worker::ExecTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
     run_ctx->container_ = exec_container;
   }
 
+  // Start CPU and wall timers before execution
+  run_ctx->cpu_timer_.Resume();
+  run_ctx->wall_timer_.Resume();
+
   // Call appropriate coroutine function based on task state
   if (is_started) {
     ResumeCoroutine(task_ptr, run_ctx);
   } else {
     StartCoroutine(task_ptr, run_ctx);
     task_ptr->SetFlags(TASK_STARTED);
+
+    // Predict load for new tasks. predicted_stat_ is populated by
+    // BeginTask via container->GetTaskStats(task), so derive the model
+    // inferences from the already-cached stat instead of re-calling
+    // GetTaskStats here.
+    if (run_ctx->container_) {
+      run_ctx->predicted_load_ = run_ctx->container_->InferCpuTime(task_ptr->method_, run_ctx->predicted_stat_);
+      run_ctx->predicted_wall_us_ = run_ctx->container_->InferWallClockTime(task_ptr->method_, run_ctx->predicted_stat_);
+      load_ += run_ctx->predicted_load_;
+    }
   }
+
+  // Pause CPU and wall timers after execution
+  run_ctx->cpu_timer_.Pause();
+  run_ctx->wall_timer_.Pause();
 
   // For periodic tasks, only set task_did_work_ if the task reported
   // actual work done (e.g., received data, sent data). This prevents
@@ -726,27 +952,6 @@ void Worker::ExecTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
   EndTask(task_ptr, run_ctx, true);
 }
 
-void Worker::EndTaskShmTransfer(const FullPtr<Task> &task_ptr,
-                                RunContext *run_ctx, Container *container) {
-  auto future_shm = run_ctx->future_.GetFutureShm();
-
-  // Build SHM context for transfer (output reuses same copy_space)
-  future_shm->output_.copy_space_size_ = future_shm->input_.copy_space_size_;
-  hshm::lbm::LbmContext ctx;
-  ctx.copy_space = future_shm->copy_space;
-  ctx.shm_info_ = &future_shm->output_;
-
-  // Serialize outputs
-  SaveTaskArchive archive(MsgType::kSerializeOut, shm_send_transport_.get());
-  container->SaveTask(task_ptr->method_, archive, task_ptr);
-
-  // Send via SHM transport (blocking)
-  shm_send_transport_->Send(archive, ctx);
-
-  // Set FUTURE_COMPLETE and clean up task
-  future_shm->flags_.SetBits(FutureShm::FUTURE_COMPLETE);
-  container->DelTask(task_ptr->method_, task_ptr);
-}
 
 void Worker::EndTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
                      bool can_resched) {
@@ -756,6 +961,22 @@ void Worker::EndTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
     HLOG(kError, "EndTask: container is null");
     return;
   }
+
+  // Track completed tasks
+  ++num_tasks_processed_;
+
+  // Subtract predicted load from worker
+  load_ -= run_ctx->predicted_load_;
+
+  // Reinforce model with actual CPU and wall time
+  float actual_cpu_us = static_cast<float>(run_ctx->cpu_timer_.GetUsec());
+  float actual_wall_us = static_cast<float>(run_ctx->wall_timer_.GetUsec());
+  container->ReinforceCpuModel(
+      task_ptr->method_, run_ctx->predicted_load_, actual_cpu_us,
+      run_ctx->predicted_stat_);
+  container->ReinforceWallModel(
+      task_ptr->method_, run_ctx->predicted_wall_us_, actual_wall_us,
+      run_ctx->predicted_stat_);
 
   // Get task properties at the start
   bool is_remote = task_ptr->IsRemote();
@@ -772,9 +993,23 @@ void Worker::EndTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
     container->UpdateWork(task_ptr, *run_ctx, -1);
   }
 
-  // If task is remote, enqueue to net_queue_ for SendOut
+  // Fire-and-forget: skip all response paths, just delete the task
+  if (task_ptr->task_flags_.Any(TASK_FIRE_AND_FORGET)) {
+    task_ptr->ClearFlags(TASK_DATA_OWNER);
+    container->DelTask(task_ptr->method_, task_ptr);
+    return;
+  }
+
+  // If task is remote, enqueue to net_queue_ for SendOut. Choose the
+  // latency vs I/O lane from the task's cached predicted_stat_ so a
+  // small ACK / heartbeat reply doesn't queue behind a 1 MiB GetBlob
+  // response on the wire.
   if (is_remote) {
-    CHI_IPC->EnqueueNetTask(run_ctx->future_, NetQueuePriority::kSendOut);
+    size_t io_size = run_ctx->predicted_stat_.io_size_;
+    NetQueuePriority prio = (io_size >= kNetQueueIoThreshold)
+                                ? NetQueuePriority::kSendOutIO
+                                : NetQueuePriority::kSendOutLatency;
+    CLIO_IPC->EnqueueNetTask(run_ctx->future_, prio);
     return;
   }
 
@@ -782,51 +1017,20 @@ void Worker::EndTask(const FullPtr<Task> &task_ptr, RunContext *run_ctx,
   // This prevents use-after-free since client may free future_shm after
   // SetComplete()
   auto future_shm = run_ctx->future_.GetFutureShm();
+  if (future_shm.IsNull()) {
+    HLOG(kError, "EndTask: future_shm is NULL for pool={} method={}",
+         task_ptr->pool_id_, task_ptr->method_);
+    return;
+  }
   bool was_copied = future_shm->flags_.Any(FutureShm::FUTURE_WAS_COPIED);
 
   // Copy parent task pointer before transfer begins (may be modified during
   // transfer)
   RunContext *parent_task = run_ctx->future_.GetParentTask();
 
-  // Handle client transfer based on origin transport mode
-  if (was_copied) {
-    u32 origin = future_shm->origin_;
-    switch (origin) {
-      case FutureShm::FUTURE_CLIENT_SHM:
-        EndTaskShmTransfer(task_ptr, run_ctx, container);
-        break;
-      case FutureShm::FUTURE_CLIENT_TCP:
-        CHI_IPC->EnqueueNetTask(run_ctx->future_,
-                                NetQueuePriority::kClientSendTcp);
-        break;
-      case FutureShm::FUTURE_CLIENT_IPC:
-        CHI_IPC->EnqueueNetTask(run_ctx->future_,
-                                NetQueuePriority::kClientSendIpc);
-        break;
-      default:
-        EndTaskShmTransfer(task_ptr, run_ctx, container);
-        break;
-    }
-  } else if (parent_task && parent_task->event_queue_) {
-    // Runtime subtask with parent: enqueue Future to parent worker's event
-    // queue. FUTURE_COMPLETE is NOT set here — it will be set by
-    // ProcessEventQueue on the parent's worker thread. This prevents the race
-    // where the parent sees FUTURE_COMPLETE early, completes, frees memory, and
-    // a stale event resumes a different task that reused the same address.
-    auto *parent_event_queue =
-        reinterpret_cast<hipc::mpsc_ring_buffer<Future<Task, CHI_MAIN_ALLOC_T>,
-                                                hshm::ipc::MallocAllocator> *>(
-            parent_task->event_queue_);
-    bool was_empty = parent_event_queue->Empty();
-    parent_event_queue->Emplace(run_ctx->future_);
-    if (was_empty && parent_task->lane_) {
-      CHI_IPC->AwakenWorker(parent_task->lane_);
-    }
-  } else {
-    // Runtime task without parent (top-level client task) - set FUTURE_COMPLETE
-    // directly so the client's Wait() can see it
-    future_shm->flags_.SetBits(FutureShm::FUTURE_COMPLETE);
-  }
+  // Dispatch response via transport class
+  IpcCpu2Self::RuntimeSend(task_ptr, run_ctx, container,
+                           shm_send_transport_.get());
 }
 
 void Worker::ProcessBlockedQueue(std::queue<RunContext *> &queue,
@@ -891,7 +1095,7 @@ void Worker::ProcessPeriodicQueue(std::queue<RunContext *> &queue,
   // Capture SINGLE timestamp for ALL tasks processed in this batch
   // This prevents timestamp desynchronization between tasks with same
   // yield_time
-  hshm::Timepoint batch_timestamp;
+  ctp::Timepoint batch_timestamp;
   batch_timestamp.Now();
 
   // Get current time for all checks
@@ -929,8 +1133,8 @@ void Worker::ProcessPeriodicQueue(std::queue<RunContext *> &queue,
       run_ctx->block_start_ = batch_timestamp;
 
       // Route task again - this will handle both local and distributed routing
-      if (CHI_IPC->RouteTask(run_ctx->future_)) {
-        // Routing successful, execute the task
+      // RouteTask handles Retry/Dne internally via AddToRetryQueue
+      if (CLIO_IPC->RouteTask(run_ctx->future_) == RouteResult::ExecHere) {
         ExecTask(run_ctx->task_, run_ctx, is_started);
 
         // If task re-yielded with a polling interval, ExecTask already
@@ -949,8 +1153,10 @@ void Worker::ProcessEventQueue() {
   // FUTURE_COMPLETE on it here (on the parent worker's thread), then resume
   // the parent coroutine. This avoids stale RunContext* pointers since
   // FUTURE_COMPLETE is never set before the event is consumed.
-  Future<Task, CHI_MAIN_ALLOC_T> future;
+  Future<Task, CLIO_QUEUE_ALLOC_T> future;
   while (event_queue_->Pop(future)) {
+    HLOG(kDebug, "Worker {}: ProcessEventQueue popped subtask future",
+         worker_id_);
     // Mark the subtask's future as complete
     future.Complete();
 
@@ -1127,34 +1333,14 @@ void Worker::ProcessRetryQueue() {
       continue;  // Skip invalid entries
     }
 
-    // Re-resolve the pool query for this task
-    std::vector<PoolQuery> pool_queries = CHI_IPC->ResolvePoolQuery(
-        task_ptr->pool_query_, task_ptr->pool_id_, task_ptr);
-
-    bool is_local = CHI_IPC->IsTaskLocal(task_ptr, pool_queries);
-    if (is_local) {
-      // Container is back / available locally — check plug state
-      auto *pool_manager = CHI_POOL_MANAGER;
-      bool is_plugged = false;
-      ContainerId container_id = task_ptr->pool_query_.GetContainerId();
-      Container *exec_container = pool_manager->GetContainer(
-          task_ptr->pool_id_, container_id, is_plugged);
-
-      if (is_plugged) {
-        // Still plugged, put back in retry queue
-        retry_queue_.push(run_ctx);
-      } else if (exec_container) {
-        // Container available — execute locally
-        run_ctx->container_ = exec_container;
-        task_ptr->SetCompleter(exec_container->container_id_);
-        ExecTask(task_ptr, run_ctx, false);
-      } else {
-        // Container gone but resolved as local — shouldn't happen, retry
-        retry_queue_.push(run_ctx);
-      }
-    } else {
-      // Container migrated away — route globally
-      CHI_IPC->RouteGlobal(run_ctx->future_, pool_queries);
+    // Clear TASK_ROUTED so RouteTask re-evaluates.
+    // RouteTask handles Retry/Dne internally via AddToRetryQueue.
+    task_ptr->ClearFlags(TASK_ROUTED);
+    RouteResult result =
+        CLIO_IPC->RouteTask(run_ctx->future_, /*force_enqueue=*/true);
+    if (result == RouteResult::ExecHere) {
+      // force_enqueue=true means this shouldn't happen, but handle it
+      ExecTask(task_ptr, run_ctx, false);
     }
   }
 }
@@ -1164,6 +1350,13 @@ void Worker::ReschedulePeriodicTask(RunContext *run_ctx,
   if (!run_ctx || task_ptr.IsNull() || !task_ptr->IsPeriodic()) {
     return;
   }
+
+  // Reset timers and predictions for next period
+  run_ctx->cpu_timer_.time_ns_ = 0;
+  run_ctx->wall_timer_.time_ns_ = 0;
+  run_ctx->predicted_load_ = 0;
+  run_ctx->predicted_wall_us_ = 0;
+  run_ctx->predicted_stat_ = TaskStat();
 
   // Get the lane from the run context
   TaskLane *lane = run_ctx->lane_;
@@ -1191,11 +1384,11 @@ void Worker::ReschedulePeriodicTask(RunContext *run_ctx,
 }
 
 RunContext *GetCurrentRunContextFromWorker() {
-  Worker *worker = CHI_CUR_WORKER;
+  Worker *worker = CLIO_CUR_WORKER;
   if (worker) {
     return worker->GetCurrentRunContext();
   }
   return nullptr;
 }
 
-}  // namespace chi
+}  // namespace clio::run

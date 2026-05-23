@@ -10,7 +10,7 @@ This directory contains a comprehensive benchmark suite for measuring the perfor
 
 ## Building
 
-The benchmark is built automatically when `HSHM_ENABLE_BENCHMARKS` is enabled:
+The benchmark is built automatically when `CTP_ENABLE_BENCHMARKS` is enabled:
 
 ```bash
 cmake --preset=debug -DWRP_CORE_ENABLE_BENCHMARKS=ON
@@ -141,7 +141,7 @@ This runs all three allocators sequentially with identical parameters and displa
 - **BuddyAllocator**: Uses MallocBackend with 2GB heap
 - **Standard malloc**: Uses system malloc directly
 
-All HSHM allocators write to allocated memory to verify allocations are valid and properly mapped.
+All CTP allocators write to allocated memory to verify allocations are valid and properly mapped.
 
 ## Known Performance Characteristics
 

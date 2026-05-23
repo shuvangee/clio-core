@@ -2,50 +2,31 @@
 # Build adapters
 #------------------------------------------------------------------------------
 
-# Create the CAE configuration library
-add_library(wrp_cte_cae_config SHARED
-    cae_config.cc
-    cae_config.h
-)
-
-# Note: wrp_cte_core_client provides core/include via transitive includes
-# LOCAL includes for this library's own headers and adapter/ path resolution
-target_include_directories(wrp_cte_cae_config PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}  # For cae_config.h in same directory
-    ${WRP_CTE_ROOT}              # For adapter/cae_config.h and adapter/adapter_types.h include paths
-)
-
-target_link_libraries(wrp_cte_cae_config
-    hshm::configure
-    hshm::cxx
-    wrp_cte_core_client  # Provides core headers transitively
-)
-
 # CTE adapter singleton implementation - moved to filesystem directory
 # to leverage existing working build configuration
 
 # Adapters require ELF support (for real_api.h)
 # Disable all adapters when ELF is disabled
-if(WRP_CORE_ENABLE_ELF)
+if(CLIO_CORE_ENABLE_ELF)
     message(STATUS "CTE Adapters: ENABLED (ELF support available)")
 
     # Core adapters that are built when ELF is enabled
     add_subdirectory(filesystem)
 
     # Optional adapters - controlled by root CMakeLists.txt options
-    if (WRP_CTE_ENABLE_POSIX_ADAPTER)
+    if (CLIO_CTE_ENABLE_POSIX_ADAPTER)
         add_subdirectory(posix)
     endif()
-    if (WRP_CTE_ENABLE_STDIO_ADAPTER)
+    if (CLIO_CTE_ENABLE_STDIO_ADAPTER)
         add_subdirectory(stdio)
     endif()
-    if (WRP_CTE_ENABLE_MPIIO_ADAPTER)
+    if (CLIO_CTE_ENABLE_MPIIO_ADAPTER)
         add_subdirectory(mpiio)
     endif()
-    if (WRP_CTE_ENABLE_VFD)
+    if (CLIO_CTE_ENABLE_VFD)
         add_subdirectory(vfd)
     endif()
-    if (WRP_CTE_ENABLE_NVIDIA_GDS_ADAPTER)
+    if (CLIO_CTE_ENABLE_NVIDIA_GDS_ADAPTER)
         add_subdirectory(nvidia_gds)
     endif()
 else()
@@ -54,29 +35,35 @@ else()
 endif()
 
 # ADIOS2 adapter does not require ELF support (it's a plugin engine)
-if (WRP_CTE_ENABLE_ADIOS2_ADAPTER)
+if (CLIO_CTE_ENABLE_ADIOS2_ADAPTER)
     add_subdirectory(adios2)
+endif()
+
+# FUSE adapter does not require ELF support (standalone daemon)
+if (CLIO_CTE_ENABLE_FUSE_ADAPTER)
+    add_subdirectory(libfuse)
+endif()
+
+# HDF5 VOL connector (requires HDF5 >= 2.0, does not require ELF)
+if (CLIO_CTE_ENABLE_HDF5_VOL)
+    add_subdirectory(hdf5_vol)
+endif()
+
+# GPU Vector adapter (CUDA/ROCm only; producer-only kernel API)
+if (CLIO_CORE_ENABLE_CUDA OR CLIO_CORE_ENABLE_ROCM)
+    add_subdirectory(gpu_vector)
 endif()
 
 #-----------------------------------------------------------------------------
 # Install adapter headers
 #-----------------------------------------------------------------------------
-file(GLOB_RECURSE WRP_CTE_HEADERS "*.h")
+file(GLOB_RECURSE CLIO_CTE_HEADERS "*.h")
 install(
         FILES
-        ${WRP_CTE_HEADERS}
+        ${CLIO_CTE_HEADERS}
         DESTINATION
         include/adapter
         COMPONENT
         headers
 )
 install(DIRECTORY mapper DESTINATION include/adapter)
-
-#-----------------------------------------------------------------------------
-# Install CAE config library
-#-----------------------------------------------------------------------------
-install(TARGETS wrp_cte_cae_config
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-)

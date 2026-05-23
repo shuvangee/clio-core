@@ -60,6 +60,9 @@ class Iowarp(CMakePackage):
     depends_on('python')
     depends_on('py-pip')
     depends_on('py-setuptools')
+    depends_on('py-pyyaml', when='+python')
+    depends_on('py-msgpack', when='+python')
+    depends_on('py-flask', when='+python')
 
     # Conditional core dependencies
     depends_on('libelf', when='+elf')
@@ -68,6 +71,10 @@ class Iowarp(CMakePackage):
     depends_on('adios2', when='+adios2')
 
     # Networking libraries
+    # +ares: build libfabric with the full Ares-rail fabric set. The
+    # spec is a single node in the concretized graph, so this constraint
+    # propagates to mochi-thallium's mercury dep automatically when
+    # both +ares and +mochi are set.
     depends_on('libfabric fabrics=sockets,tcp,udp,verbs,mlx,rxm,rxd,shm', when='+ares')
     depends_on('mochi-thallium+cereal', when='+mochi')
     depends_on('argobots@1.1+affinity', when='+mochi')
@@ -103,64 +110,64 @@ class Iowarp(CMakePackage):
         args.append(self.define_from_variant('BUILD_SHARED_LIBS', 'shared'))
 
         # Component enable/disable (using the naming from CMakeLists.txt)
-        args.append(self.define_from_variant('WRP_CORE_ENABLE_RUNTIME', 'runtime'))
-        args.append(self.define_from_variant('WRP_CORE_ENABLE_CTE', 'cte'))
-        args.append(self.define_from_variant('WRP_CORE_ENABLE_CAE', 'cae'))
-        args.append(self.define_from_variant('WRP_CORE_ENABLE_CEE', 'cee'))
+        args.append(self.define_from_variant('CLIO_CORE_ENABLE_RUNTIME', 'runtime'))
+        args.append(self.define_from_variant('CLIO_CORE_ENABLE_CTE', 'cte'))
+        args.append(self.define_from_variant('CLIO_CORE_ENABLE_CAE', 'cae'))
+        args.append(self.define_from_variant('CLIO_CORE_ENABLE_CEE', 'cee'))
 
-        # Context-transport-primitives (HSHM) options
+        # Context-transport-primitives (CTP) options
         if '+hdf5' in self.spec:
-            args.append(self.define('HSHM_ENABLE_VFD', 'ON'))
+            args.append(self.define('CTP_ENABLE_VFD', 'ON'))
         if '+compress' in self.spec:
-            args.append(self.define('HSHM_ENABLE_COMPRESS', 'ON'))
+            args.append(self.define('CTP_ENABLE_COMPRESS', 'ON'))
         if '+encrypt' in self.spec:
-            args.append(self.define('HSHM_ENABLE_ENCRYPT', 'ON'))
+            args.append(self.define('CTP_ENABLE_ENCRYPT', 'ON'))
         if '+mochi' in self.spec:
-            args.append(self.define('HSHM_RPC_THALLIUM', 'ON'))
+            args.append(self.define('CLIO_CORE_ENABLE_THALLIUM', 'ON'))
         if '+zmq' in self.spec:
-            args.append(self.define('HSHM_ENABLE_ZMQ_TESTS', 'ON'))
+            args.append(self.define('CTP_ENABLE_ZMQ_TESTS', 'ON'))
         if '+elf' in self.spec:
-            args.append(self.define('HSHM_ENABLE_ELF', 'ON'))
+            args.append(self.define('CTP_ENABLE_ELF', 'ON'))
         if '+cuda' in self.spec:
-            args.append(self.define('HSHM_ENABLE_CUDA', 'ON'))
+            args.append(self.define('CTP_ENABLE_CUDA', 'ON'))
         if '+rocm' in self.spec:
-            args.append(self.define('HSHM_ENABLE_ROCM', 'ON'))
+            args.append(self.define('CTP_ENABLE_ROCM', 'ON'))
         if '+adios2' in self.spec:
-            args.append(self.define('WRP_CTE_ENABLE_ADIOS2_ADAPTER', 'ON'))
-            args.append(self.define('WRP_CORE_ENABLE_GRAY_SCOTT', 'ON'))
+            args.append(self.define('CLIO_CTE_ENABLE_ADIOS2_ADAPTER', 'ON'))
+            args.append(self.define('CLIO_CORE_ENABLE_GRAY_SCOTT', 'ON'))
 
         # Tests and benchmarks
         if '+test' in self.spec:
-            args.append(self.define('WRP_CORE_ENABLE_TESTS', 'ON'))
-            args.append(self.define('HSHM_ENABLE_TESTS', 'ON'))
+            args.append(self.define('CLIO_CORE_ENABLE_TESTS', 'ON'))
+            args.append(self.define('CTP_ENABLE_TESTS', 'ON'))
             args.append(self.define('CHIMAERA_ENABLE_TESTS', 'ON'))
-            args.append(self.define('WRP_CTE_ENABLE_TESTS', 'ON'))
-            args.append(self.define('WRP_CAE_ENABLE_TESTS', 'ON'))
-            args.append(self.define('WRP_CEE_ENABLE_TESTS', 'ON'))
+            args.append(self.define('CLIO_CTE_ENABLE_TESTS', 'ON'))
+            args.append(self.define('CLIO_CAE_ENABLE_TESTS', 'ON'))
+            args.append(self.define('CLIO_CEE_ENABLE_TESTS', 'ON'))
         else:
-            args.append(self.define('WRP_CORE_ENABLE_TESTS', 'OFF'))
-            args.append(self.define('HSHM_ENABLE_TESTS', 'OFF'))
+            args.append(self.define('CLIO_CORE_ENABLE_TESTS', 'OFF'))
+            args.append(self.define('CTP_ENABLE_TESTS', 'OFF'))
             args.append(self.define('CHIMAERA_ENABLE_TESTS', 'OFF'))
-            args.append(self.define('WRP_CTE_ENABLE_TESTS', 'OFF'))
-            args.append(self.define('WRP_CAE_ENABLE_TESTS', 'OFF'))
-            args.append(self.define('WRP_CEE_ENABLE_TESTS', 'OFF'))
+            args.append(self.define('CLIO_CTE_ENABLE_TESTS', 'OFF'))
+            args.append(self.define('CLIO_CAE_ENABLE_TESTS', 'OFF'))
+            args.append(self.define('CLIO_CEE_ENABLE_TESTS', 'OFF'))
 
         if '+benchmark' in self.spec:
-            args.append(self.define('WRP_CORE_ENABLE_BENCHMARKS', 'ON'))
-            args.append(self.define('HSHM_ENABLE_BENCHMARKS', 'ON'))
+            args.append(self.define('CLIO_CORE_ENABLE_BENCHMARKS', 'ON'))
+            args.append(self.define('CTP_ENABLE_BENCHMARKS', 'ON'))
             args.append(self.define('CHIMAERA_ENABLE_BENCHMARKS', 'ON'))
-            args.append(self.define('WRP_CTE_ENABLE_BENCHMARKS', 'ON'))
-            args.append(self.define('WRP_CAE_ENABLE_BENCHMARKS', 'ON'))
-            args.append(self.define('WRP_CEE_ENABLE_BENCHMARKS', 'ON'))
+            args.append(self.define('CLIO_CTE_ENABLE_BENCHMARKS', 'ON'))
+            args.append(self.define('CLIO_CAE_ENABLE_BENCHMARKS', 'ON'))
+            args.append(self.define('CLIO_CEE_ENABLE_BENCHMARKS', 'ON'))
         else:
-            args.append(self.define('WRP_CORE_ENABLE_BENCHMARKS', 'OFF'))
-            args.append(self.define('HSHM_ENABLE_BENCHMARKS', 'OFF'))
+            args.append(self.define('CLIO_CORE_ENABLE_BENCHMARKS', 'OFF'))
+            args.append(self.define('CTP_ENABLE_BENCHMARKS', 'OFF'))
             args.append(self.define('CHIMAERA_ENABLE_BENCHMARKS', 'OFF'))
-            args.append(self.define('WRP_CTE_ENABLE_BENCHMARKS', 'OFF'))
-            args.append(self.define('WRP_CAE_ENABLE_BENCHMARKS', 'OFF'))
-            args.append(self.define('WRP_CEE_ENABLE_BENCHMARKS', 'OFF'))
+            args.append(self.define('CLIO_CTE_ENABLE_BENCHMARKS', 'OFF'))
+            args.append(self.define('CLIO_CAE_ENABLE_BENCHMARKS', 'OFF'))
+            args.append(self.define('CLIO_CEE_ENABLE_BENCHMARKS', 'OFF'))
 
-        # Chimaera runtime options (if enabled)
+        # CLIO Runtime runtime options (if enabled)
         if '+runtime' in self.spec:
             if '+cuda' in self.spec:
                 args.append(self.define('CHIMAERA_ENABLE_CUDA', 'ON'))

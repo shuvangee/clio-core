@@ -50,86 +50,59 @@
 #include <unistd.h>
 #include <vector>
 
-#include "adapter/cae_config.h"
-#include "chimaera/chimaera.h"
-#include "wrp_cte/core/core_client.h"
+#include "clio_runtime/clio_runtime.h"
+#include "clio_cte/core/core_client.h"
 
 using namespace std::chrono_literals;
 namespace stdfs = std::filesystem;
 
-// Test constants
+// Test constants — paths use the clio:: prefix that opts in interception.
 const size_t kTestFileSize = 16 * 1024 * 1024; // 16MB
 const std::string kTestDir = "/tmp";
-const std::string kTestFile = "/tmp/wrp_cte_posix_test.dat";
+const std::string kTestBackendFile = "/tmp/clio_cte_posix_test.dat";
+const std::string kTestFile = "clio::" + kTestBackendFile;
 
 /**
- * Initialize CTE runtime and register test target
- * Must be called before any POSIX adapter operations that use CTE
+ * Initialize CTE runtime and register test target. Must be called before
+ * any POSIX adapter operation that should go through CTE.
  */
 bool initializeRuntime() {
   static bool initialized = false;
-
-  // Ensure initialization happens only once
   if (initialized) {
     return true;
   }
 
-  INFO("Disabling interception during initialization...");
-
-  // Disable interception during initialization
-  auto *cae_config = WRP_CAE_CONF;
-  if (cae_config != nullptr) {
-    cae_config->DisableInterception();
-    INFO("✓ Interception disabled");
-  }
-
   INFO("Initializing Chimaera runtime...");
-
-  // Initialize Chimaera first
   if (!chi::CHIMAERA_INIT(chi::ChimaeraMode::kClient, true)) {
-    INFO("Chimaera initialization failed - continuing without CTE "
-         "tracking");
+    INFO("Chimaera initialization failed - continuing without CTE tracking");
     initialized = true;
-    return true; // Continue test without CTE, POSIX still works
+    return true;
   }
-
   INFO("✓ Chimaera runtime initialized");
 
   INFO("Initializing CTE runtime...");
-
-  // Initialize CTE (which prevents re-initialization automatically)
-  if (!wrp_cte::core::WRP_CTE_CLIENT_INIT()) {
+  if (!clio::cte::core::CLIO_CTE_CLIENT_INIT()) {
     INFO("CTE initialization failed - continuing without CTE tracking");
     initialized = true;
-    return true; // Continue test without CTE, POSIX still works
+    return true;
   }
-
   INFO("✓ CTE runtime initialized");
 
-  // Register the test file as a target
   INFO("Registering test target with CTE...");
-  auto *cte_client = WRP_CTE_CLIENT;
-  chi::u32 result =
-      cte_client->RegisterTarget(hipc::MemContext(),
-                                 kTestFile, // target_name (file path)
-                                 chimaera::bdev::BdevType::kFile, // bdev_type
-                                 kTestFileSize * 10               // total_size
-      );
-
+  auto *cte_client = CLIO_CTE_CLIENT;
+  chi::u32 result = cte_client->RegisterTarget(
+      ctp::ipc::MemContext(),
+      kTestBackendFile,                  // target_name (backend file path)
+      clio::run::bdev::BdevType::kFile,   // bdev_type
+      kTestFileSize * 10                 // total_size
+  );
   if (result != 0) {
     INFO("Failed to register target with CTE, result code: "
          << result << " - continuing without CTE tracking");
     initialized = true;
-    return true; // Continue test without CTE, POSIX still works
+    return true;
   }
-
   INFO("✓ Test target registered successfully");
-
-  // Re-enable interception at the end of initialization
-  if (cae_config != nullptr) {
-    cae_config->EnableInterception();
-    INFO("✓ Interception enabled");
-  }
 
   initialized = true;
   return true;
@@ -151,8 +124,10 @@ TEST_CASE("POSIX Adapter: Open-Write-Read-Close", "[posix][adapter]") {
   REQUIRE(initializeRuntime());
 
   // Clean up any existing test file
-  if (stdfs::exists(kTestFile)) {
-    stdfs::remove(kTestFile);
+  // stdfs takes plain filesystem paths; the backend file is what lands
+  // on disk, so clean that, not the clio:: alias.
+  if (stdfs::exists(kTestBackendFile)) {
+    stdfs::remove(kTestBackendFile);
   }
 
   SECTION("Basic file I/O operations") {
@@ -209,9 +184,9 @@ TEST_CASE("POSIX Adapter: Open-Write-Read-Close", "[posix][adapter]") {
     REQUIRE(close_result == 0);
     INFO("✓ File closed successfully");
 
-    // Step 9: Remove test file
+    // Step 9: Remove test file (via the kernel, on the backend path)
     INFO("Step 9: Removing test file...");
-    bool removed = stdfs::remove(kTestFile);
+    bool removed = stdfs::remove(kTestBackendFile);
     REQUIRE(removed);
     INFO("✓ Test file removed successfully");
   }
@@ -225,8 +200,10 @@ TEST_CASE("POSIX Adapter: File Size Verification", "[posix][adapter]") {
   REQUIRE(initializeRuntime());
 
   // Clean up any existing test file
-  if (stdfs::exists(kTestFile)) {
-    stdfs::remove(kTestFile);
+  // stdfs takes plain filesystem paths; the backend file is what lands
+  // on disk, so clean that, not the clio:: alias.
+  if (stdfs::exists(kTestBackendFile)) {
+    stdfs::remove(kTestBackendFile);
   }
 
   SECTION("Verify file size after write operations") {
@@ -242,11 +219,212 @@ TEST_CASE("POSIX Adapter: File Size Verification", "[posix][adapter]") {
 
     close(fd);
 
-    // Verify file size using filesystem
-    auto file_size = stdfs::file_size(kTestFile);
+    // Verify file size using filesystem (the backend path is the one
+    // the kernel can stat directly; clio:: is an adapter-level alias).
+    auto file_size = stdfs::file_size(kTestBackendFile);
     REQUIRE(file_size == test_size);
 
     // Clean up
-    stdfs::remove(kTestFile);
+    stdfs::remove(kTestBackendFile);
   }
+}
+
+/* ===========================================================================
+ * clio:: prefix-gating tests
+ *
+ * The new design: a path is intercepted iff it starts with "clio::".
+ * Verify both branches:
+ *  - clio:: path is intercepted, ends up tracked, and gets a CTE-issued fd
+ *  - bare path is NOT intercepted, gets a kernel fd, and is not in the MDM
+ *
+ * We can't peek at the MDM directly without internal headers, but
+ * CTE-issued fds are >= 8192 (see PosixFs::IsFdTracked) while the
+ * kernel keeps app fds < 8192 for tiny processes, so checking the fd
+ * range is a reliable proxy for "did this get intercepted".
+ * =========================================================================*/
+
+TEST_CASE("POSIX Adapter: clio:: prefix opts in interception",
+          "[posix][adapter][prefix]") {
+  REQUIRE(initializeRuntime());
+
+  const std::string backend = "/tmp/clio_cte_prefix_test.dat";
+  const std::string clio = "clio::" + backend;
+
+  // Start clean.
+  stdfs::remove(backend);
+
+  SECTION("clio:: path is intercepted") {
+    int fd = open(clio.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    REQUIRE(fd >= 0);
+    // CTE-issued fds live above 8192; kernel fds are tiny in this test
+    // process, so a high fd is a reliable signal we went through CTE.
+    REQUIRE(fd >= 8192);
+    REQUIRE(close(fd) == 0);
+    stdfs::remove(backend);
+  }
+
+  SECTION("bare path is NOT intercepted") {
+    int fd = open(backend.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    REQUIRE(fd >= 0);
+    REQUIRE(fd < 8192);  // plain kernel fd
+    REQUIRE(close(fd) == 0);
+    stdfs::remove(backend);
+  }
+}
+
+TEST_CASE("POSIX Adapter: clio:: opens write to the bare backend path",
+          "[posix][adapter][prefix]") {
+  REQUIRE(initializeRuntime());
+
+  // Open via clio::, write, close. After flush the kernel should see a
+  // file at the bare path (proves the prefix was stripped before
+  // RealOpen reached the kernel).
+  const std::string backend = "/tmp/clio_cte_strip_test.dat";
+  const std::string clio = "clio::" + backend;
+  stdfs::remove(backend);
+
+  int fd = open(clio.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  REQUIRE(fd >= 0);
+  const char *payload = "clio";
+  REQUIRE(write(fd, payload, 4) == 4);
+  REQUIRE(close(fd) == 0);
+
+  // The backend file must exist on disk — *not* a literal "clio::..." file.
+  REQUIRE(stdfs::exists(backend));
+  REQUIRE_FALSE(stdfs::exists(std::string("/tmp/") + "clio::clio_cte_strip_test.dat"));
+  stdfs::remove(backend);
+}
+
+/* ===========================================================================
+ * stat-family correctness
+ *
+ * The historically-fragile area. Verify every field we promise to
+ * populate is non-zero and reasonable.
+ * =========================================================================*/
+
+TEST_CASE("POSIX Adapter: fstat returns full struct stat",
+          "[posix][adapter][stat]") {
+  REQUIRE(initializeRuntime());
+
+  const std::string backend = "/tmp/clio_cte_fstat_test.dat";
+  const std::string clio = "clio::" + backend;
+  stdfs::remove(backend);
+
+  int fd = open(clio.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  REQUIRE(fd >= 0);
+
+  const size_t kPayload = 4096 + 7;  // odd size on purpose
+  std::vector<char> data(kPayload, 'Z');
+  REQUIRE(write(fd, data.data(), kPayload) == static_cast<ssize_t>(kPayload));
+
+  struct stat st;
+  memset(&st, 0xAB, sizeof(st));  // poison to catch missed fields
+  REQUIRE(fstat(fd, &st) == 0);
+
+  // Size first — the most common reason apps stat a file.
+  REQUIRE(st.st_size == static_cast<off_t>(kPayload));
+  // Regular file with sane permission bits.
+  REQUIRE(S_ISREG(st.st_mode));
+  REQUIRE((st.st_mode & 0777) == 0644);
+  // Owner = current user.
+  REQUIRE(st.st_uid == geteuid());
+  REQUIRE(st.st_gid == getegid());
+  // Single link to itself.
+  REQUIRE(st.st_nlink == 1);
+  // Synthetic device id is non-zero; inode is non-zero so apps can
+  // use (dev, ino) as a unique key.
+  REQUIRE(st.st_dev != 0);
+  REQUIRE(st.st_ino != 0);
+  // st_blocks counts 512-byte units, rounded up.
+  REQUIRE(st.st_blocks >= static_cast<blkcnt_t>((kPayload + 511) / 512));
+  // 1 MiB preferred block size from the adapter.
+  REQUIRE(st.st_blksize == 1024 * 1024);
+
+  REQUIRE(close(fd) == 0);
+  stdfs::remove(backend);
+}
+
+TEST_CASE("POSIX Adapter: stat-by-path matches fstat-by-fd",
+          "[posix][adapter][stat]") {
+  REQUIRE(initializeRuntime());
+
+  const std::string backend = "/tmp/clio_cte_statpath_test.dat";
+  const std::string clio = "clio::" + backend;
+  stdfs::remove(backend);
+
+  int fd = open(clio.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  REQUIRE(fd >= 0);
+  std::vector<char> data(2048, 'q');
+  REQUIRE(write(fd, data.data(), data.size()) ==
+          static_cast<ssize_t>(data.size()));
+
+  struct stat by_fd;
+  REQUIRE(fstat(fd, &by_fd) == 0);
+
+  struct stat by_path;
+  REQUIRE(stat(clio.c_str(), &by_path) == 0);
+
+  // Size/mode/owner/blksize must agree.
+  REQUIRE(by_fd.st_size == by_path.st_size);
+  REQUIRE(by_fd.st_mode == by_path.st_mode);
+  REQUIRE(by_fd.st_uid == by_path.st_uid);
+  REQUIRE(by_fd.st_gid == by_path.st_gid);
+  REQUIRE(by_fd.st_blksize == by_path.st_blksize);
+  // Inode is derived from the bare path → must be stable between
+  // fstat and stat-by-clio-path.
+  REQUIRE(by_fd.st_ino == by_path.st_ino);
+
+  REQUIRE(close(fd) == 0);
+  stdfs::remove(backend);
+}
+
+TEST_CASE("POSIX Adapter: stat() on missing clio:: path returns ENOENT",
+          "[posix][adapter][stat][errors]") {
+  REQUIRE(initializeRuntime());
+
+  struct stat st;
+  errno = 0;
+  // No prior open of this path, no backend file exists.
+  int result = stat("clio::/tmp/clio_cte_does_not_exist.dat", &st);
+  REQUIRE(result == -1);
+  REQUIRE(errno == ENOENT);
+}
+
+/* ===========================================================================
+ * Misc adapter coverage: lseek, ftruncate, unlink, fsync
+ * =========================================================================*/
+
+TEST_CASE("POSIX Adapter: seek + truncate + sync + unlink",
+          "[posix][adapter][ops]") {
+  REQUIRE(initializeRuntime());
+
+  const std::string backend = "/tmp/clio_cte_ops_test.dat";
+  const std::string clio = "clio::" + backend;
+  stdfs::remove(backend);
+
+  int fd = open(clio.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+  REQUIRE(fd >= 0);
+
+  // Write 4 KiB, seek to start, read back, then truncate to 1 KiB.
+  std::vector<char> w(4096, 'X');
+  REQUIRE(write(fd, w.data(), w.size()) == static_cast<ssize_t>(w.size()));
+
+  off_t back = lseek(fd, 0, SEEK_SET);
+  REQUIRE(back == 0);
+
+  std::vector<char> r(4096, 0);
+  REQUIRE(read(fd, r.data(), r.size()) == static_cast<ssize_t>(r.size()));
+  REQUIRE(r == w);
+
+  REQUIRE(ftruncate(fd, 1024) == 0);
+  struct stat st;
+  REQUIRE(fstat(fd, &st) == 0);
+  REQUIRE(st.st_size == 1024);
+
+  REQUIRE(fsync(fd) == 0);
+  REQUIRE(close(fd) == 0);
+
+  REQUIRE(unlink(clio.c_str()) == 0);
+  // After unlink, the backend file is gone.
+  REQUIRE_FALSE(stdfs::exists(backend));
 }
