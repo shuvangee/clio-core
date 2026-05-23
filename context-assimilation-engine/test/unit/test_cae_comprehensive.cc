@@ -49,6 +49,7 @@
 #include <clio_runtime/bdev/bdev_client.h>
 #include <clio_runtime/bdev/bdev_tasks.h>
 #include <fstream>
+#include <filesystem>
 #include <cstdlib>
 
 using namespace clio::cae::core;

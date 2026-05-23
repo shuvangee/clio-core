@@ -159,16 +159,35 @@ typedef HighResMonotonicTimepoint Timepoint;
 class CpuTimer {
  public:
   double time_ns_ = 0;
+#ifndef _WIN32
   struct timespec start_{0, 0};
+#else
+  // Windows placeholder for compatibility with CLOCK_THREAD_CPUTIME_ID
+  struct {
+    long tv_sec;
+    long tv_nsec;
+  } start_{0, 0};
+#endif
 
   CTP_INLINE_CROSS_FUN void Resume() {
+#ifndef _WIN32
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &start_);
+#else
+    // Windows: stub implementation (not available on Windows)
+    start_.tv_sec = 0;
+    start_.tv_nsec = 0;
+#endif
   }
   CTP_INLINE_CROSS_FUN double Pause() {
+#ifndef _WIN32
     struct timespec end;
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);
     time_ns_ += (end.tv_sec - start_.tv_sec) * 1e9
               + (end.tv_nsec - start_.tv_nsec);
+#else
+    // Windows: stub implementation (not available on Windows)
+    // Just return current accumulated time
+#endif
     return time_ns_;
   }
   CTP_INLINE_CROSS_FUN void Reset() { time_ns_ = 0; Resume(); }

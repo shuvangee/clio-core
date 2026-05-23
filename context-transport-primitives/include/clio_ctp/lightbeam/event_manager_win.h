@@ -80,6 +80,17 @@ class EventManager {
     return event_id;
   }
 
+  void RemoveEvent(int fd) {
+    // Find and remove the fd from both poll_fds_ and registrations_
+    for (size_t i = 0; i < registrations_.size(); ++i) {
+      if (registrations_[i].fd_ == fd) {
+        poll_fds_.erase(poll_fds_.begin() + i);
+        registrations_.erase(registrations_.begin() + i);
+        return;
+      }
+    }
+  }
+
   int AddSignalEvent(EventAction *action = nullptr) {
     signal_event_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
     if (!signal_event_) {
