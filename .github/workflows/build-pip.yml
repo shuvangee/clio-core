@@ -177,10 +177,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-latest
+          # Pin to macos-14 (Apple Silicon, macOS 14 Sonoma host). macos-latest
+          # is currently macos-15, where Homebrew bottles target macOS 15.0,
+          # which forces every bundled dylib's minimum target to 15.0 and
+          # makes the resulting wheel installable only on macOS 15+. macos-14
+          # bottles target macOS 14.0, giving the wheel ~2.5 years of OS
+          # compatibility (Sonoma, Sequoia, ...). The deployment target
+          # below has to match so delocate accepts the bundle.
+          - runner: macos-14
             arch: arm64
             cibw_build: "cp310-macosx_arm64 cp311-macosx_arm64 cp312-macosx_arm64 cp313-macosx_arm64"
             brew_prefix: /opt/homebrew
+            macosx_deployment_target: '14.0'
 
     steps:
     - name: Checkout repository
@@ -209,6 +217,13 @@ jobs:
     - name: Build macOS wheels
       env:
         CIBW_BUILD: ${{ matrix.cibw_build }}
+        # MACOSX_DEPLOYMENT_TARGET must match (or exceed) the minimum
+        # macOS target of every dylib bundled by delocate. Homebrew
+        # bottles on the macos-14 runner are built for macOS 14.0, so
+        # the wheel's deployment target has to be at least 14.0 — set
+        # it for cibuildwheel (which propagates it into the build) AND
+        # set it as an env var seen by the C++ compiler.
+        MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macosx_deployment_target }}
         # CMAKE_PREFIX_PATH / PKG_CONFIG_PATH point cmake and pkg-config
         # at Homebrew. SKBUILD_CMAKE_DEFINE overrides the pyproject.toml
         # default (CLIO_CORE_ENABLE_RPATH=OFF, which exists because the
@@ -219,6 +234,7 @@ jobs:
         CIBW_ENVIRONMENT_MACOS: >-
           CMAKE_PREFIX_PATH=${{ matrix.brew_prefix }}
           PKG_CONFIG_PATH=${{ matrix.brew_prefix }}/lib/pkgconfig
+          MACOSX_DEPLOYMENT_TARGET=${{ matrix.macosx_deployment_target }}
           SKBUILD_CMAKE_DEFINE='CLIO_CORE_ENABLE_RPATH=ON'
         CIBW_TEST_COMMAND: >
           python -c "import iowarp_core; print('Version:', iowarp_core.get_version())"
@@ -391,7 +407,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-latest
+          # Same runner as the build so the wheel's macosx_14_0_arm64
+          # platform tag is satisfied (the wheel is also installable on
+          # macos-15+, but pinning here keeps test infra deterministic).
+          - runner: macos-14
             arch: arm64
             python: '3.12'
 
