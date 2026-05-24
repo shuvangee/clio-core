@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(iowarp-core VERSION 1.5.8 LANGUAGES C CXX)
+project(iowarp-core VERSION 1.9.0 LANGUAGES C CXX)
 
 #------------------------------------------------------------------------------
 # Project Options
