@@ -37,11 +37,22 @@ if(CLIO_CORE_ENABLE_DEB_PACKAGE OR CLIO_CORE_ENABLE_CPACK)
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "IOWarp Team <grc@illinoistech.edu>")
     set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
-    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+    # Architecture: derive from the build host via `dpkg --print-architecture`
+    # instead of hardcoding amd64. The previous hardcode shipped an "amd64"-
+    # labeled .deb from the arm64 builder, and apt on arm64 then tried to
+    # install it as a foreign arch and failed pulling :amd64 dependencies.
+    # CPack falls back to dpkg auto-detection when CPACK_DEBIAN_PACKAGE_ARCHITECTURE
+    # is unset.
+    find_program(DPKG_CMD dpkg)
+    if(DPKG_CMD)
+        execute_process(COMMAND ${DPKG_CMD} --print-architecture
+            OUTPUT_VARIABLE CPACK_DEBIAN_PACKAGE_ARCHITECTURE
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+    endif()
     # Runtime dependencies: libzmq5 or libzmq3-dev, libyaml-cpp0.8 or libyaml-cpp-dev
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libzmq3-dev, libyaml-cpp-dev")
 
-    message(STATUS "CPack: DEB generator enabled")
+    message(STATUS "CPack: DEB generator enabled (arch=${CPACK_DEBIAN_PACKAGE_ARCHITECTURE})")
 endif()
 
 # RPM Package Configuration
@@ -53,6 +64,19 @@ if(CLIO_CORE_ENABLE_RPM_PACKAGE OR CLIO_CORE_ENABLE_CPACK)
     set(CPACK_RPM_PACKAGE_LICENSE "MIT")
     set(CPACK_RPM_PACKAGE_GROUP "System/Libraries")
     set(CPACK_RPM_PACKAGE_REQUIRES "zeromq, yaml-cpp")
+    # Disable auto-generated Requires on internal libraries. With AUTOREQ
+    # default-on, rpmbuild scans every installed .so and adds a
+    # Requires: lib<x>.so()(64bit) for each one — including our OWN
+    # libclio_admin_client.so / libchimaera_MOD_NAME_*.so / etc. which
+    # ARE in the same RPM. The matching Provides: side isn't generated
+    # at the same path (sym-version mismatch under the cpack flow),
+    # so dnf refuses to install with "nothing provides libclio_*". Turn
+    # both directions off and rely on CPACK_RPM_PACKAGE_REQUIRES above
+    # for the external deps that actually need declaring (zeromq,
+    # yaml-cpp). Internal .so resolution happens at runtime via
+    # rpath (`$ORIGIN/../lib`).
+    set(CPACK_RPM_PACKAGE_AUTOREQ OFF)
+    set(CPACK_RPM_PACKAGE_AUTOPROV OFF)
 
     message(STATUS "CPack: RPM generator enabled")
 endif()
