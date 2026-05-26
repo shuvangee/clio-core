@@ -1485,6 +1485,32 @@ if(CLIO_CORE_ENABLE_BENCHMARKS)
   endforeach()
 endif()
 
+# Belt-and-braces fallback install for context-runtime binaries into the
+# default ("Unspecified") component picked up by `cpack -G DEB/RPM` (the
+# component filter is set in cmake/packaging/CPackConfig.cmake to
+# `Unspecified` only — pip_package files are filtered out).
+#
+# The per-subdir installs at context-runtime/util/CMakeLists.txt:40 and
+# context-runtime/benchmark/CMakeLists.txt:17 are functionally identical
+# to the working installs at context-transfer-engine/benchmark and
+# context-assimilation-engine/core, but at v1.9.5 the resulting .deb
+# shipped without clio_run / clio_run_thrpt_bench / chimaera while it
+# DID ship clio_cte_bench / clio_cae / allocator_benchmark. Exact root
+# cause is unidentified (the per-subdir rules look correct in cmake_install.cmake).
+# Add explicit top-level installs as a safety net so any future drop-out
+# can't ship a half-broken native package silently. PR #458's new
+# test-deb / test-rpm jobs will catch a recurrence.
+if(TARGET clio_run)
+  install(TARGETS clio_run RUNTIME DESTINATION bin)
+endif()
+if(TARGET clio_run_thrpt_bench)
+  install(TARGETS clio_run_thrpt_bench RUNTIME DESTINATION bin)
+endif()
+# `chimaera` is created as a symlink to `clio_run` by an install(CODE)
+# in context-runtime/util/CMakeLists.txt — that runs after this point
+# during cmake --install, so the symlink lands in the default
+# component too. No extra rule needed here.
+
 # Python extensions -> iowarp_core/ext/
 if(CLIO_CORE_ENABLE_PYTHON)
   if(TARGET clio_cte_core_ext)
