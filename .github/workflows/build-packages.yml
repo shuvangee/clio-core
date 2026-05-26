@@ -1,9 +1,17 @@
 name: Build and Publish Binary Packages
 
+# Build + install-test runs on every push to main and every PR, so a
+# broken .deb / .rpm / .AppImage is caught before merge. Only the
+# publish-release job (tag-gated below) actually uploads to a GitHub
+# Release — pushes to main produce artifacts that expire with normal
+# Actions retention, nothing user-facing.
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ['v*']
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -44,10 +52,18 @@ jobs:
   # job already uses for Fedora.
   #-----------------------------------------------------------------------
   build-deb:
-    name: Build Debian package
-    runs-on: ubuntu-latest
+    name: Build Debian package (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     needs: [check-version]
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -82,7 +98,7 @@ jobs:
     - name: Upload DEB artifact
       uses: actions/upload-artifact@v4
       with:
-        name: deb-package
+        name: deb-package-${{ matrix.arch }}
         path: build-deb/*.deb
 
   #-----------------------------------------------------------------------
@@ -93,11 +109,19 @@ jobs:
   # git BEFORE the checkout step so it can use the native git path.
   #-----------------------------------------------------------------------
   build-rpm:
-    name: Build RPM package
-    runs-on: ubuntu-latest
+    name: Build RPM package (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     container: fedora:40
     needs: [check-version]
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Install git (required for actions/checkout submodule mode)
       run: dnf install -y git
@@ -134,7 +158,7 @@ jobs:
     - name: Upload RPM artifact
       uses: actions/upload-artifact@v4
       with:
-        name: rpm-package
+        name: rpm-package-${{ matrix.arch }}
         path: build-rpm/*.rpm
 
   #-----------------------------------------------------------------------
@@ -146,10 +170,21 @@ jobs:
   # ubuntu-latest with deps installed inline.
   #-----------------------------------------------------------------------
   build-appimage:
-    name: Build AppImage
-    runs-on: ubuntu-latest
+    name: Build AppImage (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     needs: [check-version]
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          # AppImageKit's continuous release ships appimagetool-aarch64.AppImage;
+          # build_appimage.sh.in autodetects host arch and downloads the matching
+          # binary, so the same script works on either runner.
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -182,8 +217,141 @@ jobs:
     - name: Upload AppImage artifact
       uses: actions/upload-artifact@v4
       with:
-        name: appimage
+        name: appimage-${{ matrix.arch }}
         path: build-appimage/*.AppImage
+
+  #-----------------------------------------------------------------------
+  # Install-and-smoke-test each native package on a clean container.
+  #
+  # Caught nothing in v1.9.0 because these jobs didn't exist — the
+  # equivalent failure mode for native packages was the dangling-DLL
+  # Windows wheel bug (#446). Mirror what test-wheels-{linux,macos,
+  # windows} do in build-pip.yml: pip install (here: native install) the
+  # artifact into a clean container, then run `clio_run --help` and
+  # treat a signal-level death (exit >= 128 / segfault / DLL-load
+  # failure) as a CI failure. Small positive exit codes are app-level
+  # "I printed usage and stopped", which is what --help typically does.
+  #-----------------------------------------------------------------------
+  test-deb:
+    name: Test DEB install (${{ matrix.arch }})
+    needs: [build-deb]
+    runs-on: ${{ matrix.runner }}
+    container: ubuntu:24.04
+    if: always() && needs.build-deb.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+    - name: Download DEB artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: deb-package-${{ matrix.arch }}
+        path: pkg/
+
+    - name: Install + smoke test
+      run: |
+        set -e
+        apt-get update
+        # dpkg-installs the .deb, then apt-get -f install pulls in any
+        # runtime deps the package declared (libzmq, libyaml-cpp, ...).
+        apt-get install -y ./pkg/*.deb || (apt-get -f install -y && apt-get install -y ./pkg/*.deb)
+        echo "=== clio_run --help ==="
+        clio_run --help; rc=$?
+        # --help prints usage and may exit 0 or small non-zero from the
+        # arg-parser. Signal-level deaths (>=128) or load failures
+        # (e.g. missing shared lib) are what we actually want to catch.
+        if [ "$rc" -ge 128 ] || [ "$rc" -lt 0 ]; then
+          echo "FAIL: clio_run --help died with exit code $rc"
+          exit 1
+        fi
+        echo "=== dpkg -L iowarp-core (file manifest) ==="
+        dpkg -L iowarp-core | head -40
+        echo "=== ldd $(command -v clio_run) ==="
+        ldd "$(command -v clio_run)" | grep -E "not found" && exit 1 || echo "All shared libraries resolve."
+
+  test-rpm:
+    name: Test RPM install (${{ matrix.arch }})
+    needs: [build-rpm]
+    runs-on: ${{ matrix.runner }}
+    container: fedora:40
+    if: always() && needs.build-rpm.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+    - name: Download RPM artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: rpm-package-${{ matrix.arch }}
+        path: pkg/
+
+    - name: Install + smoke test
+      run: |
+        set -e
+        # dnf install resolves declared runtime deps from the package
+        # metadata; --skip-broken=no so a missing dep fails the job.
+        dnf install -y ./pkg/*.rpm
+        echo "=== clio_run --help ==="
+        clio_run --help; rc=$?
+        if [ "$rc" -ge 128 ] || [ "$rc" -lt 0 ]; then
+          echo "FAIL: clio_run --help died with exit code $rc"
+          exit 1
+        fi
+        echo "=== rpm -ql iowarp-core (file manifest) ==="
+        rpm -ql iowarp-core | head -40
+        echo "=== ldd $(command -v clio_run) ==="
+        ldd "$(command -v clio_run)" | grep -E "not found" && exit 1 || echo "All shared libraries resolve."
+
+  test-appimage:
+    name: Test AppImage (${{ matrix.arch }})
+    needs: [build-appimage]
+    runs-on: ${{ matrix.runner }}
+    if: always() && needs.build-appimage.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+    - name: Download AppImage artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: appimage-${{ matrix.arch }}
+        path: pkg/
+
+    - name: Install fuse + smoke test
+      run: |
+        set -e
+        # GHA runners can run AppImages two ways:
+        #   1. Mount via FUSE (requires libfuse2 on the runner)
+        #   2. APPIMAGE_EXTRACT_AND_RUN=1 — extract to a tmpdir + exec
+        # Use (2) so the test runs even on minimal runners without FUSE.
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends file
+        chmod +x pkg/*.AppImage
+        echo "=== AppImage info ==="
+        file pkg/*.AppImage
+        APPIMG=$(ls pkg/*.AppImage | head -1)
+        echo "=== $APPIMG --help ==="
+        APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMG" --help; rc=$?
+        if [ "$rc" -ge 128 ] || [ "$rc" -lt 0 ]; then
+          echo "FAIL: AppImage --help died with exit code $rc"
+          exit 1
+        fi
+        echo "AppImage launches and prints usage."
 
   #-----------------------------------------------------------------------
   # Publish all artifacts to GitHub Release on tag
@@ -192,33 +360,36 @@ jobs:
   # exists (created by build-pip.yml's github-release job), or creates a
   # new one if not. fail_on_unmatched_files=true so a missing artifact
   # is surfaced as a job failure instead of silently shipping a partial
-  # release.
+  # release. Gated on the test jobs so a broken package never ships.
   #-----------------------------------------------------------------------
   publish-release:
     name: Publish to GitHub Release
-    needs: [build-deb, build-rpm, build-appimage]
+    needs: [build-deb, build-rpm, build-appimage, test-deb, test-rpm, test-appimage]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
-    - name: Download DEB package
+    - name: Download DEB packages (both arches)
       uses: actions/download-artifact@v4
       with:
-        name: deb-package
+        pattern: deb-package-*
         path: packages/
+        merge-multiple: true
 
-    - name: Download RPM package
+    - name: Download RPM packages (both arches)
       uses: actions/download-artifact@v4
       with:
-        name: rpm-package
+        pattern: rpm-package-*
         path: packages/
+        merge-multiple: true
 
-    - name: Download AppImage
+    - name: Download AppImages (both arches)
       uses: actions/download-artifact@v4
       with:
-        name: appimage
+        pattern: appimage-*
         path: packages/
+        merge-multiple: true
 
     - name: List packages
       run: ls -lh packages/

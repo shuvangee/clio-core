@@ -1413,6 +1413,24 @@ if(PIP_LIB_TARGETS)
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
     PUBLIC_HEADER DESTINATION include/chimaera)
+  # Mirror the install into the default ("Unspecified") component so the
+  # same shared libs ship in the .deb / .rpm built by cpack -G DEB/RPM
+  # (those generators filter to CPACK_COMPONENTS_ALL=Unspecified). Without
+  # this, libclio_admin_client.so / libclio_admin_runtime.so /
+  # libclio_bdev_*.so / libchimaera_MOD_NAME_*.so are only in the pip
+  # wheel — and the .rpm's clio_run binary then fails to start with
+  #   error while loading shared libraries: libclio_admin_client.so
+  # because its NEEDED entry (Fedora's ld doesn't strip --as-needed as
+  # aggressively as Ubuntu's) can't be resolved. The .deb happened to
+  # work because Ubuntu's linker stripped the direct NEEDED reference,
+  # but the libs were still missing from the package — same root cause,
+  # different surface symptom. Shipping the libs in both packages is
+  # the correct fix.
+  install(TARGETS ${PIP_LIB_TARGETS}
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+    PUBLIC_HEADER DESTINATION include/chimaera)
 endif()
 
 # CLI binary -> iowarp_core/bin/
@@ -1484,6 +1502,32 @@ if(CLIO_CORE_ENABLE_BENCHMARKS)
     endif()
   endforeach()
 endif()
+
+# Belt-and-braces fallback install for context-runtime binaries into the
+# default ("Unspecified") component picked up by `cpack -G DEB/RPM` (the
+# component filter is set in cmake/packaging/CPackConfig.cmake to
+# `Unspecified` only — pip_package files are filtered out).
+#
+# The per-subdir installs at context-runtime/util/CMakeLists.txt:40 and
+# context-runtime/benchmark/CMakeLists.txt:17 are functionally identical
+# to the working installs at context-transfer-engine/benchmark and
+# context-assimilation-engine/core, but at v1.9.5 the resulting .deb
+# shipped without clio_run / clio_run_thrpt_bench / chimaera while it
+# DID ship clio_cte_bench / clio_cae / allocator_benchmark. Exact root
+# cause is unidentified (the per-subdir rules look correct in cmake_install.cmake).
+# Add explicit top-level installs as a safety net so any future drop-out
+# can't ship a half-broken native package silently. PR #458's new
+# test-deb / test-rpm jobs will catch a recurrence.
+if(TARGET clio_run)
+  install(TARGETS clio_run RUNTIME DESTINATION bin)
+endif()
+if(TARGET clio_run_thrpt_bench)
+  install(TARGETS clio_run_thrpt_bench RUNTIME DESTINATION bin)
+endif()
+# `chimaera` is created as a symlink to `clio_run` by an install(CODE)
+# in context-runtime/util/CMakeLists.txt — that runs after this point
+# during cmake --install, so the symlink lands in the default
+# component too. No extra rule needed here.
 
 # Python extensions -> iowarp_core/ext/
 if(CLIO_CORE_ENABLE_PYTHON)
