@@ -77,6 +77,20 @@ if(CLIO_CORE_ENABLE_RPM_PACKAGE OR CLIO_CORE_ENABLE_CPACK)
     # rpath (`$ORIGIN/../lib`).
     set(CPACK_RPM_PACKAGE_AUTOREQ OFF)
     set(CPACK_RPM_PACKAGE_AUTOPROV OFF)
+    # Disable Fedora's brp-check-rpaths spec-file post-policy. CMake bakes
+    # an $ORIGIN/../lib rpath into clio_run / clio_cae / clio_cte_bench so
+    # they can find their sibling libclio_*.so files at /usr/lib/. Fedora's
+    # rpmbuild macros run check-rpaths-worker as part of the install-time
+    # %install scriptlet, which sees the $ORIGIN-relative rpath and strips
+    # it on the grounds that "binaries in /usr/bin shouldn't need rpath."
+    # Net effect: `clio_run --help` exits 127 with
+    #   error while loading shared libraries: libclio_admin_client.so:
+    #   cannot open shared object file
+    # because ld.so falls back to LD_LIBRARY_PATH + ld.so.cache and finds
+    # no entry for our libs. Disabling the brp check preserves the same
+    # install layout the .deb already uses (which Debian's policy doesn't
+    # touch), so both packages now resolve their internal libs identically.
+    set(CPACK_RPM_SPEC_MORE_DEFINE "%define __brp_check_rpaths %{nil}")
 
     message(STATUS "CPack: RPM generator enabled")
 endif()
