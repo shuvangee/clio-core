@@ -52,10 +52,18 @@ jobs:
   # job already uses for Fedora.
   #-----------------------------------------------------------------------
   build-deb:
-    name: Build Debian package
-    runs-on: ubuntu-latest
+    name: Build Debian package (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     needs: [check-version]
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -90,7 +98,7 @@ jobs:
     - name: Upload DEB artifact
       uses: actions/upload-artifact@v4
       with:
-        name: deb-package
+        name: deb-package-${{ matrix.arch }}
         path: build-deb/*.deb
 
   #-----------------------------------------------------------------------
@@ -101,11 +109,19 @@ jobs:
   # git BEFORE the checkout step so it can use the native git path.
   #-----------------------------------------------------------------------
   build-rpm:
-    name: Build RPM package
-    runs-on: ubuntu-latest
+    name: Build RPM package (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     container: fedora:40
     needs: [check-version]
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Install git (required for actions/checkout submodule mode)
       run: dnf install -y git
@@ -142,7 +158,7 @@ jobs:
     - name: Upload RPM artifact
       uses: actions/upload-artifact@v4
       with:
-        name: rpm-package
+        name: rpm-package-${{ matrix.arch }}
         path: build-rpm/*.rpm
 
   #-----------------------------------------------------------------------
@@ -154,10 +170,21 @@ jobs:
   # ubuntu-latest with deps installed inline.
   #-----------------------------------------------------------------------
   build-appimage:
-    name: Build AppImage
-    runs-on: ubuntu-latest
+    name: Build AppImage (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     needs: [check-version]
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          # AppImageKit's continuous release ships appimagetool-aarch64.AppImage;
+          # build_appimage.sh.in autodetects host arch and downloads the matching
+          # binary, so the same script works on either runner.
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -190,7 +217,7 @@ jobs:
     - name: Upload AppImage artifact
       uses: actions/upload-artifact@v4
       with:
-        name: appimage
+        name: appimage-${{ matrix.arch }}
         path: build-appimage/*.AppImage
 
   #-----------------------------------------------------------------------
@@ -206,16 +233,24 @@ jobs:
   # "I printed usage and stopped", which is what --help typically does.
   #-----------------------------------------------------------------------
   test-deb:
-    name: Test DEB install
+    name: Test DEB install (${{ matrix.arch }})
     needs: [build-deb]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     container: ubuntu:24.04
     if: always() && needs.build-deb.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Download DEB artifact
       uses: actions/download-artifact@v4
       with:
-        name: deb-package
+        name: deb-package-${{ matrix.arch }}
         path: pkg/
 
     - name: Install + smoke test
@@ -240,16 +275,24 @@ jobs:
         ldd "$(command -v clio_run)" | grep -E "not found" && exit 1 || echo "All shared libraries resolve."
 
   test-rpm:
-    name: Test RPM install
+    name: Test RPM install (${{ matrix.arch }})
     needs: [build-rpm]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     container: fedora:40
     if: always() && needs.build-rpm.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Download RPM artifact
       uses: actions/download-artifact@v4
       with:
-        name: rpm-package
+        name: rpm-package-${{ matrix.arch }}
         path: pkg/
 
     - name: Install + smoke test
@@ -270,15 +313,23 @@ jobs:
         ldd "$(command -v clio_run)" | grep -E "not found" && exit 1 || echo "All shared libraries resolve."
 
   test-appimage:
-    name: Test AppImage
+    name: Test AppImage (${{ matrix.arch }})
     needs: [build-appimage]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     if: always() && needs.build-appimage.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Download AppImage artifact
       uses: actions/download-artifact@v4
       with:
-        name: appimage
+        name: appimage-${{ matrix.arch }}
         path: pkg/
 
     - name: Install fuse + smoke test
@@ -319,23 +370,26 @@ jobs:
     permissions:
       contents: write
     steps:
-    - name: Download DEB package
+    - name: Download DEB packages (both arches)
       uses: actions/download-artifact@v4
       with:
-        name: deb-package
+        pattern: deb-package-*
         path: packages/
+        merge-multiple: true
 
-    - name: Download RPM package
+    - name: Download RPM packages (both arches)
       uses: actions/download-artifact@v4
       with:
-        name: rpm-package
+        pattern: rpm-package-*
         path: packages/
+        merge-multiple: true
 
-    - name: Download AppImage
+    - name: Download AppImages (both arches)
       uses: actions/download-artifact@v4
       with:
-        name: appimage
+        pattern: appimage-*
         path: packages/
+        merge-multiple: true
 
     - name: List packages
       run: ls -lh packages/
