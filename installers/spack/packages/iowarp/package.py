@@ -45,6 +45,7 @@ class Iowarp(CMakePackage):
     variant('cuda', default=False, description='Enable CUDA support')
     variant('rocm', default=False, description='Enable ROCm support')
     variant('adios2', default=False, description='Build with ADIOS2 support')
+    variant('fuse', default=False, description='Enable FUSE3 adapter (CTE)')
 
     # Core dependencies (always required)
     depends_on('cmake@3.25:')
@@ -69,6 +70,9 @@ class Iowarp(CMakePackage):
     depends_on('mpi', when='+mpiio')
     depends_on('hdf5', when='+hdf5')
     depends_on('adios2', when='+adios2')
+    depends_on('libfuse@3:', when='+fuse')
+
+    conflicts('+fuse', when='~cte', msg='fuse adapter lives under CTE; enable +cte')
 
     # Networking libraries
     # +ares: build libfabric with the full Ares-rail fabric set. The
@@ -198,6 +202,8 @@ class Iowarp(CMakePackage):
                 args.append(self.define('CTE_ENABLE_CUDA', 'ON'))
             if '+rocm' in self.spec:
                 args.append(self.define('CTE_ENABLE_ROCM', 'ON'))
+            if '+fuse' in self.spec:
+                args.append(self.define('CLIO_CTE_ENABLE_FUSE_ADAPTER', 'ON'))
 
         # Context-assimilation-engine (CAE) options (if enabled)
         if '+cae' in self.spec:
