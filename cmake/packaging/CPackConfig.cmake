@@ -50,14 +50,23 @@ if(CLIO_CORE_ENABLE_DEB_PACKAGE OR CLIO_CORE_ENABLE_CPACK)
             OUTPUT_STRIP_TRAILING_WHITESPACE)
     endif()
     # Runtime dependencies: external shared libraries our binaries NEED.
-    # Be exhaustive here — by symmetry with the RPM side, where we turn
-    # AUTOREQ off to silence false-positives on our internal libs, we
-    # also lose auto-detection of true external deps. Match the set of
-    # third-party .so files our binaries link against
-    # (readelf -d clio_run | grep NEEDED, plus the same for the bench
-    # binaries).
+    # Use the -dev package names (instead of the runtime-only soname
+    # packages like libzmq5 / libmsgpack-c2t64) because:
+    #   - the runtime package names are unstable across Ubuntu versions
+    #     (libmsgpack-c2 vs libmsgpack-c2t64 after the 64-bit time_t
+    #     transition; libyaml-cpp0.7 vs libyaml-cpp0.8 between LTS
+    #     releases)
+    #   - apt resolves -dev → runtime automatically (-dev `Depends:`
+    #     the matching versioned soname)
+    #   - they exactly match what the build job apt-installs to
+    #     COMPILE clio-core, so the .deb's declared deps and the build
+    #     deps stay in lockstep
+    # Slight overhead: -dev pulls headers the runtime user doesn't
+    # need, but Debian convention permits this and the disk-space
+    # cost is small. The -dev packages are also the only set we've
+    # actually validated in CI.
     set(CPACK_DEBIAN_PACKAGE_DEPENDS
-        "libzmq5, libyaml-cpp0.8, libmsgpack-c2, libsodium23")
+        "libzmq3-dev, libyaml-cpp-dev, libmsgpack-dev, libsodium-dev")
 
     message(STATUS "CPack: DEB generator enabled (arch=${CPACK_DEBIAN_PACKAGE_ARCHITECTURE})")
 endif()
@@ -72,9 +81,15 @@ if(CLIO_CORE_ENABLE_RPM_PACKAGE OR CLIO_CORE_ENABLE_CPACK)
     set(CPACK_RPM_PACKAGE_GROUP "System/Libraries")
     # External shared-library deps. AUTOREQ is off below (otherwise rpm
     # generates spurious Requires on our OWN internal libs and fails to
-    # self-resolve), so list every external lib we link against. Match
-    # the NEEDED entries from `readelf -d clio_run` etc.
-    set(CPACK_RPM_PACKAGE_REQUIRES "zeromq, yaml-cpp, msgpack-c, libsodium")
+    # self-resolve), so list every external lib we link against. Use
+    # the -devel package names — those are what the build job dnf-
+    # installs to compile clio-core, so they're guaranteed to exist
+    # and pull in the matching runtime libs. Runtime-only Fedora
+    # package names (e.g. `msgpack-c`) are not consistently published
+    # across Fedora versions and were observed to fail with
+    # "nothing provides msgpack-c" on Fedora 40.
+    set(CPACK_RPM_PACKAGE_REQUIRES
+        "zeromq-devel, yaml-cpp-devel, msgpack-devel, libsodium-devel")
     # Disable auto-generated Requires on internal libraries. With AUTOREQ
     # default-on, rpmbuild scans every installed .so and adds a
     # Requires: lib<x>.so()(64bit) for each one — including our OWN
