@@ -316,10 +316,17 @@ if(CLIO_CTE_ENABLE_COMPRESS)
     if(TARGET dense_nn_predictor)
         target_link_libraries(compress INTERFACE dense_nn_predictor)
     endif()
+    # nvcomp.h includes <cuda_runtime.h>; the nvcomp imported target does not
+    # propagate the CUDA toolkit include dir, so link CUDA::cudart to provide it
+    # to every consumer of ctp::compress (test + CTE compressor module).
+    if(CLIO_CTP_ENABLE_NVCOMP AND TARGET CUDA::cudart)
+        target_link_libraries(compress INTERFACE CUDA::cudart)
+    endif()
 endif()
 target_compile_definitions(compress INTERFACE
     CTP_ENABLE_COMPRESS=$<BOOL:${CLIO_CTE_ENABLE_COMPRESS}>
     CTP_ENABLE_LIBPRESSIO=$<BOOL:${CLIO_CTP_ENABLE_LIBPRESSIO}>
+    CTP_ENABLE_NVCOMP=$<BOOL:${CLIO_CTP_ENABLE_NVCOMP}>
 )
 add_library(ctp::compress ALIAS compress)
 
